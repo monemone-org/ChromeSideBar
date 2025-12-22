@@ -591,6 +591,9 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
   // Track pointer position for accurate drop target calculation during scroll
   const pointerPositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
+  // Track if drop was valid (for conditional animation)
+  const wasValidDropRef = useRef(false);
+
   // Find a node by ID in the bookmark tree
   const findNode = useCallback((id: string): chrome.bookmarks.BookmarkTreeNode | null => {
     const search = (nodes: chrome.bookmarks.BookmarkTreeNode[]): chrome.bookmarks.BookmarkTreeNode | null => {
@@ -737,17 +740,21 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     const { active } = event;
     const sourceId = active.id as string;
 
+    // Track if this is a valid drop (for animation decision)
+    const isValidDrop = !!(dropTargetId && dropPosition);
+    wasValidDropRef.current = isValidDrop;
+
     // Perform the move if we have a valid drop target
-    if (dropTargetId && dropPosition) {
+    if (isValidDrop) {
       // Check if target is an expanded folder
       const targetNode = findNode(dropTargetId);
-      const isExpandedFolder = !!(targetNode && !targetNode.url && expandedState[dropTargetId]);
+      const isExpandedFolder = !!(targetNode && !targetNode.url && expandedState[dropTargetId!]);
 
-      moveBookmark(sourceId, dropTargetId, dropPosition, isExpandedFolder);
+      moveBookmark(sourceId, dropTargetId!, dropPosition!, isExpandedFolder);
 
       // Auto-expand folder if dropping into it
-      if ((dropPosition === 'into' || (dropPosition === 'after' && isExpandedFolder)) && !expandedState[dropTargetId]) {
-        setExpandedState(prev => ({ ...prev, [dropTargetId]: true }));
+      if ((dropPosition === 'into' || (dropPosition === 'after' && isExpandedFolder)) && !expandedState[dropTargetId!]) {
+        setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
       }
     }
 
@@ -757,7 +764,25 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     setActiveDepth(0);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [dropTargetId, dropPosition, moveBookmark, expandedState]);
+  }, [dropTargetId, dropPosition, moveBookmark, expandedState, findNode]);
+
+  // Drag cancel handler (e.g., Escape key)
+  const handleDragCancel = useCallback(() => {
+    // Clear auto-expand timer
+    if (autoExpandTimerRef.current) {
+      clearTimeout(autoExpandTimerRef.current);
+      autoExpandTimerRef.current = null;
+    }
+    lastHoveredFolderRef.current = null;
+    wasValidDropRef.current = false;
+
+    // Reset drag state
+    setActiveId(null);
+    setActiveNode(null);
+    setActiveDepth(0);
+    setDropTargetId(null);
+    setDropPosition(null);
+  }, []);
 
   // Pointer enter/leave handlers for tracking hover
   const handlePointerEnter = useCallback((_id: string) => {
@@ -774,6 +799,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
       onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       {visibleBookmarks.map((node) => (
         <BookmarkItem
@@ -797,8 +823,8 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
         />
       ))}
 
-      {/* Drag overlay */}
-      <DragOverlay>
+      {/* Drag overlay - no animation for valid drops, default animation for cancelled */}
+      <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
         {activeNode ? <DragOverlayContent node={activeNode} depth={activeDepth} /> : null}
       </DragOverlay>
 
