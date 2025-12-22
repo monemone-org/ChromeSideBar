@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Chrome SideBar",
+  "version": "1.0",
+  "description": "Bookmarks and Active Tabs in Side Panel",
+  "permissions": [
+    "sidePanel",
+    "bookmarks",
+    "tabs",
+    "storage",
+    "favicon"
+  ],
+  "action": {
+    "default_title": "Toggle Chrome SideBar"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "side_panel": {
+    "default_path": "index.html"
+  },
+  "commands": {
+    "_execute_side_panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+E",
+        "mac": "Command+Shift+E"
+      },
+      "description": "Toggle Side Panel"
+    }
+  }
+}
