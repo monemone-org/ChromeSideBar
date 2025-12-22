@@ -5,8 +5,9 @@
 - [x] display all custom icons
 - [x] drag bookmark item is covering up the drap target indicator 
 
-- remove tab count  in "Active Tab" row. add a "..." menu button which contains these actions
+- [x] remove tab count  in "Active Tab" row. add a "..." menu button which contains these actions
    - sort by domain, then by title
    - close all tabs
    
-- export/import pinned sites in json 
+- [x] export/import pinned sites in json 
+- [ ] for youtube tab, add a action button to show chapters in a popup menu

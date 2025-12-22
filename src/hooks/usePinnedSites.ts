@@ -181,6 +181,37 @@ export const usePinnedSites = () => {
     savePinnedSites(compacted);
   }, [pinnedSites, savePinnedSites]);
 
+  const exportPinnedSites = useCallback(() => {
+    const data = JSON.stringify(pinnedSites, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pinned-sites.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [pinnedSites]);
+
+  const importPinnedSites = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target?.result as string) as PinnedSite[];
+        // Regenerate IDs and reorder
+        const sites = imported.map((site, index) => ({
+          ...site,
+          id: generateId(),
+          order: index,
+        }));
+        setPinnedSites(sites);
+        savePinnedSites(sites);
+      } catch {
+        setError('Invalid JSON file');
+      }
+    };
+    reader.readAsText(file);
+  }, [savePinnedSites]);
+
   return {
     pinnedSites,
     addPin,
@@ -188,6 +219,8 @@ export const usePinnedSites = () => {
     updatePin,
     resetFavicon,
     movePin,
+    exportPinnedSites,
+    importPinnedSites,
     refresh: loadPinnedSites,
     error,
   };

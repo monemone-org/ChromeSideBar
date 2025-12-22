@@ -3,7 +3,7 @@ import { BookmarkTree } from './components/BookmarkTree';
 import { TabList } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
 import { usePinnedSites } from './hooks/usePinnedSites';
-import { X } from 'lucide-react';
+import { X, Settings } from 'lucide-react';
 
 function App() {
   const [fontSize, setFontSize] = useState<number>(() => {
@@ -20,7 +20,7 @@ function App() {
     return localStorage.getItem('sidebar-open-bookmark-new-tab') === 'true';
   });
   const [showSettings, setShowSettings] = useState(false);
-  const { pinnedSites, addPin, removePin, updatePin, resetFavicon, movePin } = usePinnedSites();
+  const { pinnedSites, addPin, removePin, updatePin, resetFavicon, movePin, exportPinnedSites, importPinnedSites } = usePinnedSites();
 
   const handleHideOtherBookmarksChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.checked;
@@ -50,7 +50,7 @@ function App() {
 
   return (
     <div
-      className="flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
+      className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
       style={{ fontSize: `${fontSize}px` }}
     >
       {/* Settings Modal */}
@@ -123,12 +123,40 @@ function App() {
                   Cmd+click opens in current tab
                 </p>
               </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                <label className="block text-xs font-medium mb-2 text-gray-700 dark:text-gray-300">
+                  Pinned Sites Backup
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={exportPinnedSites}
+                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    Export
+                  </button>
+                  <label className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer">
+                    Import
+                    <input
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          importPinnedSites(e.target.files[0]);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Pinned Sites (includes settings button) */}
+      {/* Pinned Sites */}
       <PinnedBar
         pinnedSites={pinnedSites}
         removePin={removePin}
@@ -136,8 +164,16 @@ function App() {
         resetFavicon={resetFavicon}
         movePin={movePin}
         openInNewTab={openPinnedInNewTab}
-        onSettingsClick={() => setShowSettings(true)}
       />
+
+      {/* Settings button - bottom-left corner of panel */}
+      <button
+        onClick={() => setShowSettings(true)}
+        title="Settings"
+        className="absolute left-2 bottom-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-200 z-10"
+      >
+        <Settings size={16} />
+      </button>
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto p-2">
