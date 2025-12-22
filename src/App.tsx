@@ -3,7 +3,7 @@ import { BookmarkTree } from './components/BookmarkTree';
 import { TabList } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
 import { usePinnedSites } from './hooks/usePinnedSites';
-import { Settings, X, ExternalLink } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
 
 function App() {
   const [fontSize, setFontSize] = useState<number>(() => {
@@ -28,15 +28,6 @@ function App() {
       setFontSize(newSize);
       localStorage.setItem('sidebar-font-size-px', newSize.toString());
     }
-  };
-
-  const openInNewWindow = () => {
-    chrome.windows.create({
-      url: 'index.html',
-      type: 'popup',
-      width: 400,
-      height: 600
-    });
   };
 
   return (
@@ -91,22 +82,13 @@ function App() {
 
       {/* Toolbar */}
       <div className="flex justify-end items-center px-2 py-1 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 select-none flex-shrink-0">
-        <div className="flex items-center space-x-1">
-          <button
-            onClick={openInNewWindow}
-            title="Pop out to new window"
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-          >
-            <ExternalLink size={16} />
-          </button>
-          <button
-            onClick={() => setShowSettings(true)}
-            title="Settings"
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-          >
-            <Settings size={16} />
-          </button>
-        </div>
+        <button
+          onClick={() => setShowSettings(true)}
+          title="Settings"
+          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+        >
+          <Settings size={16} />
+        </button>
       </div>
 
       {/* Pinned Sites */}
