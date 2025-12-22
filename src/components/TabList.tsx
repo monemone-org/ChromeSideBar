@@ -249,9 +249,15 @@ export const TabList = ({ onPin }: TabListProps) => {
           >
             <button
               className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-              onClick={(e) => { e.stopPropagation(); sortTabs(); setShowMenu(false); }}
+              onClick={(e) => { e.stopPropagation(); sortTabs('asc'); setShowMenu(false); }}
             >
-              Sort by Domain
+              Sort by Domain (A-Z)
+            </button>
+            <button
+              className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+              onClick={(e) => { e.stopPropagation(); sortTabs('desc'); setShowMenu(false); }}
+            >
+              Sort by Domain (Z-A)
             </button>
             <button
               className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"

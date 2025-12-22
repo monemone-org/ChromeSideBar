@@ -65,12 +65,17 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
-  const sortTabs = useCallback(() => {
+  const sortTabs = useCallback((direction: 'asc' | 'desc' = 'asc') => {
     const sorted = [...tabs].sort((a, b) => {
       const domainA = new URL(a.url || '').hostname;
       const domainB = new URL(b.url || '').hostname;
-      if (domainA !== domainB) return domainA.localeCompare(domainB);
-      return (a.title || '').localeCompare(b.title || '');
+      let cmp = 0;
+      if (domainA !== domainB) {
+        cmp = domainA.localeCompare(domainB);
+      } else {
+        cmp = (a.title || '').localeCompare(b.title || '');
+      }
+      return direction === 'asc' ? cmp : -cmp;
     });
     sorted.forEach((tab, index) => {
       chrome.tabs.move(tab.id!, { index }, () => {
