@@ -355,7 +355,6 @@ const BookmarkItem = ({
     attributes,
     listeners,
     setNodeRef,
-    transform
   } = useDraggable({
     id: node.id,
     disabled: isSpecialFolder
@@ -363,7 +362,6 @@ const BookmarkItem = ({
 
   const style: React.CSSProperties = {
     paddingLeft: `${getIndentPadding(depth)}px`,
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
   };
 
   // Check if this item is being dragged
