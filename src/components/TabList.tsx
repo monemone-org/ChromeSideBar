@@ -39,7 +39,7 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    paddingLeft: `${getIndentPadding(2)}px`,
+    paddingLeft: `${getIndentPadding(1)}px`,
   };
 
   return (
@@ -56,6 +56,10 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
       )}
       onClick={() => onActivate(tab.id!)}
     >
+      {/* Speaker placeholder - matches chevron spacing in BookmarkTree */}
+      <span className={clsx("mr-1 p-0.5", !tab.audible && "invisible")}>
+        <Volume2 size={14} className="text-blue-500" />
+      </span>
       {tab.favIconUrl ? (
         <img src={tab.favIconUrl} alt="" className="w-4 h-4 mr-2 flex-shrink-0" />
       ) : (
@@ -64,9 +68,6 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
       <span className="flex-1 truncate">
         {tab.title}
       </span>
-      {tab.audible && (
-        <Volume2 size={14} className="ml-1 text-blue-500 flex-shrink-0" />
-      )}
       {onPin && tab.url && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
