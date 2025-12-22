@@ -9,14 +9,30 @@ import clsx from 'clsx';
 // Get all icon names from lucide-react
 const ALL_ICON_NAMES = Object.keys(icons).sort();
 
+// Default icon color
+const DEFAULT_ICON_COLOR = '#6b7280';
+
+// Preset color palette
+const PRESET_COLORS = [
+  { name: 'Gray', value: '#6b7280' },
+  { name: 'Red', value: '#ef4444' },
+  { name: 'Orange', value: '#f97316' },
+  { name: 'Yellow', value: '#eab308' },
+  { name: 'Green', value: '#22c55e' },
+  { name: 'Teal', value: '#14b8a6' },
+  { name: 'Blue', value: '#3b82f6' },
+  { name: 'Purple', value: '#a855f7' },
+  { name: 'Pink', value: '#ec4899' },
+];
+
 // Convert a Lucide icon component to a data URL
-const iconToDataUrl = (iconName: string): string => {
+const iconToDataUrl = (iconName: string, color: string = DEFAULT_ICON_COLOR): string => {
   const IconComponent = icons[iconName as keyof typeof icons];
   if (!IconComponent) return '';
 
   // Render the icon to static markup
   const svgMarkup = renderToStaticMarkup(
-    <IconComponent size={32} stroke="#6b7280" strokeWidth={2} />
+    <IconComponent size={32} stroke={color} strokeWidth={2} />
   );
 
   // Encode as data URL
@@ -26,7 +42,12 @@ const iconToDataUrl = (iconName: string): string => {
 interface PinnedIconProps {
   site: PinnedSite;
   onRemove: (id: string) => void;
-  onUpdate: (id: string, title: string, url: string, favicon?: string) => void;
+  onUpdate: (id: string,
+             title: string,
+             url: string,
+             favicon?: string,
+             customIconName?: string,
+             iconColor?: string) => void;
   onResetFavicon: (id: string) => void;
   openInNewTab?: boolean;
 }
@@ -37,6 +58,9 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
   const [editFavicon, setEditFavicon] = useState(site.favicon);
+  const [editCustomIconName, setEditCustomIconName] = useState(site.customIconName);
+  const [editIconColor, setEditIconColor] = useState(site.iconColor || DEFAULT_ICON_COLOR);
+  const [customHexInput, setCustomHexInput] = useState('');
   const [iconSearch, setIconSearch] = useState('');
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
@@ -179,18 +203,46 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     setEditTitle(site.title);
     setEditUrl(site.url);
     setEditFavicon(site.favicon);
+    setEditCustomIconName(site.customIconName);
+    setEditIconColor(site.iconColor || DEFAULT_ICON_COLOR);
+    setCustomHexInput('');
     setIconSearch('');
     setShowEditModal(true);
   };
 
   const handleSaveEdit = () => {
-    onUpdate(site.id, editTitle, editUrl, editFavicon);
+    onUpdate(site.id,
+             editTitle,
+             editUrl,
+             editFavicon,
+             editCustomIconName,
+             editCustomIconName ? editIconColor : undefined);
     setShowEditModal(false);
   };
 
   const handleSelectIcon = (iconName: string) => {
-    const dataUrl = iconToDataUrl(iconName);
+    const dataUrl = iconToDataUrl(iconName, editIconColor);
     setEditFavicon(dataUrl);
+    setEditCustomIconName(iconName);
+  };
+
+  const handleColorChange = (color: string) => {
+    setEditIconColor(color);
+    // Regenerate icon with new color if a custom icon is selected
+    if (editCustomIconName) {
+      const dataUrl = iconToDataUrl(editCustomIconName, color);
+      setEditFavicon(dataUrl);
+    }
+  };
+
+  const handleCustomHexSubmit = () => {
+    const hex = customHexInput.trim();
+    // Validate hex color format
+    if (/^#?[0-9A-Fa-f]{6}$/.test(hex)) {
+      const color = hex.startsWith('#') ? hex : `#${hex}`;
+      handleColorChange(color);
+      setCustomHexInput('');
+    }
   };
 
   const handleResetIcon = () => {
@@ -203,11 +255,11 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     onRemove(site.id);
   };
 
-  // Render an icon by name
+  // Render an icon by name with the current edit color
   const renderIcon = (iconName: string, size: number = 18) => {
     const IconComponent = icons[iconName as keyof typeof icons];
     if (!IconComponent) return null;
-    return <IconComponent size={size} className="text-gray-500" />;
+    return <IconComponent size={size} style={{ color: editIconColor }} />;
   };
 
   // Combine refs for sortable and icon positioning
@@ -365,6 +417,53 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
                 <p className="text-xs text-gray-400 mt-1">
                   {allFilteredIcons.length} icons
                 </p>
+                {/* Color picker */}
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Icon Color</label>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {PRESET_COLORS.map((preset) => (
+                      <button
+                        key={preset.value}
+                        onClick={() => handleColorChange(preset.value)}
+                        className={clsx(
+                          "w-6 h-6 rounded-full border-2 transition-transform hover:scale-110",
+                          editIconColor === preset.value
+                            ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
+                            : "border-gray-300 dark:border-gray-600"
+                        )}
+                        style={{ backgroundColor: preset.value }}
+                        title={preset.name}
+                      />
+                    ))}
+                    {/* Custom hex input */}
+                    <div className="flex items-center gap-1 ml-1">
+                      <input
+                        type="text"
+                        value={customHexInput}
+                        onChange={(e) => setCustomHexInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleCustomHexSubmit()}
+                        placeholder="#hex"
+                        className="w-16 px-1.5 py-0.5 text-xs border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                      <button
+                        onClick={handleCustomHexSubmit}
+                        className="px-1.5 py-0.5 text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded"
+                      >
+                        Set
+                      </button>
+                    </div>
+                  </div>
+                  {/* Show current color if not a preset */}
+                  {!PRESET_COLORS.some(p => p.value === editIconColor) && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <div
+                        className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600"
+                        style={{ backgroundColor: editIconColor }}
+                      />
+                      <span className="text-xs text-gray-500">{editIconColor}</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex justify-end space-x-2 pt-4">

@@ -6,6 +6,8 @@ export interface PinnedSite {
   title: string;
   favicon?: string;
   order: number;
+  customIconName?: string;  // Lucide icon name when using custom icon
+  iconColor?: string;       // Custom icon color (hex, e.g., "#ef4444")
 }
 
 const STORAGE_KEY = 'pinnedSites';
@@ -128,10 +130,19 @@ export const usePinnedSites = () => {
   const updatePin = useCallback((id: string,
                                   title: string,
                                   url: string,
-                                  favicon?: string) => {
+                                  favicon?: string,
+                                  customIconName?: string,
+                                  iconColor?: string) => {
     const updatedSites = pinnedSites.map(site =>
       site.id === id
-        ? { ...site, title, url, ...(favicon !== undefined && { favicon }) }
+        ? {
+            ...site,
+            title,
+            url,
+            ...(favicon !== undefined && { favicon }),
+            ...(customIconName !== undefined && { customIconName }),
+            ...(iconColor !== undefined && { iconColor }),
+          }
         : site
     );
     setPinnedSites(updatedSites);
@@ -147,7 +158,9 @@ export const usePinnedSites = () => {
     const favicon = await fetchFaviconAsBase64(faviconUrl);
 
     const updatedSites = pinnedSites.map(s =>
-      s.id === id ? { ...s, favicon } : s
+      s.id === id
+        ? { ...s, favicon, customIconName: undefined, iconColor: undefined }
+        : s
     );
     setPinnedSites(updatedSites);
     savePinnedSites(updatedSites);
