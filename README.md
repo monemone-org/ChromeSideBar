@@ -72,33 +72,34 @@ ChromeSideBar displays pinned sites, bookmarks and active tabs in a side panel, 
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/)
 - **Icons**: [Lucide React](https://lucide.dev/)
 - **Drag & Drop**: [@dnd-kit/core](https://dndkit.com/)
-- **Chrome API**: Manifest V3 (`sidePanel`, `bookmarks`, `tabs`, `storage`)
+- **Chrome API**: Manifest V3 (`sidePanel`, `bookmarks`, `tabs`, `storage`, `favicon`)
 
 ## Project Structure
 
 ```
 /
+├── docs/                       # Feature documentation
 ├── public/
-│   ├── manifest.json       # Chrome Extension Manifest V3
-│   └── background.js       # Service worker for toolbar icon behavior
+│   ├── manifest.json           # Chrome Extension Manifest V3
+│   └── background.js           # Service worker for toolbar icon behavior
 ├── src/
 │   ├── components/
-│   │   ├── BookmarkTree.tsx # Recursive tree with drag-drop, context menu
-│   │   ├── TabList.tsx      # Collapsible tab list with audio indicator
-│   │   ├── PinnedBar.tsx    # Pinned sites grid with drag-drop
-│   │   └── PinnedIcon.tsx   # Individual pin with click/context/edit
+│   │   ├── BookmarkTree.tsx    # Recursive tree with drag-drop, context menu
+│   │   ├── TabList.tsx         # Collapsible tab list with audio indicator
+│   │   ├── PinnedBar.tsx       # Pinned sites grid with drag-drop
+│   │   └── PinnedIcon.tsx      # Individual pin with click/context/edit
 │   ├── hooks/
-│   │   ├── useBookmarks.ts  # Hook wrapping chrome.bookmarks API
-│   │   ├── useTabs.ts       # Hook wrapping chrome.tabs API
-│   │   └── usePinnedSites.ts # Hook for pinned sites CRUD + storage
+│   │   ├── useBookmarks.ts     # Hook wrapping chrome.bookmarks API
+│   │   ├── useTabs.ts          # Hook wrapping chrome.tabs API
+│   │   └── usePinnedSites.ts   # Hook for pinned sites CRUD + storage
 │   ├── utils/
-│   │   └── indent.ts        # Unified indentation utility
-│   ├── App.tsx              # Main layout with settings modal
-│   ├── main.tsx             # React entry point
-│   └── index.css            # Tailwind directives and global styles
-├── vite.config.ts           # Vite build configuration
-├── tailwind.config.js       # Tailwind configuration
-└── package.json             # Dependencies and scripts
+│   │   └── indent.ts           # Unified indentation utility
+│   ├── App.tsx                 # Main layout with settings modal
+│   ├── main.tsx                # React entry point
+│   └── index.css               # Tailwind directives and global styles
+├── vite.config.ts              # Vite build configuration
+├── tailwind.config.js          # Tailwind configuration
+└── package.json                # Dependencies and scripts
 ```
 
 ## Architecture
