@@ -588,6 +588,9 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
   const autoExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastHoveredFolderRef = useRef<string | null>(null);
 
+  // Track pointer position for accurate drop target calculation during scroll
+  const pointerPositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+
   // Find a node by ID in the bookmark tree
   const findNode = useCallback((id: string): chrome.bookmarks.BookmarkTreeNode | null => {
     const search = (nodes: chrome.bookmarks.BookmarkTreeNode[]): chrome.bookmarks.BookmarkTreeNode | null => {
@@ -610,6 +613,18 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     })
   );
 
+  // Track pointer position during drag for accurate drop target calculation
+  useEffect(() => {
+    if (!activeId) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      pointerPositionRef.current = { x: e.clientX, y: e.clientY };
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    return () => window.removeEventListener('pointermove', handlePointerMove);
+  }, [activeId]);
+
   const toggleFolder = (id: string, expanded: boolean) => {
     setExpandedState(prev => ({ ...prev, [id]: expanded }));
   };
@@ -631,15 +646,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
 
   // Drag move handler - calculate drop position based on pointer
   const handleDragMove = useCallback((event: DragMoveEvent) => {
-    const { active, activatorEvent } = event;
+    const { active } = event;
 
-    // Get pointer coordinates from the event
-    const pointerEvent = activatorEvent as PointerEvent;
-    if (!pointerEvent) return;
-
-    // Get the current pointer position (we need to add the delta to get current position)
-    const currentX = pointerEvent.clientX + (event.delta?.x || 0);
-    const currentY = pointerEvent.clientY + (event.delta?.y || 0);
+    // Use tracked pointer position (accurate during scroll)
+    const currentX = pointerPositionRef.current.x;
+    const currentY = pointerPositionRef.current.y;
 
     // Find the element under the pointer
     const elements = document.elementsFromPoint(currentX, currentY);
