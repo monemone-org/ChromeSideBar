@@ -8,7 +8,12 @@
     "bookmarks",
     "tabs",
     "storage",
-    "favicon"
+    "favicon",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://www.youtube.com/*"
   ],
   "action": {
     "default_title": "Toggle Chrome SideBar"

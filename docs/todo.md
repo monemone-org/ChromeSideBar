@@ -10,4 +10,7 @@
    - close all tabs
    
 - [x] export/import pinned sites in json 
-- [ ] for youtube tab, add a action button to show chapters in a popup menu
+- [x] for youtube tab, add a action button to show chapters in a popup menu
+
+- Active Tab, "sort by domain" support accending (a-z) and descending (z-a). 
+

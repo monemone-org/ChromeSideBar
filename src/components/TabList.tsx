@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useTabs } from '../hooks/useTabs';
-import { X, Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, MoreHorizontal } from 'lucide-react';
+import { X, Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, MoreHorizontal, List } from 'lucide-react';
+import {
+  Chapter,
+  getYouTubeVideoId,
+  fetchYouTubeChapters,
+  jumpToChapter
+} from '../utils/youtube';
 import { getIndentPadding } from '../utils/indent';
 import {
   DndContext,
@@ -36,10 +42,42 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
     transition,
   } = useSortable({ id: tab.id! });
 
+  const [showChapters, setShowChapters] = useState(false);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
+  const chaptersRef = useRef<HTMLDivElement>(null);
+  const chaptersButtonRef = useRef<HTMLButtonElement>(null);
+
+  const videoId = tab.url ? getYouTubeVideoId(tab.url) : null;
+
+  useEffect(() => {
+    if (!showChapters) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (chaptersButtonRef.current?.contains(target)) return;
+      if (chaptersRef.current && !chaptersRef.current.contains(target)) {
+        setShowChapters(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showChapters]);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     paddingLeft: `${getIndentPadding(1)}px`,
+  };
+
+  const handleChaptersClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!showChapters) {
+      setLoadingChapters(true);
+      const fetchedChapters = await fetchYouTubeChapters(tab.id!);
+      setChapters(fetchedChapters);
+      setLoadingChapters(false);
+    }
+    setShowChapters(!showChapters);
   };
 
   return (
@@ -69,7 +107,18 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
         {tab.title}
       </span>
       {/* Action buttons - positioned absolutely to overlap title */}
-      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-2 opacity-0 group-hover:opacity-100 bg-inherit rounded">
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-2 opacity-0 group-hover:opacity-100 bg-white/80 dark:bg-gray-900/80 rounded">
+        {videoId && (
+          <button
+            ref={chaptersButtonRef}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={handleChaptersClick}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+            title="Chapters"
+          >
+            <List size={14} className="text-gray-700 dark:text-gray-200" />
+          </button>
+        )}
         {onPin && tab.url && (
           <button
             onPointerDown={(e) => e.stopPropagation()}
@@ -94,6 +143,34 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
           <X size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       </div>
+
+      {/* Chapters popup */}
+      {showChapters && (
+        <div
+          ref={chaptersRef}
+          className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-48 max-h-64 overflow-y-auto"
+        >
+          {loadingChapters ? (
+            <div className="px-3 py-2 text-gray-500">Loading...</div>
+          ) : chapters.length === 0 ? (
+            <div className="px-3 py-2 text-gray-500">No chapters found</div>
+          ) : (
+            chapters.map((chapter, i) => (
+              <button
+                key={i}
+                className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-400"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  jumpToChapter(tab.id!, chapter.url);
+                  setShowChapters(false);
+                }}
+              >
+                {chapter.timestamp} - {chapter.title}
+              </button>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 };
