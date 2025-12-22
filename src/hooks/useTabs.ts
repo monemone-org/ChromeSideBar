@@ -65,5 +65,29 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
-  return { tabs, closeTab, activateTab, moveTab, error };
+  const sortTabs = useCallback(() => {
+    const sorted = [...tabs].sort((a, b) => {
+      const domainA = new URL(a.url || '').hostname;
+      const domainB = new URL(b.url || '').hostname;
+      if (domainA !== domainB) return domainA.localeCompare(domainB);
+      return (a.title || '').localeCompare(b.title || '');
+    });
+    sorted.forEach((tab, index) => {
+      chrome.tabs.move(tab.id!, { index }, () => {
+        handleError('sort');
+      });
+    });
+  }, [tabs, handleError]);
+
+  const closeAllTabs = useCallback(() => {
+    const tabIds = tabs.map(t => t.id!);
+    // Create a new blank tab first, then close others
+    chrome.tabs.create({ active: true }, () => {
+      chrome.tabs.remove(tabIds, () => {
+        handleError('close all');
+      });
+    });
+  }, [tabs, handleError]);
+
+  return { tabs, closeTab, activateTab, moveTab, sortTabs, closeAllTabs, error };
 };

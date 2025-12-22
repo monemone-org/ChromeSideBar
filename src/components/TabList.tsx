@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useTabs } from '../hooks/useTabs';
-import { X, Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin } from 'lucide-react';
+import { X, Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, MoreHorizontal } from 'lucide-react';
 import { getIndentPadding } from '../utils/indent';
 import {
   DndContext,
@@ -104,8 +104,23 @@ interface TabListProps {
 }
 
 export const TabList = ({ onPin }: TabListProps) => {
-  const { tabs, closeTab, activateTab, moveTab } = useTabs();
+  const { tabs, closeTab, activateTab, moveTab, sortTabs, closeAllTabs } = useTabs();
   const [isExpanded, setIsExpanded] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (menuButtonRef.current?.contains(target)) return;
+      if (menuRef.current && !menuRef.current.contains(target)) {
+        setShowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -131,7 +146,7 @@ export const TabList = ({ onPin }: TabListProps) => {
     <>
       {/* Virtual Active Tabs Root */}
       <div
-        className="group flex items-center py-1 rounded cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent"
+        className="group relative flex items-center py-1 rounded cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent"
         style={{ paddingLeft: `${getIndentPadding(0)}px`, paddingRight: '8px' }}
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -142,7 +157,33 @@ export const TabList = ({ onPin }: TabListProps) => {
           <Layers size={16} />
         </span>
         <span className="flex-1 font-medium">Active Tabs</span>
-        <span className="text-gray-400 text-xs">{tabs.length}</span>
+        <button
+          ref={menuButtonRef}
+          onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+        >
+          <MoreHorizontal size={14} />
+        </button>
+
+        {showMenu && (
+          <div
+            ref={menuRef}
+            className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-32"
+          >
+            <button
+              className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+              onClick={(e) => { e.stopPropagation(); sortTabs(); setShowMenu(false); }}
+            >
+              Sort by Domain
+            </button>
+            <button
+              className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
+              onClick={(e) => { e.stopPropagation(); closeAllTabs(); setShowMenu(false); }}
+            >
+              Close All Tabs
+            </button>
+          </div>
+        )}
       </div>
 
       {isExpanded && (
