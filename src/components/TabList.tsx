@@ -52,7 +52,7 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
         "group relative flex items-center py-1 px-2 rounded-md cursor-pointer",
         tab.active
           ? "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
-          : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+          : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
       )}
       onClick={() => onActivate(tab.id!)}
     >
@@ -69,7 +69,7 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
         {tab.title}
       </span>
       {/* Action buttons - positioned absolutely to overlap title */}
-      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 bg-inherit rounded">
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-2 opacity-0 group-hover:opacity-100 bg-inherit rounded">
         {onPin && tab.url && (
           <button
             onPointerDown={(e) => e.stopPropagation()}
@@ -80,7 +80,7 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
             className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
             title="Pin"
           >
-            <Pin size={14} className="text-gray-500" />
+            <Pin size={14} className="text-gray-700 dark:text-gray-200" />
           </button>
         )}
         <button
@@ -91,7 +91,7 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
           }}
           className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
         >
-          <X size={14} className="text-gray-500" />
+          <X size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       </div>
     </div>
