@@ -13,6 +13,12 @@ function App() {
   const [hideOtherBookmarks, setHideOtherBookmarks] = useState<boolean>(() => {
     return localStorage.getItem('sidebar-hide-other-bookmarks') === 'true';
   });
+  const [openPinnedInNewTab, setOpenPinnedInNewTab] = useState<boolean>(() => {
+    return localStorage.getItem('sidebar-open-pinned-new-tab') === 'true';
+  });
+  const [openBookmarkInNewTab, setOpenBookmarkInNewTab] = useState<boolean>(() => {
+    return localStorage.getItem('sidebar-open-bookmark-new-tab') === 'true';
+  });
   const [showSettings, setShowSettings] = useState(false);
   const { pinnedSites, addPin, removePin, updatePin, resetFavicon, movePin } = usePinnedSites();
 
@@ -28,6 +34,18 @@ function App() {
       setFontSize(newSize);
       localStorage.setItem('sidebar-font-size-px', newSize.toString());
     }
+  };
+
+  const handleOpenPinnedInNewTabChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setOpenPinnedInNewTab(value);
+    localStorage.setItem('sidebar-open-pinned-new-tab', value.toString());
+  };
+
+  const handleOpenBookmarkInNewTabChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.checked;
+    setOpenBookmarkInNewTab(value);
+    localStorage.setItem('sidebar-open-bookmark-new-tab', value.toString());
   };
 
   return (
@@ -75,6 +93,36 @@ function App() {
                   Hide "Other Bookmarks"
                 </label>
               </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={openPinnedInNewTab}
+                    onChange={handleOpenPinnedInNewTabChange}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  Open pinned sites in new tab
+                </label>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-5">
+                  Cmd+click opens in current tab
+                </p>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={openBookmarkInNewTab}
+                    onChange={handleOpenBookmarkInNewTabChange}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  Open bookmarks in new tab
+                </label>
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-5">
+                  Cmd+click opens in current tab
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -98,11 +146,12 @@ function App() {
         updatePin={updatePin}
         resetFavicon={resetFavicon}
         movePin={movePin}
+        openInNewTab={openPinnedInNewTab}
       />
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} />
+        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} openInNewTab={openBookmarkInNewTab} />
         <TabList onPin={addPin} />
       </div>
     </div>

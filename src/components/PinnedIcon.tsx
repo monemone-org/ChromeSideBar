@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Globe, X, RotateCcw, Search, icons } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { PinnedSite } from '../hooks/usePinnedSites';
@@ -28,16 +28,19 @@ interface PinnedIconProps {
   onRemove: (id: string) => void;
   onUpdate: (id: string, title: string, url: string, favicon?: string) => void;
   onResetFavicon: (id: string) => void;
+  openInNewTab?: boolean;
 }
 
-export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon }: PinnedIconProps) => {
+export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNewTab = false }: PinnedIconProps) => {
   const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
   const [editFavicon, setEditFavicon] = useState(site.favicon);
   const [iconSearch, setIconSearch] = useState('');
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const menuRef = useRef<HTMLDivElement>(null);
+  const iconRef = useRef<HTMLDivElement>(null);
   const wasDraggingRef = useRef(false);
 
   const {
@@ -50,22 +53,53 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon }: PinnedI
   } = useSortable({ id: site.id });
 
   // Filter icons based on search
-  const filteredIcons = useMemo(() => {
+  const allFilteredIcons = useMemo(() => {
     if (!iconSearch.trim()) {
-      // Show common icons when no search
-      const commonIcons = [
-        'Home', 'Star', 'Heart', 'Folder', 'Mail', 'Calendar',
-        'Music', 'Video', 'Image', 'FileText', 'ShoppingCart', 'Briefcase',
-        'BookOpen', 'Coffee', 'Settings', 'User', 'Bell', 'Search',
-        'Globe', 'Link', 'Download', 'Upload', 'Cloud', 'Database',
-        'Code', 'Terminal', 'Github', 'Slack', 'Chrome', 'Figma',
-      ];
-      return commonIcons.filter(name => ALL_ICON_NAMES.includes(name));
+      return ALL_ICON_NAMES;
     }
     const search = iconSearch.toLowerCase();
     return ALL_ICON_NAMES.filter(name =>
       name.toLowerCase().includes(search)
-    ).slice(0, 50); // Limit results for performance
+    );
+  }, [iconSearch]);
+
+  // Grid layout constants
+  const COLS = 7;
+  const ICON_SIZE = 32; // w-8 = 2rem = 32px
+  const GAP = 4; // gap-1 = 0.25rem = 4px
+  const PADDING = 8; // p-2 = 0.5rem = 8px
+  const ROW_HEIGHT = ICON_SIZE + GAP;
+
+  // Calculate total rows and content height
+  const totalRows = Math.ceil(allFilteredIcons.length / COLS);
+  const totalContentHeight = totalRows * ROW_HEIGHT - GAP + PADDING * 2; // subtract last gap, add padding
+
+  // Calculate which icons are visible based on scroll position
+  const [scrollTop, setScrollTop] = useState(0);
+  const visibleHeight = 128; // max-h-32 = 8rem = 128px
+
+  // Determine visible row range with buffer
+  const startRow = Math.max(0, Math.floor((scrollTop - PADDING) / ROW_HEIGHT) - 2);
+  const endRow = Math.min(totalRows, Math.ceil((scrollTop + visibleHeight - PADDING) / ROW_HEIGHT) + 2);
+
+  // Get visible icons
+  const visibleIcons = useMemo(() => {
+    const startIndex = startRow * COLS;
+    const endIndex = endRow * COLS;
+    return allFilteredIcons.slice(startIndex, endIndex).map((name, i) => ({
+      name,
+      index: startIndex + i,
+    }));
+  }, [allFilteredIcons, startRow, endRow]);
+
+  // Scroll handler updates scroll position
+  const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    setScrollTop(e.currentTarget.scrollTop);
+  }, []);
+
+  // Reset scroll when search changes
+  useEffect(() => {
+    setScrollTop(0);
   }, [iconSearch]);
 
   // Track when dragging ends to prevent click
@@ -95,23 +129,48 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon }: PinnedI
   }, [showMenu]);
 
   const handleClick = (e: React.MouseEvent) => {
+    // Only handle left-clicks
+    if (e.button !== 0) {
+      return;
+    }
+
     // Prevent navigation if we just finished dragging
     if (wasDraggingRef.current) {
       wasDraggingRef.current = false;
       return;
     }
 
+    // Ignore clicks when context menu is open
+    if (showMenu) {
+      return;
+    }
+
     if (e.shiftKey) {
       chrome.windows.create({ url: site.url });
     } else if (e.metaKey || e.ctrlKey) {
-      chrome.tabs.create({ url: site.url, active: false });
+      // Cmd+click: invert the default behavior
+      if (openInNewTab) {
+        chrome.tabs.update({ url: site.url });
+      } else {
+        chrome.tabs.create({ url: site.url, active: false });
+      }
     } else {
-      chrome.tabs.update({ url: site.url });
+      // Regular click: use the setting
+      if (openInNewTab) {
+        chrome.tabs.create({ url: site.url, active: true });
+      } else {
+        chrome.tabs.update({ url: site.url });
+      }
     }
   };
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (iconRef.current) {
+      const rect = iconRef.current.getBoundingClientRect();
+      setMenuPosition({ top: rect.bottom + 4, left: rect.left });
+    }
     setShowMenu(true);
   };
 
@@ -151,10 +210,16 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon }: PinnedI
     return <IconComponent size={size} className="text-gray-500" />;
   };
 
+  // Combine refs for sortable and icon positioning
+  const setRefs = useCallback((node: HTMLDivElement | null) => {
+    setNodeRef(node);
+    (iconRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  }, [setNodeRef]);
+
   return (
     <>
       <div
-        ref={setNodeRef}
+        ref={setRefs}
         style={style}
         {...attributes}
         {...listeners}
@@ -162,7 +227,7 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon }: PinnedI
           "group/pin relative w-8 h-8 flex items-center justify-center rounded",
           isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
         )}
-        onClick={handleClick}
+        onMouseUp={handleClick}
         onContextMenu={handleContextMenu}
       >
         {site.favicon ? (
@@ -176,26 +241,33 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon }: PinnedI
           {site.title}
         </div>
 
-        {showMenu && (
-          <div
-            ref={menuRef}
-            className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-32"
-          >
-            <button
-              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-              onClick={handleEdit}
-            >
-              Edit
-            </button>
-            <button
-              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
-              onClick={handleUnpin}
-            >
-              Unpin
-            </button>
-          </div>
-        )}
       </div>
+
+      {showMenu && (
+        <div
+          ref={menuRef}
+          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-32"
+          style={{
+            top: `${menuPosition.top}px`,
+            left: `${menuPosition.left}px`,
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+            onClick={handleEdit}
+          >
+            Edit
+          </button>
+          <button
+            className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
+            onClick={handleUnpin}
+          >
+            Unpin
+          </button>
+        </div>
+      )}
 
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
@@ -258,27 +330,41 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon }: PinnedI
                     className="w-full pl-7 pr-2 py-1 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-xs"
                   />
                 </div>
-                {/* Icon grid */}
-                <div className="grid grid-cols-7 gap-1 p-2 bg-gray-50 dark:bg-gray-900 rounded-md max-h-32 overflow-y-auto">
-                  {filteredIcons.map((iconName) => (
-                    <button
-                      key={iconName}
-                      onClick={() => handleSelectIcon(iconName)}
-                      className="w-8 h-8 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                      title={iconName}
-                    >
-                      {renderIcon(iconName)}
-                    </button>
-                  ))}
-                  {filteredIcons.length === 0 && (
-                    <div className="col-span-7 text-center text-gray-400 text-xs py-2">
-                      No icons found
-                    </div>
-                  )}
+                {/* Icon grid - virtualized */}
+                <div
+                  onScroll={handleGridScroll}
+                  className="relative bg-gray-50 dark:bg-gray-900 rounded-md max-h-32 overflow-y-auto overflow-x-hidden"
+                  style={{ height: Math.min(visibleHeight, totalContentHeight) }}
+                >
+                  <div style={{ height: totalContentHeight, position: 'relative' }}>
+                    {visibleIcons.map(({ name, index }) => {
+                      const row = Math.floor(index / COLS);
+                      const col = index % COLS;
+                      return (
+                        <button
+                          key={name}
+                          onClick={() => handleSelectIcon(name)}
+                          className="absolute w-8 h-8 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                          style={{
+                            top: PADDING + row * ROW_HEIGHT,
+                            left: PADDING + col * (ICON_SIZE + GAP),
+                          }}
+                          title={name}
+                        >
+                          {renderIcon(name)}
+                        </button>
+                      );
+                    })}
+                    {allFilteredIcons.length === 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">
+                        No icons found
+                      </div>
+                    )}
+                  </div>
                 </div>
-                {iconSearch && filteredIcons.length === 50 && (
-                  <p className="text-xs text-gray-400 mt-1">Showing first 50 results</p>
-                )}
+                <p className="text-xs text-gray-400 mt-1">
+                  {allFilteredIcons.length} icons
+                </p>
               </div>
             </div>
             <div className="flex justify-end space-x-2 pt-4">

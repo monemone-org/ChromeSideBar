@@ -317,6 +317,7 @@ interface BookmarkItemProps {
   onCreateFolder: (parentId: string) => void;
   onSort: (folderId: string, sortBy: SortOption) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
+  openInNewTab?: boolean;
   // Drag-drop props
   isDragging?: boolean;
   activeId?: string | null;
@@ -336,6 +337,7 @@ const BookmarkItem = ({
   onCreateFolder,
   onSort,
   onPin,
+  openInNewTab = false,
   isDragging,
   activeId,
   dropTargetId,
@@ -436,12 +438,22 @@ const BookmarkItem = ({
             if (isFolder) {
               toggleFolder(node.id, !expandedState[node.id]);
             } else if (node.url) {
-              if (e.metaKey || e.ctrlKey) {
-                chrome.tabs.create({ url: node.url, active: false });
-              } else if (e.shiftKey) {
+              if (e.shiftKey) {
                 chrome.windows.create({ url: node.url });
+              } else if (e.metaKey || e.ctrlKey) {
+                // Cmd+click: invert the default behavior
+                if (openInNewTab) {
+                  chrome.tabs.update({ url: node.url });
+                } else {
+                  chrome.tabs.create({ url: node.url, active: false });
+                }
               } else {
-                chrome.tabs.update({ url: node.url });
+                // Regular click: use the setting
+                if (openInNewTab) {
+                  chrome.tabs.create({ url: node.url, active: true });
+                } else {
+                  chrome.tabs.update({ url: node.url });
+                }
               }
             }
           }}
@@ -496,6 +508,7 @@ const BookmarkItem = ({
               onCreateFolder={onCreateFolder}
               onSort={onSort}
               onPin={onPin}
+              openInNewTab={openInNewTab}
               isDragging={isDragging}
               activeId={activeId}
               dropTargetId={dropTargetId}
@@ -530,9 +543,10 @@ const DragOverlayContent = ({ node }: DragOverlayContentProps) => {
 interface BookmarkTreeProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   hideOtherBookmarks?: boolean;
+  openInNewTab?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab = false }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
 
   // Filter out "Other Bookmarks" (id "2") if hidden
@@ -737,6 +751,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false }: BookmarkTree
           onCreateFolder={handleCreateFolder}
           onSort={sortBookmarks}
           onPin={onPin}
+          openInNewTab={openInNewTab}
           isDragging={!!activeId}
           activeId={activeId}
           dropTargetId={dropTargetId}

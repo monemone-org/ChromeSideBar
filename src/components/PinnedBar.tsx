@@ -21,9 +21,10 @@ interface PinnedBarProps {
   updatePin: (id: string, title: string, url: string, favicon?: string) => void;
   resetFavicon: (id: string) => void;
   movePin: (activeId: string, overId: string) => void;
+  openInNewTab?: boolean;
 }
 
-export const PinnedBar = ({ pinnedSites, removePin, updatePin, resetFavicon, movePin }: PinnedBarProps) => {
+export const PinnedBar = ({ pinnedSites, removePin, updatePin, resetFavicon, movePin, openInNewTab = false }: PinnedBarProps) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -60,6 +61,7 @@ export const PinnedBar = ({ pinnedSites, removePin, updatePin, resetFavicon, mov
               onRemove={removePin}
               onUpdate={updatePin}
               onResetFavicon={resetFavicon}
+              openInNewTab={openInNewTab}
             />
           ))}
         </SortableContext>
