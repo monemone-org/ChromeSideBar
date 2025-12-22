@@ -381,6 +381,7 @@ const BookmarkItem = ({
         ref={setNodeRef}
         data-bookmark-id={node.id}
         data-is-folder={isFolder}
+        data-depth={depth}
         style={style}
         className={clsx(
           "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none",
@@ -524,16 +525,36 @@ const BookmarkItem = ({
 // --- Drag Overlay Content ---
 interface DragOverlayContentProps {
   node: chrome.bookmarks.BookmarkTreeNode;
+  depth: number;
 }
 
-const DragOverlayContent = ({ node }: DragOverlayContentProps) => {
+const DragOverlayContent = ({ node, depth }: DragOverlayContentProps) => {
   const isFolder = !node.url;
   return (
-    <div className="flex items-center py-1 px-2 bg-white dark:bg-gray-800 rounded shadow-lg border border-gray-200 dark:border-gray-700">
-      <span className="mr-2 text-gray-500">
-        {isFolder ? <Folder size={16} /> : <Globe size={16} />}
+    <div
+      className="flex items-center py-1 pr-2"
+      style={{ paddingLeft: `${getIndentPadding(depth)}px` }}
+    >
+      {/* Chevron placeholder - same spacing as BookmarkItem */}
+      <span className="mr-1 p-0.5 invisible">
+        <ChevronRight size={14} />
       </span>
-      <span className="truncate max-w-48">{node.title}</span>
+      <span className="mr-2 text-gray-500 flex-shrink-0">
+        {isFolder ? (
+          <Folder size={16} />
+        ) : node.url ? (
+          <img
+            src={getFaviconUrl(node.url)}
+            alt=""
+            className="w-4 h-4"
+          />
+        ) : (
+          <Globe size={16} />
+        )}
+      </span>
+      <span className="truncate max-w-48 bg-blue-100 dark:bg-blue-900/50 px-1 rounded">
+        {node.title}
+      </span>
     </div>
   );
 };
@@ -559,6 +580,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
   // Drag-drop state
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeNode, setActiveNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
+  const [activeDepth, setActiveDepth] = useState<number>(0);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<DropPosition>(null);
 
@@ -601,6 +623,10 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     const id = event.active.id as string;
     setActiveId(id);
     setActiveNode(findNode(id));
+    // Read depth from DOM element
+    const element = document.querySelector(`[data-bookmark-id="${id}"]`);
+    const depth = element?.getAttribute('data-depth');
+    setActiveDepth(depth ? parseInt(depth, 10) : 0);
   }, [findNode]);
 
   // Drag move handler - calculate drop position based on pointer
@@ -717,6 +743,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     // Reset drag state
     setActiveId(null);
     setActiveNode(null);
+    setActiveDepth(0);
     setDropTargetId(null);
     setDropPosition(null);
   }, [dropTargetId, dropPosition, moveBookmark, expandedState]);
@@ -761,7 +788,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
 
       {/* Drag overlay */}
       <DragOverlay>
-        {activeNode ? <DragOverlayContent node={activeNode} /> : null}
+        {activeNode ? <DragOverlayContent node={activeNode} depth={activeDepth} /> : null}
       </DragOverlay>
 
       {editingNode && createPortal(
