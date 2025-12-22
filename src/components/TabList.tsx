@@ -49,7 +49,7 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
       {...attributes}
       {...listeners}
       className={clsx(
-        "group flex items-center py-1 px-2 rounded-md cursor-pointer",
+        "group relative flex items-center py-1 px-2 rounded-md cursor-pointer",
         tab.active
           ? "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
           : "hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
@@ -65,32 +65,35 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
       ) : (
         <Globe className="w-4 h-4 mr-2 text-gray-400 flex-shrink-0" />
       )}
-      <span className="flex-1 truncate">
+      <span className="flex-1 truncate pr-1">
         {tab.title}
       </span>
-      {onPin && tab.url && (
+      {/* Action buttons - positioned absolutely to overlap title */}
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 bg-inherit rounded">
+        {onPin && tab.url && (
+          <button
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl);
+            }}
+            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+            title="Pin"
+          >
+            <Pin size={14} className="text-gray-500" />
+          </button>
+        )}
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
-            onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl);
+            if (tab.id) onClose(tab.id);
           }}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded ml-1"
-          title="Pin"
+          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
         >
-          <Pin size={14} className="text-gray-500" />
+          <X size={14} className="text-gray-500" />
         </button>
-      )}
-      <button
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (tab.id) onClose(tab.id);
-        }}
-        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded ml-1"
-      >
-        <X size={14} className="text-gray-500" />
-      </button>
+      </div>
     </div>
   );
 };
