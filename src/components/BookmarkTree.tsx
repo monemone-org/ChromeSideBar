@@ -1,6 +1,9 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
+import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
+import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
+import { DropIndicators } from './DropIndicators';
 import {
   ChevronRight,
   ChevronDown,
@@ -28,9 +31,6 @@ import {
   DragMoveEvent,
   DragEndEvent,
 } from '@dnd-kit/core';
-
-// Types for drag-drop
-type DropPosition = 'before' | 'after' | 'into' | null;
 
 // Get favicon URL using Chrome's internal favicon cache
 const getFaviconUrl = (url: string): string => {
@@ -211,25 +211,6 @@ const isDescendant = (
   return sourceNode ? checkDescendants(sourceNode) : false;
 };
 
-// Helper: Calculate drop position based on pointer Y position
-const calculateDropPosition = (
-  element: HTMLElement,
-  pointerY: number,
-  isFolder: boolean
-): DropPosition => {
-  const rect = element.getBoundingClientRect();
-  const relativeY = pointerY - rect.top;
-  const height = rect.height;
-
-  if (isFolder) {
-    if (relativeY < height * 0.25) return 'before';
-    if (relativeY > height * 0.75) return 'after';
-    return 'into';
-  } else {
-    return relativeY < height * 0.5 ? 'before' : 'after';
-  }
-};
-
 // --- Context Menu Component ---
 interface ContextMenuProps {
   isFolder: boolean;
@@ -395,15 +376,7 @@ const BookmarkItem = ({
         {...attributes}
         {...listeners}
       >
-        {/* Drop before indicator */}
-        {showDropBefore && (
-          <div className="absolute left-0 right-0 top-0 h-0.5 bg-blue-500 z-20" />
-        )}
-
-        {/* Drop after indicator */}
-        {showDropAfter && (
-          <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-blue-500 z-20" />
-        )}
+        <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} />
 
         <span
           className={clsx("mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700", !isFolder && "invisible")}
@@ -577,22 +550,23 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
 
-  // Drag-drop state
-  const [activeId, setActiveId] = useState<string | null>(null);
+  // Shared drag-drop state from hook
+  const {
+    activeId,
+    setActiveId,
+    dropTargetId,
+    setDropTargetId,
+    dropPosition,
+    setDropPosition,
+    pointerPositionRef,
+    wasValidDropRef,
+    setAutoExpandTimer,
+    clearAutoExpandTimer,
+  } = useDragDrop<string>();
+
+  // Bookmark-specific drag state
   const [activeNode, setActiveNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [activeDepth, setActiveDepth] = useState<number>(0);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [dropPosition, setDropPosition] = useState<DropPosition>(null);
-
-  // Auto-expand timer for folders
-  const autoExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastHoveredFolderRef = useRef<string | null>(null);
-
-  // Track pointer position for accurate drop target calculation during scroll
-  const pointerPositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  // Track if drop was valid (for conditional animation)
-  const wasValidDropRef = useRef(false);
 
   // Find a node by ID in the bookmark tree
   const findNode = useCallback((id: string): chrome.bookmarks.BookmarkTreeNode | null => {
@@ -616,18 +590,6 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     })
   );
 
-  // Track pointer position during drag for accurate drop target calculation
-  useEffect(() => {
-    if (!activeId) return;
-
-    const handlePointerMove = (e: PointerEvent) => {
-      pointerPositionRef.current = { x: e.clientX, y: e.clientY };
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    return () => window.removeEventListener('pointermove', handlePointerMove);
-  }, [activeId]);
-
   const toggleFolder = (id: string, expanded: boolean) => {
     setExpandedState(prev => ({ ...prev, [id]: expanded }));
   };
@@ -645,7 +607,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     const element = document.querySelector(`[data-bookmark-id="${id}"]`);
     const depth = element?.getAttribute('data-depth');
     setActiveDepth(depth ? parseInt(depth, 10) : 0);
-  }, [findNode]);
+  }, [findNode, setActiveId]);
 
   // Drag move handler - calculate drop position based on pointer
   const handleDragMove = useCallback((event: DragMoveEvent) => {
@@ -704,39 +666,18 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
 
     // Auto-expand/collapse folder on hover
     if (isFolder && position === 'into') {
-      if (lastHoveredFolderRef.current !== targetId) {
-        // Clear existing timer
-        if (autoExpandTimerRef.current) {
-          clearTimeout(autoExpandTimerRef.current);
-        }
-        lastHoveredFolderRef.current = targetId;
-
-        // Set new timer to toggle folder after 1 second
-        autoExpandTimerRef.current = setTimeout(() => {
-          if (targetId) {
-            // Expand if collapsed, collapse if expanded
-            setExpandedState(prev => ({ ...prev, [targetId]: !prev[targetId] }));
-          }
-        }, 1000);
-      }
+      setAutoExpandTimer(targetId, () => {
+        // Toggle: expand if collapsed, collapse if expanded
+        setExpandedState(prev => ({ ...prev, [targetId]: !prev[targetId] }));
+      });
     } else {
-      // Clear timer if not hovering over folder center
-      if (autoExpandTimerRef.current) {
-        clearTimeout(autoExpandTimerRef.current);
-        autoExpandTimerRef.current = null;
-      }
-      lastHoveredFolderRef.current = null;
+      clearAutoExpandTimer();
     }
-  }, [bookmarks, expandedState, findNode]);
+  }, [bookmarks, findNode, setAutoExpandTimer, clearAutoExpandTimer, setDropTargetId, setDropPosition]);
 
   // Drag end handler
   const handleDragEnd = useCallback((event: DragEndEvent) => {
-    // Clear auto-expand timer
-    if (autoExpandTimerRef.current) {
-      clearTimeout(autoExpandTimerRef.current);
-      autoExpandTimerRef.current = null;
-    }
-    lastHoveredFolderRef.current = null;
+    clearAutoExpandTimer();
 
     const { active } = event;
     const sourceId = active.id as string;
@@ -765,16 +706,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     setActiveDepth(0);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [dropTargetId, dropPosition, moveBookmark, expandedState, findNode]);
+  }, [dropTargetId, dropPosition, moveBookmark, expandedState, findNode, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() => {
-    // Clear auto-expand timer
-    if (autoExpandTimerRef.current) {
-      clearTimeout(autoExpandTimerRef.current);
-      autoExpandTimerRef.current = null;
-    }
-    lastHoveredFolderRef.current = null;
+    clearAutoExpandTimer();
     wasValidDropRef.current = false;
 
     // Reset drag state
@@ -783,7 +719,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     setActiveDepth(0);
     setDropTargetId(null);
     setDropPosition(null);
-  }, []);
+  }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
   // Pointer enter/leave handlers for tracking hover
   const handlePointerEnter = useCallback((_id: string) => {

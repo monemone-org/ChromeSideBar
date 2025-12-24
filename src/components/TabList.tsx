@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
+import { useDragDrop } from '../hooks/useDragDrop';
 import { X, Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, MoreHorizontal, List } from 'lucide-react';
 import {
   Chapter,
@@ -9,6 +10,8 @@ import {
   jumpToChapter
 } from '../utils/youtube';
 import { getIndentPadding } from '../utils/indent';
+import { calculateDropPosition } from '../utils/dragDrop';
+import { DropIndicators } from './DropIndicators';
 import {
   DndContext,
   DragOverlay,
@@ -33,32 +36,6 @@ const GROUP_COLORS: Record<string, { bg: string; text: string; dot: string }> = 
   purple: { bg: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-700 dark:text-purple-200', dot: 'bg-purple-500' },
   cyan: { bg: 'bg-cyan-100 dark:bg-cyan-900/40', text: 'text-cyan-700 dark:text-cyan-200', dot: 'bg-cyan-500' },
   orange: { bg: 'bg-orange-100 dark:bg-orange-900/40', text: 'text-orange-700 dark:text-orange-200', dot: 'bg-orange-500' },
-};
-
-type DropPosition = 'before' | 'after' | 'into' | null;
-
-const calculateDropPosition = (
-  element: HTMLElement,
-  pointerY: number,
-  isGroupHeader: boolean
-): DropPosition =>
-{
-  const rect = element.getBoundingClientRect();
-  const relativeY = pointerY - rect.top;
-  const height = rect.height;
-
-  if (isGroupHeader)
-  {
-    // Group header: top 25% = before, middle 50% = into, bottom 25% = after
-    if (relativeY < height * 0.25) return 'before';
-    if (relativeY > height * 0.75) return 'after';
-    return 'into';
-  }
-  else
-  {
-    // Tab: top 50% = before, bottom 50% = after
-    return relativeY < height * 0.5 ? 'before' : 'after';
-  }
 };
 
 interface DraggableTabProps {
@@ -153,13 +130,7 @@ const DraggableTab = ({
       )}
       onClick={() => onActivate(tab.id!)}
     >
-      {/* Drop position indicators */}
-      {showDropBefore && (
-        <div className="absolute left-0 right-0 top-0 h-0.5 bg-blue-500 z-20" />
-      )}
-      {showDropAfter && (
-        <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-blue-500 z-20" />
-      )}
+      <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} />
 
       {/* Speaker placeholder */}
       <span className={clsx("mr-1 p-0.5", !tab.audible && "invisible")}>
@@ -284,13 +255,7 @@ const TabGroupHeader = ({
       style={{ paddingLeft: `${getIndentPadding(1)}px` }}
       onClick={onToggle}
     >
-      {/* Drop position indicators */}
-      {showDropBefore && (
-        <div className="absolute left-0 right-0 top-0 h-0.5 bg-blue-500 z-20" />
-      )}
-      {showDropAfter && (
-        <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-blue-500 z-20" />
-      )}
+      <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} />
 
       <span className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -349,50 +314,46 @@ export const TabList = ({ onPin }: TabListProps) =>
   const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, sortTabs, closeAllTabs } = useTabs();
   const { tabGroups } = useTabGroups();
   const [isExpanded, setIsExpanded] = useState(true);
-  const [expandedGroups, setExpandedGroups] = useState<Set<number>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Drag state
-  const [activeId, setActiveId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<chrome.tabs.Tab | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [dropPosition, setDropPosition] = useState<DropPosition>(null);
+  // Shared drag-drop state from hook
+  const {
+    activeId,
+    setActiveId,
+    dropTargetId,
+    setDropTargetId,
+    dropPosition,
+    setDropPosition,
+    pointerPositionRef,
+    wasValidDropRef,
+    setAutoExpandTimer,
+    clearAutoExpandTimer,
+  } = useDragDrop<number>();
 
-  // Refs
-  const pointerPositionRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const autoExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastHoveredGroupRef = useRef<number | null>(null);
-  const wasValidDropRef = useRef<boolean>(false);
+  // Tab-specific drag state
+  const [activeTab, setActiveTab] = useState<chrome.tabs.Tab | null>(null);
 
   // Initialize all groups as expanded when they first appear
   useEffect(() =>
   {
     setExpandedGroups((prev) =>
     {
-      const newSet = new Set(prev);
+      let hasChanges = false;
+      const newState = { ...prev };
       tabGroups.forEach((g) =>
       {
-        if (!prev.has(g.id))
+        if (!(g.id in newState))
         {
-          newSet.add(g.id);
+          newState[g.id] = true;
+          hasChanges = true;
         }
       });
-      return newSet;
+      return hasChanges ? newState : prev;
     });
   }, [tabGroups]);
-
-  // Track pointer position
-  useEffect(() =>
-  {
-    const handlePointerMove = (e: PointerEvent) =>
-    {
-      pointerPositionRef.current = { x: e.clientX, y: e.clientY };
-    };
-    window.addEventListener('pointermove', handlePointerMove);
-    return () => window.removeEventListener('pointermove', handlePointerMove);
-  }, []);
 
   useEffect(() =>
   {
@@ -465,7 +426,7 @@ export const TabList = ({ onPin }: TabListProps) =>
     const id = event.active.id as number;
     setActiveId(id);
     setActiveTab(tabs.find(t => t.id === id) || null);
-  }, [tabs]);
+  }, [tabs, setActiveId]);
 
   const handleDragMove = useCallback((event: DragMoveEvent) =>
   {
@@ -494,40 +455,15 @@ export const TabList = ({ onPin }: TabListProps) =>
         const groupIdNum = parseInt(groupId);
         if (position === 'into')
         {
-          if (lastHoveredGroupRef.current !== groupIdNum)
+          setAutoExpandTimer(groupIdNum, () =>
           {
-            if (autoExpandTimerRef.current)
-            {
-              clearTimeout(autoExpandTimerRef.current);
-            }
-            lastHoveredGroupRef.current = groupIdNum;
-            autoExpandTimerRef.current = setTimeout(() =>
-            {
-              // Toggle: expand if collapsed, collapse if expanded
-              setExpandedGroups(prev =>
-              {
-                const newSet = new Set(prev);
-                if (newSet.has(groupIdNum))
-                {
-                  newSet.delete(groupIdNum);
-                }
-                else
-                {
-                  newSet.add(groupIdNum);
-                }
-                return newSet;
-              });
-            }, 1000);
-          }
+            // Toggle: expand if collapsed, collapse if expanded
+            setExpandedGroups(prev => ({ ...prev, [groupIdNum]: !prev[groupIdNum] }));
+          });
         }
         else
         {
-          if (autoExpandTimerRef.current)
-          {
-            clearTimeout(autoExpandTimerRef.current);
-            autoExpandTimerRef.current = null;
-          }
-          lastHoveredGroupRef.current = null;
+          clearAutoExpandTimer();
         }
         return;
       }
@@ -548,13 +484,7 @@ export const TabList = ({ onPin }: TabListProps) =>
         setDropTargetId(tabId);
         setDropPosition(position);
 
-        // Clear auto-expand timer when hovering over tabs
-        if (autoExpandTimerRef.current)
-        {
-          clearTimeout(autoExpandTimerRef.current);
-          autoExpandTimerRef.current = null;
-        }
-        lastHoveredGroupRef.current = null;
+        clearAutoExpandTimer();
         return;
       }
     }
@@ -562,23 +492,12 @@ export const TabList = ({ onPin }: TabListProps) =>
     // No valid target
     setDropTargetId(null);
     setDropPosition(null);
-    if (autoExpandTimerRef.current)
-    {
-      clearTimeout(autoExpandTimerRef.current);
-      autoExpandTimerRef.current = null;
-    }
-    lastHoveredGroupRef.current = null;
-  }, [expandedGroups]);
+    clearAutoExpandTimer();
+  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer]);
 
   const handleDragEnd = useCallback((_event: DragEndEvent) =>
   {
-    // Clear auto-expand timer
-    if (autoExpandTimerRef.current)
-    {
-      clearTimeout(autoExpandTimerRef.current);
-      autoExpandTimerRef.current = null;
-    }
-    lastHoveredGroupRef.current = null;
+    clearAutoExpandTimer();
 
     // Track if this is a valid drop (affects animation)
     const isValidDrop = !!(dropTargetId && dropPosition && activeId);
@@ -686,18 +605,12 @@ export const TabList = ({ onPin }: TabListProps) =>
     setActiveTab(null);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [activeId, dropTargetId, dropPosition, tabs, groupTab, ungroupTab, moveTab]);
+  }, [activeId, dropTargetId, dropPosition, tabs, groupTab, ungroupTab, moveTab, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
   {
-    // Clear auto-expand timer
-    if (autoExpandTimerRef.current)
-    {
-      clearTimeout(autoExpandTimerRef.current);
-      autoExpandTimerRef.current = null;
-    }
-    lastHoveredGroupRef.current = null;
+    clearAutoExpandTimer();
     wasValidDropRef.current = false;
 
     // Reset drag state
@@ -705,23 +618,11 @@ export const TabList = ({ onPin }: TabListProps) =>
     setActiveTab(null);
     setDropTargetId(null);
     setDropPosition(null);
-  }, []);
+  }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
   const toggleGroup = (groupId: number) =>
   {
-    setExpandedGroups((prev) =>
-    {
-      const newSet = new Set(prev);
-      if (newSet.has(groupId))
-      {
-        newSet.delete(groupId);
-      }
-      else
-      {
-        newSet.add(groupId);
-      }
-      return newSet;
-    });
+    setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
   };
 
   const closeGroup = (groupTabs: chrome.tabs.Tab[]) =>
@@ -817,7 +718,7 @@ export const TabList = ({ onPin }: TabListProps) =>
             }
             else
             {
-              const isGroupExpanded = expandedGroups.has(item.group.id);
+              const isGroupExpanded = expandedGroups[item.group.id];
               const groupTargetId = `group-${item.group.id}`;
               const isTarget = dropTargetId === groupTargetId;
               return (
