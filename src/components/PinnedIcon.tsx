@@ -1,13 +1,35 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Globe, X, RotateCcw, Search, icons } from 'lucide-react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { Globe, X, RotateCcw, Search } from 'lucide-react';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
 
-// Get all icon names from lucide-react
-const ALL_ICON_NAMES = Object.keys(icons).sort();
+// Iconify API for on-demand icon loading
+const ICONIFY_API_BASE = 'https://api.iconify.design';
+const ICONIFY_COLLECTION_API = `${ICONIFY_API_BASE}/collection?prefix=lucide`;
+
+// Get icon URL from Iconify CDN
+function getIconUrl(name: string): string {
+  return `${ICONIFY_API_BASE}/lucide/${name}.svg`;
+}
+
+// Fetch icon names from Iconify API
+async function fetchIconNames(): Promise<string[]> {
+  const response = await fetch(ICONIFY_COLLECTION_API);
+  const data = await response.json();
+  const names: string[] = [];
+  if (data.uncategorized) {
+    names.push(...data.uncategorized);
+  }
+  if (data.categories) {
+    for (const category of Object.values(data.categories)) {
+      names.push(...(category as string[]));
+    }
+  }
+  names.sort();
+  return names;
+}
 
 // Default icon color
 const DEFAULT_ICON_COLOR = '#6b7280';
@@ -25,19 +47,18 @@ const PRESET_COLORS = [
   { name: 'Pink', value: '#ec4899' },
 ];
 
-// Convert a Lucide icon component to a data URL
-const iconToDataUrl = (iconName: string, color: string = DEFAULT_ICON_COLOR): string => {
-  const IconComponent = icons[iconName as keyof typeof icons];
-  if (!IconComponent) return '';
-
-  // Render the icon to static markup
-  const svgMarkup = renderToStaticMarkup(
-    <IconComponent size={32} stroke={color} strokeWidth={2} />
-  );
-
-  // Encode as data URL
-  return `data:image/svg+xml,${encodeURIComponent(svgMarkup)}`;
-};
+// Fetch icon SVG from CDN and convert to data URL with color
+async function iconToDataUrl(iconName: string, color: string = DEFAULT_ICON_COLOR): Promise<string> {
+  try {
+    const response = await fetch(getIconUrl(iconName));
+    let svg = await response.text();
+    // Replace stroke color in the SVG
+    svg = svg.replace(/stroke="[^"]*"/g, `stroke="${color}"`);
+    return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  } catch {
+    return '';
+  }
+}
 
 interface PinnedIconProps {
   site: PinnedSite;
@@ -63,6 +84,8 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
   const [customHexInput, setCustomHexInput] = useState('');
   const [iconSearch, setIconSearch] = useState('');
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [allIconNames, setAllIconNames] = useState<string[]>([]);
+  const [iconsLoading, setIconsLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const iconRef = useRef<HTMLDivElement>(null);
   const wasDraggingRef = useRef(false);
@@ -76,16 +99,29 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     isDragging,
   } = useSortable({ id: site.id });
 
+  // Load icons when modal opens
+  useEffect(() => {
+    if (showEditModal && allIconNames.length === 0 && !iconsLoading) {
+      setIconsLoading(true);
+      fetchIconNames().then(names => {
+        setAllIconNames(names);
+        setIconsLoading(false);
+      }).catch(() => {
+        setIconsLoading(false);
+      });
+    }
+  }, [showEditModal, allIconNames.length, iconsLoading]);
+
   // Filter icons based on search
   const allFilteredIcons = useMemo(() => {
     if (!iconSearch.trim()) {
-      return ALL_ICON_NAMES;
+      return allIconNames;
     }
     const search = iconSearch.toLowerCase();
-    return ALL_ICON_NAMES.filter(name =>
+    return allIconNames.filter(name =>
       name.toLowerCase().includes(search)
     );
-  }, [iconSearch]);
+  }, [iconSearch, allIconNames]);
 
   // Grid layout constants
   const COLS = 7;
@@ -220,17 +256,17 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     setShowEditModal(false);
   };
 
-  const handleSelectIcon = (iconName: string) => {
-    const dataUrl = iconToDataUrl(iconName, editIconColor);
+  const handleSelectIcon = async (iconName: string) => {
+    const dataUrl = await iconToDataUrl(iconName, editIconColor);
     setEditFavicon(dataUrl);
     setEditCustomIconName(iconName);
   };
 
-  const handleColorChange = (color: string) => {
+  const handleColorChange = async (color: string) => {
     setEditIconColor(color);
     // Regenerate icon with new color if a custom icon is selected
     if (editCustomIconName) {
-      const dataUrl = iconToDataUrl(editCustomIconName, color);
+      const dataUrl = await iconToDataUrl(editCustomIconName, color);
       setEditFavicon(dataUrl);
     }
   };
@@ -255,11 +291,17 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     onRemove(site.id);
   };
 
-  // Render an icon by name with the current edit color
+  // Render an icon by name from CDN
   const renderIcon = (iconName: string, size: number = 18) => {
-    const IconComponent = icons[iconName as keyof typeof icons];
-    if (!IconComponent) return null;
-    return <IconComponent size={size} style={{ color: editIconColor }} />;
+    return (
+      <img
+        src={getIconUrl(iconName)}
+        alt={iconName}
+        width={size}
+        height={size}
+        className="dark:invert"
+      />
+    );
   };
 
   // Combine refs for sortable and icon positioning
@@ -386,33 +428,39 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
                 <div
                   onScroll={handleGridScroll}
                   className="relative bg-gray-50 dark:bg-gray-900 rounded-md max-h-32 overflow-y-auto overflow-x-hidden"
-                  style={{ height: Math.min(visibleHeight, totalContentHeight) }}
+                  style={{ height: Math.min(visibleHeight, Math.max(totalContentHeight, 64)) }}
                 >
-                  <div style={{ height: totalContentHeight, position: 'relative' }}>
-                    {visibleIcons.map(({ name, index }) => {
-                      const row = Math.floor(index / COLS);
-                      const col = index % COLS;
-                      return (
-                        <button
-                          key={name}
-                          onClick={() => handleSelectIcon(name)}
-                          className="absolute w-8 h-8 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                          style={{
-                            top: PADDING + row * ROW_HEIGHT,
-                            left: PADDING + col * (ICON_SIZE + GAP),
-                          }}
-                          title={name}
-                        >
-                          {renderIcon(name)}
-                        </button>
-                      );
-                    })}
-                    {allFilteredIcons.length === 0 && (
-                      <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">
-                        No icons found
-                      </div>
-                    )}
-                  </div>
+                  {iconsLoading ? (
+                    <div className="flex items-center justify-center h-16 text-gray-400 text-xs">
+                      Loading icons...
+                    </div>
+                  ) : (
+                    <div style={{ height: totalContentHeight, position: 'relative' }}>
+                      {visibleIcons.map(({ name, index }) => {
+                        const row = Math.floor(index / COLS);
+                        const col = index % COLS;
+                        return (
+                          <button
+                            key={name}
+                            onClick={() => handleSelectIcon(name)}
+                            className="absolute w-8 h-8 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                            style={{
+                              top: PADDING + row * ROW_HEIGHT,
+                              left: PADDING + col * (ICON_SIZE + GAP),
+                            }}
+                            title={name}
+                          >
+                            {renderIcon(name)}
+                          </button>
+                        );
+                      })}
+                      {allFilteredIcons.length === 0 && !iconsLoading && (
+                        <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-xs">
+                          No icons found
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <p className="text-xs text-gray-400 mt-1">
                   {allFilteredIcons.length} icons
