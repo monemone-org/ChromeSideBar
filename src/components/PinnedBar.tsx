@@ -55,6 +55,11 @@ export const PinnedBar = ({
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        autoScroll={{
+          threshold: { x: 0.1, y: 0.1 },
+          acceleration: 7,
+          interval: 10,
+        }}
         onDragEnd={handleDragEnd}
       >
         <SortableContext

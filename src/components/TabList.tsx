@@ -785,6 +785,11 @@ export const TabList = ({ onPin }: TabListProps) =>
       {isExpanded && (
         <DndContext
           sensors={sensors}
+          autoScroll={{
+            threshold: { x: 0.1, y: 0.1 },
+            acceleration: 7,
+            interval: 10,
+          }}
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragEnd={handleDragEnd}
