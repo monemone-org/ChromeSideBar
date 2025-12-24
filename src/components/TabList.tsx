@@ -45,6 +45,7 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
   const [showChapters, setShowChapters] = useState(false);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
+  const [popupAbove, setPopupAbove] = useState(false);
   const chaptersRef = useRef<HTMLDivElement>(null);
   const chaptersButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -71,6 +72,15 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
 
   const handleChaptersClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Calculate if popup should flip above
+    const button = chaptersButtonRef.current;
+    if (button) {
+      const rect = button.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setPopupAbove(spaceBelow < 280); // 256px max-height + margin
+    }
+
     if (!showChapters) {
       setLoadingChapters(true);
       const fetchedChapters = await fetchYouTubeChapters(tab.id!);
@@ -107,7 +117,7 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
         {tab.title}
       </span>
       {/* Action buttons - positioned absolutely to overlap title */}
-      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-2 opacity-0 group-hover:opacity-100 bg-white/80 dark:bg-gray-900/80 rounded">
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-2 opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-900 rounded">
         {videoId && (
           <button
             ref={chaptersButtonRef}
@@ -148,8 +158,14 @@ const SortableTab = ({ tab, onClose, onActivate, onPin }: SortableTabProps) => {
       {showChapters && (
         <div
           ref={chaptersRef}
-          className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-48 max-h-64 overflow-y-auto"
+          className={clsx(
+            "absolute right-0 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-48 max-h-64 overflow-y-auto",
+            popupAbove ? "bottom-full mb-1" : "top-full mt-1"
+          )}
         >
+          <div className="px-3 py-1.5 font-medium text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">
+            Chapters
+          </div>
           {loadingChapters ? (
             <div className="px-3 py-2 text-gray-500">Loading...</div>
           ) : chapters.length === 0 ? (
