@@ -702,7 +702,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
     setDropTargetId(targetId);
     setDropPosition(position);
 
-    // Auto-expand folder on hover
+    // Auto-expand/collapse folder on hover
     if (isFolder && position === 'into') {
       if (lastHoveredFolderRef.current !== targetId) {
         // Clear existing timer
@@ -711,10 +711,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
         }
         lastHoveredFolderRef.current = targetId;
 
-        // Set new timer to expand folder after 1 second
+        // Set new timer to toggle folder after 1 second
         autoExpandTimerRef.current = setTimeout(() => {
-          if (targetId && !expandedState[targetId]) {
-            setExpandedState(prev => ({ ...prev, [targetId]: true }));
+          if (targetId) {
+            // Expand if collapsed, collapse if expanded
+            setExpandedState(prev => ({ ...prev, [targetId]: !prev[targetId] }));
           }
         }, 1000);
       }

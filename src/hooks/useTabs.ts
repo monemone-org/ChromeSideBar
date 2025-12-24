@@ -94,5 +94,27 @@ export const useTabs = () => {
     });
   }, [tabs, handleError]);
 
-  return { tabs, closeTab, activateTab, moveTab, sortTabs, closeAllTabs, error };
+  const groupTab = useCallback((tabId: number, groupId: number) => {
+    chrome.tabs.group({ tabIds: [tabId], groupId }, () => {
+      handleError('group');
+    });
+  }, [handleError]);
+
+  const ungroupTab = useCallback((tabId: number) => {
+    chrome.tabs.ungroup([tabId], () => {
+      handleError('ungroup');
+    });
+  }, [handleError]);
+
+  return {
+    tabs,
+    closeTab,
+    activateTab,
+    moveTab,
+    groupTab,
+    ungroupTab,
+    sortTabs,
+    closeAllTabs,
+    error
+  };
 };
