@@ -15,7 +15,6 @@ Chrome sidebar extension built with React, TypeScript, and Tailwind CSS.
 ## Build & Test
 
 - Build: `npm run build`
-- Dev: `npm run dev`
 - Lint: `npm run lint`
 
 Do not run build after making changes. Notify the user to compile and verify.
@@ -24,3 +23,18 @@ Do not run build after making changes. Notify the user to compile and verify.
 
 - Use TypeScript strict mode
 - Follow existing patterns in the codebase
+
+## Versioning
+
+Version format: `{major}.{minor}.{build_number}` where build_number is the git commit count.
+
+**Before running command git-commit-msg**, run:
+```bash
+./tools/update-version.sh
+```
+
+Commands:
+- `./tools/update-version.sh` - Update build number only
+- `./tools/update-version.sh minor` - Bump minor version
+- `./tools/update-version.sh major` - Bump major version
+- `./tools/update-version.sh 2 1` - Set specific major.minor
