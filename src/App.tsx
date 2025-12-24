@@ -22,30 +22,47 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const { pinnedSites, addPin, removePin, updatePin, resetFavicon, movePin, exportPinnedSites, importPinnedSites } = usePinnedSites();
 
-  const handleHideOtherBookmarksChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.checked;
-    setHideOtherBookmarks(value);
-    localStorage.setItem('sidebar-hide-other-bookmarks', value.toString());
+  // Temporary state for settings dialog
+  const [tempFontSize, setTempFontSize] = useState(fontSize);
+  const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(hideOtherBookmarks);
+  const [tempOpenPinnedInNewTab, setTempOpenPinnedInNewTab] = useState(openPinnedInNewTab);
+  const [tempOpenBookmarkInNewTab, setTempOpenBookmarkInNewTab] = useState(openBookmarkInNewTab);
+
+  const openSettings = () => {
+    // Copy current values to temp state
+    setTempFontSize(fontSize);
+    setTempHideOtherBookmarks(hideOtherBookmarks);
+    setTempOpenPinnedInNewTab(openPinnedInNewTab);
+    setTempOpenBookmarkInNewTab(openBookmarkInNewTab);
+    setShowSettings(true);
   };
 
-  const handleFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCancel = () => {
+    setShowSettings(false);
+  };
+
+  const handleApply = () => {
+    // Apply temp values to real state and localStorage
+    setFontSize(tempFontSize);
+    localStorage.setItem('sidebar-font-size-px', tempFontSize.toString());
+
+    setHideOtherBookmarks(tempHideOtherBookmarks);
+    localStorage.setItem('sidebar-hide-other-bookmarks', tempHideOtherBookmarks.toString());
+
+    setOpenPinnedInNewTab(tempOpenPinnedInNewTab);
+    localStorage.setItem('sidebar-open-pinned-new-tab', tempOpenPinnedInNewTab.toString());
+
+    setOpenBookmarkInNewTab(tempOpenBookmarkInNewTab);
+    localStorage.setItem('sidebar-open-bookmark-new-tab', tempOpenBookmarkInNewTab.toString());
+
+    setShowSettings(false);
+  };
+
+  const handleTempFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newSize = parseInt(e.target.value, 10);
     if (!isNaN(newSize) && newSize > 4 && newSize < 72) {
-      setFontSize(newSize);
-      localStorage.setItem('sidebar-font-size-px', newSize.toString());
+      setTempFontSize(newSize);
     }
-  };
-
-  const handleOpenPinnedInNewTabChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.checked;
-    setOpenPinnedInNewTab(value);
-    localStorage.setItem('sidebar-open-pinned-new-tab', value.toString());
-  };
-
-  const handleOpenBookmarkInNewTabChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.checked;
-    setOpenBookmarkInNewTab(value);
-    localStorage.setItem('sidebar-open-bookmark-new-tab', value.toString());
   };
 
   return (
@@ -59,12 +76,13 @@ function App() {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 w-56 border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-3">
               <h2 className="font-bold">Settings</h2>
-              <button onClick={() => setShowSettings(false)} className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+              <button onClick={handleCancel} className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
                 <X size={16} />
               </button>
             </div>
 
             <div className="space-y-3">
+              {/* Font Size */}
               <div>
                 <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
                   Font Size (px)
@@ -73,8 +91,8 @@ function App() {
                   type="number"
                   min="6"
                   max="36"
-                  value={fontSize}
-                  onChange={handleFontSizeChange}
+                  value={tempFontSize}
+                  onChange={handleTempFontSizeChange}
                   className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-xs"
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -82,48 +100,55 @@ function App() {
                 </p>
               </div>
 
-              <div>
-                <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={hideOtherBookmarks}
-                    onChange={handleHideOtherBookmarksChange}
-                    className="rounded border-gray-300 dark:border-gray-600"
-                  />
-                  Hide "Other Bookmarks"
+              {/* Behaviour group */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                <label className="block text-xs font-medium mb-2 text-gray-700 dark:text-gray-300">
+                  Behaviour
                 </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tempHideOtherBookmarks}
+                      onChange={(e) => setTempHideOtherBookmarks(e.target.checked)}
+                      className="rounded border-gray-300 dark:border-gray-600"
+                    />
+                    Hide "Other Bookmarks"
+                  </label>
+
+                  <div>
+                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={tempOpenPinnedInNewTab}
+                        onChange={(e) => setTempOpenPinnedInNewTab(e.target.checked)}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      Open pinned sites in new tab
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-5">
+                      Cmd+click opens in current tab
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={tempOpenBookmarkInNewTab}
+                        onChange={(e) => setTempOpenBookmarkInNewTab(e.target.checked)}
+                        className="rounded border-gray-300 dark:border-gray-600"
+                      />
+                      Open bookmarks in new tab
+                    </label>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-5">
+                      Cmd+click opens in current tab
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div>
-                <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={openPinnedInNewTab}
-                    onChange={handleOpenPinnedInNewTabChange}
-                    className="rounded border-gray-300 dark:border-gray-600"
-                  />
-                  Open pinned sites in new tab
-                </label>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-5">
-                  Cmd+click opens in current tab
-                </p>
-              </div>
-
-              <div>
-                <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={openBookmarkInNewTab}
-                    onChange={handleOpenBookmarkInNewTabChange}
-                    className="rounded border-gray-300 dark:border-gray-600"
-                  />
-                  Open bookmarks in new tab
-                </label>
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-5">
-                  Cmd+click opens in current tab
-                </p>
-              </div>
-
+              {/* Pinned Sites Backup */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
                 <label className="block text-xs font-medium mb-2 text-gray-700 dark:text-gray-300">
                   Pinned Sites Backup
@@ -151,6 +176,22 @@ function App() {
                   </label>
                 </div>
               </div>
+
+              {/* Apply / Cancel buttons */}
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end gap-2">
+                <button
+                  onClick={handleCancel}
+                  className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleApply}
+                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  Apply
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -168,7 +209,7 @@ function App() {
 
       {/* Settings button - bottom-left corner of panel */}
       <button
-        onClick={() => setShowSettings(true)}
+        onClick={openSettings}
         title="Settings"
         className="absolute left-2 bottom-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-200 z-10"
       >
