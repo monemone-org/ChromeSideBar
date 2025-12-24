@@ -318,7 +318,7 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
         {...attributes}
         {...listeners}
         className={clsx(
-          "group/pin relative w-8 h-8 flex items-center justify-center rounded",
+          "group/pin relative w-7 h-7 flex items-center justify-center rounded",
           isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
         )}
         onMouseUp={handleClick}

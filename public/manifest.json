@@ -15,8 +15,17 @@
   "host_permissions": [
     "*://www.youtube.com/*"
   ],
+  "icons": {
+    "16": "icon16.png",
+    "32": "icon32.png",
+    "128": "icon.png"
+  },
   "action": {
-    "default_title": "Toggle Chrome SideBar"
+    "default_title": "Toggle Chrome SideBar",
+    "default_icon": {
+      "16": "icon16.png",
+      "32": "icon32.png"
+    }
   },
   "background": {
     "service_worker": "background.js"
