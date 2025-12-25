@@ -37,6 +37,14 @@ So I vibe coded this extension to bring that feature to Chrome.
 - Reorder tabs via drag-and-drop
 - Click to switch to tab
 - Close tab
+- YouTube chapters: Click the list icon on YouTube video tabs to jump to chapters
+- Tab Group support:
+  - Display Chrome tab groups with their color and title
+  - Collapse/expand groups by clicking the group header
+  - Drag-and-drop support:
+    - Reorder tabs within a group
+    - Move tabs between groups
+  - Close all tabs in a group via the X button on group header
 
 ### General
 
