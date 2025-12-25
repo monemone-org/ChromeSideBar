@@ -44,6 +44,8 @@ interface DraggableTabProps {
   isBeingDragged: boolean;
   showDropBefore: boolean;
   showDropAfter: boolean;
+  beforeIndentPx?: number;
+  afterIndentPx?: number;
   onClose: (id: number) => void;
   onActivate: (id: number) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
@@ -55,6 +57,8 @@ const DraggableTab = ({
   isBeingDragged,
   showDropBefore,
   showDropAfter,
+  beforeIndentPx,
+  afterIndentPx,
   onClose,
   onActivate,
   onPin
@@ -130,7 +134,7 @@ const DraggableTab = ({
       )}
       onClick={() => onActivate(tab.id!)}
     >
-      <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} />
+      <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
 
       {/* Speaker placeholder */}
       <span className={clsx("mr-1 p-0.5", !tab.audible && "invisible")}>
@@ -228,6 +232,7 @@ interface TabGroupHeaderProps {
   showDropBefore: boolean;
   showDropAfter: boolean;
   showDropInto: boolean;
+  afterDropIndentPx?: number;
   onToggle: () => void;
   onCloseGroup: () => void;
 }
@@ -238,6 +243,7 @@ const TabGroupHeader = ({
   showDropBefore,
   showDropAfter,
   showDropInto,
+  afterDropIndentPx,
   onToggle,
   onCloseGroup
 }: TabGroupHeaderProps) =>
@@ -255,7 +261,7 @@ const TabGroupHeader = ({
       style={{ paddingLeft: `${getIndentPadding(1)}px` }}
       onClick={onToggle}
     >
-      <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} />
+      <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} afterIndentPx={afterDropIndentPx} />
 
       <span className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
         {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -483,7 +489,6 @@ export const TabList = ({ onPin }: TabListProps) =>
         const position = calculateDropPosition(tabElement, currentY, false);
         setDropTargetId(tabId);
         setDropPosition(position);
-
         clearAutoExpandTimer();
         return;
       }
@@ -531,29 +536,81 @@ export const TabList = ({ onPin }: TabListProps) =>
 
       if (dropPosition === 'into')
       {
-        // Move tab into group
+        // Move tab into group at the end
         if (sourceGroupId !== targetGroupId)
         {
           groupTab(activeId, targetGroupId);
+        }
+
+        // Move to end of group
+        const groupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+        if (groupTabs.length > 0)
+        {
+          const lastTabIndex = tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id);
+          const sourceIndex = tabs.findIndex(t => t.id === activeId);
+          let targetIndex = lastTabIndex + 1;
+
+          // Account for source removal when moving forward
+          if (sourceIndex < targetIndex)
+          {
+            targetIndex--;
+          }
+
+          moveTab(activeId, targetIndex);
         }
       }
       else
       {
         // 'before' or 'after' on group header
-        // Find the appropriate tab index
         const groupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
         if (groupTabs.length > 0)
         {
-          const targetIndex = dropPosition === 'before'
-            ? tabs.findIndex(t => t.id === groupTabs[0].id)
-            : tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id) + 1;
-
-          // Ungroup if currently in a group
-          if (sourceGroupId !== -1)
+          if (dropPosition === 'before')
           {
-            ungroupTab(activeId);
+            // Place before the group (as sibling, outside)
+            const targetIndex = tabs.findIndex(t => t.id === groupTabs[0].id);
+            if (sourceGroupId !== -1)
+            {
+              ungroupTab(activeId);
+            }
+            moveTab(activeId, targetIndex);
           }
-          moveTab(activeId, targetIndex);
+          else
+          {
+            // 'after' behavior depends on expanded state
+            if (expandedGroups[targetGroupId])
+            {
+              // Expanded: inside group at index 0
+              const firstTabIndex = tabs.findIndex(t => t.id === groupTabs[0].id);
+              const sourceIndex = tabs.findIndex(t => t.id === activeId);
+              let targetIndex = firstTabIndex;
+              if (sourceIndex < targetIndex)
+              {
+                targetIndex--;
+              }
+              moveTab(activeId, targetIndex);
+              if (sourceGroupId !== targetGroupId)
+              {
+                groupTab(activeId, targetGroupId);
+              }
+            }
+            else
+            {
+              // Collapsed: sibling after group (after last tab in group)
+              const lastTabIndex = tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id);
+              const sourceIndex = tabs.findIndex(t => t.id === activeId);
+              let targetIndex = lastTabIndex + 1;
+              if (sourceIndex < targetIndex)
+              {
+                targetIndex--;
+              }
+              if (sourceGroupId !== -1)
+              {
+                ungroupTab(activeId);
+              }
+              moveTab(activeId, targetIndex);
+            }
+          }
         }
       }
     }
@@ -729,6 +786,11 @@ export const TabList = ({ onPin }: TabListProps) =>
                     showDropBefore={isTarget && dropPosition === 'before'}
                     showDropAfter={isTarget && dropPosition === 'after'}
                     showDropInto={isTarget && dropPosition === 'into'}
+                    afterDropIndentPx={
+                      isTarget && dropPosition === 'after' && isGroupExpanded
+                        ? getIndentPadding(2)
+                        : undefined
+                    }
                     onToggle={() => toggleGroup(item.group.id)}
                     onCloseGroup={() => closeGroup(item.tabs)}
                   />
@@ -736,6 +798,8 @@ export const TabList = ({ onPin }: TabListProps) =>
                   {
                     const tabId = String(tab.id);
                     const isTabTarget = dropTargetId === tabId;
+                    // Indent lines for tabs in group since drop stays within group
+                    const indentPx = isTabTarget ? getIndentPadding(2) : undefined;
                     return (
                       <DraggableTab
                         key={tab.id}
@@ -744,6 +808,8 @@ export const TabList = ({ onPin }: TabListProps) =>
                         isBeingDragged={activeId === tab.id}
                         showDropBefore={isTabTarget && dropPosition === 'before'}
                         showDropAfter={isTabTarget && dropPosition === 'after'}
+                        beforeIndentPx={dropPosition === 'before' ? indentPx : undefined}
+                        afterIndentPx={dropPosition === 'after' ? indentPx : undefined}
                         onClose={closeTab}
                         onActivate={activateTab}
                         onPin={onPin}

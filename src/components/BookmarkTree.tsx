@@ -356,6 +356,13 @@ const BookmarkItem = ({
   const showDropAfter = isDropTarget && dropPosition === 'after';
   const showDropInto = isDropTarget && dropPosition === 'into' && isFolder;
 
+  // Indent lines when inside a folder (depth > 0), or 'after' expanded folder
+  const insideFolder = depth > 0;
+  const beforeIndentPx = showDropBefore && insideFolder ? getIndentPadding(depth) : undefined;
+  const afterIndentPx = showDropAfter && (insideFolder || (isFolder && expandedState[node.id]))
+    ? getIndentPadding(isFolder && expandedState[node.id] ? depth + 1 : depth)
+    : undefined;
+
   return (
     <>
       <div
@@ -376,7 +383,7 @@ const BookmarkItem = ({
         {...attributes}
         {...listeners}
       >
-        <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} />
+        <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
 
         <span
           className={clsx("mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700", !isFolder && "invisible")}
