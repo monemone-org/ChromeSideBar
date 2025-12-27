@@ -229,6 +229,7 @@ const DraggableTab = ({
 interface TabGroupHeaderProps {
   group: chrome.tabGroups.TabGroup;
   isExpanded: boolean;
+  hasActiveTab: boolean;
   showDropBefore: boolean;
   showDropAfter: boolean;
   showDropInto: boolean;
@@ -240,6 +241,7 @@ interface TabGroupHeaderProps {
 const TabGroupHeader = ({
   group,
   isExpanded,
+  hasActiveTab,
   showDropBefore,
   showDropAfter,
   showDropInto,
@@ -255,8 +257,12 @@ const TabGroupHeader = ({
       data-group-header-id={group.id}
       data-is-group-header="true"
       className={clsx(
-        "group relative flex items-center py-1 px-2 rounded-md cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800",
-        showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500"
+        "group relative flex items-center py-1 px-2 rounded-md cursor-pointer select-none",
+        showDropInto
+          ? "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500"
+          : hasActiveTab
+            ? colorStyle.bg
+            : "hover:bg-gray-100 dark:hover:bg-gray-800"
       )}
       style={{ paddingLeft: `${getIndentPadding(1)}px` }}
       onClick={onToggle}
@@ -360,6 +366,23 @@ export const TabList = ({ onPin }: TabListProps) =>
       return hasChanges ? newState : prev;
     });
   }, [tabGroups]);
+
+  // Auto-scroll to active tab when it changes
+  const prevActiveTabIdRef = useRef<number | null>(null);
+  useEffect(() =>
+  {
+    const activeTab = tabs.find(t => t.active);
+    if (activeTab && activeTab.id !== prevActiveTabIdRef.current)
+    {
+      prevActiveTabIdRef.current = activeTab.id ?? null;
+      // Scroll after DOM updates
+      setTimeout(() =>
+      {
+        const element = document.querySelector(`[data-tab-id="${activeTab.id}"]`);
+        element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+  }, [tabs]);
 
   useEffect(() =>
   {
@@ -778,11 +801,13 @@ export const TabList = ({ onPin }: TabListProps) =>
               const isGroupExpanded = expandedGroups[item.group.id];
               const groupTargetId = `group-${item.group.id}`;
               const isTarget = dropTargetId === groupTargetId;
+              const hasActiveTab = item.tabs.some(t => t.active);
               return (
                 <div key={`group-${item.group.id}`}>
                   <TabGroupHeader
                     group={item.group}
                     isExpanded={isGroupExpanded}
+                    hasActiveTab={hasActiveTab}
                     showDropBefore={isTarget && dropPosition === 'before'}
                     showDropAfter={isTarget && dropPosition === 'after'}
                     showDropInto={isTarget && dropPosition === 'into'}
