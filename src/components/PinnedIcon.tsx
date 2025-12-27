@@ -4,6 +4,7 @@ import { PinnedSite } from '../hooks/usePinnedSites';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
+import { ContextMenuOverlay } from './ContextMenuOverlay';
 
 // Iconify API for on-demand icon loading
 const ICONIFY_API_BASE = 'https://api.iconify.design';
@@ -86,7 +87,6 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [allIconNames, setAllIconNames] = useState<string[]>([]);
   const [iconsLoading, setIconsLoading] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const iconRef = useRef<HTMLDivElement>(null);
   const wasDraggingRef = useRef(false);
 
@@ -111,6 +111,21 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
       });
     }
   }, [showEditModal, allIconNames.length, iconsLoading]);
+
+  // Escape key handler for edit modal
+  useEffect(() =>
+  {
+    if (!showEditModal) return;
+    const handleKeyDown = (e: KeyboardEvent) =>
+    {
+      if (e.key === 'Escape')
+      {
+        setShowEditModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showEditModal]);
 
   // Filter icons based on search
   const allFilteredIcons = useMemo(() => {
@@ -175,18 +190,6 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     touchAction: 'none',
     zIndex: isDragging ? 10 : undefined,
   };
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    if (showMenu) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMenu]);
 
   const handleClick = (e: React.MouseEvent) => {
     // Only handle left-clicks
@@ -337,31 +340,24 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
 
       </div>
 
-      {showMenu && (
-        <div
-          ref={menuRef}
-          className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-32"
-          style={{
-            top: `${menuPosition.top}px`,
-            left: `${menuPosition.left}px`,
-          }}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
+      <ContextMenuOverlay
+        isOpen={showMenu}
+        onClose={() => setShowMenu(false)}
+        position={menuPosition}
+      >
+        <button
+          className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+          onClick={handleEdit}
         >
-          <button
-            className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-            onClick={handleEdit}
-          >
-            Edit
-          </button>
-          <button
-            className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
-            onClick={handleUnpin}
-          >
-            Unpin
-          </button>
-        </div>
-      )}
+          Edit
+        </button>
+        <button
+          className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
+          onClick={handleUnpin}
+        >
+          Unpin
+        </button>
+      </ContextMenuOverlay>
 
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

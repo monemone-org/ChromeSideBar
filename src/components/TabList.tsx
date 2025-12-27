@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useDragDrop } from '../hooks/useDragDrop';
-import { X, Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, MoreHorizontal, List } from 'lucide-react';
+import { X, Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List } from 'lucide-react';
 import {
   Chapter,
   getYouTubeVideoId,
@@ -12,6 +12,7 @@ import {
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
+import { ContextMenuOverlay } from './ContextMenuOverlay';
 import {
   DndContext,
   DragOverlay,
@@ -77,6 +78,10 @@ const DraggableTab = ({
   const chaptersRef = useRef<HTMLDivElement>(null);
   const chaptersButtonRef = useRef<HTMLButtonElement>(null);
 
+  // Context menu state
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+
   const videoId = tab.url ? getYouTubeVideoId(tab.url) : null;
 
   useEffect(() =>
@@ -88,11 +93,25 @@ const DraggableTab = ({
       if (chaptersButtonRef.current?.contains(target)) return;
       if (chaptersRef.current && !chaptersRef.current.contains(target))
       {
+        e.stopPropagation();
+        e.preventDefault();
         setShowChapters(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const handleKeyDown = (e: KeyboardEvent) =>
+    {
+      if (e.key === 'Escape')
+      {
+        setShowChapters(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () =>
+    {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [showChapters]);
 
   const handleChaptersClick = async (e: React.MouseEvent) =>
@@ -117,6 +136,14 @@ const DraggableTab = ({
     setShowChapters(!showChapters);
   };
 
+  const handleContextMenu = (e: React.MouseEvent) =>
+  {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuPosition({ top: e.clientY, left: e.clientX });
+    setShowMenu(true);
+  };
+
   return (
     <div
       ref={setNodeRef}
@@ -133,6 +160,7 @@ const DraggableTab = ({
           : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
       )}
       onClick={() => onActivate(tab.id!)}
+      onContextMenu={handleContextMenu}
     >
       <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
 
@@ -187,6 +215,36 @@ const DraggableTab = ({
           <X size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       </div>
+
+      {/* Context menu */}
+      <ContextMenuOverlay
+        isOpen={showMenu}
+        onClose={() => setShowMenu(false)}
+        position={menuPosition}
+      >
+        {onPin && tab.url && (
+          <button
+            className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+            onClick={() =>
+            {
+              setShowMenu(false);
+              onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl);
+            }}
+          >
+            Pin to Sidebar
+          </button>
+        )}
+        <button
+          className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
+          onClick={() =>
+          {
+            setShowMenu(false);
+            if (tab.id) onClose(tab.id);
+          }}
+        >
+          Close Tab
+        </button>
+      </ContextMenuOverlay>
 
       {/* Chapters popup */}
       {showChapters && (
@@ -251,9 +309,25 @@ const TabGroupHeader = ({
 }: TabGroupHeaderProps) =>
 {
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
+  const [showMenu, setShowMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  const handleContextMenu = (e: React.MouseEvent) =>
+  {
+    e.preventDefault();
+    e.stopPropagation();
+    if (rowRef.current)
+    {
+      const rect = rowRef.current.getBoundingClientRect();
+      setMenuPosition({ top: rect.bottom + 4, left: e.clientX });
+    }
+    setShowMenu(true);
+  };
 
   return (
     <div
+      ref={rowRef}
       data-group-header-id={group.id}
       data-is-group-header="true"
       className={clsx(
@@ -266,6 +340,7 @@ const TabGroupHeader = ({
       )}
       style={{ paddingLeft: `${getIndentPadding(1)}px` }}
       onClick={onToggle}
+      onContextMenu={handleContextMenu}
     >
       <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} afterIndentPx={afterDropIndentPx} />
 
@@ -276,17 +351,23 @@ const TabGroupHeader = ({
       <span className={clsx("flex-1 font-medium truncate", colorStyle.text)}>
         {group.title || 'Unnamed Group'}
       </span>
-      <button
-        onClick={(e) =>
-        {
-          e.stopPropagation();
-          onCloseGroup();
-        }}
-        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-        title="Close group"
+
+      <ContextMenuOverlay
+        isOpen={showMenu}
+        onClose={() => setShowMenu(false)}
+        position={menuPosition}
       >
-        <X size={14} className="text-gray-500" />
-      </button>
+        <button
+          className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
+          onClick={() =>
+          {
+            setShowMenu(false);
+            onCloseGroup();
+          }}
+        >
+          Close Group
+        </button>
+      </ContextMenuOverlay>
     </div>
   );
 };
@@ -328,8 +409,7 @@ export const TabList = ({ onPin }: TabListProps) =>
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   // Shared drag-drop state from hook
   const {
@@ -383,21 +463,6 @@ export const TabList = ({ onPin }: TabListProps) =>
       }, 50);
     }
   }, [tabs]);
-
-  useEffect(() =>
-  {
-    const handleClickOutside = (e: MouseEvent) =>
-    {
-      const target = e.target as Node;
-      if (menuButtonRef.current?.contains(target)) return;
-      if (menuRef.current && !menuRef.current.contains(target))
-      {
-        setShowMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -720,6 +785,13 @@ export const TabList = ({ onPin }: TabListProps) =>
         className="group relative flex items-center py-1 rounded cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent"
         style={{ paddingLeft: `${getIndentPadding(0)}px`, paddingRight: '8px' }}
         onClick={() => setIsExpanded(!isExpanded)}
+        onContextMenu={(e) =>
+        {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenuPosition({ top: e.clientY, left: e.clientX });
+          setShowMenu(true);
+        }}
       >
         <span className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -728,40 +800,32 @@ export const TabList = ({ onPin }: TabListProps) =>
           <Layers size={16} />
         </span>
         <span className="flex-1 font-medium">Active Tabs</span>
-        <button
-          ref={menuButtonRef}
-          onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-        >
-          <MoreHorizontal size={14} />
-        </button>
-
-        {showMenu && (
-          <div
-            ref={menuRef}
-            className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-32"
-          >
-            <button
-              className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-              onClick={(e) => { e.stopPropagation(); sortTabs('asc'); setShowMenu(false); }}
-            >
-              Sort by Domain (A-Z)
-            </button>
-            <button
-              className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-              onClick={(e) => { e.stopPropagation(); sortTabs('desc'); setShowMenu(false); }}
-            >
-              Sort by Domain (Z-A)
-            </button>
-            <button
-              className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
-              onClick={(e) => { e.stopPropagation(); closeAllTabs(); setShowMenu(false); }}
-            >
-              Close All Tabs
-            </button>
-          </div>
-        )}
       </div>
+
+      <ContextMenuOverlay
+        isOpen={showMenu}
+        onClose={() => setShowMenu(false)}
+        position={menuPosition}
+      >
+        <button
+          className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+          onClick={() => { sortTabs('asc'); setShowMenu(false); }}
+        >
+          Sort by Domain (A-Z)
+        </button>
+        <button
+          className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
+          onClick={() => { sortTabs('desc'); setShowMenu(false); }}
+        >
+          Sort by Domain (Z-A)
+        </button>
+        <button
+          className="flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
+          onClick={() => { closeAllTabs(); setShowMenu(false); }}
+        >
+          Close All Tabs
+        </button>
+      </ContextMenuOverlay>
 
       {isExpanded && (
         <DndContext

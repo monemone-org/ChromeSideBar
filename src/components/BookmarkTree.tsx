@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
+import { ContextMenuOverlay } from './ContextMenuOverlay';
 import {
   ChevronRight,
   ChevronDown,
@@ -15,7 +16,6 @@ import {
   FolderPlus,
   ArrowDownAZ,
   Calendar,
-  MoreHorizontal,
   Pin
 } from 'lucide-react';
 import clsx from 'clsx';
@@ -53,6 +53,20 @@ const EditModal = ({ node, onSave, onClose }: EditModalProps) => {
   const [title, setTitle] = useState(node.title);
   const [url, setUrl] = useState(node.url || '');
   const isFolder = !node.url;
+
+  // Escape key handler
+  useEffect(() =>
+  {
+    const handleKeyDown = (e: KeyboardEvent) =>
+    {
+      if (e.key === 'Escape')
+      {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,50 +229,30 @@ const isDescendant = (
 interface ContextMenuProps {
   isFolder: boolean;
   isSpecialFolder: boolean;
+  position: { top: number; left: number };
   onEdit: () => void;
   onDelete: () => void;
   onCreateFolder?: () => void;
   onSortByName?: () => void;
   onSortByDate?: () => void;
   onClose: () => void;
-  toggleButtonRef?: React.RefObject<HTMLButtonElement>;
 }
 
 const ContextMenu = ({
   isFolder,
   isSpecialFolder,
+  position,
   onEdit,
   onDelete,
   onCreateFolder,
   onSortByName,
   onSortByDate,
-  onClose,
-  toggleButtonRef
+  onClose
 }: ContextMenuProps) => {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      // Ignore clicks on the toggle button (let button handle it)
-      if (toggleButtonRef?.current?.contains(target)) {
-        return;
-      }
-      if (menuRef.current && !menuRef.current.contains(target)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose, toggleButtonRef]);
-
   const menuItemClass = "flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200";
 
   return (
-    <div
-      ref={menuRef}
-      className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-32"
-    >
+    <ContextMenuOverlay isOpen={true} onClose={onClose} position={position}>
       {isFolder && (
         <>
           <button className={menuItemClass} onClick={() => { onCreateFolder?.(); onClose(); }}>
@@ -283,7 +277,7 @@ const ContextMenu = ({
           </button>
         </>
       )}
-    </div>
+    </ContextMenuOverlay>
   );
 };
 
@@ -328,7 +322,7 @@ const BookmarkItem = ({
 }: BookmarkItemProps) => {
   const isFolder = !node.url;
   const [showMenu, setShowMenu] = useState(false);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   // Set up draggable (disabled for special folders)
   const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
@@ -380,6 +374,13 @@ const BookmarkItem = ({
         )}
         onPointerEnter={() => isDragging && onPointerEnter?.(node.id)}
         onPointerLeave={() => isDragging && onPointerLeave?.()}
+        onContextMenu={(e) =>
+        {
+          e.preventDefault();
+          e.stopPropagation();
+          setMenuPosition({ top: e.clientY, left: e.clientX });
+          setShowMenu(true);
+        }}
         {...attributes}
         {...listeners}
       >
@@ -450,25 +451,17 @@ const BookmarkItem = ({
           </button>
         )}
 
-        <button
-          ref={menuButtonRef}
-          onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
-          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-        >
-          <MoreHorizontal size={14} />
-        </button>
-
         {showMenu && (
           <ContextMenu
             isFolder={isFolder}
             isSpecialFolder={SPECIAL_FOLDER_IDS.includes(node.id)}
+            position={menuPosition}
             onEdit={() => onEdit(node)}
             onDelete={() => onRemove(node.id)}
             onCreateFolder={() => onCreateFolder(node.id)}
             onSortByName={() => onSort(node.id, 'name')}
             onSortByDate={() => onSort(node.id, 'dateAdded')}
             onClose={() => setShowMenu(false)}
-            toggleButtonRef={menuButtonRef}
           />
         )}
       </div>
