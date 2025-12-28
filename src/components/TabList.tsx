@@ -356,13 +356,16 @@ const RenameGroupDialog = ({
 }: RenameGroupDialogProps) =>
 {
   const [newName, setNewName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Reset state when dialog opens
+  // Reset state and focus input when dialog opens
   useEffect(() =>
   {
     if (isOpen && group)
     {
       setNewName(group.title || '');
+      // Focus after a short delay to ensure portal is mounted
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [isOpen, group]);
 
@@ -410,11 +413,11 @@ const RenameGroupDialog = ({
               Group Name
             </label>
             <input
+              ref={inputRef}
               type="text"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
               placeholder="Enter group name"
-              autoFocus
               className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
               onKeyDown={(e) =>
               {
