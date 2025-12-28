@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
+import { Dialog } from './Dialog';
 import * as ContextMenu from './ContextMenu';
 import {
   ChevronRight,
@@ -12,14 +13,12 @@ import {
   Globe,
   Trash,
   Edit,
-  X,
   FolderPlus,
   ArrowDownAZ,
   Calendar,
   Pin
 } from 'lucide-react';
 import clsx from 'clsx';
-import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragOverlay,
@@ -54,20 +53,6 @@ const EditModal = ({ node, onSave, onClose }: EditModalProps) => {
   const [url, setUrl] = useState(node.url || '');
   const isFolder = !node.url;
 
-  // Escape key handler
-  useEffect(() =>
-  {
-    const handleKeyDown = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape')
-      {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(node.id, title, isFolder ? undefined : url);
@@ -75,57 +60,51 @@ const EditModal = ({ node, onSave, onClose }: EditModalProps) => {
   };
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 w-full max-w-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100">
-            Edit {isFolder ? 'Folder' : 'Bookmark'}
-          </h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500">
-            <X size={16} />
-          </button>
+    <Dialog
+      isOpen={true}
+      onClose={onClose}
+      title={`Edit ${isFolder ? 'Folder' : 'Bookmark'}`}
+      maxWidth="max-w-sm"
+    >
+      <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        <div>
+          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Name</label>
+          <input
+            autoFocus
+            className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        {!isFolder && (
           <div>
-            <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Name</label>
+            <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">URL</label>
             <input
-              autoFocus
               className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
             />
           </div>
+        )}
 
-          {!isFolder && (
-            <div>
-              <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">URL</label>
-              <input
-                className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-            </div>
-          )}
-
-          <div className="flex justify-end space-x-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
-            >
-              Save
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex justify-end space-x-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+          >
+            Save
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 };
 
@@ -148,48 +127,37 @@ const CreateFolderModal = ({ parentId, onSave, onClose }: CreateFolderModalProps
   };
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 w-full max-w-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100">
-            New Folder
-          </h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500">
-            <X size={16} />
-          </button>
+    <Dialog isOpen={true} onClose={onClose} title="New Folder" maxWidth="max-w-sm">
+      <form onSubmit={handleSubmit} className="p-4 space-y-3">
+        <div>
+          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Folder Name</label>
+          <input
+            autoFocus
+            className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter folder name"
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Folder Name</label>
-            <input
-              autoFocus
-              className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter folder name"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-2 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!title.trim()}
-              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-md"
-            >
-              Create
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex justify-end space-x-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!title.trim()}
+            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-md"
+          >
+            Create
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 };
 
@@ -731,16 +699,15 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
         {activeNode ? <DragOverlayContent node={activeNode} depth={activeDepth} /> : null}
       </DragOverlay>
 
-      {editingNode && createPortal(
+      {editingNode && (
         <EditModal
           node={editingNode}
           onSave={updateBookmark}
           onClose={() => setEditingNode(null)}
-        />,
-        document.body
+        />
       )}
 
-      {creatingFolderParentId && createPortal(
+      {creatingFolderParentId && (
         <CreateFolderModal
           parentId={creatingFolderParentId}
           onSave={(parentId, title) => {
@@ -755,8 +722,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
             });
           }}
           onClose={() => setCreatingFolderParentId(null)}
-        />,
-        document.body
+        />
       )}
     </DndContext>
   );

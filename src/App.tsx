@@ -3,6 +3,7 @@ import { BookmarkTree } from './components/BookmarkTree';
 import { TabList } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
 import { usePinnedSites } from './hooks/usePinnedSites';
+import { FontSizeContext } from './contexts/FontSizeContext';
 import { X, Settings } from 'lucide-react';
 
 function App() {
@@ -75,13 +76,14 @@ function App() {
   };
 
   return (
-    <div
-      className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
-      style={{ fontSize: `${fontSize}px` }}
-    >
+    <FontSizeContext.Provider value={fontSize}>
+      <div
+        className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
+        style={{ fontSize: `${fontSize}px` }}
+      >
       {/* Settings Modal */}
       {showSettings && (
-        <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4 text-sm">
+        <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 w-56 border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-3">
               <h2 className="font-bold">Settings</h2>
@@ -93,7 +95,7 @@ function App() {
             <div className="space-y-3">
               {/* Font Size */}
               <div>
-                <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
+                <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
                   Font Size (px)
                 </label>
                 <input
@@ -102,20 +104,20 @@ function App() {
                   max="36"
                   value={tempFontSize}
                   onChange={handleTempFontSizeChange}
-                  className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-xs"
+                  className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-gray-500 dark:text-gray-400">
                   Default: 14px
                 </p>
               </div>
 
               {/* Behaviour group */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                <label className="block text-xs font-medium mb-2 text-gray-700 dark:text-gray-300">
+                <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
                   Behaviour
                 </label>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={tempHideOtherBookmarks}
@@ -126,7 +128,7 @@ function App() {
                   </label>
 
                   <div>
-                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={tempOpenPinnedInNewTab}
@@ -135,13 +137,13 @@ function App() {
                       />
                       Open pinned sites in new tab
                     </label>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-5">
+                    <p className="mt-1 text-gray-500 dark:text-gray-400 ml-5">
                       Cmd+click opens in current tab
                     </p>
                   </div>
 
                   <div>
-                    <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={tempOpenBookmarkInNewTab}
@@ -150,12 +152,12 @@ function App() {
                       />
                       Open bookmarks in new tab
                     </label>
-                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 ml-5">
+                    <p className="mt-1 text-gray-500 dark:text-gray-400 ml-5">
                       Cmd+click opens in current tab
                     </p>
                   </div>
 
-                  <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={tempSortGroupsFirst}
@@ -169,17 +171,17 @@ function App() {
 
               {/* Pinned Sites Backup */}
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                <label className="block text-xs font-medium mb-2 text-gray-700 dark:text-gray-300">
+                <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
                   Pinned Sites Backup
                 </label>
                 <div className="flex gap-2">
                   <button
                     onClick={exportPinnedSites}
-                    className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                    className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
                   >
                     Export
                   </button>
-                  <label className="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer">
+                  <label className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer">
                     Import
                     <input
                       type="file"
@@ -200,13 +202,13 @@ function App() {
               <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end gap-2">
                 <button
                   onClick={handleCancel}
-                  className="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+                  className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleApply}
-                  className="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                 >
                   Apply
                 </button>
@@ -240,7 +242,8 @@ function App() {
         <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} openInNewTab={openBookmarkInNewTab} />
         <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} />
       </div>
-    </div>
+      </div>
+    </FontSizeContext.Provider>
   );
 }
 

@@ -2,6 +2,7 @@ import * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
 import { ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
 import { forwardRef, ComponentPropsWithoutRef } from 'react';
+import { useFontSize } from '../contexts/FontSizeContext';
 
 // Re-export Root and Trigger as-is
 export const Root = ContextMenuPrimitive.Root;
@@ -13,17 +14,21 @@ export const Sub = ContextMenuPrimitive.Sub;
 export const Content = forwardRef<
   HTMLDivElement,
   ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <ContextMenuPrimitive.Content
-    ref={ref}
-    className={clsx(
-      "z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
-      "animate-in fade-in-0 zoom-in-95",
-      className
-    )}
-    {...props}
-  />
-));
+>(({ className, style, ...props }, ref) => {
+  const fontSize = useFontSize();
+  return (
+    <ContextMenuPrimitive.Content
+      ref={ref}
+      className={clsx(
+        "z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
+        "animate-in fade-in-0 zoom-in-95",
+        className
+      )}
+      style={{ fontSize: `${fontSize}px`, ...style }}
+      {...props}
+    />
+  );
+});
 Content.displayName = 'ContextMenu.Content';
 
 // Styled Item
@@ -72,18 +77,22 @@ SubTrigger.displayName = 'ContextMenu.SubTrigger';
 export const SubContent = forwardRef<
   HTMLDivElement,
   ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubContent>
->(({ className, ...props }, ref) => (
-  <ContextMenuPrimitive.SubContent
-    ref={ref}
-    className={clsx(
-      "z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
-      "animate-in fade-in-0 zoom-in-95",
-      className
-    )}
-    sideOffset={4}
-    {...props}
-  />
-));
+>(({ className, style, ...props }, ref) => {
+  const fontSize = useFontSize();
+  return (
+    <ContextMenuPrimitive.SubContent
+      ref={ref}
+      className={clsx(
+        "z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
+        "animate-in fade-in-0 zoom-in-95",
+        className
+      )}
+      style={{ fontSize: `${fontSize}px`, ...style }}
+      sideOffset={4}
+      {...props}
+    />
+  );
+});
 SubContent.displayName = 'ContextMenu.SubContent';
 
 // Separator

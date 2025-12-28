@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { createPortal } from 'react-dom';
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useDragDrop } from '../hooks/useDragDrop';
-import { X, Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus } from 'lucide-react';
+import { Dialog } from './Dialog';
+import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus, X } from 'lucide-react';
 import {
   Chapter,
   getYouTubeVideoId,
@@ -93,22 +93,7 @@ const AddToGroupDialog = ({
     }
   }, [isOpen]);
 
-  // Escape key handler
-  useEffect(() =>
-  {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape')
-      {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || tabId === null) return null;
+  if (tabId === null) return null;
 
   const handleSelectGroup = (groupId: number) =>
   {
@@ -125,111 +110,100 @@ const AddToGroupDialog = ({
     }
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-xs border border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100">
-            {isCreatingNew ? 'Create New Group' : 'Add to Group'}
-          </h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {isCreatingNew ? (
-          <div className="p-3 space-y-3">
-            <div>
-              <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
-                Group Name
-              </label>
-              <input
-                type="text"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="Enter group name"
-                autoFocus
-                className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                onKeyDown={(e) =>
+  return (
+    <Dialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title={isCreatingNew ? 'Create New Group' : 'Add to Group'}
+    >
+      {isCreatingNew ? (
+        <div className="p-3 space-y-3">
+          <div>
+            <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
+              Group Name
+            </label>
+            <input
+              type="text"
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              placeholder="Enter group name"
+              autoFocus
+              className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              onKeyDown={(e) =>
+              {
+                if (e.key === 'Enter' && newGroupName.trim())
                 {
-                  if (e.key === 'Enter' && newGroupName.trim())
-                  {
-                    handleCreateGroup();
-                  }
-                }}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
-                Color
-              </label>
-              <div className="flex gap-1.5 flex-wrap">
-                {GROUP_COLOR_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    onClick={() => setNewGroupColor(opt.value)}
-                    className={clsx(
-                      "w-6 h-6 rounded-full border-2 transition-transform hover:scale-110",
-                      opt.dot,
-                      newGroupColor === opt.value
-                        ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
-                        : "border-transparent"
-                    )}
-                    title={opt.value}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setIsCreatingNew(false)}
-                className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-              >
-                Back
-              </button>
-              <button
-                onClick={handleCreateGroup}
-                disabled={!newGroupName.trim()}
-                className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-md"
-              >
-                Create
-              </button>
+                  handleCreateGroup();
+                }
+              }}
+            />
+          </div>
+          <div>
+            <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
+              Color
+            </label>
+            <div className="flex gap-1.5 flex-wrap">
+              {GROUP_COLOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setNewGroupColor(opt.value)}
+                  className={clsx(
+                    "w-6 h-6 rounded-full border-2 transition-transform hover:scale-110",
+                    opt.dot,
+                    newGroupColor === opt.value
+                      ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
+                      : "border-transparent"
+                  )}
+                  title={opt.value}
+                />
+              ))}
             </div>
           </div>
-        ) : (
-          <div className="py-1 max-h-64 overflow-y-auto">
-            {/* Existing groups */}
-            {availableGroups.map((group) =>
-            {
-              const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
-              return (
-                <button
-                  key={group.id}
-                  onClick={() => handleSelectGroup(group.id)}
-                  className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
-                >
-                  <span className={clsx("w-3 h-3 rounded-full flex-shrink-0", colorStyle.dot)} />
-                  <span className="truncate">{group.title || 'Unnamed Group'}</span>
-                </button>
-              );
-            })}
-
-            {/* Create new group option at bottom */}
+          <div className="flex justify-end gap-2 pt-2">
             <button
-              onClick={() => setIsCreatingNew(true)}
-              className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-blue-600 dark:text-blue-400"
+              onClick={() => setIsCreatingNew(false)}
+              className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
             >
-              <Plus size={16} />
-              <span>Create New Group</span>
+              Back
+            </button>
+            <button
+              onClick={handleCreateGroup}
+              disabled={!newGroupName.trim()}
+              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-md"
+            >
+              Create
             </button>
           </div>
-        )}
-      </div>
-    </div>,
-    document.body
+        </div>
+      ) : (
+        <div className="py-1 max-h-64 overflow-y-auto">
+          {/* Existing groups */}
+          {availableGroups.map((group) =>
+          {
+            const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
+            return (
+              <button
+                key={group.id}
+                onClick={() => handleSelectGroup(group.id)}
+                className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
+              >
+                <span className={clsx("w-3 h-3 rounded-full flex-shrink-0", colorStyle.dot)} />
+                <span className="truncate">{group.title || 'Unnamed Group'}</span>
+              </button>
+            );
+          })}
+
+          {/* Create new group option at bottom */}
+          <button
+            onClick={() => setIsCreatingNew(true)}
+            className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-blue-600 dark:text-blue-400"
+          >
+            <Plus size={16} />
+            <span>Create New Group</span>
+          </button>
+        </div>
+      )}
+    </Dialog>
   );
 };
 
@@ -259,22 +233,7 @@ const ChangeGroupColorDialog = ({
     }
   }, [isOpen, group]);
 
-  // Escape key handler
-  useEffect(() =>
-  {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape')
-      {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !group) return null;
+  if (!group) return null;
 
   const handleSave = () =>
   {
@@ -282,61 +241,46 @@ const ChangeGroupColorDialog = ({
     onClose();
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-xs border border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100">
-            Change Group Color
-          </h3>
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose} title="Change Group Color">
+      <div className="p-3 space-y-3">
+        <div>
+          <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
+            Select Color
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            {GROUP_COLOR_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setSelectedColor(opt.value)}
+                className={clsx(
+                  "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110",
+                  opt.dot,
+                  selectedColor === opt.value
+                    ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
+                    : "border-transparent"
+                )}
+                title={opt.value}
+              />
+            ))}
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
           >
-            <X size={16} />
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+          >
+            Save
           </button>
         </div>
-
-        <div className="p-3 space-y-3">
-          <div>
-            <label className="block text-xs font-medium mb-2 text-gray-700 dark:text-gray-300">
-              Select Color
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              {GROUP_COLOR_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  onClick={() => setSelectedColor(opt.value)}
-                  className={clsx(
-                    "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110",
-                    opt.dot,
-                    selectedColor === opt.value
-                      ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
-                      : "border-transparent"
-                  )}
-                  title={opt.value}
-                />
-              ))}
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md"
-            >
-              Save
-            </button>
-          </div>
-        </div>
       </div>
-    </div>,
-    document.body
+    </Dialog>
   );
 };
 
@@ -369,22 +313,7 @@ const RenameGroupDialog = ({
     }
   }, [isOpen, group]);
 
-  // Escape key handler
-  useEffect(() =>
-  {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape')
-      {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen || !group) return null;
+  if (!group) return null;
 
   const handleSave = () =>
   {
@@ -392,60 +321,45 @@ const RenameGroupDialog = ({
     onClose();
   };
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-xs border border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="font-medium text-gray-900 dark:text-gray-100">
-            Rename Group
-          </h3>
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose} title="Rename Group">
+      <div className="p-3 space-y-3">
+        <div>
+          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
+            Group Name
+          </label>
+          <input
+            ref={inputRef}
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Enter group name"
+            className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+            onKeyDown={(e) =>
+            {
+              if (e.key === 'Enter')
+              {
+                handleSave();
+              }
+            }}
+          />
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
           <button
             onClick={onClose}
-            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
           >
-            <X size={16} />
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+          >
+            Save
           </button>
         </div>
-
-        <div className="p-3 space-y-3">
-          <div>
-            <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
-              Group Name
-            </label>
-            <input
-              ref={inputRef}
-              type="text"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="Enter group name"
-              className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-              onKeyDown={(e) =>
-              {
-                if (e.key === 'Enter')
-                {
-                  handleSave();
-                }
-              }}
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={onClose}
-              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md"
-            >
-              Save
-            </button>
-          </div>
-        </div>
       </div>
-    </div>,
-    document.body
+    </Dialog>
   );
 };
 

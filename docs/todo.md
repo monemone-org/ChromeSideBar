@@ -12,5 +12,10 @@
 - [x] export/import pinned sites in json 
 - [x] for youtube tab, add a action button to show chapters in a popup menu
 
-- Active Tab, "sort by domain" support accending (a-z) and descending (z-a). 
+- [x] Active Tab, "sort by domain" support accending (a-z) and descending (z-a). 
+- [x] rename group dialog: text field should have default focus
+
+- [ ] Save and cancel buttons in dialog is bigger than system default font. check all UI in all dialogs to use system normal size font.
+- [ ] pin site icon size , configurable in option dialog.
+- [ ] pin site to be in sync with Chrome's pinned tab
 
