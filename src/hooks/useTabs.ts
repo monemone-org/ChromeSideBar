@@ -217,6 +217,20 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
+  const createTabInGroup = useCallback((groupId: number) =>
+  {
+    chrome.tabs.create({ active: true }, (tab) =>
+    {
+      if (!handleError('create tab'))
+      {
+        chrome.tabs.group({ tabIds: [tab.id!], groupId }, () =>
+        {
+          handleError('add to group');
+        });
+      }
+    });
+  }, [handleError]);
+
   const sortGroupTabs = useCallback((groupId: number, direction: 'asc' | 'desc' = 'asc') =>
   {
     // Get tabs in this group
@@ -248,6 +262,7 @@ export const useTabs = () => {
     groupTab,
     ungroupTab,
     createGroupWithTab,
+    createTabInGroup,
     sortTabs,
     sortGroupTabs,
     closeAllTabs,

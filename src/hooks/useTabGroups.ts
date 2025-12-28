@@ -53,5 +53,14 @@ export const useTabGroups = () =>
     };
   }, [fetchTabGroups]);
 
-  return { tabGroups, error };
+  const updateGroup = useCallback((groupId: number,
+                                   properties: { title?: string; color?: chrome.tabGroups.ColorEnum }) =>
+  {
+    chrome.tabGroups.update(groupId, properties, () =>
+    {
+      handleError('update');
+    });
+  }, [handleError]);
+
+  return { tabGroups, updateGroup, error };
 };

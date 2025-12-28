@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chrome SideBar",
-  "version": "1.0.31",
+  "version": "1.0.32",
   "description": "Bookmarks and Active Tabs in Side Panel",
   "permissions": [
     "sidePanel",
@@ -41,6 +41,13 @@
         "mac": "Command+Shift+E"
       },
       "description": "Toggle Side Panel"
+    },
+    "new-tab-in-group": {
+      "suggested_key": {
+        "default": "Alt+T",
+        "mac": "Alt+T"
+      },
+      "description": "New Tab in Active Group"
     }
   }
 }

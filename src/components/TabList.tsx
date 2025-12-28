@@ -233,6 +233,219 @@ const AddToGroupDialog = ({
   );
 };
 
+// --- Change Group Color Dialog ---
+interface ChangeGroupColorDialogProps {
+  isOpen: boolean;
+  group: chrome.tabGroups.TabGroup | null;
+  onChangeColor: (groupId: number, color: chrome.tabGroups.ColorEnum) => void;
+  onClose: () => void;
+}
+
+const ChangeGroupColorDialog = ({
+  isOpen,
+  group,
+  onChangeColor,
+  onClose
+}: ChangeGroupColorDialogProps) =>
+{
+  const [selectedColor, setSelectedColor] = useState<chrome.tabGroups.ColorEnum>('blue');
+
+  // Reset state when dialog opens
+  useEffect(() =>
+  {
+    if (isOpen && group)
+    {
+      setSelectedColor(group.color);
+    }
+  }, [isOpen, group]);
+
+  // Escape key handler
+  useEffect(() =>
+  {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) =>
+    {
+      if (e.key === 'Escape')
+      {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !group) return null;
+
+  const handleSave = () =>
+  {
+    onChangeColor(group.id, selectedColor);
+    onClose();
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-xs border border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="font-medium text-gray-900 dark:text-gray-100">
+            Change Group Color
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-3 space-y-3">
+          <div>
+            <label className="block text-xs font-medium mb-2 text-gray-700 dark:text-gray-300">
+              Select Color
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {GROUP_COLOR_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setSelectedColor(opt.value)}
+                  className={clsx(
+                    "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110",
+                    opt.dot,
+                    selectedColor === opt.value
+                      ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
+                      : "border-transparent"
+                  )}
+                  title={opt.value}
+                />
+              ))}
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={onClose}
+              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// --- Rename Group Dialog ---
+interface RenameGroupDialogProps {
+  isOpen: boolean;
+  group: chrome.tabGroups.TabGroup | null;
+  onRename: (groupId: number, title: string) => void;
+  onClose: () => void;
+}
+
+const RenameGroupDialog = ({
+  isOpen,
+  group,
+  onRename,
+  onClose
+}: RenameGroupDialogProps) =>
+{
+  const [newName, setNewName] = useState('');
+
+  // Reset state when dialog opens
+  useEffect(() =>
+  {
+    if (isOpen && group)
+    {
+      setNewName(group.title || '');
+    }
+  }, [isOpen, group]);
+
+  // Escape key handler
+  useEffect(() =>
+  {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) =>
+    {
+      if (e.key === 'Escape')
+      {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !group) return null;
+
+  const handleSave = () =>
+  {
+    onRename(group.id, newName.trim());
+    onClose();
+  };
+
+  return createPortal(
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-xs border border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="font-medium text-gray-900 dark:text-gray-100">
+            Rename Group
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-3 space-y-3">
+          <div>
+            <label className="block text-xs font-medium mb-1 text-gray-700 dark:text-gray-300">
+              Group Name
+            </label>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Enter group name"
+              autoFocus
+              className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+              onKeyDown={(e) =>
+              {
+                if (e.key === 'Enter')
+                {
+                  handleSave();
+                }
+              }}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={onClose}
+              className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 interface DraggableTabProps {
   tab: chrome.tabs.Tab;
   indentLevel: number;
@@ -470,6 +683,9 @@ interface TabGroupHeaderProps {
   onToggle: () => void;
   onCloseGroup: () => void;
   onSortGroup: (direction: 'asc' | 'desc') => void;
+  onChangeColor: () => void;
+  onRename: () => void;
+  onNewTab: () => void;
 }
 
 const TabGroupHeader = ({
@@ -482,7 +698,10 @@ const TabGroupHeader = ({
   afterDropIndentPx,
   onToggle,
   onCloseGroup,
-  onSortGroup
+  onSortGroup,
+  onChangeColor,
+  onRename,
+  onNewTab
 }: TabGroupHeaderProps) =>
 {
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
@@ -516,12 +735,24 @@ const TabGroupHeader = ({
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content>
+          <ContextMenu.Item onSelect={onNewTab}>
+            New Tab
+          </ContextMenu.Item>
+          <ContextMenu.Separator />
           <ContextMenu.Item onSelect={() => onSortGroup('asc')}>
             Sort by Domain (A-Z)
           </ContextMenu.Item>
           <ContextMenu.Item onSelect={() => onSortGroup('desc')}>
             Sort by Domain (Z-A)
           </ContextMenu.Item>
+          <ContextMenu.Separator />
+          <ContextMenu.Item onSelect={onRename}>
+            Rename Group
+          </ContextMenu.Item>
+          <ContextMenu.Item onSelect={onChangeColor}>
+            Change Color
+          </ContextMenu.Item>
+          <ContextMenu.Separator />
           <ContextMenu.Item danger onSelect={onCloseGroup}>
             Close Group
           </ContextMenu.Item>
@@ -564,8 +795,8 @@ interface TabListProps {
 
 export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
 {
-  const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
-  const { tabGroups } = useTabGroups();
+  const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
+  const { tabGroups, updateGroup } = useTabGroups();
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -584,6 +815,38 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
   const closeAddToGroupDialog = useCallback(() =>
   {
     setAddToGroupDialog({ isOpen: false, tabId: null });
+  }, []);
+
+  // Change Group Color dialog state
+  const [changeColorDialog, setChangeColorDialog] = useState<{
+    isOpen: boolean;
+    group: chrome.tabGroups.TabGroup | null;
+  }>({ isOpen: false, group: null });
+
+  const openChangeColorDialog = useCallback((group: chrome.tabGroups.TabGroup) =>
+  {
+    setChangeColorDialog({ isOpen: true, group });
+  }, []);
+
+  const closeChangeColorDialog = useCallback(() =>
+  {
+    setChangeColorDialog({ isOpen: false, group: null });
+  }, []);
+
+  // Rename Group dialog state
+  const [renameGroupDialog, setRenameGroupDialog] = useState<{
+    isOpen: boolean;
+    group: chrome.tabGroups.TabGroup | null;
+  }>({ isOpen: false, group: null });
+
+  const openRenameGroupDialog = useCallback((group: chrome.tabGroups.TabGroup) =>
+  {
+    setRenameGroupDialog({ isOpen: true, group });
+  }, []);
+
+  const closeRenameGroupDialog = useCallback(() =>
+  {
+    setRenameGroupDialog({ isOpen: false, group: null });
   }, []);
 
   // Shared drag-drop state from hook
@@ -1044,6 +1307,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
                     onToggle={() => toggleGroup(item.group.id)}
                     onCloseGroup={() => closeGroup(item.tabs)}
                     onSortGroup={(direction) => sortGroupTabs(item.group.id, direction)}
+                    onChangeColor={() => openChangeColorDialog(item.group)}
+                    onRename={() => openRenameGroupDialog(item.group)}
+                    onNewTab={() => createTabInGroup(item.group.id)}
                   />
                   {isGroupExpanded && item.tabs.map((tab) =>
                   {
@@ -1087,6 +1353,20 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
         onAddToGroup={groupTab}
         onCreateGroup={createGroupWithTab}
         onClose={closeAddToGroupDialog}
+      />
+
+      <ChangeGroupColorDialog
+        isOpen={changeColorDialog.isOpen}
+        group={changeColorDialog.group}
+        onChangeColor={(groupId, color) => updateGroup(groupId, { color })}
+        onClose={closeChangeColorDialog}
+      />
+
+      <RenameGroupDialog
+        isOpen={renameGroupDialog.isOpen}
+        group={renameGroupDialog.group}
+        onRename={(groupId, title) => updateGroup(groupId, { title })}
+        onClose={closeRenameGroupDialog}
       />
     </>
   );
