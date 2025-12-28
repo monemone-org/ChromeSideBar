@@ -19,6 +19,10 @@ function App() {
   const [openBookmarkInNewTab, setOpenBookmarkInNewTab] = useState<boolean>(() => {
     return localStorage.getItem('sidebar-open-bookmark-new-tab') === 'true';
   });
+  const [sortGroupsFirst, setSortGroupsFirst] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sidebar-sort-groups-first');
+    return saved === null ? true : saved === 'true';
+  });
   const [showSettings, setShowSettings] = useState(false);
   const { pinnedSites, addPin, removePin, updatePin, resetFavicon, movePin, exportPinnedSites, importPinnedSites } = usePinnedSites();
 
@@ -27,6 +31,7 @@ function App() {
   const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(hideOtherBookmarks);
   const [tempOpenPinnedInNewTab, setTempOpenPinnedInNewTab] = useState(openPinnedInNewTab);
   const [tempOpenBookmarkInNewTab, setTempOpenBookmarkInNewTab] = useState(openBookmarkInNewTab);
+  const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(sortGroupsFirst);
 
   const openSettings = () => {
     // Copy current values to temp state
@@ -34,6 +39,7 @@ function App() {
     setTempHideOtherBookmarks(hideOtherBookmarks);
     setTempOpenPinnedInNewTab(openPinnedInNewTab);
     setTempOpenBookmarkInNewTab(openBookmarkInNewTab);
+    setTempSortGroupsFirst(sortGroupsFirst);
     setShowSettings(true);
   };
 
@@ -54,6 +60,9 @@ function App() {
 
     setOpenBookmarkInNewTab(tempOpenBookmarkInNewTab);
     localStorage.setItem('sidebar-open-bookmark-new-tab', tempOpenBookmarkInNewTab.toString());
+
+    setSortGroupsFirst(tempSortGroupsFirst);
+    localStorage.setItem('sidebar-sort-groups-first', tempSortGroupsFirst.toString());
 
     setShowSettings(false);
   };
@@ -145,6 +154,16 @@ function App() {
                       Cmd+click opens in current tab
                     </p>
                   </div>
+
+                  <label className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={tempSortGroupsFirst}
+                      onChange={(e) => setTempSortGroupsFirst(e.target.checked)}
+                      className="rounded border-gray-300 dark:border-gray-600"
+                    />
+                    Sort tab groups first
+                  </label>
                 </div>
               </div>
 
@@ -219,7 +238,7 @@ function App() {
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto p-2">
         <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} openInNewTab={openBookmarkInNewTab} />
-        <TabList onPin={addPin} />
+        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} />
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Globe, X, RotateCcw, Search } from 'lucide-react';
+import { Globe, X, RotateCcw, Search, Edit, Trash } from 'lucide-react';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
-import { ContextMenuOverlay } from './ContextMenuOverlay';
+import * as ContextMenu from './ContextMenu';
 
 // Iconify API for on-demand icon loading
 const ICONIFY_API_BASE = 'https://api.iconify.design';
@@ -75,7 +75,6 @@ interface PinnedIconProps {
 }
 
 export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNewTab = false }: PinnedIconProps) => {
-  const [showMenu, setShowMenu] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
@@ -84,7 +83,6 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
   const [editIconColor, setEditIconColor] = useState(site.iconColor || DEFAULT_ICON_COLOR);
   const [customHexInput, setCustomHexInput] = useState('');
   const [iconSearch, setIconSearch] = useState('');
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [allIconNames, setAllIconNames] = useState<string[]>([]);
   const [iconsLoading, setIconsLoading] = useState(false);
   const iconRef = useRef<HTMLDivElement>(null);
@@ -203,11 +201,6 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
       return;
     }
 
-    // Ignore clicks when context menu is open
-    if (showMenu) {
-      return;
-    }
-
     if (e.shiftKey) {
       chrome.windows.create({ url: site.url });
     } else if (e.metaKey || e.ctrlKey) {
@@ -227,18 +220,7 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     }
   };
 
-  const handleContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (iconRef.current) {
-      const rect = iconRef.current.getBoundingClientRect();
-      setMenuPosition({ top: rect.bottom + 4, left: rect.left });
-    }
-    setShowMenu(true);
-  };
-
   const handleEdit = () => {
-    setShowMenu(false);
     setEditTitle(site.title);
     setEditUrl(site.url);
     setEditFavicon(site.favicon);
@@ -290,7 +272,6 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
   };
 
   const handleUnpin = () => {
-    setShowMenu(false);
     onRemove(site.id);
   };
 
@@ -315,49 +296,42 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
 
   return (
     <>
-      <div
-        ref={setRefs}
-        style={style}
-        {...attributes}
-        {...listeners}
-        className={clsx(
-          "group/pin relative w-7 h-7 flex items-center justify-center rounded",
-          isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
-        )}
-        onMouseUp={handleClick}
-        onContextMenu={handleContextMenu}
-      >
-        {site.favicon ? (
-          <img src={site.favicon} alt="" className="w-5 h-5" />
-        ) : (
-          <Globe className="w-5 h-5 text-gray-400" />
-        )}
+      <ContextMenu.Root>
+        <ContextMenu.Trigger asChild>
+          <div
+            ref={setRefs}
+            style={style}
+            {...attributes}
+            {...listeners}
+            className={clsx(
+              "group/pin relative w-7 h-7 flex items-center justify-center rounded",
+              isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+            )}
+            onMouseUp={handleClick}
+          >
+            {site.favicon ? (
+              <img src={site.favicon} alt="" className="w-5 h-5" />
+            ) : (
+              <Globe className="w-5 h-5 text-gray-400" />
+            )}
 
-        {/* Fast tooltip */}
-        <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/pin:opacity-100 group-hover/pin:visible transition-opacity duration-100 delay-150 pointer-events-none z-50">
-          {site.title}
-        </div>
-
-      </div>
-
-      <ContextMenuOverlay
-        isOpen={showMenu}
-        onClose={() => setShowMenu(false)}
-        position={menuPosition}
-      >
-        <button
-          className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
-          onClick={handleEdit}
-        >
-          Edit
-        </button>
-        <button
-          className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-red-500 dark:text-red-400"
-          onClick={handleUnpin}
-        >
-          Unpin
-        </button>
-      </ContextMenuOverlay>
+            {/* Fast tooltip */}
+            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded whitespace-nowrap opacity-0 invisible group-hover/pin:opacity-100 group-hover/pin:visible transition-opacity duration-100 delay-150 pointer-events-none z-50">
+              {site.title}
+            </div>
+          </div>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content>
+            <ContextMenu.Item onSelect={handleEdit}>
+              <Edit size={14} className="mr-2" /> Edit
+            </ContextMenu.Item>
+            <ContextMenu.Item danger onSelect={handleUnpin}>
+              <Trash size={14} className="mr-2" /> Unpin
+            </ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
 
       {showEditModal && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">

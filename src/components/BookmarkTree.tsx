@@ -4,7 +4,7 @@ import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
-import { ContextMenuOverlay } from './ContextMenuOverlay';
+import * as ContextMenu from './ContextMenu';
 import {
   ChevronRight,
   ChevronDown,
@@ -225,62 +225,6 @@ const isDescendant = (
   return sourceNode ? checkDescendants(sourceNode) : false;
 };
 
-// --- Context Menu Component ---
-interface ContextMenuProps {
-  isFolder: boolean;
-  isSpecialFolder: boolean;
-  position: { top: number; left: number };
-  onEdit: () => void;
-  onDelete: () => void;
-  onCreateFolder?: () => void;
-  onSortByName?: () => void;
-  onSortByDate?: () => void;
-  onClose: () => void;
-}
-
-const ContextMenu = ({
-  isFolder,
-  isSpecialFolder,
-  position,
-  onEdit,
-  onDelete,
-  onCreateFolder,
-  onSortByName,
-  onSortByDate,
-  onClose
-}: ContextMenuProps) => {
-  const menuItemClass = "flex items-center w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200";
-
-  return (
-    <ContextMenuOverlay isOpen={true} onClose={onClose} position={position}>
-      {isFolder && (
-        <>
-          <button className={menuItemClass} onClick={() => { onCreateFolder?.(); onClose(); }}>
-            <FolderPlus size={14} className="mr-2" /> New Folder
-          </button>
-          <button className={menuItemClass} onClick={() => { onSortByName?.(); onClose(); }}>
-            <ArrowDownAZ size={14} className="mr-2" /> Sort by Name
-          </button>
-          <button className={menuItemClass} onClick={() => { onSortByDate?.(); onClose(); }}>
-            <Calendar size={14} className="mr-2" /> Sort by Date
-          </button>
-          {!isSpecialFolder && <div className="border-t border-gray-200 dark:border-gray-700 my-1" />}
-        </>
-      )}
-      {!isSpecialFolder && (
-        <>
-          <button className={menuItemClass} onClick={() => { onEdit(); onClose(); }}>
-            <Edit size={14} className="mr-2" /> Edit
-          </button>
-          <button className={clsx(menuItemClass, "text-red-500 dark:text-red-400")} onClick={() => { onDelete(); onClose(); }}>
-            <Trash size={14} className="mr-2" /> Delete
-          </button>
-        </>
-      )}
-    </ContextMenuOverlay>
-  );
-};
-
 // --- Bookmark Item ---
 interface BookmarkItemProps {
   node: chrome.bookmarks.BookmarkTreeNode;
@@ -321,11 +265,9 @@ const BookmarkItem = ({
   onPointerLeave
 }: BookmarkItemProps) => {
   const isFolder = !node.url;
-  const [showMenu, setShowMenu] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
 
   // Set up draggable (disabled for special folders)
-  const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
   const {
     attributes,
     listeners,
@@ -359,112 +301,131 @@ const BookmarkItem = ({
 
   return (
     <>
-      <div
-        ref={setNodeRef}
-        data-bookmark-id={node.id}
-        data-is-folder={isFolder}
-        data-depth={depth}
-        style={style}
-        className={clsx(
-          "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none",
-          !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
-          isBeingDragged && "opacity-50",
-          showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
-          !isSpecialFolder && "touch-none"
-        )}
-        onPointerEnter={() => isDragging && onPointerEnter?.(node.id)}
-        onPointerLeave={() => isDragging && onPointerLeave?.()}
-        onContextMenu={(e) =>
-        {
-          e.preventDefault();
-          e.stopPropagation();
-          setMenuPosition({ top: e.clientY, left: e.clientX });
-          setShowMenu(true);
-        }}
-        {...attributes}
-        {...listeners}
-      >
-        <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
-
-        <span
-          className={clsx("mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700", !isFolder && "invisible")}
-          onClick={(e) => { e.stopPropagation(); toggleFolder(node.id, !expandedState[node.id]); }}
-        >
-          {expandedState[node.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </span>
-
-        <span className="mr-2 text-gray-500 flex-shrink-0">
-          {isFolder ? (
-            <Folder size={16} />
-          ) : node.url ? (
-            <img
-              src={getFaviconUrl(node.url)}
-              alt=""
-              className="w-4 h-4"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-          ) : (
-            <Globe size={16} />
-          )}
-          {!isFolder && <Globe size={16} className="hidden" />}
-        </span>
-
-        <span
-          className="flex-1 truncate"
-          onClick={(e) => {
-            if (isFolder) {
-              toggleFolder(node.id, !expandedState[node.id]);
-            } else if (node.url) {
-              if (e.shiftKey) {
-                chrome.windows.create({ url: node.url });
-              } else if (e.metaKey || e.ctrlKey) {
-                // Cmd+click: invert the default behavior
-                if (openInNewTab) {
-                  chrome.tabs.update({ url: node.url });
-                } else {
-                  chrome.tabs.create({ url: node.url, active: false });
-                }
-              } else {
-                // Regular click: use the setting
-                if (openInNewTab) {
-                  chrome.tabs.create({ url: node.url, active: true });
-                } else {
-                  chrome.tabs.update({ url: node.url });
-                }
-              }
-            }
-          }}
-        >
-          {node.title}
-        </span>
-
-        {!isFolder && onPin && node.url && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
-            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-            title="Pin"
+      <ContextMenu.Root>
+        <ContextMenu.Trigger asChild>
+          <div
+            ref={setNodeRef}
+            data-bookmark-id={node.id}
+            data-is-folder={isFolder}
+            data-depth={depth}
+            style={style}
+            className={clsx(
+              "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none",
+              !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
+              isBeingDragged && "opacity-50",
+              showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
+              !isSpecialFolder && "touch-none"
+            )}
+            onPointerEnter={() => isDragging && onPointerEnter?.(node.id)}
+            onPointerLeave={() => isDragging && onPointerLeave?.()}
+            {...attributes}
+            {...listeners}
           >
-            <Pin size={14} />
-          </button>
-        )}
+            <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
 
-        {showMenu && (
-          <ContextMenu
-            isFolder={isFolder}
-            isSpecialFolder={SPECIAL_FOLDER_IDS.includes(node.id)}
-            position={menuPosition}
-            onEdit={() => onEdit(node)}
-            onDelete={() => onRemove(node.id)}
-            onCreateFolder={() => onCreateFolder(node.id)}
-            onSortByName={() => onSort(node.id, 'name')}
-            onSortByDate={() => onSort(node.id, 'dateAdded')}
-            onClose={() => setShowMenu(false)}
-          />
-        )}
-      </div>
+            <span
+              className={clsx("mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700", !isFolder && "invisible")}
+              onClick={(e) => { e.stopPropagation(); toggleFolder(node.id, !expandedState[node.id]); }}
+            >
+              {expandedState[node.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </span>
+
+            <span className="mr-2 text-gray-500 flex-shrink-0">
+              {isFolder ? (
+                <Folder size={16} />
+              ) : node.url ? (
+                <img
+                  src={getFaviconUrl(node.url)}
+                  alt=""
+                  className="w-4 h-4"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+              ) : (
+                <Globe size={16} />
+              )}
+              {!isFolder && <Globe size={16} className="hidden" />}
+            </span>
+
+            <span
+              className="flex-1 truncate"
+              onClick={(e) => {
+                if (isFolder) {
+                  toggleFolder(node.id, !expandedState[node.id]);
+                } else if (node.url) {
+                  if (e.shiftKey) {
+                    chrome.windows.create({ url: node.url });
+                  } else if (e.metaKey || e.ctrlKey) {
+                    // Cmd+click: invert the default behavior
+                    if (openInNewTab) {
+                      chrome.tabs.update({ url: node.url });
+                    } else {
+                      chrome.tabs.create({ url: node.url, active: false });
+                    }
+                  } else {
+                    // Regular click: use the setting
+                    if (openInNewTab) {
+                      chrome.tabs.create({ url: node.url, active: true });
+                    } else {
+                      chrome.tabs.update({ url: node.url });
+                    }
+                  }
+                }
+              }}
+            >
+              {node.title}
+            </span>
+
+            {!isFolder && onPin && node.url && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
+                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                title="Pin"
+              >
+                <Pin size={14} />
+              </button>
+            )}
+          </div>
+        </ContextMenu.Trigger>
+        <ContextMenu.Portal>
+          <ContextMenu.Content>
+            {isFolder && (
+              <>
+                <ContextMenu.Item onSelect={() => onCreateFolder(node.id)}>
+                  <FolderPlus size={14} className="mr-2" /> New Folder
+                </ContextMenu.Item>
+                <ContextMenu.Item onSelect={() => onSort(node.id, 'name')}>
+                  <ArrowDownAZ size={14} className="mr-2" /> Sort by Name
+                </ContextMenu.Item>
+                <ContextMenu.Item onSelect={() => onSort(node.id, 'dateAdded')}>
+                  <Calendar size={14} className="mr-2" /> Sort by Date
+                </ContextMenu.Item>
+                {!isSpecialFolder && <ContextMenu.Separator />}
+              </>
+            )}
+            {!isFolder && onPin && node.url && (
+              <>
+                <ContextMenu.Item onSelect={() => onPin(node.url!, node.title, getFaviconUrl(node.url!))}>
+                  <Pin size={14} className="mr-2" /> Pin to Sidebar
+                </ContextMenu.Item>
+                <ContextMenu.Separator />
+              </>
+            )}
+            {!isSpecialFolder && (
+              <>
+                <ContextMenu.Item onSelect={() => onEdit(node)}>
+                  <Edit size={14} className="mr-2" /> Edit
+                </ContextMenu.Item>
+                <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
+                  <Trash size={14} className="mr-2" /> Delete
+                </ContextMenu.Item>
+              </>
+            )}
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
 
       {isFolder && expandedState[node.id] && node.children && (
         <div>
