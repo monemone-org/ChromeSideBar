@@ -27,30 +27,31 @@ import {
 } from '@dnd-kit/core';
 import clsx from 'clsx';
 
-// Chrome tab group color mapping to Tailwind classes
-const GROUP_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
-  grey: { bg: 'bg-gray-200 dark:bg-gray-600', text: 'text-gray-700 dark:text-gray-200', dot: 'bg-gray-500' },
-  blue: { bg: 'bg-blue-100 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-200', dot: 'bg-blue-500' },
-  red: { bg: 'bg-red-100 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-200', dot: 'bg-red-500' },
-  yellow: { bg: 'bg-yellow-100 dark:bg-yellow-900/40', text: 'text-yellow-700 dark:text-yellow-200', dot: 'bg-yellow-500' },
-  green: { bg: 'bg-green-100 dark:bg-green-900/40', text: 'text-green-700 dark:text-green-200', dot: 'bg-green-500' },
-  pink: { bg: 'bg-pink-100 dark:bg-pink-900/40', text: 'text-pink-700 dark:text-pink-200', dot: 'bg-pink-500' },
-  purple: { bg: 'bg-purple-100 dark:bg-purple-900/40', text: 'text-purple-700 dark:text-purple-200', dot: 'bg-purple-500' },
-  cyan: { bg: 'bg-cyan-100 dark:bg-cyan-900/40', text: 'text-cyan-700 dark:text-cyan-200', dot: 'bg-cyan-500' },
-  orange: { bg: 'bg-orange-100 dark:bg-orange-900/40', text: 'text-orange-700 dark:text-orange-200', dot: 'bg-orange-500' },
+// Chrome tab group color mapping (exact Chrome hex codes)
+// Light theme: badge uses darker colors, Dark theme: badge uses lighter/pastel colors
+const GROUP_COLORS: Record<string, { bg: string; badge: string; dot: string }> = {
+  grey: { bg: 'bg-[#F1F3F4] dark:bg-[#5F6368]/30', badge: 'bg-[#5F6368] dark:bg-[#BDC1C6]', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]' },
+  blue: { bg: 'bg-[#E8F0FE] dark:bg-[#8AB4F8]/20', badge: 'bg-[#1A73E8] dark:bg-[#8AB4F8]', dot: 'bg-[#1A73E8] dark:bg-[#8AB4F8]' },
+  red: { bg: 'bg-[#FCE8E6] dark:bg-[#F28B82]/20', badge: 'bg-[#D93025] dark:bg-[#F28B82]', dot: 'bg-[#D93025] dark:bg-[#F28B82]' },
+  yellow: { bg: 'bg-[#FEF7E0] dark:bg-[#FDD663]/20', badge: 'bg-[#E37400] dark:bg-[#FDD663]', dot: 'bg-[#E37400] dark:bg-[#FDD663]' },
+  green: { bg: 'bg-[#E6F4EA] dark:bg-[#81C995]/20', badge: 'bg-[#188038] dark:bg-[#81C995]', dot: 'bg-[#188038] dark:bg-[#81C995]' },
+  pink: { bg: 'bg-[#FEE7F5] dark:bg-[#FF8BCB]/20', badge: 'bg-[#D01884] dark:bg-[#FF8BCB]', dot: 'bg-[#D01884] dark:bg-[#FF8BCB]' },
+  purple: { bg: 'bg-[#F3E8FD] dark:bg-[#D7AEFB]/20', badge: 'bg-[#9333EA] dark:bg-[#D7AEFB]', dot: 'bg-[#9333EA] dark:bg-[#D7AEFB]' },
+  cyan: { bg: 'bg-[#E4F7FB] dark:bg-[#78D9EC]/20', badge: 'bg-[#11858E] dark:bg-[#78D9EC]', dot: 'bg-[#11858E] dark:bg-[#78D9EC]' },
+  orange: { bg: 'bg-[#FEF1E8] dark:bg-[#FCAD70]/20', badge: 'bg-[#FA903E] dark:bg-[#FCAD70]', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]' },
 };
 
 // Chrome tab group color options for new group creation
 const GROUP_COLOR_OPTIONS: { value: chrome.tabGroups.ColorEnum; dot: string }[] = [
-  { value: 'grey', dot: 'bg-gray-500' },
-  { value: 'blue', dot: 'bg-blue-500' },
-  { value: 'red', dot: 'bg-red-500' },
-  { value: 'yellow', dot: 'bg-yellow-500' },
-  { value: 'green', dot: 'bg-green-500' },
-  { value: 'pink', dot: 'bg-pink-500' },
-  { value: 'purple', dot: 'bg-purple-500' },
-  { value: 'cyan', dot: 'bg-cyan-500' },
-  { value: 'orange', dot: 'bg-orange-500' },
+  { value: 'grey', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]' },
+  { value: 'blue', dot: 'bg-[#1A73E8] dark:bg-[#8AB4F8]' },
+  { value: 'red', dot: 'bg-[#D93025] dark:bg-[#F28B82]' },
+  { value: 'yellow', dot: 'bg-[#E37400] dark:bg-[#FDD663]' },
+  { value: 'green', dot: 'bg-[#188038] dark:bg-[#81C995]' },
+  { value: 'pink', dot: 'bg-[#D01884] dark:bg-[#FF8BCB]' },
+  { value: 'purple', dot: 'bg-[#9333EA] dark:bg-[#D7AEFB]' },
+  { value: 'cyan', dot: 'bg-[#11858E] dark:bg-[#78D9EC]' },
+  { value: 'orange', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]' },
 ];
 
 // --- Add to Group Dialog ---
@@ -508,8 +509,7 @@ const TabGroupHeader = ({
           <span className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </span>
-          <span className={clsx("w-3 h-3 rounded-full mr-2 flex-shrink-0", colorStyle.dot)} />
-          <span className={clsx("flex-1 font-medium truncate", colorStyle.text)}>
+          <span className={clsx("px-2 py-0.5 rounded-full font-medium truncate text-white dark:text-black", colorStyle.badge)}>
             {group.title || 'Unnamed Group'}
           </span>
         </div>
