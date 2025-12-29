@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
@@ -43,17 +43,36 @@ const getFaviconUrl = (url: string): string => {
 
 // --- Edit Modal Component ---
 interface EditModalProps {
-  node: chrome.bookmarks.BookmarkTreeNode;
+  isOpen: boolean;
+  node: chrome.bookmarks.BookmarkTreeNode | null;
   onSave: (id: string, title: string, url?: string) => void;
   onClose: () => void;
 }
 
-const EditModal = ({ node, onSave, onClose }: EditModalProps) => {
-  const [title, setTitle] = useState(node.title);
-  const [url, setUrl] = useState(node.url || '');
+const EditModal = ({ isOpen, node, onSave, onClose }: EditModalProps) =>
+{
+  const [title, setTitle] = useState('');
+  const [url, setUrl] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Reset state and focus input when dialog opens
+  useEffect(() =>
+  {
+    if (isOpen && node)
+    {
+      setTitle(node.title);
+      setUrl(node.url || '');
+      // Focus after a short delay to ensure portal is mounted
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen, node]);
+
+  if (!node) return null;
+
   const isFolder = !node.url;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) =>
+  {
     e.preventDefault();
     onSave(node.id, title, isFolder ? undefined : url);
     onClose();
@@ -61,16 +80,16 @@ const EditModal = ({ node, onSave, onClose }: EditModalProps) => {
 
   return (
     <Dialog
-      isOpen={true}
+      isOpen={isOpen}
       onClose={onClose}
       title={`Edit ${isFolder ? 'Folder' : 'Bookmark'}`}
       maxWidth="max-w-sm"
     >
       <form onSubmit={handleSubmit} className="p-4 space-y-3">
         <div>
-          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Name</label>
+          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Folder Name</label>
           <input
-            autoFocus
+            ref={inputRef}
             className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -110,29 +129,47 @@ const EditModal = ({ node, onSave, onClose }: EditModalProps) => {
 
 // --- Create Folder Modal Component ---
 interface CreateFolderModalProps {
-  parentId: string;
+  isOpen: boolean;
+  parentId: string | null;
   onSave: (parentId: string, title: string) => void;
   onClose: () => void;
 }
 
-const CreateFolderModal = ({ parentId, onSave, onClose }: CreateFolderModalProps) => {
+const CreateFolderModal = ({ isOpen, parentId, onSave, onClose }: CreateFolderModalProps) =>
+{
   const [title, setTitle] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Reset state and focus input when dialog opens
+  useEffect(() =>
+  {
+    if (isOpen && parentId)
+    {
+      setTitle('');
+      // Focus after a short delay to ensure portal is mounted
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen, parentId]);
+
+  if (!parentId) return null;
+
+  const handleSubmit = (e: React.FormEvent) =>
+  {
     e.preventDefault();
-    if (title.trim()) {
+    if (title.trim())
+    {
       onSave(parentId, title.trim());
       onClose();
     }
   };
 
   return (
-    <Dialog isOpen={true} onClose={onClose} title="New Folder" maxWidth="max-w-sm">
+    <Dialog isOpen={isOpen} onClose={onClose} title="New Folder" maxWidth="max-w-sm">
       <form onSubmit={handleSubmit} className="p-4 space-y-3">
         <div>
           <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Folder Name</label>
           <input
-            autoFocus
+            ref={inputRef}
             className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -384,7 +421,7 @@ const BookmarkItem = ({
             {!isSpecialFolder && (
               <>
                 <ContextMenu.Item onSelect={() => onEdit(node)}>
-                  <Edit size={14} className="mr-2" /> Edit
+                  <Edit size={14} className="mr-2" /> Rename Folder
                 </ContextMenu.Item>
                 <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
                   <Trash size={14} className="mr-2" /> Delete
@@ -660,70 +697,70 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
   }, []);
 
   return (
-    <DndContext
-      sensors={sensors}
-      autoScroll={{
-        threshold: { x: 0.1, y: 0.1 },
-        acceleration: 7,
-        interval: 10,
-      }}
-      onDragStart={handleDragStart}
-      onDragMove={handleDragMove}
-      onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
-    >
-      {visibleBookmarks.map((node) => (
-        <BookmarkItem
-          key={node.id}
-          node={node}
-          depth={0}
-          expandedState={expandedState}
-          toggleFolder={toggleFolder}
-          onRemove={removeBookmark}
-          onEdit={setEditingNode}
-          onCreateFolder={handleCreateFolder}
-          onSort={sortBookmarks}
-          onPin={onPin}
-          openInNewTab={openInNewTab}
-          isDragging={!!activeId}
-          activeId={activeId}
-          dropTargetId={dropTargetId}
-          dropPosition={dropPosition}
-          onPointerEnter={handlePointerEnter}
-          onPointerLeave={handlePointerLeave}
-        />
-      ))}
+    <>
+      <DndContext
+        sensors={sensors}
+        autoScroll={{
+          threshold: { x: 0.1, y: 0.1 },
+          acceleration: 7,
+          interval: 10,
+        }}
+        onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
+        onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
+      >
+        {visibleBookmarks.map((node) => (
+          <BookmarkItem
+            key={node.id}
+            node={node}
+            depth={0}
+            expandedState={expandedState}
+            toggleFolder={toggleFolder}
+            onRemove={removeBookmark}
+            onEdit={setEditingNode}
+            onCreateFolder={handleCreateFolder}
+            onSort={sortBookmarks}
+            onPin={onPin}
+            openInNewTab={openInNewTab}
+            isDragging={!!activeId}
+            activeId={activeId}
+            dropTargetId={dropTargetId}
+            dropPosition={dropPosition}
+            onPointerEnter={handlePointerEnter}
+            onPointerLeave={handlePointerLeave}
+          />
+        ))}
 
-      {/* Drag overlay - no animation for valid drops, default animation for cancelled */}
-      <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
-        {activeNode ? <DragOverlayContent node={activeNode} depth={activeDepth} /> : null}
-      </DragOverlay>
+        {/* Drag overlay - no animation for valid drops, default animation for cancelled */}
+        <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
+          {activeNode ? <DragOverlayContent node={activeNode} depth={activeDepth} /> : null}
+        </DragOverlay>
+      </DndContext>
 
-      {editingNode && (
-        <EditModal
-          node={editingNode}
-          onSave={updateBookmark}
-          onClose={() => setEditingNode(null)}
-        />
-      )}
+      <EditModal
+        isOpen={editingNode !== null}
+        node={editingNode}
+        onSave={updateBookmark}
+        onClose={() => setEditingNode(null)}
+      />
 
-      {creatingFolderParentId && (
-        <CreateFolderModal
-          parentId={creatingFolderParentId}
-          onSave={(parentId, title) => {
-            createFolder(parentId, title, (newNode) => {
-              // Auto-expand parent folder to show the new folder
-              setExpandedState(prev => ({ ...prev, [parentId]: true }));
-              // Scroll to the new folder after DOM updates
-              setTimeout(() => {
-                const element = document.querySelector(`[data-bookmark-id="${newNode.id}"]`);
-                element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }, 100);
-            });
-          }}
-          onClose={() => setCreatingFolderParentId(null)}
-        />
-      )}
-    </DndContext>
+      <CreateFolderModal
+        isOpen={creatingFolderParentId !== null}
+        parentId={creatingFolderParentId}
+        onSave={(parentId, title) => {
+          createFolder(parentId, title, (newNode) => {
+            // Auto-expand parent folder to show the new folder
+            setExpandedState(prev => ({ ...prev, [parentId]: true }));
+            // Scroll to the new folder after DOM updates
+            setTimeout(() => {
+              const element = document.querySelector(`[data-bookmark-id="${newNode.id}"]`);
+              element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+          });
+        }}
+        onClose={() => setCreatingFolderParentId(null)}
+      />
+    </>
   );
 };

@@ -15,7 +15,8 @@
 - [x] Active Tab, "sort by domain" support accending (a-z) and descending (z-a). 
 - [x] rename group dialog: text field should have default focus
 
-- [ ] Save and cancel buttons in dialog is bigger than system default font. check all UI in all dialogs to use system normal size font.
-- [ ] pin site icon size , configurable in option dialog.
-- [ ] pin site to be in sync with Chrome's pinned tab
+- [x] Save and cancel buttons in dialog is bigger than system default font. check all UI in all dialogs to use system normal size font.
+- [x] pin site icon size , configurable in option dialog.
+- [x] pin site to be in sync with Chrome's pinned tab
 
+- [ ] add icon to popup menu for tabs and groups , similar to bookmarks and bookmark folders.
