@@ -469,11 +469,10 @@ const DraggableTab = ({
           data-tab-id={tab.id}
           data-group-id={tab.groupId ?? -1}
           style={{ paddingLeft: `${TAB_ROW_PADDING}px` }}
-          title={tab.url}
           {...attributes}
           {...listeners}
           className={clsx(
-            "group relative flex items-center py-1 px-2 rounded-md cursor-pointer",
+            "group/tab relative flex items-center py-1 px-2 rounded-md cursor-pointer",
             isBeingDragged && "opacity-50",
             tab.active
               ? "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
@@ -499,8 +498,12 @@ const DraggableTab = ({
       <span className="flex-1 truncate pr-1">
         {tab.title}
       </span>
+      {/* Fast URL tooltip */}
+      <div className="absolute left-0 top-full mt-1 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white rounded max-w-xs truncate opacity-0 invisible group-hover/tab:opacity-100 group-hover/tab:visible transition-opacity duration-100 delay-150 pointer-events-none z-50">
+        {tab.url}
+      </div>
       {/* Action buttons */}
-      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-2 opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-900 rounded">
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-2 opacity-0 group-hover/tab:opacity-100 bg-white dark:bg-gray-900 rounded">
         {videoId && (
           <button
             ref={chaptersButtonRef}
