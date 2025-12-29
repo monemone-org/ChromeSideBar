@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Chrome SideBar",
-  "version": "1.0.32",
+  "version": "1.0.39",
   "description": "Bookmarks and Active Tabs in Side Panel",
   "permissions": [
     "sidePanel",
