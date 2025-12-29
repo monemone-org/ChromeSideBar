@@ -72,9 +72,10 @@ interface PinnedIconProps {
              iconColor?: string) => void;
   onResetFavicon: (id: string) => void;
   onOpen: (site: PinnedSite) => void;
+  iconSize: number;
 }
 
-export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen }: PinnedIconProps) => {
+export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, iconSize }: PinnedIconProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
@@ -290,19 +291,19 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen }:
         <ContextMenu.Trigger asChild>
           <div
             ref={setRefs}
-            style={style}
+            style={{ ...style, width: iconSize + 8, height: iconSize + 8 }}
             {...attributes}
             {...listeners}
             className={clsx(
-              "group/pin relative w-7 h-7 flex items-center justify-center rounded",
+              "group/pin relative flex items-center justify-center rounded",
               isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
             )}
             onMouseUp={handleClick}
           >
             {site.favicon ? (
-              <img src={site.favicon} alt="" className="w-5 h-5" />
+              <img src={site.favicon} alt="" style={{ width: iconSize, height: iconSize }} />
             ) : (
-              <Globe className="w-5 h-5 text-gray-400" />
+              <Globe style={{ width: iconSize, height: iconSize }} className="text-gray-400" />
             )}
 
             {/* Fast tooltip */}

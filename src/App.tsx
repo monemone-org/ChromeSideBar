@@ -21,6 +21,10 @@ function App() {
     const saved = localStorage.getItem('sidebar-sort-groups-first');
     return saved === null ? true : saved === 'true';
   });
+  const [pinnedIconSize, setPinnedIconSize] = useState<number>(() => {
+    const saved = localStorage.getItem('sidebar-pinned-icon-size-px');
+    return saved ? parseInt(saved, 10) : 22;
+  });
   const [showSettings, setShowSettings] = useState(false);
   const { pinnedSites, addPin, removePin, updatePin, resetFavicon, openAsPinnedTab, movePin, exportPinnedSites, importPinnedSites } = usePinnedSites();
 
@@ -29,6 +33,7 @@ function App() {
   const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(hideOtherBookmarks);
   const [tempOpenBookmarkInNewTab, setTempOpenBookmarkInNewTab] = useState(openBookmarkInNewTab);
   const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(sortGroupsFirst);
+  const [tempPinnedIconSize, setTempPinnedIconSize] = useState(pinnedIconSize);
 
   const openSettings = () => {
     // Copy current values to temp state
@@ -36,6 +41,7 @@ function App() {
     setTempHideOtherBookmarks(hideOtherBookmarks);
     setTempOpenBookmarkInNewTab(openBookmarkInNewTab);
     setTempSortGroupsFirst(sortGroupsFirst);
+    setTempPinnedIconSize(pinnedIconSize);
     setShowSettings(true);
   };
 
@@ -57,6 +63,9 @@ function App() {
     setSortGroupsFirst(tempSortGroupsFirst);
     localStorage.setItem('sidebar-sort-groups-first', tempSortGroupsFirst.toString());
 
+    setPinnedIconSize(tempPinnedIconSize);
+    localStorage.setItem('sidebar-pinned-icon-size-px', tempPinnedIconSize.toString());
+
     setShowSettings(false);
   };
 
@@ -64,6 +73,13 @@ function App() {
     const newSize = parseInt(e.target.value, 10);
     if (!isNaN(newSize) && newSize > 4 && newSize < 72) {
       setTempFontSize(newSize);
+    }
+  };
+
+  const handleTempPinnedIconSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newSize = parseInt(e.target.value, 10);
+    if (!isNaN(newSize) && newSize >= 12 && newSize <= 48) {
+      setTempPinnedIconSize(newSize);
     }
   };
 
@@ -100,6 +116,24 @@ function App() {
                 />
                 <p className="mt-1 text-gray-500 dark:text-gray-400">
                   Default: 14px
+                </p>
+              </div>
+
+              {/* Pinned Icon Size */}
+              <div>
+                <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
+                  Pinned Icon Size (px)
+                </label>
+                <input
+                  type="number"
+                  min="12"
+                  max="48"
+                  value={tempPinnedIconSize}
+                  onChange={handleTempPinnedIconSizeChange}
+                  className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+                <p className="mt-1 text-gray-500 dark:text-gray-400">
+                  Default: 22px
                 </p>
               </div>
 
@@ -203,6 +237,7 @@ function App() {
         resetFavicon={resetFavicon}
         openAsPinnedTab={openAsPinnedTab}
         movePin={movePin}
+        iconSize={pinnedIconSize}
       />
 
       {/* Settings button - bottom-left corner of panel */}

@@ -27,6 +27,7 @@ interface PinnedBarProps {
   resetFavicon: (id: string) => void;
   openAsPinnedTab: (site: PinnedSite) => void;
   movePin: (activeId: string, overId: string) => void;
+  iconSize: number;
 }
 
 export const PinnedBar = ({
@@ -36,6 +37,7 @@ export const PinnedBar = ({
   resetFavicon,
   openAsPinnedTab,
   movePin,
+  iconSize,
 }: PinnedBarProps) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -79,6 +81,7 @@ export const PinnedBar = ({
               onUpdate={updatePin}
               onResetFavicon={resetFavicon}
               onOpen={openAsPinnedTab}
+              iconSize={iconSize}
             />
           ))}
         </SortableContext>
