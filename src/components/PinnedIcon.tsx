@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Globe, X, RotateCcw, Search, Edit, Trash } from 'lucide-react';
+import { Globe, Edit, Trash, X, RotateCcw, Search } from 'lucide-react';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -71,10 +71,10 @@ interface PinnedIconProps {
              customIconName?: string,
              iconColor?: string) => void;
   onResetFavicon: (id: string) => void;
-  openInNewTab?: boolean;
+  onOpen: (site: PinnedSite) => void;
 }
 
-export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNewTab = false }: PinnedIconProps) => {
+export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen }: PinnedIconProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
@@ -110,21 +110,6 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     }
   }, [showEditModal, allIconNames.length, iconsLoading]);
 
-  // Escape key handler for edit modal
-  useEffect(() =>
-  {
-    if (!showEditModal) return;
-    const handleKeyDown = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape')
-      {
-        setShowEditModal(false);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showEditModal]);
-
   // Filter icons based on search
   const allFilteredIcons = useMemo(() => {
     if (!iconSearch.trim()) {
@@ -145,7 +130,7 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
 
   // Calculate total rows and content height
   const totalRows = Math.ceil(allFilteredIcons.length / COLS);
-  const totalContentHeight = totalRows * ROW_HEIGHT - GAP + PADDING * 2; // subtract last gap, add padding
+  const totalContentHeight = totalRows * ROW_HEIGHT - GAP + PADDING * 2;
 
   // Calculate which icons are visible based on scroll position
   const [scrollTop, setScrollTop] = useState(0);
@@ -182,6 +167,18 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     }
   }, [isDragging]);
 
+  // Escape key handler for edit modal
+  useEffect(() => {
+    if (!showEditModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowEditModal(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [showEditModal]);
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -202,21 +199,11 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
     }
 
     if (e.shiftKey) {
+      // Shift+click: open in new window
       chrome.windows.create({ url: site.url });
-    } else if (e.metaKey || e.ctrlKey) {
-      // Cmd+click: invert the default behavior
-      if (openInNewTab) {
-        chrome.tabs.update({ url: site.url });
-      } else {
-        chrome.tabs.create({ url: site.url, active: false });
-      }
     } else {
-      // Regular click: use the setting
-      if (openInNewTab) {
-        chrome.tabs.create({ url: site.url, active: true });
-      } else {
-        chrome.tabs.update({ url: site.url });
-      }
+      // Normal click: open as new pinned tab
+      onOpen(site);
     }
   };
 
@@ -268,7 +255,10 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, openInNew
 
   const handleResetIcon = () => {
     onResetFavicon(site.id);
-    setShowEditModal(false);
+    // Clear local edit state to reflect the reset
+    setEditFavicon(undefined);
+    setEditCustomIconName(undefined);
+    setEditIconColor(DEFAULT_ICON_COLOR);
   };
 
   const handleUnpin = () => {

@@ -377,9 +377,12 @@ interface DraggableTabProps {
   onOpenAddToGroupDialog?: (tabId: number, currentGroupId?: number) => void;
 }
 
+// Fixed indentation for all tab rows: [speaker][pin][icon] label
+const TAB_ROW_PADDING = 12;
+
 const DraggableTab = ({
   tab,
-  indentLevel,
+  indentLevel: _indentLevel,
   isBeingDragged,
   showDropBefore,
   showDropAfter,
@@ -465,7 +468,7 @@ const DraggableTab = ({
           ref={setNodeRef}
           data-tab-id={tab.id}
           data-group-id={tab.groupId ?? -1}
-          style={{ paddingLeft: `${getIndentPadding(indentLevel)}px` }}
+          style={{ paddingLeft: `${TAB_ROW_PADDING}px` }}
           title={tab.url}
           {...attributes}
           {...listeners}
@@ -480,9 +483,13 @@ const DraggableTab = ({
         >
       <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
 
-      {/* Speaker placeholder */}
+      {/* Speaker indicator */}
       <span className={clsx("mr-1 p-0.5", !tab.audible && "invisible")}>
         <Volume2 size={14} className="text-blue-500" />
+      </span>
+      {/* Pin indicator for Chrome pinned tabs */}
+      <span className={clsx("mr-1 p-0.5", !tab.pinned && "invisible")}>
+        <Pin size={14} className="text-gray-400" />
       </span>
       {tab.favIconUrl ? (
         <img src={tab.favIconUrl} alt="" className="w-4 h-4 mr-2 flex-shrink-0" />
@@ -505,7 +512,7 @@ const DraggableTab = ({
             <List size={14} className="text-gray-700 dark:text-gray-200" />
           </button>
         )}
-        {onPin && tab.url && (
+        {onPin && tab.url && !tab.pinned && (
           <button
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) =>
@@ -570,7 +577,7 @@ const DraggableTab = ({
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content>
-          {onPin && tab.url && (
+          {onPin && tab.url && !tab.pinned && (
             <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
               Pin to Sidebar
             </ContextMenu.Item>

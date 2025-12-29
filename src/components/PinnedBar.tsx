@@ -18,10 +18,15 @@ import { PinnedSite } from '../hooks/usePinnedSites';
 interface PinnedBarProps {
   pinnedSites: PinnedSite[];
   removePin: (id: string) => void;
-  updatePin: (id: string, title: string, url: string, favicon?: string) => void;
+  updatePin: (id: string,
+              title: string,
+              url: string,
+              favicon?: string,
+              customIconName?: string,
+              iconColor?: string) => void;
   resetFavicon: (id: string) => void;
+  openAsPinnedTab: (site: PinnedSite) => void;
   movePin: (activeId: string, overId: string) => void;
-  openInNewTab?: boolean;
 }
 
 export const PinnedBar = ({
@@ -29,8 +34,8 @@ export const PinnedBar = ({
   removePin,
   updatePin,
   resetFavicon,
+  openAsPinnedTab,
   movePin,
-  openInNewTab = false
 }: PinnedBarProps) => {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -73,7 +78,7 @@ export const PinnedBar = ({
               onRemove={removePin}
               onUpdate={updatePin}
               onResetFavicon={resetFavicon}
-              openInNewTab={openInNewTab}
+              onOpen={openAsPinnedTab}
             />
           ))}
         </SortableContext>

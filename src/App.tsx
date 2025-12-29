@@ -14,9 +14,6 @@ function App() {
   const [hideOtherBookmarks, setHideOtherBookmarks] = useState<boolean>(() => {
     return localStorage.getItem('sidebar-hide-other-bookmarks') === 'true';
   });
-  const [openPinnedInNewTab, setOpenPinnedInNewTab] = useState<boolean>(() => {
-    return localStorage.getItem('sidebar-open-pinned-new-tab') === 'true';
-  });
   const [openBookmarkInNewTab, setOpenBookmarkInNewTab] = useState<boolean>(() => {
     return localStorage.getItem('sidebar-open-bookmark-new-tab') === 'true';
   });
@@ -25,12 +22,11 @@ function App() {
     return saved === null ? true : saved === 'true';
   });
   const [showSettings, setShowSettings] = useState(false);
-  const { pinnedSites, addPin, removePin, updatePin, resetFavicon, movePin, exportPinnedSites, importPinnedSites } = usePinnedSites();
+  const { pinnedSites, addPin, removePin, updatePin, resetFavicon, openAsPinnedTab, movePin, exportPinnedSites, importPinnedSites } = usePinnedSites();
 
   // Temporary state for settings dialog
   const [tempFontSize, setTempFontSize] = useState(fontSize);
   const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(hideOtherBookmarks);
-  const [tempOpenPinnedInNewTab, setTempOpenPinnedInNewTab] = useState(openPinnedInNewTab);
   const [tempOpenBookmarkInNewTab, setTempOpenBookmarkInNewTab] = useState(openBookmarkInNewTab);
   const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(sortGroupsFirst);
 
@@ -38,7 +34,6 @@ function App() {
     // Copy current values to temp state
     setTempFontSize(fontSize);
     setTempHideOtherBookmarks(hideOtherBookmarks);
-    setTempOpenPinnedInNewTab(openPinnedInNewTab);
     setTempOpenBookmarkInNewTab(openBookmarkInNewTab);
     setTempSortGroupsFirst(sortGroupsFirst);
     setShowSettings(true);
@@ -55,9 +50,6 @@ function App() {
 
     setHideOtherBookmarks(tempHideOtherBookmarks);
     localStorage.setItem('sidebar-hide-other-bookmarks', tempHideOtherBookmarks.toString());
-
-    setOpenPinnedInNewTab(tempOpenPinnedInNewTab);
-    localStorage.setItem('sidebar-open-pinned-new-tab', tempOpenPinnedInNewTab.toString());
 
     setOpenBookmarkInNewTab(tempOpenBookmarkInNewTab);
     localStorage.setItem('sidebar-open-bookmark-new-tab', tempOpenBookmarkInNewTab.toString());
@@ -126,21 +118,6 @@ function App() {
                     />
                     Hide "Other Bookmarks"
                   </label>
-
-                  <div>
-                    <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={tempOpenPinnedInNewTab}
-                        onChange={(e) => setTempOpenPinnedInNewTab(e.target.checked)}
-                        className="rounded border-gray-300 dark:border-gray-600"
-                      />
-                      Open pinned sites in new tab
-                    </label>
-                    <p className="mt-1 text-gray-500 dark:text-gray-400 ml-5">
-                      Cmd+click opens in current tab
-                    </p>
-                  </div>
 
                   <div>
                     <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
@@ -224,8 +201,8 @@ function App() {
         removePin={removePin}
         updatePin={updatePin}
         resetFavicon={resetFavicon}
+        openAsPinnedTab={openAsPinnedTab}
         movePin={movePin}
-        openInNewTab={openPinnedInNewTab}
       />
 
       {/* Settings button - bottom-left corner of panel */}

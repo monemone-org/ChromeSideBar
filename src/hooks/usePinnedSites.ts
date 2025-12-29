@@ -6,6 +6,7 @@ export interface PinnedSite {
   title: string;
   favicon?: string;
   order: number;
+  tabId?: number;  // Remembered tab ID (may be stale if tab was closed)
   customIconName?: string;  // Lucide icon name when using custom icon
   iconColor?: string;       // Custom icon color (hex, e.g., "#ef4444")
 }
@@ -122,49 +123,88 @@ export const usePinnedSites = () => {
   }, [pinnedSites, savePinnedSites]);
 
   const removePin = useCallback((id: string) => {
-    const updatedSites = compactOrders(pinnedSites.filter(site => site.id !== id));
+    const updatedSites = compactOrders(pinnedSites.filter(s => s.id !== id));
     setPinnedSites(updatedSites);
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
 
-  const updatePin = useCallback((id: string,
-                                  title: string,
-                                  url: string,
-                                  favicon?: string,
-                                  customIconName?: string,
-                                  iconColor?: string) => {
+  const updatePin = useCallback((
+    id: string,
+    title: string,
+    url: string,
+    favicon?: string,
+    customIconName?: string,
+    iconColor?: string
+  ) => {
     const updatedSites = pinnedSites.map(site =>
-      site.id === id
-        ? {
-            ...site,
-            title,
-            url,
-            ...(favicon !== undefined && { favicon }),
-            ...(customIconName !== undefined && { customIconName }),
-            ...(iconColor !== undefined && { iconColor }),
-          }
-        : site
+      site.id === id ? {
+        ...site,
+        title,
+        url,
+        ...(favicon !== undefined && { favicon }),
+        customIconName,
+        iconColor: customIconName ? iconColor : undefined,
+      } : site
     );
     setPinnedSites(updatedSites);
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
 
+  // Reset favicon to the original site icon
   const resetFavicon = useCallback(async (id: string) => {
     const site = pinnedSites.find(s => s.id === id);
     if (!site) return;
 
-    // Re-fetch favicon from Chrome's cache
-    const faviconUrl = getFaviconUrl(site.url);
-    const favicon = await fetchFaviconAsBase64(faviconUrl);
+    const chromeFaviconUrl = getFaviconUrl(site.url);
+    const favicon = await fetchFaviconAsBase64(chromeFaviconUrl);
 
     const updatedSites = pinnedSites.map(s =>
-      s.id === id
-        ? { ...s, favicon, customIconName: undefined, iconColor: undefined }
-        : s
+      s.id === id ? {
+        ...s,
+        favicon,
+        customIconName: undefined,
+        iconColor: undefined,
+      } : s
     );
     setPinnedSites(updatedSites);
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
+
+  // Update stored tabId when a new tab is created for a pinned site
+  const updateTabId = useCallback((id: string, newTabId: number) => {
+    const updatedSites = pinnedSites.map(site =>
+      site.id === id ? { ...site, tabId: newTabId } : site
+    );
+    setPinnedSites(updatedSites);
+    savePinnedSites(updatedSites);
+  }, [pinnedSites, savePinnedSites]);
+
+  // Open pinned site: activate existing tab if it exists, otherwise create new pinned tab
+  const openAsPinnedTab = useCallback((site: PinnedSite) => {
+    if (site.tabId) {
+      // Check if the tab still exists
+      chrome.tabs.get(site.tabId, (tab) => {
+        if (chrome.runtime.lastError || !tab) {
+          // Tab doesn't exist - create new pinned tab and remember tabId
+          chrome.tabs.create({ url: site.url, pinned: true }, (newTab) => {
+            if (newTab?.id) {
+              updateTabId(site.id, newTab.id);
+            }
+          });
+        } else {
+          // Tab exists - activate it
+          chrome.tabs.update(site.tabId!, { active: true });
+        }
+      });
+    } else {
+      // No tabId stored - create new pinned tab and remember tabId
+      chrome.tabs.create({ url: site.url, pinned: true }, (newTab) => {
+        if (newTab?.id) {
+          updateTabId(site.id, newTab.id);
+        }
+      });
+    }
+  }, [updateTabId]);
 
   const movePin = useCallback((activeId: string, overId: string) => {
     const oldIndex = pinnedSites.findIndex(s => s.id === activeId);
@@ -218,6 +258,7 @@ export const usePinnedSites = () => {
     removePin,
     updatePin,
     resetFavicon,
+    openAsPinnedTab,
     movePin,
     exportPinnedSites,
     importPinnedSites,
