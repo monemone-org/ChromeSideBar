@@ -417,31 +417,12 @@ const DraggableTab = ({
   useEffect(() =>
   {
     if (!showChapters) return;
-    const handleClickOutside = (e: MouseEvent) =>
-    {
-      const target = e.target as Node;
-      if (chaptersButtonRef.current?.contains(target)) return;
-      if (chaptersRef.current && !chaptersRef.current.contains(target))
-      {
-        e.stopPropagation();
-        e.preventDefault();
-        setShowChapters(false);
-      }
-    };
     const handleKeyDown = (e: KeyboardEvent) =>
     {
-      if (e.key === 'Escape')
-      {
-        setShowChapters(false);
-      }
+      if (e.key === 'Escape') setShowChapters(false);
     };
-    document.addEventListener('mousedown', handleClickOutside, true);
     document.addEventListener('keydown', handleKeyDown);
-    return () =>
-    {
-      document.removeEventListener('mousedown', handleClickOutside, true);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showChapters]);
 
   const handleChaptersClick = async (e: React.MouseEvent) =>
@@ -554,13 +535,18 @@ const DraggableTab = ({
 
       {/* Chapters popup */}
       {showChapters && (
-        <div
-          ref={chaptersRef}
-          className={clsx(
-            "absolute right-0 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-48 max-h-64 overflow-y-auto",
-            popupAbove ? "bottom-full mb-1" : "top-full mt-1"
-          )}
-        >
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowChapters(false)}
+          />
+          <div
+            ref={chaptersRef}
+            className={clsx(
+              "absolute right-0 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-48 max-h-64 overflow-y-auto",
+              popupAbove ? "bottom-full mb-1" : "top-full mt-1"
+            )}
+          >
           <div className="px-3 py-1.5 font-medium text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">
             Chapters
           </div>
@@ -584,7 +570,8 @@ const DraggableTab = ({
               </button>
             ))
           )}
-        </div>
+          </div>
+        </>
       )}
         </div>
       </ContextMenu.Trigger>
