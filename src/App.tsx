@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { BookmarkTree } from './components/BookmarkTree';
 import { TabList } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
+import { SettingsDialog, SettingsValues } from './components/SettingsDialog';
 import { usePinnedSites } from './hooks/usePinnedSites';
 import { FontSizeContext } from './contexts/FontSizeContext';
-import { X, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 
 function App() {
   const [fontSize, setFontSize] = useState<number>(() => {
@@ -28,59 +29,23 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const { pinnedSites, addPin, removePin, updatePin, resetFavicon, openAsPinnedTab, movePin, exportPinnedSites, importPinnedSites } = usePinnedSites();
 
-  // Temporary state for settings dialog
-  const [tempFontSize, setTempFontSize] = useState(fontSize);
-  const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(hideOtherBookmarks);
-  const [tempOpenBookmarkInNewTab, setTempOpenBookmarkInNewTab] = useState(openBookmarkInNewTab);
-  const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(sortGroupsFirst);
-  const [tempPinnedIconSize, setTempPinnedIconSize] = useState(pinnedIconSize);
+  const handleApplySettings = (newSettings: SettingsValues) => {
+    setFontSize(newSettings.fontSize);
+    localStorage.setItem('sidebar-font-size-px', newSettings.fontSize.toString());
 
-  const openSettings = () => {
-    // Copy current values to temp state
-    setTempFontSize(fontSize);
-    setTempHideOtherBookmarks(hideOtherBookmarks);
-    setTempOpenBookmarkInNewTab(openBookmarkInNewTab);
-    setTempSortGroupsFirst(sortGroupsFirst);
-    setTempPinnedIconSize(pinnedIconSize);
-    setShowSettings(true);
-  };
+    setHideOtherBookmarks(newSettings.hideOtherBookmarks);
+    localStorage.setItem('sidebar-hide-other-bookmarks', newSettings.hideOtherBookmarks.toString());
 
-  const handleCancel = () => {
-    setShowSettings(false);
-  };
+    setOpenBookmarkInNewTab(newSettings.openBookmarkInNewTab);
+    localStorage.setItem('sidebar-open-bookmark-new-tab', newSettings.openBookmarkInNewTab.toString());
 
-  const handleApply = () => {
-    // Apply temp values to real state and localStorage
-    setFontSize(tempFontSize);
-    localStorage.setItem('sidebar-font-size-px', tempFontSize.toString());
+    setSortGroupsFirst(newSettings.sortGroupsFirst);
+    localStorage.setItem('sidebar-sort-groups-first', newSettings.sortGroupsFirst.toString());
 
-    setHideOtherBookmarks(tempHideOtherBookmarks);
-    localStorage.setItem('sidebar-hide-other-bookmarks', tempHideOtherBookmarks.toString());
-
-    setOpenBookmarkInNewTab(tempOpenBookmarkInNewTab);
-    localStorage.setItem('sidebar-open-bookmark-new-tab', tempOpenBookmarkInNewTab.toString());
-
-    setSortGroupsFirst(tempSortGroupsFirst);
-    localStorage.setItem('sidebar-sort-groups-first', tempSortGroupsFirst.toString());
-
-    setPinnedIconSize(tempPinnedIconSize);
-    localStorage.setItem('sidebar-pinned-icon-size-px', tempPinnedIconSize.toString());
+    setPinnedIconSize(newSettings.pinnedIconSize);
+    localStorage.setItem('sidebar-pinned-icon-size-px', newSettings.pinnedIconSize.toString());
 
     setShowSettings(false);
-  };
-
-  const handleTempFontSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSize = parseInt(e.target.value, 10);
-    if (!isNaN(newSize) && newSize > 4 && newSize < 72) {
-      setTempFontSize(newSize);
-    }
-  };
-
-  const handleTempPinnedIconSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSize = parseInt(e.target.value, 10);
-    if (!isNaN(newSize) && newSize >= 12 && newSize <= 48) {
-      setTempPinnedIconSize(newSize);
-    }
   };
 
   return (
@@ -89,145 +54,20 @@ function App() {
         className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
         style={{ fontSize: `${fontSize}px` }}
       >
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 w-56 border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="font-bold">Settings</h2>
-              <button onClick={handleCancel} className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              {/* Font Size */}
-              <div>
-                <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
-                  Font Size (px)
-                </label>
-                <input
-                  type="number"
-                  min="6"
-                  max="36"
-                  value={tempFontSize}
-                  onChange={handleTempFontSizeChange}
-                  className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-                <p className="mt-1 text-gray-500 dark:text-gray-400">
-                  Default: 14px
-                </p>
-              </div>
-
-              {/* Pinned Icon Size */}
-              <div>
-                <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
-                  Pinned Icon Size (px)
-                </label>
-                <input
-                  type="number"
-                  min="12"
-                  max="48"
-                  value={tempPinnedIconSize}
-                  onChange={handleTempPinnedIconSizeChange}
-                  className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-                <p className="mt-1 text-gray-500 dark:text-gray-400">
-                  Default: 22px
-                </p>
-              </div>
-
-              {/* Behaviour group */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                  Behaviour
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={tempHideOtherBookmarks}
-                      onChange={(e) => setTempHideOtherBookmarks(e.target.checked)}
-                      className="rounded border-gray-300 dark:border-gray-600"
-                    />
-                    Hide "Other Bookmarks"
-                  </label>
-
-                  <div>
-                    <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={tempOpenBookmarkInNewTab}
-                        onChange={(e) => setTempOpenBookmarkInNewTab(e.target.checked)}
-                        className="rounded border-gray-300 dark:border-gray-600"
-                      />
-                      Open bookmarks in new tab
-                    </label>
-                    <p className="mt-1 text-gray-500 dark:text-gray-400 ml-5">
-                      Cmd+click opens in current tab
-                    </p>
-                  </div>
-
-                  <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={tempSortGroupsFirst}
-                      onChange={(e) => setTempSortGroupsFirst(e.target.checked)}
-                      className="rounded border-gray-300 dark:border-gray-600"
-                    />
-                    Sort tab groups first
-                  </label>
-                </div>
-              </div>
-
-              {/* Pinned Sites Backup */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
-                  Pinned Sites Backup
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={exportPinnedSites}
-                    className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-                  >
-                    Export
-                  </button>
-                  <label className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 cursor-pointer">
-                    Import
-                    <input
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.files?.[0]) {
-                          importPinnedSites(e.target.files[0]);
-                          e.target.value = '';
-                        }
-                      }}
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Apply / Cancel buttons */}
-              <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end gap-2">
-                <button
-                  onClick={handleCancel}
-                  className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleApply}
-                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SettingsDialog
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        settings={{
+          fontSize,
+          hideOtherBookmarks,
+          openBookmarkInNewTab,
+          sortGroupsFirst,
+          pinnedIconSize,
+        }}
+        onApply={handleApplySettings}
+        exportPinnedSites={exportPinnedSites}
+        importPinnedSites={importPinnedSites}
+      />
 
       {/* Pinned Sites */}
       <PinnedBar
@@ -242,7 +82,7 @@ function App() {
 
       {/* Settings button - bottom-left corner of panel */}
       <button
-        onClick={openSettings}
+        onClick={() => setShowSettings(true)}
         title="Settings"
         className="absolute left-2 bottom-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-200 z-10"
       >
