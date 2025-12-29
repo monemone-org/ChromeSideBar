@@ -29,16 +29,17 @@ import clsx from 'clsx';
 
 // Chrome tab group color mapping (exact Chrome hex codes)
 // Light theme: badge uses darker colors, Dark theme: badge uses lighter/pastel colors
-const GROUP_COLORS: Record<string, { bg: string; badge: string; dot: string }> = {
-  grey: { bg: 'bg-[#F1F3F4] dark:bg-[#5F6368]/30', badge: 'bg-[#5F6368] dark:bg-[#BDC1C6]', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]' },
-  blue: { bg: 'bg-[#E8F0FE] dark:bg-[#8AB4F8]/20', badge: 'bg-[#1A73E8] dark:bg-[#8AB4F8]', dot: 'bg-[#1A73E8] dark:bg-[#8AB4F8]' },
-  red: { bg: 'bg-[#FCE8E6] dark:bg-[#F28B82]/20', badge: 'bg-[#D93025] dark:bg-[#F28B82]', dot: 'bg-[#D93025] dark:bg-[#F28B82]' },
-  yellow: { bg: 'bg-[#FEF7E0] dark:bg-[#FDD663]/20', badge: 'bg-[#E37400] dark:bg-[#FDD663]', dot: 'bg-[#E37400] dark:bg-[#FDD663]' },
-  green: { bg: 'bg-[#E6F4EA] dark:bg-[#81C995]/20', badge: 'bg-[#188038] dark:bg-[#81C995]', dot: 'bg-[#188038] dark:bg-[#81C995]' },
-  pink: { bg: 'bg-[#FEE7F5] dark:bg-[#FF8BCB]/20', badge: 'bg-[#D01884] dark:bg-[#FF8BCB]', dot: 'bg-[#D01884] dark:bg-[#FF8BCB]' },
-  purple: { bg: 'bg-[#F3E8FD] dark:bg-[#D7AEFB]/20', badge: 'bg-[#9333EA] dark:bg-[#D7AEFB]', dot: 'bg-[#9333EA] dark:bg-[#D7AEFB]' },
-  cyan: { bg: 'bg-[#E4F7FB] dark:bg-[#78D9EC]/20', badge: 'bg-[#11858E] dark:bg-[#78D9EC]', dot: 'bg-[#11858E] dark:bg-[#78D9EC]' },
-  orange: { bg: 'bg-[#FEF1E8] dark:bg-[#FCAD70]/20', badge: 'bg-[#FA903E] dark:bg-[#FCAD70]', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]' },
+// bg: subtle background for grouped tabs, bgStrong: stronger background when group has active tab
+const GROUP_COLORS: Record<string, { bg: string; bgStrong: string; badge: string; dot: string }> = {
+  grey:   { bg: 'bg-[#F1F3F4] dark:bg-[#5F6368]/30', bgStrong: 'bg-[#E8EAED] dark:bg-[#5F6368]/50', badge: 'bg-[#5F6368] dark:bg-[#BDC1C6]', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]' },
+  blue:   { bg: 'bg-[#E8F0FE] dark:bg-[#8AB4F8]/20', bgStrong: 'bg-[#D2E3FC] dark:bg-[#8AB4F8]/40', badge: 'bg-[#1A73E8] dark:bg-[#8AB4F8]', dot: 'bg-[#1A73E8] dark:bg-[#8AB4F8]' },
+  red:    { bg: 'bg-[#FCE8E6] dark:bg-[#F28B82]/20', bgStrong: 'bg-[#F9D0CC] dark:bg-[#F28B82]/40', badge: 'bg-[#D93025] dark:bg-[#F28B82]', dot: 'bg-[#D93025] dark:bg-[#F28B82]' },
+  yellow: { bg: 'bg-[#FEF7E0] dark:bg-[#FDD663]/20', bgStrong: 'bg-[#FCEFC7] dark:bg-[#FDD663]/40', badge: 'bg-[#E37400] dark:bg-[#FDD663]', dot: 'bg-[#E37400] dark:bg-[#FDD663]' },
+  green:  { bg: 'bg-[#E6F4EA] dark:bg-[#81C995]/20', bgStrong: 'bg-[#CEEAD6] dark:bg-[#81C995]/40', badge: 'bg-[#188038] dark:bg-[#81C995]', dot: 'bg-[#188038] dark:bg-[#81C995]' },
+  pink:   { bg: 'bg-[#FEE7F5] dark:bg-[#FF8BCB]/20', bgStrong: 'bg-[#FCCFEB] dark:bg-[#FF8BCB]/40', badge: 'bg-[#D01884] dark:bg-[#FF8BCB]', dot: 'bg-[#D01884] dark:bg-[#FF8BCB]' },
+  purple: { bg: 'bg-[#F3E8FD] dark:bg-[#D7AEFB]/20', bgStrong: 'bg-[#E8D0FB] dark:bg-[#D7AEFB]/40', badge: 'bg-[#9333EA] dark:bg-[#D7AEFB]', dot: 'bg-[#9333EA] dark:bg-[#D7AEFB]' },
+  cyan:   { bg: 'bg-[#E4F7FB] dark:bg-[#78D9EC]/20', bgStrong: 'bg-[#CBEFF7] dark:bg-[#78D9EC]/40', badge: 'bg-[#11858E] dark:bg-[#78D9EC]', dot: 'bg-[#11858E] dark:bg-[#78D9EC]' },
+  orange: { bg: 'bg-[#FEF1E8] dark:bg-[#FCAD70]/20', bgStrong: 'bg-[#FCE3D1] dark:bg-[#FCAD70]/40', badge: 'bg-[#FA903E] dark:bg-[#FCAD70]', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]' },
 };
 
 // Chrome tab group color options for new group creation
@@ -371,6 +372,8 @@ interface DraggableTabProps {
   showDropAfter: boolean;
   beforeIndentPx?: number;
   afterIndentPx?: number;
+  groupColor?: string;
+  isLastInGroup?: boolean;
   onClose: (id: number) => void;
   onActivate: (id: number) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
@@ -388,6 +391,8 @@ const DraggableTab = ({
   showDropAfter,
   beforeIndentPx,
   afterIndentPx,
+  groupColor,
+  isLastInGroup,
   onClose,
   onActivate,
   onPin,
@@ -472,11 +477,16 @@ const DraggableTab = ({
           {...attributes}
           {...listeners}
           className={clsx(
-            "group/tab relative flex items-center py-1 px-2 rounded-md cursor-pointer",
+            "group/tab relative hover:z-10 flex items-center py-1 px-2 cursor-pointer",
+            isLastInGroup ? "rounded-b-lg" : "rounded-none",
             isBeingDragged && "opacity-50",
             tab.active
-              ? "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
-              : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
+              ? groupColor
+                ? clsx(GROUP_COLORS[groupColor]?.bgStrong, "text-gray-900 dark:text-gray-100")
+                : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
+              : groupColor
+                ? clsx(GROUP_COLORS[groupColor]?.bg, "hover:brightness-95 dark:hover:brightness-110 text-gray-700 dark:text-gray-200")
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
           )}
           onClick={() => onActivate(tab.id!)}
         >
@@ -499,7 +509,7 @@ const DraggableTab = ({
         {tab.title}
       </span>
       {/* Fast URL tooltip */}
-      <div className="absolute left-0 top-full mt-1 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white rounded max-w-xs truncate opacity-0 invisible group-hover/tab:opacity-100 group-hover/tab:visible transition-opacity duration-100 delay-150 pointer-events-none z-50">
+      <div className="absolute left-0 top-full mt-1 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white rounded max-w-xs truncate invisible group-hover/tab:visible pointer-events-none z-50">
         {tab.url}
       </div>
       {/* Action buttons */}
@@ -602,7 +612,6 @@ const DraggableTab = ({
 interface TabGroupHeaderProps {
   group: chrome.tabGroups.TabGroup;
   isExpanded: boolean;
-  hasActiveTab: boolean;
   showDropBefore: boolean;
   showDropAfter: boolean;
   showDropInto: boolean;
@@ -618,7 +627,6 @@ interface TabGroupHeaderProps {
 const TabGroupHeader = ({
   group,
   isExpanded,
-  hasActiveTab,
   showDropBefore,
   showDropAfter,
   showDropInto,
@@ -640,12 +648,10 @@ const TabGroupHeader = ({
           data-group-header-id={group.id}
           data-is-group-header="true"
           className={clsx(
-            "group relative flex items-center py-1 px-2 rounded-md cursor-pointer select-none",
+            "group relative flex items-center py-1 px-2 rounded-t-lg cursor-pointer select-none",
             showDropInto
               ? "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500"
-              : hasActiveTab
-                ? colorStyle.bg
-                : "hover:bg-gray-100 dark:hover:bg-gray-800"
+              : clsx(colorStyle.bg, "hover:brightness-95 dark:hover:brightness-110")
           )}
           style={{ paddingLeft: `${getIndentPadding(1)}px` }}
           onClick={onToggle}
@@ -1216,13 +1222,11 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
               const isGroupExpanded = expandedGroups[item.group.id];
               const groupTargetId = `group-${item.group.id}`;
               const isTarget = dropTargetId === groupTargetId;
-              const hasActiveTab = item.tabs.some(t => t.active);
               return (
                 <div key={`group-${item.group.id}`}>
                   <TabGroupHeader
                     group={item.group}
                     isExpanded={isGroupExpanded}
-                    hasActiveTab={hasActiveTab}
                     showDropBefore={isTarget && dropPosition === 'before'}
                     showDropAfter={isTarget && dropPosition === 'after'}
                     showDropInto={isTarget && dropPosition === 'into'}
@@ -1238,7 +1242,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
                     onRename={() => openRenameGroupDialog(item.group)}
                     onNewTab={() => createTabInGroup(item.group.id)}
                   />
-                  {isGroupExpanded && item.tabs.map((tab) =>
+                  {isGroupExpanded && item.tabs.map((tab, index) =>
                   {
                     const tabId = String(tab.id);
                     const isTabTarget = dropTargetId === tabId;
@@ -1254,6 +1258,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
                         showDropAfter={isTabTarget && dropPosition === 'after'}
                         beforeIndentPx={dropPosition === 'before' ? indentPx : undefined}
                         afterIndentPx={dropPosition === 'after' ? indentPx : undefined}
+                        groupColor={item.group.color}
+                        isLastInGroup={index === item.tabs.length - 1}
                         onClose={closeTab}
                         onActivate={activateTab}
                         onPin={onPin}
