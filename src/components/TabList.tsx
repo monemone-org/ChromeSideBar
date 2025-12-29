@@ -3,7 +3,7 @@ import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { Dialog } from './Dialog';
-import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus, X } from 'lucide-react';
+import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus } from 'lucide-react';
 import {
   Chapter,
   getYouTubeVideoId,
@@ -592,16 +592,16 @@ const DraggableTab = ({
         <ContextMenu.Content>
           {onPin && tab.url && !tab.pinned && (
             <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
-              Pin to Sidebar
+              <Pin size={14} className="mr-2" /> Pin to Sidebar
             </ContextMenu.Item>
           )}
           {onOpenAddToGroupDialog && (
             <ContextMenu.Item onSelect={() => onOpenAddToGroupDialog(tab.id!, tab.groupId)}>
-              Add to Group
+              <FolderPlus size={14} className="mr-2" /> Add to Group
             </ContextMenu.Item>
           )}
           <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
-            Close Tab
+            <X size={14} className="mr-2" /> Close Tab
           </ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Portal>
@@ -669,25 +669,25 @@ const TabGroupHeader = ({
       <ContextMenu.Portal>
         <ContextMenu.Content>
           <ContextMenu.Item onSelect={onNewTab}>
-            New Tab
+            <Plus size={14} className="mr-2" /> New Tab
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item onSelect={() => onSortGroup('asc')}>
-            Sort by Domain (A-Z)
+            <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
           </ContextMenu.Item>
           <ContextMenu.Item onSelect={() => onSortGroup('desc')}>
-            Sort by Domain (Z-A)
+            <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item onSelect={onRename}>
-            Rename Group
+            <Edit size={14} className="mr-2" /> Rename Group
           </ContextMenu.Item>
           <ContextMenu.Item onSelect={onChangeColor}>
-            Change Color
+            <Palette size={14} className="mr-2" /> Change Color
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item danger onSelect={onCloseGroup}>
-            Close Group
+            <X size={14} className="mr-2" /> Close All Tabs in Group
           </ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Portal>
@@ -1171,13 +1171,13 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
         <ContextMenu.Portal>
           <ContextMenu.Content>
             <ContextMenu.Item onSelect={() => sortTabs('asc', tabGroups, sortGroupsFirst)}>
-              Sort by Domain (A-Z)
+              <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
             </ContextMenu.Item>
             <ContextMenu.Item onSelect={() => sortTabs('desc', tabGroups, sortGroupsFirst)}>
-              Sort by Domain (Z-A)
+              <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
             </ContextMenu.Item>
             <ContextMenu.Item danger onSelect={closeAllTabs}>
-              Close All Tabs
+              <Trash size={14} className="mr-2" /> Close All Tabs
             </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Portal>
