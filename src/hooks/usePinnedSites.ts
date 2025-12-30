@@ -252,6 +252,17 @@ export const usePinnedSites = () => {
     reader.readAsText(file);
   }, [savePinnedSites]);
 
+  // Replace all pinned sites (for full backup import)
+  const replacePinnedSites = useCallback((sites: PinnedSite[]) => {
+    const reordered = sites.map((site, index) => ({
+      ...site,
+      id: generateId(),
+      order: index,
+    }));
+    setPinnedSites(reordered);
+    savePinnedSites(reordered);
+  }, [savePinnedSites]);
+
   return {
     pinnedSites,
     addPin,
@@ -262,6 +273,7 @@ export const usePinnedSites = () => {
     movePin,
     exportPinnedSites,
     importPinnedSites,
+    replacePinnedSites,
     refresh: loadPinnedSites,
     error,
   };

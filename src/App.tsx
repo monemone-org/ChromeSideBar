@@ -4,6 +4,7 @@ import { TabList } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
 import { SettingsDialog, SettingsValues } from './components/SettingsDialog';
 import { usePinnedSites } from './hooks/usePinnedSites';
+import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { Settings } from 'lucide-react';
@@ -34,7 +35,19 @@ function App() {
     { parse: (v) => parseInt(v, 10), serialize: (v) => v.toString() }
   );
   const [showSettings, setShowSettings] = useState(false);
-  const { pinnedSites, addPin, removePin, updatePin, resetFavicon, openAsPinnedTab, movePin, exportPinnedSites, importPinnedSites } = usePinnedSites();
+  const {
+    pinnedSites,
+    addPin,
+    removePin,
+    updatePin,
+    resetFavicon,
+    openAsPinnedTab,
+    movePin,
+    exportPinnedSites,
+    importPinnedSites,
+    replacePinnedSites,
+  } = usePinnedSites();
+  const { bookmarks } = useBookmarks();
 
   const handleApplySettings = (newSettings: SettingsValues) => {
     setFontSize(newSettings.fontSize);
@@ -64,6 +77,9 @@ function App() {
         onApply={handleApplySettings}
         exportPinnedSites={exportPinnedSites}
         importPinnedSites={importPinnedSites}
+        pinnedSites={pinnedSites}
+        bookmarks={bookmarks}
+        savePinnedSites={replacePinnedSites}
       />
 
       {/* Pinned Sites */}
