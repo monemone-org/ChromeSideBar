@@ -502,7 +502,7 @@ const DragOverlayContent = ({ node, depth }: DragOverlayContentProps) => {
   const isFolder = !node.url;
   return (
     <div
-      className="flex items-center py-1 pr-2"
+      className="flex items-center py-1 pr-2 pointer-events-none"
       style={{ paddingLeft: `${getIndentPadding(depth)}px` }}
     >
       {/* Chevron placeholder - same spacing as BookmarkItem */}

@@ -735,7 +735,7 @@ const TabGroupHeader = ({
 const TabDragOverlay = ({ tab }: { tab: chrome.tabs.Tab }) =>
 {
   return (
-    <div className="flex items-center py-1 px-2">
+    <div className="flex items-center py-1 px-2 pointer-events-none">
       {/* Speaker placeholder - invisible to match layout */}
       <span className="mr-1 p-0.5 invisible">
         <Volume2 size={14} />
