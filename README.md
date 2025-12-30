@@ -1,12 +1,12 @@
 # ChromeSideBar
 
-ChromeSideBar is a Google Chrome extension that displays pinned sites, bookmarks and active tabs in a side panel, similar to the Arc browser's sidebar experience.
+A Chrome extension that puts pinned sites, bookmarks, and tabs in a side panel, similar to the Arc browser's experience.
 
 ## Background
 
-I've been using Arc Browser for a while. Since Arc paused development, I started looking at Chrome and other Chromium-based browsers. The one thing I really missed was Arc's sidebar, especially how it displays favorite sites, pinned pages, and active tabs in one vertical list.
+I've been using Arc Browser for a while. When Arc paused development, I started looking at Chrome and other Chromium-based browsers. The one thing I really missed was Arc's sidebar—how it puts favorite sites, pinned pages, and tabs all in one vertical list.
 
-So I vibe coded this extension to bring that feature to Chrome.
+So I vibe-coded this extension to bring that to Chrome.
 
 ## Features
 
@@ -46,7 +46,9 @@ So I vibe coded this extension to bring that feature to Chrome.
 - Sort options (via right-click menu):
   - Sort by domain then title (A-Z or Z-A)
   - Close all tabs
-- YouTube chapters: Click the list icon on YouTube video tabs to jump to chapters
+- YouTube chapters:
+  - Not from Arc, but I watch a lot of YouTube and wanted a quick way to browse chapters
+  - List icon button shows all video chapters—click to jump to any chapter 
 - Tab Group support:
   - Display Chrome tab groups with their color and title
   - Collapse/expand groups by clicking the group header
@@ -59,7 +61,7 @@ So I vibe coded this extension to bring that feature to Chrome.
 
 ### Settings
 
-Access settings via the gear icon in the bottom-left corner:
+Gear icon in the bottom-left corner:
 
 - **Font size**: 6-36px (default: 14px)
 - **Pinned icon size**: 12-48px (default: 22px)
@@ -69,21 +71,23 @@ Access settings via the gear icon in the bottom-left corner:
 
 ### General
 
-- Dark/light mode support (follows system preference)
-- Toggle via:
-  - Extension toolbar icon (single click)
+- Dark/light mode (follows your system preference)
+- Open the sidebar with:
+  - Click the extension icon in the toolbar
   - Keyboard shortcut: `Cmd+Shift+E` (Mac) / `Ctrl+Shift+E` (Windows/Linux)
 
 
 ## Tech Stack
 
-- **Core**: [React](https://react.dev/) (v18) + [TypeScript](https://www.typescriptlang.org/)
-- **Build Tool**: [Vite](https://vitejs.dev/)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
-- **Icons**: [Lucide React](https://lucide.dev/)
-- **Drag & Drop**: [@dnd-kit/core](https://dndkit.com/)
-- **Context Menus**: [Radix UI](https://www.radix-ui.com/)
-- **Chrome API**: Manifest V3 (`sidePanel`, `bookmarks`, `tabs`, `tabGroups`, `storage`, `favicon`, `scripting`)
+Built with the usual modern web stack:
+
+- [React](https://react.dev/) (v18) + [TypeScript](https://www.typescriptlang.org/)
+- [Vite](https://vitejs.dev/) for builds
+- [Tailwind CSS](https://tailwindcss.com/) for styling
+- [Lucide React](https://lucide.dev/) for icons
+- [@dnd-kit/core](https://dndkit.com/) for drag & drop
+- [Radix UI](https://www.radix-ui.com/) for context menus
+- Chrome Manifest V3 APIs (`sidePanel`, `bookmarks`, `tabs`, `tabGroups`, `storage`, `favicon`, `scripting`)
 
 ## Project Structure
 
@@ -118,9 +122,8 @@ Outputs production build to `dist/` folder.
 
 ## Load in Chrome
 
-1. Open `chrome://extensions/`
-2. Enable **Developer mode** (top-right)
-3. Click **Load unpacked**
-4. Select the `dist/` folder
-5. Click the extension icon or use keyboard shortcut to open
+1. Go to `chrome://extensions/`
+2. Turn on **Developer mode** (top-right toggle)
+3. Click **Load unpacked** and select the `dist/` folder
+4. Click the extension icon or hit `Cmd+Shift+E` to open the sidebar
 
