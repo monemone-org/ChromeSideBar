@@ -476,8 +476,8 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
       <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
 
       {/* Speaker indicator */}
-      <span className={clsx("mr-1 p-0.5", !tab.audible && "invisible")}>
-        <Volume2 size={14} className="text-blue-500" />
+      <span className={clsx("mr-1", !tab.audible && "invisible")}>
+        <Volume2 size={18} />
       </span>
       {/* Pin indicator for Chrome pinned tabs */}
       <span className={clsx("mr-1 p-0.5", !tab.pinned && "invisible")}>
@@ -793,8 +793,8 @@ const TabDragOverlay = ({ tab }: { tab: chrome.tabs.Tab }) =>
   return (
     <div className="flex items-center py-1 px-2 pointer-events-none">
       {/* Speaker placeholder - invisible to match layout */}
-      <span className="mr-1 p-0.5 invisible">
-        <Volume2 size={14} />
+      <span className="mr-1 invisible">
+        <Volume2 size={18} />
       </span>
       {tab.favIconUrl ? (
         <img src={tab.favIconUrl} alt="" className="w-4 h-4 mr-2 flex-shrink-0" />
