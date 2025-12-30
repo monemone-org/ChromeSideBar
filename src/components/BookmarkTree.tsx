@@ -201,8 +201,13 @@ const CreateFolderModal = ({ isOpen, parentId, onSave, onClose }: CreateFolderMo
   );
 };
 
+// Standard Chrome bookmark folder IDs
+const BOOKMARKS_BAR_ID = '1';
+const OTHER_BOOKMARKS_ID = '2';
+const MOBILE_BOOKMARKS_ID = '3';
+
 // Special folder IDs that cannot be edited/deleted
-const SPECIAL_FOLDER_IDS = ['1', '2']; // Bookmarks Bar, Other Bookmarks
+const SPECIAL_FOLDER_IDS = [BOOKMARKS_BAR_ID, OTHER_BOOKMARKS_ID, MOBILE_BOOKMARKS_ID];
 
 // Helper: Check if targetId is a descendant of nodeId
 const isDescendant = (
