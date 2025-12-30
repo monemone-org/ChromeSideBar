@@ -648,6 +648,7 @@ const DraggableTab = (props: DraggableTabProps) => {
 interface TabGroupHeaderProps {
   group: chrome.tabGroups.TabGroup;
   isExpanded: boolean;
+  isDragging?: boolean;
   showDropBefore: boolean;
   showDropAfter: boolean;
   showDropInto: boolean;
@@ -658,11 +659,15 @@ interface TabGroupHeaderProps {
   onChangeColor: () => void;
   onRename: () => void;
   onNewTab: () => void;
+  // Drag attributes
+  attributes?: DraggableAttributes;
+  listeners?: SyntheticListenerMap;
 }
 
-const TabGroupHeader = ({
+const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
   group,
   isExpanded,
+  isDragging,
   showDropBefore,
   showDropAfter,
   showDropInto,
@@ -672,8 +677,10 @@ const TabGroupHeader = ({
   onSortGroup,
   onChangeColor,
   onRename,
-  onNewTab
-}: TabGroupHeaderProps) =>
+  onNewTab,
+  attributes,
+  listeners
+}, ref) =>
 {
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
 
@@ -681,10 +688,14 @@ const TabGroupHeader = ({
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
         <div
+          ref={ref}
           data-group-header-id={group.id}
           data-is-group-header="true"
+          {...attributes}
+          {...listeners}
           className={clsx(
             "group relative flex items-center py-1 px-2 rounded-t-lg cursor-pointer select-none",
+            isDragging && "opacity-50 pointer-events-none",
             showDropInto
               ? "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500"
               : clsx(colorStyle.bg, "hover:brightness-95 dark:hover:brightness-110")
@@ -729,6 +740,47 @@ const TabGroupHeader = ({
       </ContextMenu.Portal>
     </ContextMenu.Root>
   );
+});
+TabGroupHeader.displayName = 'TabGroupHeader';
+
+// --- Draggable Group Header Wrapper ---
+interface DraggableGroupHeaderProps extends Omit<TabGroupHeaderProps, 'attributes' | 'listeners' | 'isDragging'> {
+  tabCount: number;
+}
+
+const DraggableGroupHeader = ({ group, tabCount, ...props }: DraggableGroupHeaderProps) =>
+{
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `group-${group.id}`,
+  });
+
+  return (
+    <TabGroupHeader
+      ref={setNodeRef}
+      group={group}
+      isDragging={isDragging}
+      attributes={attributes}
+      listeners={listeners}
+      {...props}
+    />
+  );
+};
+
+// Drag overlay content for groups
+const GroupDragOverlay = ({ group, tabCount }: { group: chrome.tabGroups.TabGroup; tabCount: number }) =>
+{
+  const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
+  return (
+    <div className="flex items-center py-1 px-2 pointer-events-none">
+      <ChevronRight size={14} className="mr-1" />
+      <span className={clsx("px-2 py-0.5 rounded-full font-medium text-white dark:text-black", colorStyle.badge)}>
+        {group.title || 'Unnamed Group'}
+      </span>
+      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+        ({tabCount} {tabCount === 1 ? 'tab' : 'tabs'})
+      </span>
+    </div>
+  );
 };
 
 // Drag overlay content - matches tab row layout with transparent background
@@ -765,7 +817,7 @@ interface TabListProps {
 export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
 {
   const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
-  const { tabGroups, updateGroup } = useTabGroups();
+  const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -818,7 +870,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     setRenameGroupDialog({ isOpen: false, group: null });
   }, []);
 
-  // Shared drag-drop state from hook
+  // Shared drag-drop state from hook (supports both tab IDs and group IDs like "group-123")
   const {
     activeId,
     setActiveId,
@@ -830,10 +882,14 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     wasValidDropRef,
     setAutoExpandTimer,
     clearAutoExpandTimer,
-  } = useDragDrop<number>();
+  } = useDragDrop<number | string>();
 
-  // Tab-specific drag state
+  // Drag state for tab or group
   const [activeTab, setActiveTab] = useState<chrome.tabs.Tab | null>(null);
+  const [activeGroup, setActiveGroup] = useState<{ group: chrome.tabGroups.TabGroup; tabCount: number } | null>(null);
+
+  // Helper to check if we're dragging a group
+  const isDraggingGroup = typeof activeId === 'string' && String(activeId).startsWith('group-');
 
   // Initialize all groups as expanded when they first appear
   useEffect(() =>
@@ -924,16 +980,40 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
 
   const handleDragStart = useCallback((event: DragStartEvent) =>
   {
-    const id = event.active.id as number;
-    setActiveId(id);
-    setActiveTab(tabs.find(t => t.id === id) || null);
-  }, [tabs, setActiveId]);
+    const id = event.active.id;
+
+    // Check if dragging a group (ID starts with "group-")
+    if (typeof id === 'string' && id.startsWith('group-'))
+    {
+      const groupId = parseInt(id.replace('group-', ''), 10);
+      const group = tabGroups.find(g => g.id === groupId);
+      const groupTabs = tabs.filter(t => (t.groupId ?? -1) === groupId);
+
+      setActiveId(id);
+      setActiveTab(null);
+      setActiveGroup(group ? { group, tabCount: groupTabs.length } : null);
+    }
+    else
+    {
+      // Dragging a tab
+      const tabId = id as number;
+      setActiveId(tabId);
+      setActiveTab(tabs.find(t => t.id === tabId) || null);
+      setActiveGroup(null);
+    }
+  }, [tabs, tabGroups, setActiveId]);
 
   const handleDragMove = useCallback((event: DragMoveEvent) =>
   {
     const { active } = event;
     const currentX = pointerPositionRef.current.x;
     const currentY = pointerPositionRef.current.y;
+
+    // Check if we're dragging a group
+    const isDraggingGroupNow = typeof active.id === 'string' && String(active.id).startsWith('group-');
+    const draggedGroupId = isDraggingGroupNow
+      ? parseInt(String(active.id).replace('group-', ''), 10)
+      : null;
 
     // Find element under pointer
     const elements = document.elementsFromPoint(currentX, currentY);
@@ -948,18 +1028,39 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       const groupId = groupHeaderElement.getAttribute('data-group-header-id');
       if (groupId)
       {
+        const targetGroupId = parseInt(groupId, 10);
+
+        // If dragging a group, prevent dropping on self
+        if (isDraggingGroupNow && targetGroupId === draggedGroupId)
+        {
+          setDropTargetId(null);
+          setDropPosition(null);
+          clearAutoExpandTimer();
+          return;
+        }
+
+        if (isDraggingGroupNow)
+        {
+          // When dragging a group over group header: always "before"
+          // (hovering on header = top half of group area)
+          setDropTargetId(`group-${groupId}`);
+          setDropPosition('before');
+          clearAutoExpandTimer();
+          return;
+        }
+
+        // When dragging a tab: allow before/after/into (isContainer=true)
         const position = calculateDropPosition(groupHeaderElement, currentY, true);
         setDropTargetId(`group-${groupId}`);
         setDropPosition(position);
 
         // Auto-expand/collapse group after 1s hover on 'into' zone
-        const groupIdNum = parseInt(groupId);
         if (position === 'into')
         {
-          setAutoExpandTimer(groupIdNum, () =>
+          setAutoExpandTimer(targetGroupId, () =>
           {
             // Toggle: expand if collapsed, collapse if expanded
-            setExpandedGroups(prev => ({ ...prev, [groupIdNum]: !prev[groupIdNum] }));
+            setExpandedGroups(prev => ({ ...prev, [targetGroupId]: !prev[targetGroupId] }));
           });
         }
         else
@@ -981,6 +1082,46 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       const tabId = tabElement.getAttribute('data-tab-id');
       if (tabId)
       {
+        const tabGroupId = parseInt(tabElement.getAttribute('data-group-id') || '-1', 10);
+
+        // If dragging a group, prevent dropping on own tabs
+        if (isDraggingGroupNow && tabGroupId === draggedGroupId)
+        {
+          setDropTargetId(null);
+          setDropPosition(null);
+          clearAutoExpandTimer();
+          return;
+        }
+
+        // If dragging a group over another group's tabs, treat the entire group as one unit
+        if (isDraggingGroupNow && tabGroupId !== -1)
+        {
+          // Find the group's bounding area (header + all tabs)
+          const groupHeader = document.querySelector(`[data-group-header-id="${tabGroupId}"]`) as HTMLElement | null;
+          const groupTabs = document.querySelectorAll(`[data-group-id="${tabGroupId}"]`);
+
+          if (groupHeader && groupTabs.length > 0)
+          {
+            const headerRect = groupHeader.getBoundingClientRect();
+            const lastTabRect = (groupTabs[groupTabs.length - 1] as HTMLElement).getBoundingClientRect();
+
+            // Combined group area: from top of header to bottom of last tab
+            const groupTop = headerRect.top;
+            const groupBottom = lastTabRect.bottom;
+            const groupHeight = groupBottom - groupTop;
+
+            // 50% threshold: before if in top half, after if in bottom half
+            const relativeY = currentY - groupTop;
+            const position = relativeY < groupHeight * 0.5 ? 'before' : 'after';
+
+            setDropTargetId(`group-${tabGroupId}`);
+            setDropPosition(position);
+            clearAutoExpandTimer();
+            return;
+          }
+        }
+
+        // Normal tab drop (for tab dragging, or ungrouped tabs)
         const position = calculateDropPosition(tabElement, currentY, false);
         setDropTargetId(tabId);
         setDropPosition(position);
@@ -1007,157 +1148,227 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     {
       setActiveId(null);
       setActiveTab(null);
+      setActiveGroup(null);
       setDropTargetId(null);
       setDropPosition(null);
       return;
     }
 
-    const sourceTab = tabs.find(t => t.id === activeId);
-    if (!sourceTab)
+    // Check if we're dragging a group
+    const isDraggingGroupNow = typeof activeId === 'string' && String(activeId).startsWith('group-');
+
+    if (isDraggingGroupNow)
     {
-      setActiveId(null);
-      setActiveTab(null);
-      setDropTargetId(null);
-      setDropPosition(null);
-      return;
-    }
+      // --- GROUP DRAG HANDLING ---
+      const draggedGroupId = parseInt(String(activeId).replace('group-', ''), 10);
+      const isGroupHeaderTarget = dropTargetId.startsWith('group-');
 
-    const sourceGroupId = sourceTab.groupId ?? -1;
-    const isGroupHeaderTarget = dropTargetId.startsWith('group-');
+      let targetIndex = -1;
 
-    if (isGroupHeaderTarget)
-    {
-      const targetGroupId = parseInt(dropTargetId.replace('group-', ''));
-
-      if (dropPosition === 'into')
+      if (isGroupHeaderTarget)
       {
-        // Move tab into group at the end
-        if (sourceGroupId !== targetGroupId)
-        {
-          groupTab(activeId, targetGroupId);
-        }
+        // Dropping relative to another group
+        const targetGroupId = parseInt(dropTargetId.replace('group-', ''), 10);
+        const targetGroupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
 
-        // Move to end of group
-        const groupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
-        if (groupTabs.length > 0)
+        if (targetGroupTabs.length > 0)
         {
-          const lastTabIndex = tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id);
-          const sourceIndex = tabs.findIndex(t => t.id === activeId);
-          let targetIndex = lastTabIndex + 1;
-
-          // Account for source removal when moving forward
-          if (sourceIndex < targetIndex)
+          if (dropPosition === 'before')
           {
-            targetIndex--;
+            // Move before target group's first tab
+            targetIndex = tabs.findIndex(t => t.id === targetGroupTabs[0].id);
           }
-
-          moveTab(activeId, targetIndex);
+          else
+          {
+            // 'after': Move after target group's last tab
+            const lastTab = targetGroupTabs[targetGroupTabs.length - 1];
+            targetIndex = tabs.findIndex(t => t.id === lastTab.id) + 1;
+          }
         }
       }
       else
       {
-        // 'before' or 'after' on group header
-        const groupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
-        if (groupTabs.length > 0)
+        // Dropping relative to a tab
+        const targetTabId = parseInt(dropTargetId, 10);
+        const targetTab = tabs.find(t => t.id === targetTabId);
+
+        if (targetTab)
         {
-          if (dropPosition === 'before')
+          targetIndex = tabs.findIndex(t => t.id === targetTabId);
+          if (dropPosition === 'after')
           {
-            // Place before the group (as sibling, outside)
-            const targetIndex = tabs.findIndex(t => t.id === groupTabs[0].id);
-            if (sourceGroupId !== -1)
-            {
-              ungroupTab(activeId);
-            }
-            moveTab(activeId, targetIndex);
-          }
-          else
-          {
-            // 'after' behavior depends on expanded state
-            if (expandedGroups[targetGroupId])
-            {
-              // Expanded: inside group at index 0
-              const firstTabIndex = tabs.findIndex(t => t.id === groupTabs[0].id);
-              const sourceIndex = tabs.findIndex(t => t.id === activeId);
-              let targetIndex = firstTabIndex;
-              if (sourceIndex < targetIndex)
-              {
-                targetIndex--;
-              }
-              moveTab(activeId, targetIndex);
-              if (sourceGroupId !== targetGroupId)
-              {
-                groupTab(activeId, targetGroupId);
-              }
-            }
-            else
-            {
-              // Collapsed: sibling after group (after last tab in group)
-              const lastTabIndex = tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id);
-              const sourceIndex = tabs.findIndex(t => t.id === activeId);
-              let targetIndex = lastTabIndex + 1;
-              if (sourceIndex < targetIndex)
-              {
-                targetIndex--;
-              }
-              if (sourceGroupId !== -1)
-              {
-                ungroupTab(activeId);
-              }
-              moveTab(activeId, targetIndex);
-            }
+            targetIndex += 1;
           }
         }
+      }
+
+      if (targetIndex >= 0)
+      {
+        // Account for source group tabs being removed when moving down
+        const sourceGroupTabs = tabs.filter(t => (t.groupId ?? -1) === draggedGroupId);
+        const sourceFirstIndex = tabs.findIndex(t => t.id === sourceGroupTabs[0]?.id);
+
+        // If source is before target (moving down), subtract source tab count
+        if (sourceFirstIndex !== -1 && sourceFirstIndex < targetIndex)
+        {
+          targetIndex -= sourceGroupTabs.length;
+        }
+
+        moveGroup(draggedGroupId, targetIndex);
       }
     }
     else
     {
-      // Target is a tab
-      const targetTabId = parseInt(dropTargetId);
-      const targetTab = tabs.find(t => t.id === targetTabId);
-
-      if (targetTab)
+      // --- TAB DRAG HANDLING ---
+      const sourceTab = tabs.find(t => t.id === activeId);
+      if (!sourceTab)
       {
-        const targetGroupId = targetTab.groupId ?? -1;
+        setActiveId(null);
+        setActiveTab(null);
+        setActiveGroup(null);
+        setDropTargetId(null);
+        setDropPosition(null);
+        return;
+      }
 
-        // Handle group membership change
-        if (targetGroupId !== sourceGroupId)
+      const sourceGroupId = sourceTab.groupId ?? -1;
+      const isGroupHeaderTarget = dropTargetId.startsWith('group-');
+
+      if (isGroupHeaderTarget)
+      {
+        const targetGroupId = parseInt(dropTargetId.replace('group-', ''));
+
+        if (dropPosition === 'into')
         {
-          if (targetGroupId === -1)
+          // Move tab into group at the end
+          if (sourceGroupId !== targetGroupId)
           {
-            // Target is ungrouped - ungroup source
-            if (sourceGroupId !== -1)
+            groupTab(activeId as number, targetGroupId);
+          }
+
+          // Move to end of group
+          const groupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+          if (groupTabs.length > 0)
+          {
+            const lastTabIndex = tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id);
+            const sourceIndex = tabs.findIndex(t => t.id === activeId);
+            let targetIndex = lastTabIndex + 1;
+
+            // Account for source removal when moving forward
+            if (sourceIndex < targetIndex)
             {
-              ungroupTab(activeId);
+              targetIndex--;
+            }
+
+            moveTab(activeId as number, targetIndex);
+          }
+        }
+        else
+        {
+          // 'before' or 'after' on group header
+          const groupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+          if (groupTabs.length > 0)
+          {
+            if (dropPosition === 'before')
+            {
+              // Place before the group (as sibling, outside)
+              const targetIndex = tabs.findIndex(t => t.id === groupTabs[0].id);
+              if (sourceGroupId !== -1)
+              {
+                ungroupTab(activeId as number);
+              }
+              moveTab(activeId as number, targetIndex);
+            }
+            else
+            {
+              // 'after' behavior depends on expanded state
+              if (expandedGroups[targetGroupId])
+              {
+                // Expanded: inside group at index 0
+                const firstTabIndex = tabs.findIndex(t => t.id === groupTabs[0].id);
+                const sourceIndex = tabs.findIndex(t => t.id === activeId);
+                let targetIndex = firstTabIndex;
+                if (sourceIndex < targetIndex)
+                {
+                  targetIndex--;
+                }
+                moveTab(activeId as number, targetIndex);
+                if (sourceGroupId !== targetGroupId)
+                {
+                  groupTab(activeId as number, targetGroupId);
+                }
+              }
+              else
+              {
+                // Collapsed: sibling after group (after last tab in group)
+                const lastTabIndex = tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id);
+                const sourceIndex = tabs.findIndex(t => t.id === activeId);
+                let targetIndex = lastTabIndex + 1;
+                if (sourceIndex < targetIndex)
+                {
+                  targetIndex--;
+                }
+                if (sourceGroupId !== -1)
+                {
+                  ungroupTab(activeId as number);
+                }
+                moveTab(activeId as number, targetIndex);
+              }
             }
           }
-          else
-          {
-            // Target is in a group - add source to that group
-            groupTab(activeId, targetGroupId);
-          }
         }
+      }
+      else
+      {
+        // Target is a tab
+        const targetTabId = parseInt(dropTargetId);
+        const targetTab = tabs.find(t => t.id === targetTabId);
 
-        // Reorder
-        const sourceIndex = tabs.findIndex(t => t.id === activeId);
-        const targetIndex = tabs.findIndex(t => t.id === targetTabId);
-        let newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
-
-        // When moving forward, account for source removal shifting tabs left
-        if (sourceIndex < newIndex)
+        if (targetTab)
         {
-          newIndex--;
-        }
+          const targetGroupId = targetTab.groupId ?? -1;
 
-        moveTab(activeId, newIndex);
+          // Handle group membership change
+          if (targetGroupId !== sourceGroupId)
+          {
+            if (targetGroupId === -1)
+            {
+              // Target is ungrouped - ungroup source
+              if (sourceGroupId !== -1)
+              {
+                ungroupTab(activeId as number);
+              }
+            }
+            else
+            {
+              // Target is in a group - add source to that group
+              groupTab(activeId as number, targetGroupId);
+            }
+          }
+
+          // Reorder
+          const sourceIndex = tabs.findIndex(t => t.id === activeId);
+          const targetIndex = tabs.findIndex(t => t.id === targetTabId);
+          let newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
+
+          // When moving forward, account for source removal shifting tabs left
+          if (sourceIndex < newIndex)
+          {
+            newIndex--;
+          }
+
+          moveTab(activeId as number, newIndex);
+        }
       }
     }
 
     // Reset state
     setActiveId(null);
     setActiveTab(null);
+    setActiveGroup(null);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [activeId, dropTargetId, dropPosition, tabs, groupTab, ungroupTab, moveTab, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
+  }, [activeId, dropTargetId, dropPosition, tabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
@@ -1168,6 +1379,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     // Reset drag state
     setActiveId(null);
     setActiveTab(null);
+    setActiveGroup(null);
     setDropTargetId(null);
     setDropPosition(null);
   }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
@@ -1258,16 +1470,21 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
               const isGroupExpanded = expandedGroups[item.group.id];
               const groupTargetId = `group-${item.group.id}`;
               const isTarget = dropTargetId === groupTargetId;
+              // When dragging a group, never show 'into' indicator (groups can't nest)
+              const showDropInto = !isDraggingGroup && isTarget && dropPosition === 'into';
+              // When dragging a group with 'after' position, show on last tab instead of header
+              const isGroupAfterTarget = isDraggingGroup && isTarget && dropPosition === 'after';
               return (
                 <div key={`group-${item.group.id}`}>
-                  <TabGroupHeader
+                  <DraggableGroupHeader
                     group={item.group}
+                    tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
                     showDropBefore={isTarget && dropPosition === 'before'}
-                    showDropAfter={isTarget && dropPosition === 'after'}
-                    showDropInto={isTarget && dropPosition === 'into'}
+                    showDropAfter={!isDraggingGroup && isTarget && dropPosition === 'after'}
+                    showDropInto={showDropInto}
                     afterDropIndentPx={
-                      isTarget && dropPosition === 'after' && isGroupExpanded
+                      isTarget && dropPosition === 'after' && isGroupExpanded && !isDraggingGroup
                         ? getIndentPadding(2)
                         : undefined
                     }
@@ -1282,6 +1499,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
                   {
                     const tabId = String(tab.id);
                     const isTabTarget = dropTargetId === tabId;
+                    const isLastTab = index === item.tabs.length - 1;
+                    // When dragging a group with 'after', show indicator on last tab
+                    const showGroupAfterOnLastTab = isLastTab && isGroupAfterTarget;
                     // Indent lines for tabs in group since drop stays within group
                     const indentPx = isTabTarget ? getIndentPadding(2) : undefined;
                     return (
@@ -1291,11 +1511,11 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
                         indentLevel={2}
                         isBeingDragged={activeId === tab.id}
                         showDropBefore={isTabTarget && dropPosition === 'before'}
-                        showDropAfter={isTabTarget && dropPosition === 'after'}
+                        showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab}
                         beforeIndentPx={dropPosition === 'before' ? indentPx : undefined}
                         afterIndentPx={dropPosition === 'after' ? indentPx : undefined}
                         groupColor={item.group.color}
-                        isLastInGroup={index === item.tabs.length - 1}
+                        isLastInGroup={isLastTab}
                         onClose={closeTab}
                         onActivate={activateTab}
                         onPin={onPin}
@@ -1310,6 +1530,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
 
           <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
             {activeTab && <TabDragOverlay tab={activeTab} />}
+            {activeGroup && <GroupDragOverlay group={activeGroup.group} tabCount={activeGroup.tabCount} />}
           </DragOverlay>
         </DndContext>
       )}

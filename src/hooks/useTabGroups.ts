@@ -62,5 +62,13 @@ export const useTabGroups = () =>
     });
   }, [handleError]);
 
-  return { tabGroups, updateGroup, error };
+  const moveGroup = useCallback((groupId: number, index: number) =>
+  {
+    chrome.tabGroups.move(groupId, { index }, () =>
+    {
+      handleError('move');
+    });
+  }, [handleError]);
+
+  return { tabGroups, updateGroup, moveGroup, error };
 };
