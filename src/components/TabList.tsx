@@ -697,12 +697,16 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
             "group relative flex items-center py-1 px-2 rounded-t-lg cursor-pointer select-none",
             isDragging && "opacity-50 pointer-events-none",
             showDropInto
-              ? "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500"
+              ? "bg-blue-100 dark:bg-blue-900/50"
               : clsx(colorStyle.bg, "hover:brightness-95 dark:hover:brightness-110")
           )}
           style={{ paddingLeft: `${getIndentPadding(1)}px` }}
           onClick={onToggle}
         >
+          {/* Drop-into ring indicator with fully rounded corners */}
+          {showDropInto && (
+            <div className="absolute inset-0 rounded-lg ring-2 ring-blue-500 pointer-events-none" />
+          )}
           <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} afterIndentPx={afterDropIndentPx} />
 
           <span className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
