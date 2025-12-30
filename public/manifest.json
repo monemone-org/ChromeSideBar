@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Chrome SideBar",
-  "version": "1.0.40",
-  "description": "Bookmarks and Active Tabs in Side Panel",
+  "name": "Sidebar for Arc Users",
+  "version": "1.0.52",
+  "description": "Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel",
   "permissions": [
     "sidePanel",
     "bookmarks",
