@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project-specific instructions for Claude Code.
+Project-specific instructions for coding agent
 
 ## Project Overview
 
@@ -18,6 +18,7 @@ Chrome sidebar extension built with React, TypeScript, and Tailwind CSS.
 - Lint: `npm run lint`
 
 Do not run build after making changes. Notify the user to compile and verify.
+Do not run `git add` or `git commit`. Notify the user to add and commit.
 
 ## Code Style
 
@@ -26,15 +27,8 @@ Do not run build after making changes. Notify the user to compile and verify.
 
 ## Versioning
 
-Version format: `{major}.{minor}.{build_number}` where build_number is the git commit count.
-
-**Before running command git-commit-msg**, run:
+**Before running command git-commit-msg**, update extension version number with:
 ```bash
 ./tools/update-version.sh
 ```
 
-Commands:
-- `./tools/update-version.sh` - Update build number only
-- `./tools/update-version.sh minor` - Bump minor version
-- `./tools/update-version.sh major` - Bump major version
-- `./tools/update-version.sh 2 1` - Set specific major.minor

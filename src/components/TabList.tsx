@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, forwardRef } from 'react';
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useDragDrop } from '../hooks/useDragDrop';
@@ -14,6 +14,7 @@ import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
 import * as ContextMenu from './ContextMenu';
+import { useInView } from '../hooks/useInView';
 import {
   DndContext,
   DragOverlay,
@@ -24,7 +25,9 @@ import {
   DragStartEvent,
   DragMoveEvent,
   DragEndEvent,
+  DraggableAttributes,
 } from '@dnd-kit/core';
+import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import clsx from 'clsx';
 
 // Chrome tab group color mapping (exact Chrome hex codes)
@@ -378,12 +381,16 @@ interface DraggableTabProps {
   onActivate: (id: number) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   onOpenAddToGroupDialog?: (tabId: number, currentGroupId?: number) => void;
+  // Drag attributes
+  attributes?: DraggableAttributes;
+  listeners?: SyntheticListenerMap;
 }
 
 // Fixed indentation for all tab rows: [speaker][pin][icon] label
 const TAB_ROW_PADDING = 12;
 
-const DraggableTab = ({
+// --- Pure UI Row Component ---
+const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   tab,
   indentLevel: _indentLevel,
   isBeingDragged,
@@ -396,15 +403,10 @@ const DraggableTab = ({
   onClose,
   onActivate,
   onPin,
-  onOpenAddToGroupDialog
-}: DraggableTabProps) =>
-{
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-  } = useDraggable({ id: tab.id! });
-
+  onOpenAddToGroupDialog,
+  attributes,
+  listeners
+}, ref) => {
   const [showChapters, setShowChapters] = useState(false);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
@@ -451,7 +453,7 @@ const DraggableTab = ({
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
         <div
-          ref={setNodeRef}
+          ref={ref}
           data-tab-id={tab.id}
           data-group-id={tab.groupId ?? -1}
           style={{ paddingLeft: `${TAB_ROW_PADDING}px` }}
@@ -593,6 +595,53 @@ const DraggableTab = ({
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>
+  );
+});
+TabRow.displayName = 'TabRow';
+
+// --- Draggable Wrapper ---
+const DraggableTabRow = forwardRef<HTMLDivElement, DraggableTabProps>((props, ref) => {
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: props.tab.id!
+  });
+
+  const setRefs = useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+      if (typeof ref === 'function') {
+        ref(node);
+      } else if (ref) {
+        ref.current = node;
+      }
+    },
+    [setNodeRef, ref]
+  );
+
+  return (
+    <TabRow
+      ref={setRefs}
+      {...props}
+      attributes={attributes}
+      listeners={listeners}
+    />
+  );
+});
+DraggableTabRow.displayName = 'DraggableTabRow';
+
+// --- Static Wrapper ---
+const StaticTabRow = forwardRef<HTMLDivElement, DraggableTabProps>((props, ref) => {
+  return <TabRow ref={ref} {...props} />;
+});
+StaticTabRow.displayName = 'StaticTabRow';
+
+// --- DraggableTab Component (Lazy Loading) ---
+const DraggableTab = (props: DraggableTabProps) => {
+  const { ref, isInView } = useInView<HTMLDivElement>();
+
+  return isInView ? (
+    <DraggableTabRow ref={ref} {...props} />
+  ) : (
+    <StaticTabRow ref={ref} {...props} />
   );
 };
 

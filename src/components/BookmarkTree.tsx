@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, forwardRef } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
@@ -6,6 +6,7 @@ import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
 import { Dialog } from './Dialog';
 import * as ContextMenu from './ContextMenu';
+import { useInView } from '../hooks/useInView';
 import {
   ChevronRight,
   ChevronDown,
@@ -29,7 +30,9 @@ import {
   DragStartEvent,
   DragMoveEvent,
   DragEndEvent,
+  DraggableAttributes,
 } from '@dnd-kit/core';
+import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 
 // Get favicon URL using Chrome's internal favicon cache
 const getFaviconUrl = (url: string): string => {
@@ -230,10 +233,10 @@ const isDescendant = (
   return sourceNode ? checkDescendants(sourceNode) : false;
 };
 
-// --- Bookmark Item ---
-interface BookmarkItemProps {
+// --- Bookmark Row (Pure UI) ---
+interface BookmarkRowProps {
   node: chrome.bookmarks.BookmarkTreeNode;
-  depth?: number;
+  depth: number;
   expandedState: Record<string, boolean>;
   toggleFolder: (id: string, expanded: boolean) => void;
   onRemove: (id: string) => void;
@@ -242,18 +245,21 @@ interface BookmarkItemProps {
   onSort: (folderId: string, sortBy: SortOption) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   openInNewTab?: boolean;
-  // Drag-drop props
   isDragging?: boolean;
   activeId?: string | null;
   dropTargetId?: string | null;
   dropPosition?: DropPosition;
   onPointerEnter?: (id: string) => void;
   onPointerLeave?: () => void;
+  // Drag-drop attributes
+  attributes?: DraggableAttributes;
+  listeners?: SyntheticListenerMap;
 }
 
-const BookmarkItem = ({
+// Forward ref to attach to the main div
+const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   node,
-  depth = 0,
+  depth,
   expandedState,
   toggleFolder,
   onRemove,
@@ -261,43 +267,29 @@ const BookmarkItem = ({
   onCreateFolder,
   onSort,
   onPin,
-  openInNewTab = false,
+  openInNewTab,
   isDragging,
   activeId,
   dropTargetId,
   dropPosition,
   onPointerEnter,
-  onPointerLeave
-}: BookmarkItemProps) => {
+  onPointerLeave,
+  attributes,
+  listeners
+}, ref) => {
   const isFolder = !node.url;
   const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
-
-  // Set up draggable (disabled for special folders)
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-  } = useDraggable({
-    id: node.id,
-    disabled: isSpecialFolder
-  });
 
   const style: React.CSSProperties = {
     paddingLeft: `${getIndentPadding(depth)}px`,
   };
 
-  // Check if this item is being dragged
   const isBeingDragged = activeId === node.id;
-
-  // Check if this is the drop target
   const isDropTarget = dropTargetId === node.id;
-
-  // Show drop indicators
   const showDropBefore = isDropTarget && dropPosition === 'before';
   const showDropAfter = isDropTarget && dropPosition === 'after';
   const showDropInto = isDropTarget && dropPosition === 'into' && isFolder;
 
-  // Indent lines when inside a folder (depth > 0), or 'after' expanded folder
   const insideFolder = depth > 0;
   const beforeIndentPx = showDropBefore && insideFolder ? getIndentPadding(depth) : undefined;
   const afterIndentPx = showDropAfter && (insideFolder || (isFolder && expandedState[node.id]))
@@ -305,154 +297,193 @@ const BookmarkItem = ({
     : undefined;
 
   return (
-    <>
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>
-          <div
-            ref={setNodeRef}
-            data-bookmark-id={node.id}
-            data-is-folder={isFolder}
-            data-depth={depth}
-            style={style}
-            className={clsx(
-              "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none",
-              !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
-              isBeingDragged && "opacity-50",
-              showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
-              !isSpecialFolder && "touch-none"
-            )}
-            onPointerEnter={() => isDragging && onPointerEnter?.(node.id)}
-            onPointerLeave={() => isDragging && onPointerLeave?.()}
-            {...attributes}
-            {...listeners}
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild>
+        <div
+          ref={ref}
+          data-bookmark-id={node.id}
+          data-is-folder={isFolder}
+          data-depth={depth}
+          style={style}
+          className={clsx(
+            "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none",
+            !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
+            isBeingDragged && "opacity-50",
+            showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
+            !isSpecialFolder && "touch-none"
+          )}
+          onPointerEnter={() => isDragging && onPointerEnter?.(node.id)}
+          onPointerLeave={() => isDragging && onPointerLeave?.()}
+          {...attributes}
+          {...listeners}
+        >
+          <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
+
+          <span
+            className={clsx("mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700", !isFolder && "invisible")}
+            onClick={(e) => { e.stopPropagation(); toggleFolder(node.id, !expandedState[node.id]); }}
           >
-            <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
+            {expandedState[node.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </span>
 
-            <span
-              className={clsx("mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700", !isFolder && "invisible")}
-              onClick={(e) => { e.stopPropagation(); toggleFolder(node.id, !expandedState[node.id]); }}
-            >
-              {expandedState[node.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </span>
+          <span className="mr-2 text-gray-500 flex-shrink-0">
+            {isFolder ? (
+              <Folder size={16} />
+            ) : node.url ? (
+              <img
+                src={getFaviconUrl(node.url)}
+                alt=""
+                className="w-4 h-4"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                }}
+              />
+            ) : (
+              <Globe size={16} />
+            )}
+            {!isFolder && <Globe size={16} className="hidden" />}
+          </span>
 
-            <span className="mr-2 text-gray-500 flex-shrink-0">
-              {isFolder ? (
-                <Folder size={16} />
-              ) : node.url ? (
-                <img
-                  src={getFaviconUrl(node.url)}
-                  alt=""
-                  className="w-4 h-4"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-              ) : (
-                <Globe size={16} />
-              )}
-              {!isFolder && <Globe size={16} className="hidden" />}
-            </span>
-
-            <span
-              className="flex-1 truncate"
-              onClick={(e) => {
-                if (isFolder) {
-                  toggleFolder(node.id, !expandedState[node.id]);
-                } else if (node.url) {
-                  if (e.shiftKey) {
-                    chrome.windows.create({ url: node.url });
-                  } else if (e.metaKey || e.ctrlKey) {
-                    // Cmd+click: invert the default behavior
-                    if (openInNewTab) {
-                      chrome.tabs.update({ url: node.url });
-                    } else {
-                      chrome.tabs.create({ url: node.url, active: false });
-                    }
+          <span
+            className="flex-1 truncate"
+            onClick={(e) => {
+              if (isFolder) {
+                toggleFolder(node.id, !expandedState[node.id]);
+              } else if (node.url) {
+                if (e.shiftKey) {
+                  chrome.windows.create({ url: node.url });
+                } else if (e.metaKey || e.ctrlKey) {
+                  if (openInNewTab) {
+                    chrome.tabs.update({ url: node.url });
                   } else {
-                    // Regular click: use the setting
-                    if (openInNewTab) {
-                      chrome.tabs.create({ url: node.url, active: true });
-                    } else {
-                      chrome.tabs.update({ url: node.url });
-                    }
+                    chrome.tabs.create({ url: node.url, active: false });
+                  }
+                } else {
+                  if (openInNewTab) {
+                    chrome.tabs.create({ url: node.url, active: true });
+                  } else {
+                    chrome.tabs.update({ url: node.url });
                   }
                 }
-              }}
-            >
-              {node.title}
-            </span>
+              }
+            }}
+          >
+            {node.title}
+          </span>
 
-            {!isFolder && onPin && node.url && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
-                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                title="Pin"
-              >
-                <Pin size={14} />
-              </button>
-            )}
-          </div>
-        </ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content>
-            {isFolder && (
-              <>
-                <ContextMenu.Item onSelect={() => onCreateFolder(node.id)}>
-                  <FolderPlus size={14} className="mr-2" /> New Folder
-                </ContextMenu.Item>
-                <ContextMenu.Item onSelect={() => onSort(node.id, 'name')}>
-                  <ArrowDownAZ size={14} className="mr-2" /> Sort by Name
-                </ContextMenu.Item>
-                <ContextMenu.Item onSelect={() => onSort(node.id, 'dateAdded')}>
-                  <Calendar size={14} className="mr-2" /> Sort by Date
-                </ContextMenu.Item>
-                {!isSpecialFolder && <ContextMenu.Separator />}
-              </>
-            )}
-            {!isFolder && onPin && node.url && (
-              <>
-                <ContextMenu.Item onSelect={() => onPin(node.url!, node.title, getFaviconUrl(node.url!))}>
-                  <Pin size={14} className="mr-2" /> Pin to Sidebar
-                </ContextMenu.Item>
-                <ContextMenu.Separator />
-              </>
-            )}
-            {!isSpecialFolder && (
-              <>
-                <ContextMenu.Item onSelect={() => onEdit(node)}>
-                  <Edit size={14} className="mr-2" /> Rename Folder
-                </ContextMenu.Item>
-                <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
-                  <Trash size={14} className="mr-2" /> Delete
-                </ContextMenu.Item>
-              </>
-            )}
-          </ContextMenu.Content>
-        </ContextMenu.Portal>
-      </ContextMenu.Root>
+          {!isFolder && onPin && node.url && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
+              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+              title="Pin"
+            >
+              <Pin size={14} />
+            </button>
+          )}
+        </div>
+      </ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content>
+          {isFolder && (
+            <>
+              <ContextMenu.Item onSelect={() => onCreateFolder(node.id)}>
+                <FolderPlus size={14} className="mr-2" /> New Folder
+              </ContextMenu.Item>
+              <ContextMenu.Item onSelect={() => onSort(node.id, 'name')}>
+                <ArrowDownAZ size={14} className="mr-2" /> Sort by Name
+              </ContextMenu.Item>
+              <ContextMenu.Item onSelect={() => onSort(node.id, 'dateAdded')}>
+                <Calendar size={14} className="mr-2" /> Sort by Date
+              </ContextMenu.Item>
+              {!isSpecialFolder && <ContextMenu.Separator />}
+            </>
+          )}
+          {!isFolder && onPin && node.url && (
+            <>
+              <ContextMenu.Item onSelect={() => onPin(node.url!, node.title, getFaviconUrl(node.url!))}>
+                <Pin size={14} className="mr-2" /> Pin to Sidebar
+              </ContextMenu.Item>
+              <ContextMenu.Separator />
+            </>
+          )}
+          {!isSpecialFolder && (
+            <>
+              <ContextMenu.Item onSelect={() => onEdit(node)}>
+                <Edit size={14} className="mr-2" /> Rename Folder
+              </ContextMenu.Item>
+              <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
+                <Trash size={14} className="mr-2" /> Delete
+              </ContextMenu.Item>
+            </>
+          )}
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
+  );
+});
+BookmarkRow.displayName = 'BookmarkRow';
+
+// --- Draggable Wrapper ---
+const DraggableBookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>((props, ref) => {
+  const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(props.node.id);
+  const { attributes, listeners, setNodeRef } = useDraggable({
+    id: props.node.id,
+    disabled: isSpecialFolder
+  });
+
+  // Merge refs
+  const setRefs = useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+      if (typeof ref === 'function') {
+        ref(node);
+      } else if (ref) {
+        ref.current = node;
+      }
+    },
+    [setNodeRef, ref]
+  );
+
+  return (
+    <BookmarkRow
+      ref={setRefs}
+      {...props}
+      attributes={attributes}
+      listeners={listeners}
+    />
+  );
+});
+DraggableBookmarkRow.displayName = 'DraggableBookmarkRow';
+
+// --- Static Wrapper ---
+const StaticBookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>((props, ref) => {
+  return <BookmarkRow ref={ref} {...props} />;
+});
+StaticBookmarkRow.displayName = 'StaticBookmarkRow';
+
+// --- Recursive Item ---
+const BookmarkItem = (props: BookmarkRowProps) => {
+  const { node, expandedState, depth = 0 } = props;
+  const isFolder = !node.url;
+  const { ref, isInView } = useInView<HTMLDivElement>();
+
+  return (
+    <>
+      {isInView ? (
+        <DraggableBookmarkRow ref={ref} {...props} />
+      ) : (
+        <StaticBookmarkRow ref={ref} {...props} />
+      )}
 
       {isFolder && expandedState[node.id] && node.children && (
         <div>
           {node.children.map((child) => (
             <BookmarkItem
               key={child.id}
+              {...props} // Pass through all handlers
               node={child}
               depth={depth + 1}
-              expandedState={expandedState}
-              toggleFolder={toggleFolder}
-              onRemove={onRemove}
-              onEdit={onEdit}
-              onCreateFolder={onCreateFolder}
-              onSort={onSort}
-              onPin={onPin}
-              openInNewTab={openInNewTab}
-              isDragging={isDragging}
-              activeId={activeId}
-              dropTargetId={dropTargetId}
-              dropPosition={dropPosition}
-              onPointerEnter={onPointerEnter}
-              onPointerLeave={onPointerLeave}
             />
           ))}
         </div>
