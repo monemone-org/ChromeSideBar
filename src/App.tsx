@@ -87,7 +87,7 @@ function App() {
       </button>
 
       {/* Single scrollable content */}
-      <div className="flex-1 overflow-y-auto p-2">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
         <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} openInNewTab={openBookmarkInNewTab} />
         <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} />
       </div>

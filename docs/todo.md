@@ -20,4 +20,5 @@
 - [x] pin site to be in sync with Chrome's pinned tab
 
 - [x] add icon to popup menu for tabs and groups , similar to bookmarks and bookmark folders.
-- [ ] drag /drop to reorder tab groups, along with all the group tabs inside.
+- [x] drag /drop to reorder tab groups, along with all the group tabs inside.
+
