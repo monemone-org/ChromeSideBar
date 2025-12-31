@@ -4,6 +4,7 @@ node_modules/
 # Build output
 dist/
 releases/
+tmp/
 
 # OS files
 .DS_Store
@@ -11,3 +12,5 @@ Thumbs.db
 
 # Editor/IDE
 .vscode/
+playwright-report
+test-results
