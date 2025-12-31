@@ -544,7 +544,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           {...attributes}
           {...listeners}
           className={clsx(
-            "group/tab relative hover:z-10 flex items-center py-1 px-2 cursor-pointer",
+            "group/tab relative hover:z-10 flex items-center py-1 px-2 cursor-pointer outline-none",
             isLastInGroup ? "rounded-b-lg" : "rounded-none",
             isBeingDragged && "opacity-50",
             tab.active
@@ -580,7 +580,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
         {tab.url}
       </div>
       {/* Action buttons */}
-      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-2 opacity-0 group-hover/tab:opacity-100 bg-white dark:bg-gray-900 rounded">
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover/tab:opacity-100 bg-white dark:bg-gray-900 rounded">
         {videoId && (
           <button
             ref={chaptersButtonRef}
@@ -785,7 +785,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           {...attributes}
           {...listeners}
           className={clsx(
-            "group relative flex items-center py-1 px-2 rounded-t-lg cursor-pointer select-none",
+            "group relative flex items-center py-1 px-2 rounded-t-lg cursor-pointer select-none outline-none",
             isDragging && "opacity-50 pointer-events-none",
             showDropInto
               ? "bg-blue-100 dark:bg-blue-900/50"
@@ -1633,7 +1633,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>
           <div
-            className="group relative flex items-center py-1 rounded cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent"
+            className="group relative flex items-center py-1 rounded cursor-pointer select-none outline-none hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent"
             style={{ paddingLeft: `${getIndentPadding(0)}px`, paddingRight: '8px' }}
             onClick={() => setIsExpanded(!isExpanded)}
           >

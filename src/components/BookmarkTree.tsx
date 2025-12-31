@@ -311,7 +311,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           data-depth={depth}
           style={style}
           className={clsx(
-            "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none",
+            "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none outline-none",
             !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
             isBeingDragged && "opacity-50",
             showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
@@ -378,13 +378,15 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           </span>
 
           {!isFolder && onPin && node.url && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
-              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-              title="Pin"
-            >
-              <Pin size={14} />
-            </button>
+            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-900 rounded">
+              <button
+                onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
+                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                title="Pin"
+              >
+                <Pin size={14} />
+              </button>
+            </div>
           )}
         </div>
       </ContextMenu.Trigger>
