@@ -309,16 +309,6 @@ export function SettingsDialog({
               Behaviour
             </label>
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={tempHideOtherBookmarks}
-                  onChange={(e) => setTempHideOtherBookmarks(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
-                />
-                Hide "Other Bookmarks"
-              </label>
-
               <div>
                 <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                   <input
@@ -330,7 +320,7 @@ export function SettingsDialog({
                   Open bookmarks in new tab
                 </label>
                 <p className="mt-1 text-gray-500 dark:text-gray-400 ml-5">
-                  Cmd+click opens in current tab
+                  Off = active tab, On = new tab. Cmd+click inverts.
                 </p>
               </div>
 
