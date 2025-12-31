@@ -2,7 +2,9 @@ import { useState, useRef, useEffect, useMemo, useCallback, forwardRef } from 'r
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useDragDrop } from '../hooks/useDragDrop';
+import { useBookmarks } from '../hooks/useBookmarks';
 import { Dialog } from './Dialog';
+import { Toast } from './Toast';
 import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy } from 'lucide-react';
 import {
   Chapter,
@@ -281,6 +283,86 @@ const ChangeGroupColorDialog = ({
             className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
           >
             Save
+          </button>
+        </div>
+      </div>
+    </Dialog>
+  );
+};
+
+// --- Export Conflict Dialog ---
+export type ExportConflictMode = 'overwrite' | 'merge';
+
+interface ExportConflictDialogProps
+{
+  isOpen: boolean;
+  folderName: string;
+  onConfirm: (mode: ExportConflictMode) => void;
+  onClose: () => void;
+}
+
+const ExportConflictDialog = ({
+  isOpen,
+  folderName,
+  onConfirm,
+  onClose
+}: ExportConflictDialogProps) =>
+{
+  const [selectedMode, setSelectedMode] = useState<ExportConflictMode>('overwrite');
+
+  // Reset state when dialog opens
+  useEffect(() =>
+  {
+    if (isOpen)
+    {
+      setSelectedMode('overwrite');
+    }
+  }, [isOpen]);
+
+  const handleConfirm = () =>
+  {
+    onConfirm(selectedMode);
+    onClose();
+  };
+
+  return (
+    <Dialog isOpen={isOpen} onClose={onClose} title="Folder Already Exists">
+      <div className="p-3 space-y-3">
+        <p className="text-gray-600 dark:text-gray-400">
+          A bookmark folder named "{folderName}" already exists. What would you like to do?
+        </p>
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+            <input
+              type="radio"
+              name="conflictMode"
+              checked={selectedMode === 'overwrite'}
+              onChange={() => setSelectedMode('overwrite')}
+            />
+            Overwrite (replace all bookmarks)
+          </label>
+          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+            <input
+              type="radio"
+              name="conflictMode"
+              checked={selectedMode === 'merge'}
+              onChange={() => setSelectedMode('merge')}
+            />
+            Merge (add missing bookmarks only)
+          </label>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            onClick={onClose}
+            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+          >
+            OK
           </button>
         </div>
       </div>
@@ -666,6 +748,7 @@ interface TabGroupHeaderProps {
   onChangeColor: () => void;
   onRename: () => void;
   onNewTab: () => void;
+  onExportToBookmarks: () => void;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -685,6 +768,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
   onChangeColor,
   onRename,
   onNewTab,
+  onExportToBookmarks,
   attributes,
   listeners
 }, ref) =>
@@ -735,6 +819,10 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           </ContextMenu.Item>
           <ContextMenu.Item onSelect={() => onSortGroup('desc')}>
             <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
+          </ContextMenu.Item>
+          <ContextMenu.Separator />
+          <ContextMenu.Item onSelect={onExportToBookmarks}>
+            <FolderPlus size={14} className="mr-2" /> Export to Other Bookmarks
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item onSelect={onRename}>
@@ -879,6 +967,137 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
   const closeRenameGroupDialog = useCallback(() =>
   {
     setRenameGroupDialog({ isOpen: false, group: null });
+  }, []);
+
+  // Export to Bookmarks state
+  const { findFolderInParent, createFolder, createBookmark, getChildren, clearFolder } = useBookmarks();
+  const OTHER_BOOKMARKS_ID = '2';
+
+  const [exportConflictDialog, setExportConflictDialog] = useState<{
+    isOpen: boolean;
+    folderName: string;
+    existingFolder: chrome.bookmarks.BookmarkTreeNode | null;
+    tabsToExport: chrome.tabs.Tab[];
+  }>({ isOpen: false, folderName: '', existingFolder: null, tabsToExport: [] });
+
+  const [toastState, setToastState] = useState<{
+    isVisible: boolean;
+    message: string;
+  }>({ isVisible: false, message: '' });
+
+  const showToast = useCallback((message: string) =>
+  {
+    setToastState({ isVisible: true, message });
+  }, []);
+
+  const hideToast = useCallback(() =>
+  {
+    setToastState({ isVisible: false, message: '' });
+  }, []);
+
+  // Filter out empty new tabs
+  const filterBookmarkableTabs = useCallback((tabList: chrome.tabs.Tab[]): chrome.tabs.Tab[] =>
+  {
+    return tabList.filter(tab =>
+      tab.url &&
+      tab.url !== 'chrome://newtab/'
+    );
+  }, []);
+
+  // Create bookmarks in a folder
+  const createBookmarksInFolder = useCallback(async (
+    folderId: string,
+    tabList: chrome.tabs.Tab[]
+  ) =>
+  {
+    for (const tab of tabList)
+    {
+      if (tab.url && tab.title)
+      {
+        await createBookmark(folderId, tab.title, tab.url);
+      }
+    }
+  }, [createBookmark]);
+
+  // Handle export to bookmarks
+  const handleExportToBookmarks = useCallback(async (
+    group: chrome.tabGroups.TabGroup,
+    groupTabs: chrome.tabs.Tab[]
+  ) =>
+  {
+    const folderName = group.title || 'Unnamed Group';
+    const bookmarkableTabs = filterBookmarkableTabs(groupTabs);
+
+    if (bookmarkableTabs.length === 0)
+    {
+      showToast('No bookmarkable tabs to export');
+      return;
+    }
+
+    // Check for existing folder
+    const existingFolder = await findFolderInParent(OTHER_BOOKMARKS_ID, folderName);
+
+    if (existingFolder)
+    {
+      // Show conflict dialog
+      setExportConflictDialog({
+        isOpen: true,
+        folderName,
+        existingFolder,
+        tabsToExport: bookmarkableTabs
+      });
+    }
+    else
+    {
+      // Create new folder and add bookmarks
+      createFolder(OTHER_BOOKMARKS_ID, folderName, async (newFolder) =>
+      {
+        await createBookmarksInFolder(newFolder.id, bookmarkableTabs);
+        showToast(`Exported ${bookmarkableTabs.length} tabs to "${folderName}"`);
+      });
+    }
+  }, [filterBookmarkableTabs, findFolderInParent, createFolder, createBookmarksInFolder, showToast]);
+
+  // Handle conflict dialog confirmation
+  const handleExportConflictConfirm = useCallback(async (mode: ExportConflictMode) =>
+  {
+    const { existingFolder, tabsToExport, folderName } = exportConflictDialog;
+    if (!existingFolder) return;
+
+    if (mode === 'overwrite')
+    {
+      // Clear existing bookmarks and add new ones
+      await clearFolder(existingFolder.id);
+      await createBookmarksInFolder(existingFolder.id, tabsToExport);
+      showToast(`Exported ${tabsToExport.length} tabs to "${folderName}"`);
+    }
+    else
+    {
+      // Merge: skip existing, add new
+      const existingChildren = await getChildren(existingFolder.id);
+      const existingSet = new Set(
+        existingChildren.map(child => `${child.title}|${child.url}`)
+      );
+
+      const newTabs = tabsToExport.filter(tab =>
+        !existingSet.has(`${tab.title}|${tab.url}`)
+      );
+
+      if (newTabs.length > 0)
+      {
+        await createBookmarksInFolder(existingFolder.id, newTabs);
+        showToast(`Added ${newTabs.length} new bookmarks to "${folderName}"`);
+      }
+      else
+      {
+        showToast('All tabs already exist in folder');
+      }
+    }
+  }, [exportConflictDialog, clearFolder, createBookmarksInFolder, getChildren, showToast]);
+
+  const closeExportConflictDialog = useCallback(() =>
+  {
+    setExportConflictDialog({ isOpen: false, folderName: '', existingFolder: null, tabsToExport: [] });
   }, []);
 
   // Shared drag-drop state from hook (supports both tab IDs and group IDs like "group-123")
@@ -1506,6 +1725,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
                     onChangeColor={() => openChangeColorDialog(item.group)}
                     onRename={() => openRenameGroupDialog(item.group)}
                     onNewTab={() => createTabInGroup(item.group.id)}
+                    onExportToBookmarks={() => handleExportToBookmarks(item.group, item.tabs)}
                   />
                   {isGroupExpanded && item.tabs.map((tab, index) =>
                   {
@@ -1570,6 +1790,19 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
         group={renameGroupDialog.group}
         onRename={(groupId, title) => updateGroup(groupId, { title })}
         onClose={closeRenameGroupDialog}
+      />
+
+      <ExportConflictDialog
+        isOpen={exportConflictDialog.isOpen}
+        folderName={exportConflictDialog.folderName}
+        onConfirm={handleExportConflictConfirm}
+        onClose={closeExportConflictDialog}
+      />
+
+      <Toast
+        message={toastState.message}
+        isVisible={toastState.isVisible}
+        onDismiss={hideToast}
       />
     </>
   );

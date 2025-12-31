@@ -154,6 +154,84 @@ export const useBookmarks = () => {
     }
   }, [handleError]);
 
+  // Find a folder by name under a specific parent folder
+  const findFolderInParent = useCallback((
+    parentId: string,
+    folderName: string
+  ): Promise<chrome.bookmarks.BookmarkTreeNode | null> =>
+  {
+    return new Promise((resolve) =>
+    {
+      chrome.bookmarks.getChildren(parentId, (children) =>
+      {
+        if (handleError('find folder') || !children)
+        {
+          resolve(null);
+          return;
+        }
+        const folder = children.find(child => !child.url && child.title === folderName);
+        resolve(folder || null);
+      });
+    });
+  }, [handleError]);
+
+  // Create a single bookmark (with URL)
+  const createBookmark = useCallback((
+    parentId: string,
+    title: string,
+    url: string
+  ): Promise<chrome.bookmarks.BookmarkTreeNode | null> =>
+  {
+    return new Promise((resolve) =>
+    {
+      chrome.bookmarks.create({ parentId, title, url }, (node) =>
+      {
+        if (handleError('create bookmark'))
+        {
+          resolve(null);
+          return;
+        }
+        resolve(node || null);
+      });
+    });
+  }, [handleError]);
+
+  // Get children of a folder (promise-based)
+  const getChildren = useCallback((
+    folderId: string
+  ): Promise<chrome.bookmarks.BookmarkTreeNode[]> =>
+  {
+    return new Promise((resolve) =>
+    {
+      chrome.bookmarks.getChildren(folderId, (children) =>
+      {
+        if (handleError('get children'))
+        {
+          resolve([]);
+          return;
+        }
+        resolve(children || []);
+      });
+    });
+  }, [handleError]);
+
+  // Remove all children from a folder
+  const clearFolder = useCallback(async (folderId: string): Promise<void> =>
+  {
+    const children = await getChildren(folderId);
+    for (const child of children)
+    {
+      await new Promise<void>((resolve) =>
+      {
+        chrome.bookmarks.removeTree(child.id, () =>
+        {
+          handleError('clear folder');
+          resolve();
+        });
+      });
+    }
+  }, [getChildren, handleError]);
+
   return {
     bookmarks,
     removeBookmark,
@@ -161,6 +239,10 @@ export const useBookmarks = () => {
     updateBookmark,
     sortBookmarks,
     moveBookmark,
+    findFolderInParent,
+    createBookmark,
+    getChildren,
+    clearFolder,
     refresh: fetchBookmarks,
     error
   };
