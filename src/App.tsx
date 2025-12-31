@@ -97,7 +97,7 @@ function App() {
       <button
         onClick={() => setShowSettings(true)}
         title="Settings"
-        className="absolute left-2 bottom-2 p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-700 dark:text-gray-200 z-10"
+        className="absolute left-2 bottom-2 p-1.5 rounded text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-110 transition-all duration-150 z-20"
       >
         <Settings size={16} />
       </button>

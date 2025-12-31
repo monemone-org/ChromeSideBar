@@ -259,7 +259,7 @@ export function SettingsDialog({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 w-56 border border-gray-200 dark:border-gray-700">
         <div className="flex justify-between items-center mb-3">
           <h2 className="font-bold">
-            Settings <span className="font-normal text-gray-400 dark:text-gray-500">(v{chrome.runtime.getManifest().version})</span>
+            Settings
           </h2>
           <button onClick={onClose} className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
             <X size={16} />
