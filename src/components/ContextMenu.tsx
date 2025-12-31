@@ -1,109 +1,305 @@
-import * as ContextMenuPrimitive from '@radix-ui/react-context-menu';
-import { ChevronRight } from 'lucide-react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  cloneElement,
+  isValidElement,
+  ReactNode,
+  ReactElement,
+  MouseEvent as ReactMouseEvent,
+  forwardRef,
+  HTMLAttributes
+} from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import { forwardRef, ComponentPropsWithoutRef } from 'react';
 import { useFontSize } from '../contexts/FontSizeContext';
 
-// Re-export Root and Trigger as-is
-export const Root = ContextMenuPrimitive.Root;
-export const Trigger = ContextMenuPrimitive.Trigger;
-export const Portal = ContextMenuPrimitive.Portal;
-export const Sub = ContextMenuPrimitive.Sub;
+// --- Context ---
+interface ContextMenuState
+{
+  isOpen: boolean;
+  position: { x: number; y: number };
+  open: (x: number, y: number) => void;
+  close: () => void;
+}
 
-// Styled Content
-export const Content = forwardRef<
-  HTMLDivElement,
-  ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Content>
->(({ className, style, ...props }, ref) => {
-  const fontSize = useFontSize();
+const ContextMenuContext = createContext<ContextMenuState | null>(null);
+
+const useContextMenuState = () =>
+{
+  const context = useContext(ContextMenuContext);
+  if (!context)
+  {
+    throw new Error('ContextMenu components must be used within ContextMenu.Root');
+  }
+  return context;
+};
+
+// --- Root ---
+interface RootProps
+{
+  children: ReactNode;
+}
+
+export const Root = ({ children }: RootProps) =>
+{
+  const [isOpen, setIsOpen] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  const open = useCallback((x: number, y: number) =>
+  {
+    setPosition({ x, y });
+    setIsOpen(true);
+  }, []);
+
+  const close = useCallback(() =>
+  {
+    setIsOpen(false);
+  }, []);
+
   return (
-    <ContextMenuPrimitive.Content
-      ref={ref}
-      className={clsx(
-        "z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
-        "animate-in fade-in-0 zoom-in-95",
-        className
-      )}
-      style={{ fontSize: `${fontSize}px`, ...style }}
-      {...props}
-    />
+    <ContextMenuContext.Provider value={{ isOpen, position, open, close }}>
+      {children}
+    </ContextMenuContext.Provider>
   );
-});
+};
+
+// --- Trigger ---
+interface TriggerProps
+{
+  children: ReactNode;
+  asChild?: boolean;
+}
+
+export const Trigger = ({ children, asChild }: TriggerProps) =>
+{
+  const { open } = useContextMenuState();
+
+  const handleContextMenu = (e: ReactMouseEvent) =>
+  {
+    e.preventDefault();
+    // Focus window first to ensure events work (Chrome extension sidebar fix)
+    window.focus();
+    open(e.clientX, e.clientY);
+  };
+
+  if (asChild && isValidElement(children))
+  {
+    // Clone the child and add onContextMenu handler
+    const child = children as ReactElement<{ onContextMenu?: (e: ReactMouseEvent) => void }>;
+    const originalOnContextMenu = child.props.onContextMenu;
+
+    return cloneElement(child, {
+      onContextMenu: (e: ReactMouseEvent) =>
+      {
+        handleContextMenu(e);
+        originalOnContextMenu?.(e);
+      }
+    });
+  }
+
+  return (
+    <span onContextMenu={handleContextMenu}>
+      {children}
+    </span>
+  );
+};
+
+// --- Portal ---
+interface PortalProps
+{
+  children: ReactNode;
+}
+
+export const Portal = ({ children }: PortalProps) =>
+{
+  const { isOpen } = useContextMenuState();
+
+  if (!isOpen) return null;
+
+  return createPortal(children, document.body);
+};
+
+// --- Content ---
+interface ContentProps extends HTMLAttributes<HTMLDivElement>
+{
+  children: ReactNode;
+}
+
+export const Content = forwardRef<HTMLDivElement, ContentProps>(
+  ({ children, className, style, ...props }, ref) =>
+  {
+    const { isOpen, position, close } = useContextMenuState();
+    const fontSize = useFontSize();
+    const menuRef = useRef<HTMLDivElement | null>(null);
+
+    // Handle click outside and escape key
+    useEffect(() =>
+    {
+      if (!isOpen) return;
+
+      const handleClickOutside = (e: MouseEvent) =>
+      {
+        if (menuRef.current && !menuRef.current.contains(e.target as Node))
+        {
+          close();
+        }
+      };
+
+      const handleEscape = (e: KeyboardEvent) =>
+      {
+        if (e.key === 'Escape')
+        {
+          close();
+        }
+      };
+
+      // Use setTimeout to avoid closing immediately from the same click
+      const timeoutId = setTimeout(() =>
+      {
+        document.addEventListener('mousedown', handleClickOutside);
+      }, 0);
+
+      document.addEventListener('keydown', handleEscape);
+
+      return () =>
+      {
+        clearTimeout(timeoutId);
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleEscape);
+      };
+    }, [isOpen, close]);
+
+    // Adjust position to keep menu within viewport
+    const [adjustedPosition, setAdjustedPosition] = useState(position);
+
+    useEffect(() =>
+    {
+      if (!isOpen || !menuRef.current) return;
+
+      const menu = menuRef.current;
+      const rect = menu.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      let x = position.x;
+      let y = position.y;
+
+      // Adjust horizontal position
+      if (x + rect.width > viewportWidth)
+      {
+        x = viewportWidth - rect.width - 8;
+      }
+
+      // Adjust vertical position
+      if (y + rect.height > viewportHeight)
+      {
+        y = viewportHeight - rect.height - 8;
+      }
+
+      setAdjustedPosition({ x, y });
+    }, [isOpen, position]);
+
+    if (!isOpen) return null;
+
+    return (
+      <div
+        ref={(node) =>
+        {
+          menuRef.current = node;
+          if (typeof ref === 'function')
+          {
+            ref(node);
+          }
+          else if (ref)
+          {
+            ref.current = node;
+          }
+        }}
+        className={clsx(
+          "fixed z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
+          className
+        )}
+        style={{
+          left: adjustedPosition.x,
+          top: adjustedPosition.y,
+          fontSize: `${fontSize}px`,
+          ...style
+        }}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
 Content.displayName = 'ContextMenu.Content';
 
-// Styled Item
-export const Item = forwardRef<
-  HTMLDivElement,
-  ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Item> & { danger?: boolean }
->(({ className, danger, ...props }, ref) => (
-  <ContextMenuPrimitive.Item
-    ref={ref}
-    className={clsx(
-      "flex items-center w-full px-3 py-1.5 text-left cursor-pointer outline-none",
-      "data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700",
-      danger
-        ? "text-red-500 dark:text-red-400"
-        : "text-gray-700 dark:text-gray-200",
-      className
-    )}
-    {...props}
-  />
-));
+// --- Item ---
+interface ItemProps extends HTMLAttributes<HTMLDivElement>
+{
+  children: ReactNode;
+  danger?: boolean;
+  onSelect?: () => void;
+}
+
+export const Item = forwardRef<HTMLDivElement, ItemProps>(
+  ({ children, className, danger, onSelect, onClick, ...props }, ref) =>
+  {
+    const { close } = useContextMenuState();
+
+    const handleClick = (e: ReactMouseEvent<HTMLDivElement>) =>
+    {
+      onClick?.(e);
+      onSelect?.();
+      close();
+    };
+
+    return (
+      <div
+        ref={ref}
+        className={clsx(
+          "flex items-center w-full px-3 py-1.5 text-left cursor-pointer outline-none",
+          "hover:bg-gray-100 dark:hover:bg-gray-700",
+          danger
+            ? "text-red-500 dark:text-red-400"
+            : "text-gray-700 dark:text-gray-200",
+          className
+        )}
+        onClick={handleClick}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
 Item.displayName = 'ContextMenu.Item';
 
-// Styled SubTrigger
-export const SubTrigger = forwardRef<
-  HTMLDivElement,
-  ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubTrigger>
->(({ className, children, ...props }, ref) => (
-  <ContextMenuPrimitive.SubTrigger
-    ref={ref}
-    className={clsx(
-      "w-full px-3 py-1.5 text-left cursor-pointer outline-none flex items-center justify-between",
-      "text-gray-700 dark:text-gray-200",
-      "data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-700",
-      "data-[state=open]:bg-gray-100 dark:data-[state=open]:bg-gray-700",
-      className
-    )}
-    {...props}
-  >
-    {children}
-    <ChevronRight size={14} />
-  </ContextMenuPrimitive.SubTrigger>
-));
-SubTrigger.displayName = 'ContextMenu.SubTrigger';
+// --- Separator ---
+interface SeparatorProps extends HTMLAttributes<HTMLDivElement> {}
 
-// Styled SubContent
-export const SubContent = forwardRef<
-  HTMLDivElement,
-  ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubContent>
->(({ className, style, ...props }, ref) => {
-  const fontSize = useFontSize();
-  return (
-    <ContextMenuPrimitive.SubContent
+export const Separator = forwardRef<HTMLDivElement, SeparatorProps>(
+  ({ className, ...props }, ref) => (
+    <div
       ref={ref}
-      className={clsx(
-        "z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
-        "animate-in fade-in-0 zoom-in-95",
-        className
-      )}
-      style={{ fontSize: `${fontSize}px`, ...style }}
-      sideOffset={4}
+      className={clsx("h-px my-1 bg-gray-200 dark:bg-gray-700", className)}
       {...props}
     />
-  );
-});
-SubContent.displayName = 'ContextMenu.SubContent';
-
-// Separator
-export const Separator = forwardRef<
-  HTMLDivElement,
-  ComponentPropsWithoutRef<typeof ContextMenuPrimitive.Separator>
->(({ className, ...props }, ref) => (
-  <ContextMenuPrimitive.Separator
-    ref={ref}
-    className={clsx("h-px my-1 bg-gray-200 dark:bg-gray-700", className)}
-    {...props}
-  />
-));
+  )
+);
 Separator.displayName = 'ContextMenu.Separator';
+
+// --- Unused but exported for API compatibility ---
+export const Sub = ({ children }: { children: ReactNode }) => <>{children}</>;
+export const SubTrigger = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ children, ...props }, ref) => <div ref={ref} {...props}>{children}</div>
+);
+SubTrigger.displayName = 'ContextMenu.SubTrigger';
+export const SubContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  ({ children, ...props }, ref) => <div ref={ref} {...props}>{children}</div>
+);
+SubContent.displayName = 'ContextMenu.SubContent';
