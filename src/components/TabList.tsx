@@ -597,7 +597,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             </ContextMenu.Item>
           )}
           <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
-            <X size={14} className="mr-2" /> Close Tab
+            <X size={14} className="mr-2" /> Close
           </ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Portal>
