@@ -231,6 +231,25 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
+  const duplicateTab = useCallback((tabId: number) =>
+  {
+    chrome.tabs.get(tabId, (tab) =>
+    {
+      if (handleError('get tab') || !tab.url) return;
+
+      chrome.tabs.create({ url: tab.url, index: tab.index + 1, active: true }, (newTab) =>
+      {
+        if (!handleError('create tab') && tab.groupId && tab.groupId !== -1)
+        {
+          chrome.tabs.group({ tabIds: [newTab.id!], groupId: tab.groupId }, () =>
+          {
+            handleError('add to group');
+          });
+        }
+      });
+    });
+  }, [handleError]);
+
   const sortGroupTabs = useCallback((groupId: number, direction: 'asc' | 'desc' = 'asc') =>
   {
     // Get tabs in this group
@@ -263,6 +282,7 @@ export const useTabs = () => {
     ungroupTab,
     createGroupWithTab,
     createTabInGroup,
+    duplicateTab,
     sortTabs,
     sortGroupTabs,
     closeAllTabs,

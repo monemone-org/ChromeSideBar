@@ -3,7 +3,7 @@ import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { Dialog } from './Dialog';
-import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus } from 'lucide-react';
+import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy } from 'lucide-react';
 import {
   Chapter,
   getYouTubeVideoId,
@@ -379,6 +379,7 @@ interface DraggableTabProps {
   isLastInGroup?: boolean;
   onClose: (id: number) => void;
   onActivate: (id: number) => void;
+  onDuplicate?: (id: number) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   onOpenAddToGroupDialog?: (tabId: number, currentGroupId?: number) => void;
   // Drag attributes
@@ -402,6 +403,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   isLastInGroup,
   onClose,
   onActivate,
+  onDuplicate,
   onPin,
   onOpenAddToGroupDialog,
   attributes,
@@ -579,6 +581,11 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content>
+          {onDuplicate && tab.url && (
+            <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
+              <Copy size={14} className="mr-2" /> Duplicate
+            </ContextMenu.Item>
+          )}
           {onPin && tab.url && !tab.pinned && (
             <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
               <Pin size={14} className="mr-2" /> Pin to Sidebar
@@ -820,7 +827,7 @@ interface TabListProps {
 
 export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
 {
-  const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
+  const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -1464,6 +1471,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
                   showDropAfter={isTarget && dropPosition === 'after'}
                   onClose={closeTab}
                   onActivate={activateTab}
+                  onDuplicate={duplicateTab}
                   onPin={onPin}
                   onOpenAddToGroupDialog={openAddToGroupDialog}
                 />
@@ -1522,6 +1530,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
                         isLastInGroup={isLastTab}
                         onClose={closeTab}
                         onActivate={activateTab}
+                        onDuplicate={duplicateTab}
                         onPin={onPin}
                         onOpenAddToGroupDialog={openAddToGroupDialog}
                       />
