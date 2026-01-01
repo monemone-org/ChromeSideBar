@@ -13,19 +13,18 @@ export interface TabGroupBackup {
 export interface FullBackup {
   version: 1;
   exportedAt: string;
-  pinnedSites: PinnedSite[];
-  bookmarks: chrome.bookmarks.BookmarkTreeNode[];
-  tabGroups: TabGroupBackup[];
+  pinnedSites?: PinnedSite[];
+  bookmarks?: chrome.bookmarks.BookmarkTreeNode[];
+  tabGroups?: TabGroupBackup[];
 }
 
-// Type guard to check if a file is a full backup vs pinned-only
+// Type guard to check if a file is a backup (has version field)
 export function isFullBackup(data: unknown): data is FullBackup {
   return (
     typeof data === 'object' &&
     data !== null &&
     'version' in data &&
-    'bookmarks' in data &&
-    'tabGroups' in data
+    'exportedAt' in data
   );
 }
 
@@ -70,12 +69,15 @@ export async function exportFullBackup(
 }
 
 export type BookmarkImportMode = 'replace' | 'folder';
+export type PinnedSitesImportMode = 'replace' | 'append';
+export type TabGroupsImportMode = 'replace' | 'append';
 
-// Import bookmarks recursively
+// Import bookmarks recursively, returns count of bookmarks created
 async function importBookmarkNode(
   node: chrome.bookmarks.BookmarkTreeNode,
   parentId: string
-): Promise<void> {
+): Promise<number> {
+  let count = 0;
   if (node.url) {
     // It's a bookmark
     await chrome.bookmarks.create({
@@ -83,6 +85,7 @@ async function importBookmarkNode(
       title: node.title,
       url: node.url,
     });
+    count = 1;
   } else if (node.children) {
     // It's a folder
     const folder = await chrome.bookmarks.create({
@@ -90,9 +93,10 @@ async function importBookmarkNode(
       title: node.title,
     });
     for (const child of node.children) {
-      await importBookmarkNode(child, folder.id);
+      count += await importBookmarkNode(child, folder.id);
     }
   }
+  return count;
 }
 
 // Clear all bookmarks in a folder
@@ -134,69 +138,102 @@ async function importTabGroups(tabGroups: TabGroupBackup[]): Promise<void> {
 
 export interface ImportResult {
   pinnedSitesCount: number;
-  bookmarksImported: boolean;
+  bookmarksCount: number;
   tabGroupsCount: number;
+}
+
+export interface ImportOptions {
+  importPinnedSites: boolean;
+  pinnedSitesMode: PinnedSitesImportMode;
+  importBookmarks: boolean;
+  bookmarkMode: BookmarkImportMode;
+  importTabGroups: boolean;
+  tabGroupsMode: TabGroupsImportMode;
+}
+
+// Close all tabs in current window except one (Chrome requires at least one tab)
+async function closeAllTabs(): Promise<void> {
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  if (tabs.length === 0) return;
+
+  // Create a new blank tab first (Chrome won't allow closing all tabs)
+  const newTab = await chrome.tabs.create({ url: 'chrome://newtab', active: false });
+
+  // Close all other tabs
+  const tabIdsToClose = tabs
+    .filter(tab => tab.id && tab.id !== newTab.id)
+    .map(tab => tab.id as number);
+
+  if (tabIdsToClose.length > 0) {
+    await chrome.tabs.remove(tabIdsToClose);
+  }
 }
 
 // Import full backup
 export async function importFullBackup(
   backup: FullBackup,
-  bookmarkMode: BookmarkImportMode,
-  importTabGroupsFlag: boolean,
-  savePinnedSites: (sites: PinnedSite[]) => void
+  options: ImportOptions,
+  replacePinnedSites: (sites: PinnedSite[]) => void,
+  appendPinnedSites: (sites: PinnedSite[]) => void
 ): Promise<ImportResult> {
   const result: ImportResult = {
     pinnedSitesCount: 0,
-    bookmarksImported: false,
+    bookmarksCount: 0,
     tabGroupsCount: 0,
   };
 
-  // Import pinned sites (savePinnedSites will regenerate IDs)
-  if (backup.pinnedSites && backup.pinnedSites.length > 0) {
-    savePinnedSites(backup.pinnedSites);
+  // Import pinned sites
+  if (options.importPinnedSites && backup.pinnedSites && backup.pinnedSites.length > 0) {
+    if (options.pinnedSitesMode === 'replace') {
+      replacePinnedSites(backup.pinnedSites);
+    } else {
+      appendPinnedSites(backup.pinnedSites);
+    }
     result.pinnedSitesCount = backup.pinnedSites.length;
   }
 
   // Import bookmarks
-  if (backup.bookmarks && backup.bookmarks.length > 0) {
+  if (options.importBookmarks && backup.bookmarks && backup.bookmarks.length > 0) {
     const bookmarkBar = backup.bookmarks.find(n => n.title === 'Bookmarks Bar' || n.id === '1');
     const otherBookmarks = backup.bookmarks.find(n => n.title === 'Other Bookmarks' || n.id === '2');
 
-    if (bookmarkMode === 'replace') {
+    if (options.bookmarkMode === 'replace') {
       // Clear and replace existing bookmarks
       if (bookmarkBar?.children) {
         await clearBookmarkFolder('1');
         for (const child of bookmarkBar.children) {
-          await importBookmarkNode(child, '1');
+          result.bookmarksCount += await importBookmarkNode(child, '1');
         }
       }
       if (otherBookmarks?.children) {
         await clearBookmarkFolder('2');
         for (const child of otherBookmarks.children) {
-          await importBookmarkNode(child, '2');
+          result.bookmarksCount += await importBookmarkNode(child, '2');
         }
       }
     } else {
-      // Create in "Imported Bookmarks {date}" folder
+      // Create in "Other Bookmarks" as a subfolder
       const dateStr = new Date().toLocaleDateString();
       const importFolder = await chrome.bookmarks.create({
-        parentId: '1',
+        parentId: '2', // Other Bookmarks
         title: `Imported Bookmarks ${dateStr}`,
       });
 
       for (const topLevel of backup.bookmarks) {
         if (topLevel.children) {
           for (const child of topLevel.children) {
-            await importBookmarkNode(child, importFolder.id);
+            result.bookmarksCount += await importBookmarkNode(child, importFolder.id);
           }
         }
       }
     }
-    result.bookmarksImported = true;
   }
 
   // Import tab groups
-  if (importTabGroupsFlag && backup.tabGroups && backup.tabGroups.length > 0) {
+  if (options.importTabGroups && backup.tabGroups && backup.tabGroups.length > 0) {
+    if (options.tabGroupsMode === 'replace') {
+      await closeAllTabs();
+    }
     await importTabGroups(backup.tabGroups);
     result.tabGroupsCount = backup.tabGroups.length;
   }

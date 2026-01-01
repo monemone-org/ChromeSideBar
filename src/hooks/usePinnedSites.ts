@@ -263,6 +263,21 @@ export const usePinnedSites = () => {
     savePinnedSites(reordered);
   }, [savePinnedSites]);
 
+  // Append pinned sites to existing ones (for full backup import)
+  const appendPinnedSites = useCallback((sites: PinnedSite[]) => {
+    setPinnedSites(current => {
+      const startOrder = current.length;
+      const newSites = sites.map((site, index) => ({
+        ...site,
+        id: generateId(),
+        order: startOrder + index,
+      }));
+      const combined = [...current, ...newSites];
+      savePinnedSites(combined);
+      return combined;
+    });
+  }, [savePinnedSites]);
+
   return {
     pinnedSites,
     addPin,
@@ -274,6 +289,7 @@ export const usePinnedSites = () => {
     exportPinnedSites,
     importPinnedSites,
     replacePinnedSites,
+    appendPinnedSites,
     refresh: loadPinnedSites,
     error,
   };

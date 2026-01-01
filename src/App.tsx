@@ -4,11 +4,13 @@ import { TabList } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
 import { SettingsDialog, SettingsValues } from './components/SettingsDialog';
 import { AboutDialog } from './components/AboutDialog';
+import { ExportDialog } from './components/ExportDialog';
+import { ImportDialog } from './components/ImportDialog';
 import { usePinnedSites } from './hooks/usePinnedSites';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { FontSizeContext } from './contexts/FontSizeContext';
-import { Settings, Info } from 'lucide-react';
+import { Settings, Info, Upload, Download } from 'lucide-react';
 
 function App() {
   const [fontSize, setFontSize] = useLocalStorage('sidebar-font-size-px', 14, {
@@ -37,6 +39,8 @@ function App() {
   );
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showExport, setShowExport] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -48,9 +52,8 @@ function App() {
     resetFavicon,
     openAsPinnedTab,
     movePin,
-    exportPinnedSites,
-    importPinnedSites,
     replacePinnedSites,
+    appendPinnedSites,
   } = usePinnedSites();
   const { bookmarks } = useBookmarks();
 
@@ -115,16 +118,25 @@ function App() {
           pinnedIconSize,
         }}
         onApply={handleApplySettings}
-        exportPinnedSites={exportPinnedSites}
-        importPinnedSites={importPinnedSites}
-        pinnedSites={pinnedSites}
-        bookmarks={bookmarks}
-        savePinnedSites={replacePinnedSites}
       />
 
       <AboutDialog
         isOpen={showAbout}
         onClose={() => setShowAbout(false)}
+      />
+
+      <ExportDialog
+        isOpen={showExport}
+        onClose={() => setShowExport(false)}
+        pinnedSites={pinnedSites}
+        bookmarks={bookmarks}
+      />
+
+      <ImportDialog
+        isOpen={showImport}
+        onClose={() => setShowImport(false)}
+        replacePinnedSites={replacePinnedSites}
+        appendPinnedSites={appendPinnedSites}
       />
 
       {/* Pinned Sites */}
@@ -166,6 +178,32 @@ function App() {
               <Settings size={14} />
               Settings
             </button>
+            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+            <button
+              onClick={() =>
+              {
+                setShowMenu(false);
+                setShowExport(true);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
+            >
+              <Upload size={14} />
+              Export...
+            </button>
+            <button
+              onClick={() =>
+              {
+                setShowMenu(false);
+                // Toggle off first to ensure state resets, then on
+                setShowImport(false);
+                setTimeout(() => setShowImport(true), 0);
+              }}
+              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
+            >
+              <Download size={14} />
+              Import...
+            </button>
+            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
             <button
               onClick={() =>
               {
