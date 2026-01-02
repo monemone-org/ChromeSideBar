@@ -4,7 +4,6 @@ import { X } from 'lucide-react';
 export interface SettingsValues {
   fontSize: number;
   hideOtherBookmarks: boolean;
-  openBookmarkInNewTab: boolean;
   sortGroupsFirst: boolean;
   pinnedIconSize: number;
 }
@@ -25,7 +24,6 @@ export function SettingsDialog({
   // Temporary state for the dialog
   const [tempFontSize, setTempFontSize] = useState(settings.fontSize);
   const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(settings.hideOtherBookmarks);
-  const [tempOpenBookmarkInNewTab, setTempOpenBookmarkInNewTab] = useState(settings.openBookmarkInNewTab);
   const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(settings.sortGroupsFirst);
   const [tempPinnedIconSize, setTempPinnedIconSize] = useState(settings.pinnedIconSize);
 
@@ -34,7 +32,6 @@ export function SettingsDialog({
     if (isOpen) {
       setTempFontSize(settings.fontSize);
       setTempHideOtherBookmarks(settings.hideOtherBookmarks);
-      setTempOpenBookmarkInNewTab(settings.openBookmarkInNewTab);
       setTempSortGroupsFirst(settings.sortGroupsFirst);
       setTempPinnedIconSize(settings.pinnedIconSize);
     }
@@ -56,7 +53,6 @@ export function SettingsDialog({
     onApply({
       fontSize: tempFontSize,
       hideOtherBookmarks: tempHideOtherBookmarks,
-      openBookmarkInNewTab: tempOpenBookmarkInNewTab,
       sortGroupsFirst: tempSortGroupsFirst,
       pinnedIconSize: tempPinnedIconSize,
     });
@@ -135,21 +131,6 @@ export function SettingsDialog({
               Behaviour
             </label>
             <div className="space-y-2">
-              <div>
-                <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tempOpenBookmarkInNewTab}
-                    onChange={(e) => setTempOpenBookmarkInNewTab(e.target.checked)}
-                    className="rounded border-gray-300 dark:border-gray-600"
-                  />
-                  Open bookmarks in new tab
-                </label>
-                <p className="mt-1 text-gray-500 dark:text-gray-400 ml-5">
-                  Off = active tab, On = new tab. Cmd+click inverts.
-                </p>
-              </div>
-
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                 <input
                   type="checkbox"

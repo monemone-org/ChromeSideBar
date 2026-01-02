@@ -22,11 +22,12 @@
 - [x] add icon to popup menu for tabs and groups , similar to bookmarks and bookmark folders.
 - [x] drag /drop to reorder tab groups, along with all the group tabs inside.
 
-- [ ] after manually closing all tabs in SideBarForArc and the SideBarForArc group, loading any bookmark or pinned site doesn't recreate the group
+- [x] after manually closing all tabs in SideBarForArc and the SideBarForArc group, loading any bookmark or pinned site doesn't recreate the group
+
+- [x] cmd+T to create new tab, shouldn't move tab to under sidebarforArc group., if the active group is sidebarforArc.  leave the tab as in ungroup tab.
+
 
 - [ ] drag/drop a tab to bookmark folder, should create a new bookmark and move that tab to SideBarForArc and create a bookmark-tab association as a loaded bookmark
-
-- [ ] cmd+T to create new tab, shouldn't move tab to under sidebarforArc group., if the active group is sidebarforArc.  leave the tab as in ungroup tab.
 
 - [ ] introduce a "active" state for pinned site if the active tab is for that pinned site.
 

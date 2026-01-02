@@ -252,7 +252,6 @@ interface BookmarkRowProps {
   onCreateFolder: (parentId: string) => void;
   onSort: (folderId: string, sortBy: SortOption) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
-  openInNewTab?: boolean;
   isDragging?: boolean;
   activeId?: string | null;
   dropTargetId?: string | null;
@@ -282,7 +281,6 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onCreateFolder,
   onSort,
   onPin,
-  openInNewTab,
   isDragging,
   activeId,
   dropTargetId,
@@ -379,25 +377,15 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               if (isFolder) {
                 toggleFolder(node.id, !expandedState[node.id]);
               } else if (node.url) {
-                // Shift+Click: open in new window (legacy behavior)
                 if (e.shiftKey) {
+                  // Shift+Click: open in new window
                   chrome.windows.create({ url: node.url });
-                } else if (onOpenBookmark) {
-                  // Arc-like behavior: use bookmark-tab association
-                  onOpenBookmark(node.id, node.url);
                 } else if (e.metaKey || e.ctrlKey) {
-                  // Fallback: legacy behavior
-                  if (openInNewTab) {
-                    chrome.tabs.update({ url: node.url });
-                  } else {
-                    chrome.tabs.create({ url: node.url, active: false });
-                  }
-                } else {
-                  if (openInNewTab) {
-                    chrome.tabs.create({ url: node.url, active: true });
-                  } else {
-                    chrome.tabs.update({ url: node.url });
-                  }
+                  // Cmd+Click: open as unmanaged new tab
+                  chrome.tabs.create({ url: node.url });
+                } else if (onOpenBookmark) {
+                  // Normal click: open as managed tab in SideBarForArc group
+                  onOpenBookmark(node.id, node.url);
                 }
               }
             }}
@@ -584,10 +572,9 @@ const DragOverlayContent = ({ node, depth }: DragOverlayContentProps) => {
 interface BookmarkTreeProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   hideOtherBookmarks?: boolean;
-  openInNewTab?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab = false }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible } = useBookmarkTabsContext();
 
@@ -806,7 +793,6 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
             onCreateFolder={handleCreateFolder}
             onSort={sortBookmarks}
             onPin={onPin}
-            openInNewTab={openInNewTab}
             isDragging={!!activeId}
             activeId={activeId}
             dropTargetId={dropTargetId}

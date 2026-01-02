@@ -261,6 +261,40 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     };
   }, []);
 
+  // Ungroup new tabs that Chrome auto-adds to SideBarForArc group (e.g., Cmd+T)
+  useEffect(() =>
+  {
+    const handleGroupChange = (
+      tabId: number,
+      changeInfo: chrome.tabs.TabChangeInfo
+    ) =>
+    {
+      // Only care about groupId changes to our group
+      if (changeInfo.groupId === undefined || changeInfo.groupId !== groupId)
+      {
+        return;
+      }
+
+      // Check if this tab has an association (created by us)
+      chrome.storage.session.get(STORAGE_KEY, (result) =>
+      {
+        const associations: Record<number, string> = result[STORAGE_KEY] || {};
+        if (!associations[tabId])
+        {
+          // Not created by us - ungroup it
+          chrome.tabs.ungroup(tabId);
+        }
+      });
+    };
+
+    chrome.tabs?.onUpdated?.addListener(handleGroupChange);
+
+    return () =>
+    {
+      chrome.tabs?.onUpdated?.removeListener(handleGroupChange);
+    };
+  }, [groupId]);
+
   // Store association in session storage
   const storeAssociation = useCallback((tabId: number, itemKey: string): Promise<void> =>
   {
@@ -288,7 +322,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         // Check for existing group first
         let currentGroupId = groupId ?? await findExistingGroup();
 
-        chrome.tabs.create({ url, active: true }, (tab) =>
+        chrome.tabs.create({ url, active: true }, async (tab) =>
         {
           if (handleError('create') || !tab.id)
           {
@@ -297,6 +331,10 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           }
 
           const tabId = tab.id;
+
+          // Store association immediately (before grouping) to prevent race condition
+          // with onUpdated listener that ungroups tabs without associations
+          await storeAssociation(tabId, itemKey);
 
           if (currentGroupId !== null)
           {

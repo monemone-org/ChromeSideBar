@@ -23,11 +23,6 @@ function App() {
     false,
     { parse: (v) => v === 'true', serialize: (v) => v.toString() }
   );
-  const [openBookmarkInNewTab, setOpenBookmarkInNewTab] = useLocalStorage(
-    'sidebar-open-bookmark-new-tab',
-    false,
-    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
-  );
   const [sortGroupsFirst, setSortGroupsFirst] = useLocalStorage(
     'sidebar-sort-groups-first',
     true,
@@ -61,7 +56,6 @@ function App() {
   const handleApplySettings = (newSettings: SettingsValues) => {
     setFontSize(newSettings.fontSize);
     setHideOtherBookmarks(newSettings.hideOtherBookmarks);
-    setOpenBookmarkInNewTab(newSettings.openBookmarkInNewTab);
     setSortGroupsFirst(newSettings.sortGroupsFirst);
     setPinnedIconSize(newSettings.pinnedIconSize);
     setShowSettings(false);
@@ -115,7 +109,6 @@ function App() {
         settings={{
           fontSize,
           hideOtherBookmarks,
-          openBookmarkInNewTab,
           sortGroupsFirst,
           pinnedIconSize,
         }}
@@ -223,7 +216,7 @@ function App() {
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} openInNewTab={openBookmarkInNewTab} />
+        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} />
         <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} />
       </div>
       </div>
