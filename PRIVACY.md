@@ -21,14 +21,6 @@ This data never leaves your device and is not accessible to the developer or any
 
 No user data is sent in these requests beyond standard HTTP headers.
 
-## YouTube Integration
-
-The extension requests permission to access data on `www.youtube.com`. This is strictly used to:
-- Read video chapters from the page content to display them in the sidebar.
-- Allow you to click chapter timestamps to jump to that point in the video.
-
-This processing happens entirely within your browser. No viewing history or video data is collected or transmitted.
-
 ## Bookmarks and Tabs
 
 The extension reads your Chrome bookmarks and tabs to display them in the sidebar. This data is only used for display purposes and is not stored or transmitted.

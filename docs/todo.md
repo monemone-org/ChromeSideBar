@@ -10,7 +10,6 @@
    - close all tabs
    
 - [x] export/import pinned sites in json 
-- [x] for youtube tab, add a action button to show chapters in a popup menu
 
 - [x] Active Tab, "sort by domain" support accending (a-z) and descending (z-a). 
 - [x] rename group dialog: text field should have default focus
@@ -34,6 +33,5 @@
 
 - [x] cannot drop tab behind the last group if group is expended.  new a empty dummuy last row??
     
-- [] pinned site's loaded state background colour is not obvious enough.
-
+- [x] pinned site's loaded state background colour is not obvious enough.
 

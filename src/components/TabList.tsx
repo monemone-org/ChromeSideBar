@@ -14,13 +14,7 @@ export interface ExternalDropTarget
 }
 import { Dialog } from './Dialog';
 import { Toast } from './Toast';
-import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy } from 'lucide-react';
-import {
-  Chapter,
-  getYouTubeVideoId,
-  fetchYouTubeChapters,
-  jumpToChapter
-} from '../utils/youtube';
+import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy } from 'lucide-react';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
@@ -500,48 +494,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   attributes,
   listeners
 }, ref) => {
-  const [showChapters, setShowChapters] = useState(false);
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [loadingChapters, setLoadingChapters] = useState(false);
-  const [popupAbove, setPopupAbove] = useState(false);
-  const chaptersRef = useRef<HTMLDivElement>(null);
-  const chaptersButtonRef = useRef<HTMLButtonElement>(null);
-
-  const videoId = tab.url ? getYouTubeVideoId(tab.url) : null;
-
-  useEffect(() =>
-  {
-    if (!showChapters) return;
-    const handleKeyDown = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape') setShowChapters(false);
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showChapters]);
-
-  const handleChaptersClick = async (e: React.MouseEvent) =>
-  {
-    e.stopPropagation();
-
-    const button = chaptersButtonRef.current;
-    if (button)
-    {
-      const rect = button.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      setPopupAbove(spaceBelow < 280);
-    }
-
-    if (!showChapters)
-    {
-      setLoadingChapters(true);
-      const fetchedChapters = await fetchYouTubeChapters(tab.id!);
-      setChapters(fetchedChapters);
-      setLoadingChapters(false);
-    }
-    setShowChapters(!showChapters);
-  };
-
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
@@ -590,17 +542,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
       </div>
       {/* Action buttons */}
       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover/tab:opacity-100 bg-white dark:bg-gray-900 rounded">
-        {videoId && (
-          <button
-            ref={chaptersButtonRef}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={handleChaptersClick}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-            title="Chapters"
-          >
-            <List size={14} className="text-gray-700 dark:text-gray-200" />
-          </button>
-        )}
         {onPin && tab.url && !tab.pinned && (
           <button
             onPointerDown={(e) => e.stopPropagation()}
@@ -627,47 +568,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           <X size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       </div>
-
-      {/* Chapters popup */}
-      {showChapters && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            onClick={() => setShowChapters(false)}
-          />
-          <div
-            ref={chaptersRef}
-            className={clsx(
-              "absolute right-0 z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1 min-w-48 max-h-64 overflow-y-auto",
-              popupAbove ? "bottom-full mb-1" : "top-full mt-1"
-            )}
-          >
-          <div className="px-3 py-1.5 font-medium text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">
-            Chapters
-          </div>
-          {loadingChapters ? (
-            <div className="px-3 py-2 text-gray-500">Loading...</div>
-          ) : chapters.length === 0 ? (
-            <div className="px-3 py-2 text-gray-500">No chapters found</div>
-          ) : (
-            chapters.map((chapter, i) => (
-              <button
-                key={i}
-                className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-blue-400"
-                onClick={(e) =>
-                {
-                  e.stopPropagation();
-                  jumpToChapter(tab.id!, chapter.url);
-                  setShowChapters(false);
-                }}
-              >
-                {chapter.timestamp} - {chapter.title}
-              </button>
-            ))
-          )}
-          </div>
-        </>
-      )}
         </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>

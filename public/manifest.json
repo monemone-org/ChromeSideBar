@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Sidebar for Arc Users",
-  "version": "1.0.75",
+  "version": "1.0.77",
   "description": "Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel",
   "permissions": [
     "sidePanel",
@@ -11,11 +11,7 @@
     "storage",
     "favicon",
     "activeTab",
-    "scripting",
     "sessions"
-  ],
-  "host_permissions": [
-    "*://www.youtube.com/*"
   ],
   "icons": {
     "16": "icon16.png",

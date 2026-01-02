@@ -46,9 +46,6 @@ So I vibe-coded this extension to bring that to Chrome.
 - Sort options (via right-click menu):
   - Sort by domain then title (A-Z or Z-A)
   - Close all tabs
-- YouTube chapters:
-  - Not from Arc, but I watch a lot of YouTube and wanted a quick way to browse chapters
-  - List icon button shows all video chapters—click to jump to any chapter 
 - Tab Group support:
   - Display Chrome tab groups with their color and title
   - Collapse/expand groups by clicking the group header
@@ -99,7 +96,7 @@ Built with the usual modern web stack:
 │   ├── components/ # React UI components (tabs, bookmarks, pinned bar, dialogs)
 │   ├── hooks/      # Custom hooks wrapping Chrome APIs and shared state
 │   ├── contexts/   # React contexts for global state (font size)
-│   └── utils/      # Helper functions (drag-drop, YouTube chapters)
+│   └── utils/      # Helper functions (drag-drop)
 ```
 
 

@@ -32,7 +32,6 @@ Active Tabs
 • All tabs in current window with drag-and-drop reordering
 • Sort by domain
 • Audio indicator for tabs playing sound
-• YouTube chapters listing support  (added for my own YouTube binge-watching needs)
 
 Tab Groups
 • Full Chrome tab group support
@@ -52,7 +51,6 @@ Permissions
 • sidePanel, bookmarks, tabs, tabGroups: Core functionality
 • storage: Save pinned sites and settings locally
 • favicon: Display website icons
-• scripting + youtube.com: YouTube chapter integration
 
 Open Source
 Source code available on GitHub (https://github.com/monemone-org/ChromeSideBar).
