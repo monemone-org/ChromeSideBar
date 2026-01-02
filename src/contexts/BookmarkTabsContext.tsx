@@ -303,9 +303,50 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
             // Add to existing group
             chrome.tabs.group({ tabIds: [tabId], groupId: currentGroupId }, async () =>
             {
-              if (handleError('add to group'))
+              if (chrome.runtime.lastError)
               {
-                resolve();
+                // Group no longer exists - clear state and create new group
+                setGroupId(null);
+
+                chrome.tabs.group({ tabIds: [tabId] }, (newGroupId) =>
+                {
+                  if (handleError('create group after stale'))
+                  {
+                    resolve();
+                    return;
+                  }
+
+                  chrome.tabGroups.update(newGroupId, {
+                    title: TAB_GROUP_NAME,
+                    color: 'cyan',
+                    collapsed: false
+                  }, async () =>
+                  {
+                    if (handleError('update group after stale'))
+                    {
+                      resolve();
+                      return;
+                    }
+
+                    await storeAssociation(tabId, itemKey);
+
+                    setItemToTab((prev) =>
+                    {
+                      const newMap = new Map(prev);
+                      newMap.set(itemKey, tabId);
+                      return newMap;
+                    });
+                    setTabToItem((prev) =>
+                    {
+                      const newMap = new Map(prev);
+                      newMap.set(tabId, itemKey);
+                      return newMap;
+                    });
+                    setGroupId(newGroupId);
+
+                    resolve();
+                  });
+                });
                 return;
               }
 
