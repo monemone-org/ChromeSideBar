@@ -5,6 +5,7 @@ import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
+import { ExternalDropTarget } from './TabList';
 import { Dialog } from './Dialog';
 import * as ContextMenu from './ContextMenu';
 import { useInView } from '../hooks/useInView';
@@ -267,6 +268,8 @@ interface BookmarkRowProps {
   checkIsActive?: (bookmarkId: string) => boolean;
   onOpenBookmark?: (bookmarkId: string, url: string) => void;
   onCloseBookmark?: (bookmarkId: string) => void;
+  // External drop target (from tab drag)
+  externalDropTarget?: ExternalDropTarget | null;
   // Drag-drop attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -294,6 +297,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   isActive,
   onOpenBookmark,
   onCloseBookmark,
+  externalDropTarget,
   attributes,
   listeners
 }, ref) => {
@@ -306,9 +310,12 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
 
   const isBeingDragged = activeId === node.id;
   const isDropTarget = dropTargetId === node.id;
-  const showDropBefore = isDropTarget && dropPosition === 'before';
-  const showDropAfter = isDropTarget && dropPosition === 'after';
-  const showDropInto = isDropTarget && dropPosition === 'into' && isFolder;
+  // Check for external drop target (tab → bookmark)
+  const isExternalDropTarget = externalDropTarget?.bookmarkId === node.id;
+  const effectiveDropPosition = isExternalDropTarget ? externalDropTarget.position : dropPosition;
+  const showDropBefore = (isDropTarget || isExternalDropTarget) && effectiveDropPosition === 'before';
+  const showDropAfter = (isDropTarget || isExternalDropTarget) && effectiveDropPosition === 'after';
+  const showDropInto = (isDropTarget || isExternalDropTarget) && effectiveDropPosition === 'into' && isFolder;
 
   const insideFolder = depth > 0;
   const beforeIndentPx = showDropBefore && insideFolder ? getIndentPadding(depth) : undefined;
@@ -577,9 +584,10 @@ const DragOverlayContent = ({ node, depth }: DragOverlayContentProps) => {
 interface BookmarkTreeProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   hideOtherBookmarks?: boolean;
+  externalDropTarget?: ExternalDropTarget | null;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
 
@@ -836,6 +844,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false }: BookmarkTree
             checkIsActive={isBookmarkActive}
             onOpenBookmark={openBookmarkTab}
             onCloseBookmark={closeBookmarkTab}
+            externalDropTarget={externalDropTarget}
           />
         ))}
 

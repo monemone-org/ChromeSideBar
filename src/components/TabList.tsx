@@ -2,8 +2,16 @@ import { useState, useRef, useEffect, useMemo, useCallback, forwardRef } from 'r
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
-import { useDragDrop } from '../hooks/useDragDrop';
+import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
+
+// External drop target type for tab → bookmark drops
+export interface ExternalDropTarget
+{
+  bookmarkId: string;
+  position: DropPosition;
+  isFolder: boolean;
+}
 import { Dialog } from './Dialog';
 import { Toast } from './Toast';
 import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, List, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy } from 'lucide-react';
@@ -912,11 +920,12 @@ type DisplayItem =
 interface TabListProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   sortGroupsFirst?: boolean;
+  onExternalDropTargetChange?: (target: ExternalDropTarget | null) => void;
 }
 
 const SIDEBAR_GROUP_NAME = 'SideBarForArc';
 
-export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange }: TabListProps) =>
 {
   const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
@@ -986,8 +995,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     setRenameGroupDialog({ isOpen: false, group: null });
   }, []);
 
-  // Export to Bookmarks state
-  const { findFolderInParent, createFolder, createBookmark, getChildren, clearFolder } = useBookmarks();
+  // Bookmarks functions for export and tab-to-bookmark drops
+  const { findFolderInParent, createFolder, createBookmark, getBookmark, getChildren, clearFolder } = useBookmarks();
   const OTHER_BOOKMARKS_ID = '2';
 
   const [exportConflictDialog, setExportConflictDialog] = useState<{
@@ -1134,6 +1143,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
   // Drag state for tab or group
   const [activeTab, setActiveTab] = useState<chrome.tabs.Tab | null>(null);
   const [activeGroup, setActiveGroup] = useState<{ group: chrome.tabGroups.TabGroup; tabCount: number } | null>(null);
+
+  // External drop target for cross-context drops (tab → bookmark)
+  const [localExternalTarget, setLocalExternalTarget] = useState<ExternalDropTarget | null>(null);
 
   // Helper to check if we're dragging a group
   const isDraggingGroup = typeof activeId === 'string' && String(activeId).startsWith('group-');
@@ -1294,6 +1306,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
           setDropTargetId(`group-${groupId}`);
           setDropPosition('before');
           clearAutoExpandTimer();
+          // Clear external target when hovering internal target
+          setLocalExternalTarget(null);
+          onExternalDropTargetChange?.(null);
           return;
         }
 
@@ -1315,6 +1330,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
         {
           clearAutoExpandTimer();
         }
+        // Clear external target when hovering internal target
+        setLocalExternalTarget(null);
+        onExternalDropTargetChange?.(null);
         return;
       }
     }
@@ -1374,19 +1392,103 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
         setDropTargetId(tabId);
         setDropPosition(position);
         clearAutoExpandTimer();
+        // Clear external target when hovering internal target
+        setLocalExternalTarget(null);
+        onExternalDropTargetChange?.(null);
         return;
+      }
+    }
+
+    // Check for bookmark item (external drop target) - only for tab drags, not group drags
+    if (!isDraggingGroupNow)
+    {
+      const bookmarkElement = elements.find(el =>
+        el.hasAttribute('data-bookmark-id')
+      ) as HTMLElement | undefined;
+
+      if (bookmarkElement)
+      {
+        const bookmarkId = bookmarkElement.getAttribute('data-bookmark-id');
+        const isFolder = bookmarkElement.getAttribute('data-is-folder') === 'true';
+
+        if (bookmarkId)
+        {
+          const position = calculateDropPosition(bookmarkElement, currentY, isFolder);
+          const newTarget: ExternalDropTarget = { bookmarkId, position: position!, isFolder };
+
+          setLocalExternalTarget(newTarget);
+          onExternalDropTargetChange?.(newTarget);
+          // Clear internal drop targets
+          setDropTargetId(null);
+          setDropPosition(null);
+          clearAutoExpandTimer();
+          return;
+        }
       }
     }
 
     // No valid target
     setDropTargetId(null);
     setDropPosition(null);
+    setLocalExternalTarget(null);
+    onExternalDropTargetChange?.(null);
     clearAutoExpandTimer();
-  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer]);
+  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange]);
 
-  const handleDragEnd = useCallback((_event: DragEndEvent) =>
+  const handleDragEnd = useCallback(async (_event: DragEndEvent) =>
   {
     clearAutoExpandTimer();
+
+    // Handle external drop (tab → bookmark) first
+    if (localExternalTarget && activeId && typeof activeId === 'number')
+    {
+      const tab = visibleTabs.find(t => t.id === activeId);
+      if (tab && tab.url && tab.title && !tab.url.startsWith('chrome://'))
+      {
+        const { bookmarkId: targetBookmarkId, position, isFolder } = localExternalTarget;
+
+        let parentId: string;
+        let index: number | undefined;
+
+        if (position === 'into' && isFolder)
+        {
+          // Drop into folder - add at the end
+          parentId = targetBookmarkId;
+          const children = await getChildren(targetBookmarkId);
+          index = children.length;
+        }
+        else
+        {
+          // Drop before/after a bookmark - need to get target's parent and index
+          const targetBookmark = await getBookmark(targetBookmarkId);
+          if (targetBookmark && targetBookmark.parentId !== undefined && targetBookmark.index !== undefined)
+          {
+            parentId = targetBookmark.parentId;
+            index = position === 'before' ? targetBookmark.index : targetBookmark.index + 1;
+          }
+          else
+          {
+            // Fallback: drop into parent or cancel
+            parentId = targetBookmarkId;
+            index = undefined;
+          }
+        }
+
+        // Create bookmark at the calculated position (tab remains as regular tab)
+        await createBookmark(parentId, tab.title, tab.url, index);
+      }
+
+      // Clear all state
+      wasValidDropRef.current = true;
+      setActiveId(null);
+      setActiveTab(null);
+      setActiveGroup(null);
+      setDropTargetId(null);
+      setDropPosition(null);
+      setLocalExternalTarget(null);
+      onExternalDropTargetChange?.(null);
+      return;
+    }
 
     // Track if this is a valid drop (affects animation)
     const isValidDrop = !!(dropTargetId && dropPosition && activeId);
@@ -1399,6 +1501,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       setActiveGroup(null);
       setDropTargetId(null);
       setDropPosition(null);
+      setLocalExternalTarget(null);
+      onExternalDropTargetChange?.(null);
       return;
     }
 
@@ -1614,7 +1718,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     setActiveGroup(null);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
+    setLocalExternalTarget(null);
+    onExternalDropTargetChange?.(null);
+  }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
@@ -1628,7 +1734,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     setActiveGroup(null);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
+    setLocalExternalTarget(null);
+    onExternalDropTargetChange?.(null);
+  }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, onExternalDropTargetChange]);
 
   const toggleGroup = (groupId: number) =>
   {

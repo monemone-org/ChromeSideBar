@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { DropPosition } from '../utils/dragDrop';
 
+export type { DropPosition };
+
 export const useDragDrop = <TActiveId extends string | number>() =>
 {
   // Drag state

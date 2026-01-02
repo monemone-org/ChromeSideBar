@@ -16,6 +16,7 @@ interface BookmarkTabsContextValue
   isBookmarkAudible: (bookmarkId: string) => boolean;
   isBookmarkActive: (bookmarkId: string) => boolean;
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
+  associateExistingTab: (tabId: number, bookmarkId: string) => Promise<void>;
   // Pinned site functions
   openPinnedTab: (pinnedId: string, url: string) => Promise<void>;
   closePinnedTab: (pinnedId: string) => void;
@@ -568,6 +569,138 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return itemToTab.get(makeBookmarkKey(bookmarkId));
   }, [itemToTab]);
 
+  // Associate an existing tab with a bookmark (for drag-drop from tabs to bookmarks)
+  const associateExistingTab = useCallback(async (tabId: number, bookmarkId: string): Promise<void> =>
+  {
+    const itemKey = makeBookmarkKey(bookmarkId);
+
+    return new Promise(async (resolve) =>
+    {
+      try
+      {
+        // Check for existing group first
+        let currentGroupId = groupId ?? await findExistingGroup();
+
+        // Store association first to prevent race condition with onUpdated listener
+        await storeAssociation(tabId, itemKey);
+
+        if (currentGroupId !== null)
+        {
+          // Add to existing group
+          chrome.tabs.group({ tabIds: [tabId], groupId: currentGroupId }, async () =>
+          {
+            if (chrome.runtime.lastError)
+            {
+              // Group no longer exists - clear state and create new group
+              setGroupId(null);
+
+              chrome.tabs.group({ tabIds: [tabId] }, (newGroupId) =>
+              {
+                if (handleError('create group after stale'))
+                {
+                  resolve();
+                  return;
+                }
+
+                chrome.tabGroups.update(newGroupId, {
+                  title: TAB_GROUP_NAME,
+                  color: 'cyan',
+                  collapsed: false
+                }, () =>
+                {
+                  if (handleError('update group after stale'))
+                  {
+                    resolve();
+                    return;
+                  }
+
+                  setItemToTab((prev) =>
+                  {
+                    const newMap = new Map(prev);
+                    newMap.set(itemKey, tabId);
+                    return newMap;
+                  });
+                  setTabToItem((prev) =>
+                  {
+                    const newMap = new Map(prev);
+                    newMap.set(tabId, itemKey);
+                    return newMap;
+                  });
+                  setGroupId(newGroupId);
+
+                  resolve();
+                });
+              });
+              return;
+            }
+
+            setItemToTab((prev) =>
+            {
+              const newMap = new Map(prev);
+              newMap.set(itemKey, tabId);
+              return newMap;
+            });
+            setTabToItem((prev) =>
+            {
+              const newMap = new Map(prev);
+              newMap.set(tabId, itemKey);
+              return newMap;
+            });
+            setGroupId(currentGroupId!);
+
+            resolve();
+          });
+        }
+        else
+        {
+          // Create new group with this tab
+          chrome.tabs.group({ tabIds: [tabId] }, (newGroupId) =>
+          {
+            if (handleError('create group'))
+            {
+              resolve();
+              return;
+            }
+
+            chrome.tabGroups.update(newGroupId, {
+              title: TAB_GROUP_NAME,
+              color: 'cyan',
+              collapsed: false
+            }, () =>
+            {
+              if (handleError('update group'))
+              {
+                resolve();
+                return;
+              }
+
+              setItemToTab((prev) =>
+              {
+                const newMap = new Map(prev);
+                newMap.set(itemKey, tabId);
+                return newMap;
+              });
+              setTabToItem((prev) =>
+              {
+                const newMap = new Map(prev);
+                newMap.set(tabId, itemKey);
+                return newMap;
+              });
+              setGroupId(newGroupId);
+
+              resolve();
+            });
+          });
+        }
+      }
+      catch (err)
+      {
+        console.error('Failed to associate existing tab:', err);
+        resolve();
+      }
+    });
+  }, [groupId, findExistingGroup, handleError, storeAssociation]);
+
   // --- Pinned site-specific wrappers ---
   const openPinnedTab = useCallback(async (pinnedId: string, url: string): Promise<void> =>
   {
@@ -623,6 +756,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     isBookmarkAudible,
     isBookmarkActive,
     getTabIdForBookmark,
+    associateExistingTab,
     openPinnedTab,
     closePinnedTab,
     isPinnedLoaded,

@@ -175,16 +175,22 @@ export const useBookmarks = () => {
     });
   }, [handleError]);
 
-  // Create a single bookmark (with URL)
+  // Create a single bookmark (with URL) at optional index position
   const createBookmark = useCallback((
     parentId: string,
     title: string,
-    url: string
+    url: string,
+    index?: number
   ): Promise<chrome.bookmarks.BookmarkTreeNode | null> =>
   {
     return new Promise((resolve) =>
     {
-      chrome.bookmarks.create({ parentId, title, url }, (node) =>
+      const createArg: chrome.bookmarks.BookmarkCreateArg = { parentId, title, url };
+      if (index !== undefined)
+      {
+        createArg.index = index;
+      }
+      chrome.bookmarks.create(createArg, (node) =>
       {
         if (handleError('create bookmark'))
         {
@@ -192,6 +198,25 @@ export const useBookmarks = () => {
           return;
         }
         resolve(node || null);
+      });
+    });
+  }, [handleError]);
+
+  // Get a single bookmark by ID
+  const getBookmark = useCallback((
+    bookmarkId: string
+  ): Promise<chrome.bookmarks.BookmarkTreeNode | null> =>
+  {
+    return new Promise((resolve) =>
+    {
+      chrome.bookmarks.get(bookmarkId, (results) =>
+      {
+        if (handleError('get bookmark') || !results || results.length === 0)
+        {
+          resolve(null);
+          return;
+        }
+        resolve(results[0]);
       });
     });
   }, [handleError]);
@@ -241,6 +266,7 @@ export const useBookmarks = () => {
     moveBookmark,
     findFolderInParent,
     createBookmark,
+    getBookmark,
     getChildren,
     clearFolder,
     refresh: fetchBookmarks,

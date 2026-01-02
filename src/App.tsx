@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { BookmarkTree } from './components/BookmarkTree';
-import { TabList } from './components/TabList';
+import { TabList, ExternalDropTarget } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
 import { SettingsDialog, SettingsValues } from './components/SettingsDialog';
 import { AboutDialog } from './components/AboutDialog';
@@ -38,6 +38,7 @@ function App() {
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [externalDropTarget, setExternalDropTarget] = useState<ExternalDropTarget | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const {
@@ -216,8 +217,8 @@ function App() {
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} />
-        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} />
+        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} />
+        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} />
       </div>
       </div>
       </BookmarkTabsProvider>
