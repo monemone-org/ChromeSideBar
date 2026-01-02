@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Globe, Edit, Trash, X, RotateCcw, Search } from 'lucide-react';
+import { Globe, Edit, Trash, X, RotateCcw, Search, Play } from 'lucide-react';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -75,10 +75,11 @@ interface PinnedIconProps {
   onClose?: (id: string) => void;
   isLoaded?: boolean;
   isActive?: boolean;
+  isAudible?: boolean;
   iconSize: number;
 }
 
-export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, onClose, isLoaded, isActive, iconSize }: PinnedIconProps) => {
+export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, onClose, isLoaded, isActive, isAudible, iconSize }: PinnedIconProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
@@ -303,10 +304,8 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, o
             className={clsx(
               "group/pin relative flex items-center justify-center rounded",
               isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700",
-              // Active state: stronger cyan background + ring
-              isActive && !isDragging && "bg-cyan-500/40 dark:bg-cyan-400/40 ring-2 ring-cyan-500 dark:ring-cyan-400",
-              // Loaded state (non-active): subtle cyan background
-              isLoaded && !isActive && !isDragging && "bg-cyan-500/20 dark:bg-cyan-400/20"
+              // Active state: ring only (dot indicator added separately below)
+              isActive && !isDragging && "ring-2 ring-cyan-500 dark:ring-cyan-400"
             )}
             onMouseUp={handleClick}
           >
@@ -314,6 +313,31 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, o
               <img src={site.favicon} alt="" style={{ width: iconSize, height: iconSize }} />
             ) : (
               <Globe style={{ width: iconSize, height: iconSize }} className="text-gray-400" />
+            )}
+
+            {/* Loaded state indicator - bottom-right corner */}
+            {/* Play triangle when audible, dot otherwise */}
+            {isLoaded && !isDragging && (
+              isAudible ? (
+                <Play
+                  size={14}
+                  className={clsx(
+                    "absolute bottom-0 right-0 fill-current",
+                    isActive
+                      ? "text-cyan-400 dark:text-cyan-300"
+                      : "text-cyan-500 dark:text-cyan-400"
+                  )}
+                />
+              ) : (
+                <span
+                  className={clsx(
+                    "absolute bottom-0 right-0 w-2 h-2 rounded-full",
+                    isActive
+                      ? "bg-cyan-400 dark:bg-cyan-300"
+                      : "bg-cyan-500 dark:bg-cyan-400"
+                  )}
+                />
+              )
             )}
 
             {/* Fast tooltip */}

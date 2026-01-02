@@ -44,7 +44,7 @@ export const PinnedBar = ({
 }: PinnedBarProps) => {
   // Note: _openAsPinnedTab is unused - we use openPinnedTab from context for Arc-style,
   // or chrome.tabs.create for Chrome-style behavior
-  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive } = useBookmarkTabsContext();
+  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible } = useBookmarkTabsContext();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -93,6 +93,7 @@ export const PinnedBar = ({
               onClose={arcStyleBookmarks ? closePinnedTab : undefined}
               isLoaded={arcStyleBookmarks ? isPinnedLoaded(site.id) : false}
               isActive={arcStyleBookmarks ? isPinnedActive(site.id) : false}
+              isAudible={arcStyleBookmarks ? isPinnedAudible(site.id) : false}
               iconSize={iconSize}
             />
           ))}
