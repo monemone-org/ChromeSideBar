@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, forwardRef } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
+import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
@@ -17,7 +18,9 @@ import {
   FolderPlus,
   ArrowDownAZ,
   Calendar,
-  Pin
+  Pin,
+  X,
+  Volume2
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -256,6 +259,13 @@ interface BookmarkRowProps {
   dropPosition?: DropPosition;
   onPointerEnter?: (id: string) => void;
   onPointerLeave?: () => void;
+  // Arc-like bookmark-tab behavior
+  isLoaded?: boolean;
+  isAudible?: boolean;
+  checkIsLoaded?: (bookmarkId: string) => boolean;
+  checkIsAudible?: (bookmarkId: string) => boolean;
+  onOpenBookmark?: (bookmarkId: string, url: string) => void;
+  onCloseBookmark?: (bookmarkId: string) => void;
   // Drag-drop attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -279,6 +289,10 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   dropPosition,
   onPointerEnter,
   onPointerLeave,
+  isLoaded,
+  isAudible,
+  onOpenBookmark,
+  onCloseBookmark,
   attributes,
   listeners
 }, ref) => {
@@ -286,7 +300,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
 
   const style: React.CSSProperties = {
-    paddingLeft: `${getIndentPadding(depth)}px`,
+    paddingLeft: `${getIndentPadding(depth) + (isFolder ? 0 : 26)}px`,
   };
 
   const isBeingDragged = activeId === node.id;
@@ -324,12 +338,21 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
         >
           <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
 
-          <span
-            className={clsx("mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700", !isFolder && "invisible")}
-            onClick={(e) => { e.stopPropagation(); toggleFolder(node.id, !expandedState[node.id]); }}
-          >
-            {expandedState[node.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </span>
+          {/* Speaker icon - fixed at left edge for non-folders */}
+          {!isFolder && (
+            <span className={clsx("absolute left-2 top-1/2 -translate-y-1/2", !isAudible && "invisible")}>
+              <Volume2 size={18} />
+            </span>
+          )}
+
+          {isFolder && (
+            <span
+              className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+              onClick={(e) => { e.stopPropagation(); toggleFolder(node.id, !expandedState[node.id]); }}
+            >
+              {expandedState[node.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </span>
+          )}
 
           <span className="mr-2 text-gray-500 flex-shrink-0">
             {isFolder ? (
@@ -356,9 +379,14 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               if (isFolder) {
                 toggleFolder(node.id, !expandedState[node.id]);
               } else if (node.url) {
+                // Shift+Click: open in new window (legacy behavior)
                 if (e.shiftKey) {
                   chrome.windows.create({ url: node.url });
+                } else if (onOpenBookmark) {
+                  // Arc-like behavior: use bookmark-tab association
+                  onOpenBookmark(node.id, node.url);
                 } else if (e.metaKey || e.ctrlKey) {
+                  // Fallback: legacy behavior
                   if (openInNewTab) {
                     chrome.tabs.update({ url: node.url });
                   } else {
@@ -377,15 +405,30 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             {node.title}
           </span>
 
-          {!isFolder && onPin && node.url && (
-            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-900 rounded">
-              <button
-                onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
-                className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
-                title="Pin"
-              >
-                <Pin size={14} />
-              </button>
+          {!isFolder && node.url && (
+            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+              {/* Pin button - only on hover */}
+              {onPin && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
+                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100"
+                  title="Pin"
+                >
+                  <Pin size={14} />
+                </button>
+              )}
+              {/* Close button or spacer - maintains alignment */}
+              {isLoaded && onCloseBookmark ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onCloseBookmark(node.id); }}
+                  className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400"
+                  title="Close tab"
+                >
+                  <X size={14} />
+                </button>
+              ) : (
+                <span className="p-0.5 w-[14px] h-[14px]" />
+              )}
             </div>
           )}
         </div>
@@ -471,7 +514,7 @@ StaticBookmarkRow.displayName = 'StaticBookmarkRow';
 
 // --- Recursive Item ---
 const BookmarkItem = (props: BookmarkRowProps) => {
-  const { node, expandedState, depth = 0 } = props;
+  const { node, expandedState, depth = 0, checkIsLoaded, checkIsAudible } = props;
   const isFolder = !node.url;
   const { ref, isInView } = useInView<HTMLDivElement>();
 
@@ -491,6 +534,8 @@ const BookmarkItem = (props: BookmarkRowProps) => {
               {...props} // Pass through all handlers
               node={child}
               depth={depth + 1}
+              isLoaded={checkIsLoaded ? checkIsLoaded(child.id) : false}
+              isAudible={checkIsAudible ? checkIsAudible(child.id) : false}
             />
           ))}
         </div>
@@ -544,6 +589,7 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab = false }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible } = useBookmarkTabsContext();
 
   // Filter out "Other Bookmarks" (id "2") if hidden
   const visibleBookmarks = hideOtherBookmarks
@@ -767,6 +813,12 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, openInNewTab =
             dropPosition={dropPosition}
             onPointerEnter={handlePointerEnter}
             onPointerLeave={handlePointerLeave}
+            isLoaded={isBookmarkLoaded(node.id)}
+            isAudible={isBookmarkAudible(node.id)}
+            checkIsLoaded={isBookmarkLoaded}
+            checkIsAudible={isBookmarkAudible}
+            onOpenBookmark={openBookmarkTab}
+            onCloseBookmark={closeBookmarkTab}
           />
         ))}
 

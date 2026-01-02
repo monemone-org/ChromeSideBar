@@ -189,6 +189,14 @@ export const useTabs = () => {
     });
   }, [tabs, handleError]);
 
+  const createTab = useCallback(() =>
+  {
+    chrome.tabs.create({ active: true }, () =>
+    {
+      handleError('create tab');
+    });
+  }, [handleError]);
+
   const groupTab = useCallback((tabId: number, groupId: number) => {
     chrome.tabs.group({ tabIds: [tabId], groupId }, () => {
       handleError('group');
@@ -282,6 +290,7 @@ export const useTabs = () => {
     ungroupTab,
     createGroupWithTab,
     createTabInGroup,
+    createTab,
     duplicateTab,
     sortTabs,
     sortGroupTabs,

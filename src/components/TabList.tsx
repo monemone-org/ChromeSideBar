@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback, forwardRef } from 'react';
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
+import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { Dialog } from './Dialog';
@@ -913,10 +914,26 @@ interface TabListProps {
   sortGroupsFirst?: boolean;
 }
 
+const SIDEBAR_GROUP_NAME = 'SideBarForArc';
+
 export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
 {
-  const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
+  const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
+  const { groupId: sidebarGroupId } = useBookmarkTabsContext();
+
+  // Filter out tabs from the SideBarForArc group (managed by bookmark-tab associations)
+  const visibleTabs = useMemo(() =>
+  {
+    if (sidebarGroupId === null) return tabs;
+    return tabs.filter(tab => (tab.groupId ?? -1) !== sidebarGroupId);
+  }, [tabs, sidebarGroupId]);
+
+  // Filter out the SideBarForArc group from display
+  const visibleTabGroups = useMemo(() =>
+  {
+    return tabGroups.filter(g => g.title !== SIDEBAR_GROUP_NAME);
+  }, [tabGroups]);
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -1128,7 +1145,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     {
       let hasChanges = false;
       const newState = { ...prev };
-      tabGroups.forEach((g) =>
+      visibleTabGroups.forEach((g) =>
       {
         if (!(g.id in newState))
         {
@@ -1138,13 +1155,13 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       });
       return hasChanges ? newState : prev;
     });
-  }, [tabGroups]);
+  }, [visibleTabGroups]);
 
   // Auto-scroll to active tab when it changes
   const prevActiveTabIdRef = useRef<number | null>(null);
   useEffect(() =>
   {
-    const activeTab = tabs.find(t => t.active);
+    const activeTab = visibleTabs.find(t => t.active);
     if (activeTab && activeTab.id !== prevActiveTabIdRef.current)
     {
       prevActiveTabIdRef.current = activeTab.id ?? null;
@@ -1155,21 +1172,22 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
         element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 50);
     }
-  }, [tabs]);
+  }, [visibleTabs]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
   // Build display items: groups and ungrouped tabs in natural browser order
+  // Uses visibleTabs and visibleTabGroups to exclude SideBarForArc group
   const displayItems = useMemo<DisplayItem[]>(() =>
   {
     const groupMap = new Map<number, chrome.tabGroups.TabGroup>();
-    tabGroups.forEach((g) => groupMap.set(g.id, g));
+    visibleTabGroups.forEach((g) => groupMap.set(g.id, g));
 
     const tabsByGroup = new Map<number, chrome.tabs.Tab[]>();
 
-    tabs.forEach((tab) =>
+    visibleTabs.forEach((tab) =>
     {
       const groupId = tab.groupId ?? -1;
       if (groupId !== -1)
@@ -1185,7 +1203,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     const items: DisplayItem[] = [];
     const processedGroups = new Set<number>();
 
-    tabs.forEach((tab, index) =>
+    visibleTabs.forEach((tab, index) =>
     {
       const groupId = tab.groupId ?? -1;
 
@@ -1206,7 +1224,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     });
 
     return items;
-  }, [tabs, tabGroups]);
+  }, [visibleTabs, visibleTabGroups]);
 
   const handleDragStart = useCallback((event: DragStartEvent) =>
   {
@@ -1216,8 +1234,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     if (typeof id === 'string' && id.startsWith('group-'))
     {
       const groupId = parseInt(id.replace('group-', ''), 10);
-      const group = tabGroups.find(g => g.id === groupId);
-      const groupTabs = tabs.filter(t => (t.groupId ?? -1) === groupId);
+      const group = visibleTabGroups.find(g => g.id === groupId);
+      const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === groupId);
 
       setActiveId(id);
       setActiveTab(null);
@@ -1228,10 +1246,10 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       // Dragging a tab
       const tabId = id as number;
       setActiveId(tabId);
-      setActiveTab(tabs.find(t => t.id === tabId) || null);
+      setActiveTab(visibleTabs.find(t => t.id === tabId) || null);
       setActiveGroup(null);
     }
-  }, [tabs, tabGroups, setActiveId]);
+  }, [visibleTabs, visibleTabGroups, setActiveId]);
 
   const handleDragMove = useCallback((event: DragMoveEvent) =>
   {
@@ -1399,20 +1417,20 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       {
         // Dropping relative to another group
         const targetGroupId = parseInt(dropTargetId.replace('group-', ''), 10);
-        const targetGroupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+        const targetGroupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
 
         if (targetGroupTabs.length > 0)
         {
           if (dropPosition === 'before')
           {
-            // Move before target group's first tab
-            targetIndex = tabs.findIndex(t => t.id === targetGroupTabs[0].id);
+            // Move before target group's first tab - use Chrome's real index
+            targetIndex = targetGroupTabs[0].index;
           }
           else
           {
-            // 'after': Move after target group's last tab
+            // 'after': Move after target group's last tab - use Chrome's real index
             const lastTab = targetGroupTabs[targetGroupTabs.length - 1];
-            targetIndex = tabs.findIndex(t => t.id === lastTab.id) + 1;
+            targetIndex = lastTab.index + 1;
           }
         }
       }
@@ -1420,11 +1438,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       {
         // Dropping relative to a tab
         const targetTabId = parseInt(dropTargetId, 10);
-        const targetTab = tabs.find(t => t.id === targetTabId);
+        const targetTab = visibleTabs.find(t => t.id === targetTabId);
 
         if (targetTab)
         {
-          targetIndex = tabs.findIndex(t => t.id === targetTabId);
+          // Use Chrome's real index
+          targetIndex = targetTab.index;
           if (dropPosition === 'after')
           {
             targetIndex += 1;
@@ -1435,8 +1454,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       if (targetIndex >= 0)
       {
         // Account for source group tabs being removed when moving down
-        const sourceGroupTabs = tabs.filter(t => (t.groupId ?? -1) === draggedGroupId);
-        const sourceFirstIndex = tabs.findIndex(t => t.id === sourceGroupTabs[0]?.id);
+        const sourceGroupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === draggedGroupId);
+        const sourceFirstIndex = sourceGroupTabs.length > 0 ? sourceGroupTabs[0].index : -1;
 
         // If source is before target (moving down), subtract source tab count
         if (sourceFirstIndex !== -1 && sourceFirstIndex < targetIndex)
@@ -1450,7 +1469,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     else
     {
       // --- TAB DRAG HANDLING ---
-      const sourceTab = tabs.find(t => t.id === activeId);
+      const sourceTab = visibleTabs.find(t => t.id === activeId);
       if (!sourceTab)
       {
         setActiveId(null);
@@ -1462,6 +1481,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       }
 
       const sourceGroupId = sourceTab.groupId ?? -1;
+      const sourceIndex = sourceTab.index; // Chrome's real index
       const isGroupHeaderTarget = dropTargetId.startsWith('group-');
 
       if (isGroupHeaderTarget)
@@ -1477,11 +1497,10 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
           }
 
           // Move to end of group
-          const groupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+          const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
           if (groupTabs.length > 0)
           {
-            const lastTabIndex = tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id);
-            const sourceIndex = tabs.findIndex(t => t.id === activeId);
+            const lastTabIndex = groupTabs[groupTabs.length - 1].index;
             let targetIndex = lastTabIndex + 1;
 
             // Account for source removal when moving forward
@@ -1496,13 +1515,13 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
         else
         {
           // 'before' or 'after' on group header
-          const groupTabs = tabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+          const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
           if (groupTabs.length > 0)
           {
             if (dropPosition === 'before')
             {
               // Place before the group (as sibling, outside)
-              const targetIndex = tabs.findIndex(t => t.id === groupTabs[0].id);
+              const targetIndex = groupTabs[0].index;
               if (sourceGroupId !== -1)
               {
                 ungroupTab(activeId as number);
@@ -1515,8 +1534,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
               if (expandedGroups[targetGroupId])
               {
                 // Expanded: inside group at index 0
-                const firstTabIndex = tabs.findIndex(t => t.id === groupTabs[0].id);
-                const sourceIndex = tabs.findIndex(t => t.id === activeId);
+                const firstTabIndex = groupTabs[0].index;
                 let targetIndex = firstTabIndex;
                 if (sourceIndex < targetIndex)
                 {
@@ -1531,8 +1549,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
               else
               {
                 // Collapsed: sibling after group (after last tab in group)
-                const lastTabIndex = tabs.findIndex(t => t.id === groupTabs[groupTabs.length - 1].id);
-                const sourceIndex = tabs.findIndex(t => t.id === activeId);
+                const lastTabIndex = groupTabs[groupTabs.length - 1].index;
                 let targetIndex = lastTabIndex + 1;
                 if (sourceIndex < targetIndex)
                 {
@@ -1552,7 +1569,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       {
         // Target is a tab
         const targetTabId = parseInt(dropTargetId);
-        const targetTab = tabs.find(t => t.id === targetTabId);
+        const targetTab = visibleTabs.find(t => t.id === targetTabId);
 
         if (targetTab)
         {
@@ -1576,9 +1593,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
             }
           }
 
-          // Reorder
-          const sourceIndex = tabs.findIndex(t => t.id === activeId);
-          const targetIndex = tabs.findIndex(t => t.id === targetTabId);
+          // Reorder - use Chrome's real index
+          const targetIndex = targetTab.index;
           let newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
 
           // When moving forward, account for source removal shifting tabs left
@@ -1598,7 +1614,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
     setActiveGroup(null);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [activeId, dropTargetId, dropPosition, tabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
+  }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
@@ -1648,10 +1664,14 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content>
-            <ContextMenu.Item onSelect={() => sortTabs('asc', tabGroups, sortGroupsFirst)}>
+            <ContextMenu.Item onSelect={createTab}>
+              <Plus size={14} className="mr-2" /> New Tab
+            </ContextMenu.Item>
+            <ContextMenu.Separator />
+            <ContextMenu.Item onSelect={() => sortTabs('asc', visibleTabGroups, sortGroupsFirst)}>
               <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
             </ContextMenu.Item>
-            <ContextMenu.Item onSelect={() => sortTabs('desc', tabGroups, sortGroupsFirst)}>
+            <ContextMenu.Item onSelect={() => sortTabs('desc', visibleTabGroups, sortGroupsFirst)}>
               <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
             </ContextMenu.Item>
             <ContextMenu.Item danger onSelect={closeAllTabs}>
@@ -1771,7 +1791,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true }: TabListProps) =>
       <AddToGroupDialog
         isOpen={addToGroupDialog.isOpen}
         tabId={addToGroupDialog.tabId}
-        tabGroups={tabGroups}
+        tabGroups={visibleTabGroups}
         currentGroupId={addToGroupDialog.currentGroupId}
         onAddToGroup={groupTab}
         onCreateGroup={createGroupWithTab}

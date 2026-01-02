@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/sortable';
 import { PinnedIcon } from './PinnedIcon';
 import { PinnedSite } from '../hooks/usePinnedSites';
+import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 
 interface PinnedBarProps {
   pinnedSites: PinnedSite[];
@@ -35,10 +36,12 @@ export const PinnedBar = ({
   removePin,
   updatePin,
   resetFavicon,
-  openAsPinnedTab,
+  // openAsPinnedTab is replaced by openPinnedTab from useBookmarkTabs
+  openAsPinnedTab: _openAsPinnedTab,
   movePin,
   iconSize,
 }: PinnedBarProps) => {
+  const { openPinnedTab, closePinnedTab, isPinnedLoaded } = useBookmarkTabsContext();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -80,7 +83,9 @@ export const PinnedBar = ({
               onRemove={removePin}
               onUpdate={updatePin}
               onResetFavicon={resetFavicon}
-              onOpen={openAsPinnedTab}
+              onOpen={(s) => openPinnedTab(s.id, s.url)}
+              onClose={closePinnedTab}
+              isLoaded={isPinnedLoaded(site.id)}
               iconSize={iconSize}
             />
           ))}

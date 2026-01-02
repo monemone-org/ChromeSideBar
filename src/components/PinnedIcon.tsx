@@ -72,10 +72,12 @@ interface PinnedIconProps {
              iconColor?: string) => void;
   onResetFavicon: (id: string) => void;
   onOpen: (site: PinnedSite) => void;
+  onClose?: (id: string) => void;
+  isLoaded?: boolean;
   iconSize: number;
 }
 
-export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, iconSize }: PinnedIconProps) => {
+export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, onClose, isLoaded, iconSize }: PinnedIconProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
@@ -299,7 +301,9 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, i
             {...listeners}
             className={clsx(
               "group/pin relative flex items-center justify-center rounded",
-              isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
+              isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700",
+              // Loaded state: subtle cyan background
+              isLoaded && !isDragging && "bg-cyan-500/20 dark:bg-cyan-400/20"
             )}
             onMouseUp={handleClick}
           >
@@ -317,6 +321,14 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, i
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content>
+            {isLoaded && onClose && (
+              <>
+                <ContextMenu.Item onSelect={() => onClose(site.id)}>
+                  <X size={14} className="mr-2" /> Close Tab
+                </ContextMenu.Item>
+                <ContextMenu.Separator />
+              </>
+            )}
             <ContextMenu.Item onSelect={handleEdit}>
               <Edit size={14} className="mr-2" /> Edit
             </ContextMenu.Item>

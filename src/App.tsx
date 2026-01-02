@@ -10,6 +10,7 @@ import { usePinnedSites } from './hooks/usePinnedSites';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { FontSizeContext } from './contexts/FontSizeContext';
+import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
 import { Settings, Info, Upload, Download } from 'lucide-react';
 
 function App() {
@@ -103,6 +104,7 @@ function App() {
 
   return (
     <FontSizeContext.Provider value={fontSize}>
+      <BookmarkTabsProvider>
       <div
         className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
         style={{ fontSize: `${fontSize}px` }}
@@ -225,6 +227,7 @@ function App() {
         <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} />
       </div>
       </div>
+      </BookmarkTabsProvider>
     </FontSizeContext.Provider>
   );
 }
