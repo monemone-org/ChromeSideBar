@@ -14,13 +14,17 @@ interface BookmarkTabsContextValue
   closeBookmarkTab: (bookmarkId: string) => void;
   isBookmarkLoaded: (bookmarkId: string) => boolean;
   isBookmarkAudible: (bookmarkId: string) => boolean;
+  isBookmarkActive: (bookmarkId: string) => boolean;
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
   // Pinned site functions
   openPinnedTab: (pinnedId: string, url: string) => Promise<void>;
   closePinnedTab: (pinnedId: string) => void;
   isPinnedLoaded: (pinnedId: string) => boolean;
   isPinnedAudible: (pinnedId: string) => boolean;
+  isPinnedActive: (pinnedId: string) => boolean;
   getTabIdForPinned: (pinnedId: string) => number | undefined;
+  // Active item tracking
+  getActiveItemKey: () => string | null;
   // Common
   groupId: number | null;
   isInitialized: boolean;
@@ -48,9 +52,9 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 {
   // In-memory mappings for fast lookup (key is "bookmark-{id}" or "pinned-{id}")
   const [itemToTab, setItemToTab] = useState<Map<string, number>>(new Map());
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [_tabToItem, setTabToItem] = useState<Map<number, string>>(new Map());
+  const [tabToItem, setTabToItem] = useState<Map<number, string>>(new Map());
   const [audibleTabs, setAudibleTabs] = useState<Set<number>>(new Set());
+  const [activeTabId, setActiveTabId] = useState<number | null>(null);
   const [groupId, setGroupId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -258,6 +262,31 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return () =>
     {
       chrome.tabs?.onUpdated?.removeListener(handleTabUpdated);
+    };
+  }, []);
+
+  // Listen for active tab changes
+  useEffect(() =>
+  {
+    const handleTabActivated = (activeInfo: chrome.tabs.TabActiveInfo) =>
+    {
+      setActiveTabId(activeInfo.tabId);
+    };
+
+    // Initialize with current active tab
+    chrome.tabs?.query({ active: true, currentWindow: true }, (tabs) =>
+    {
+      if (tabs.length > 0 && tabs[0].id)
+      {
+        setActiveTabId(tabs[0].id);
+      }
+    });
+
+    chrome.tabs?.onActivated?.addListener(handleTabActivated);
+
+    return () =>
+    {
+      chrome.tabs?.onActivated?.removeListener(handleTabActivated);
     };
   }, []);
 
@@ -566,17 +595,41 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return itemToTab.get(makePinnedKey(pinnedId));
   }, [itemToTab]);
 
+  // --- Active state functions ---
+  const isBookmarkActive = useCallback((bookmarkId: string): boolean =>
+  {
+    if (activeTabId === null) return false;
+    const tabId = itemToTab.get(makeBookmarkKey(bookmarkId));
+    return tabId === activeTabId;
+  }, [itemToTab, activeTabId]);
+
+  const isPinnedActive = useCallback((pinnedId: string): boolean =>
+  {
+    if (activeTabId === null) return false;
+    const tabId = itemToTab.get(makePinnedKey(pinnedId));
+    return tabId === activeTabId;
+  }, [itemToTab, activeTabId]);
+
+  const getActiveItemKey = useCallback((): string | null =>
+  {
+    if (activeTabId === null) return null;
+    return tabToItem.get(activeTabId) ?? null;
+  }, [tabToItem, activeTabId]);
+
   const value: BookmarkTabsContextValue = {
     openBookmarkTab,
     closeBookmarkTab,
     isBookmarkLoaded,
     isBookmarkAudible,
+    isBookmarkActive,
     getTabIdForBookmark,
     openPinnedTab,
     closePinnedTab,
     isPinnedLoaded,
     isPinnedAudible,
+    isPinnedActive,
     getTabIdForPinned,
+    getActiveItemKey,
     groupId,
     isInitialized,
     error,

@@ -261,8 +261,10 @@ interface BookmarkRowProps {
   // Arc-like bookmark-tab behavior
   isLoaded?: boolean;
   isAudible?: boolean;
+  isActive?: boolean;
   checkIsLoaded?: (bookmarkId: string) => boolean;
   checkIsAudible?: (bookmarkId: string) => boolean;
+  checkIsActive?: (bookmarkId: string) => boolean;
   onOpenBookmark?: (bookmarkId: string, url: string) => void;
   onCloseBookmark?: (bookmarkId: string) => void;
   // Drag-drop attributes
@@ -289,6 +291,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onPointerLeave,
   isLoaded,
   isAudible,
+  isActive,
   onOpenBookmark,
   onCloseBookmark,
   attributes,
@@ -324,7 +327,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           style={style}
           className={clsx(
             "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none outline-none",
-            !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
+            isActive && !isBeingDragged && "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100",
+            !isActive && !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
             isBeingDragged && "opacity-50",
             showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
             !isSpecialFolder && "touch-none"
@@ -502,7 +506,7 @@ StaticBookmarkRow.displayName = 'StaticBookmarkRow';
 
 // --- Recursive Item ---
 const BookmarkItem = (props: BookmarkRowProps) => {
-  const { node, expandedState, depth = 0, checkIsLoaded, checkIsAudible } = props;
+  const { node, expandedState, depth = 0, checkIsLoaded, checkIsAudible, checkIsActive } = props;
   const isFolder = !node.url;
   const { ref, isInView } = useInView<HTMLDivElement>();
 
@@ -524,6 +528,7 @@ const BookmarkItem = (props: BookmarkRowProps) => {
               depth={depth + 1}
               isLoaded={checkIsLoaded ? checkIsLoaded(child.id) : false}
               isAudible={checkIsAudible ? checkIsAudible(child.id) : false}
+              isActive={checkIsActive ? checkIsActive(child.id) : false}
             />
           ))}
         </div>
@@ -576,7 +581,7 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible } = useBookmarkTabsContext();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
 
   // Filter out "Other Bookmarks" (id "2") if hidden
   const visibleBookmarks = hideOtherBookmarks
@@ -586,6 +591,30 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false }: BookmarkTree
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
+
+  // Auto-scroll to active bookmark when it changes
+  const prevActiveItemKeyRef = useRef<string | null>(null);
+  useEffect(() =>
+  {
+    const activeItemKey = getActiveItemKey();
+    // Only handle bookmark keys (not pinned sites)
+    if (activeItemKey?.startsWith('bookmark-') && activeItemKey !== prevActiveItemKeyRef.current)
+    {
+      prevActiveItemKeyRef.current = activeItemKey;
+      const bookmarkId = activeItemKey.replace('bookmark-', '');
+      // Scroll after DOM updates
+      setTimeout(() =>
+      {
+        const element = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
+        element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 50);
+    }
+    else if (!activeItemKey?.startsWith('bookmark-'))
+    {
+      // Reset ref when not a bookmark
+      prevActiveItemKeyRef.current = null;
+    }
+  }, [getActiveItemKey]);
 
   // Shared drag-drop state from hook
   const {
@@ -801,8 +830,10 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false }: BookmarkTree
             onPointerLeave={handlePointerLeave}
             isLoaded={isBookmarkLoaded(node.id)}
             isAudible={isBookmarkAudible(node.id)}
+            isActive={isBookmarkActive(node.id)}
             checkIsLoaded={isBookmarkLoaded}
             checkIsAudible={isBookmarkAudible}
+            checkIsActive={isBookmarkActive}
             onOpenBookmark={openBookmarkTab}
             onCloseBookmark={closeBookmarkTab}
           />

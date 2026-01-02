@@ -74,10 +74,11 @@ interface PinnedIconProps {
   onOpen: (site: PinnedSite) => void;
   onClose?: (id: string) => void;
   isLoaded?: boolean;
+  isActive?: boolean;
   iconSize: number;
 }
 
-export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, onClose, isLoaded, iconSize }: PinnedIconProps) => {
+export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, onClose, isLoaded, isActive, iconSize }: PinnedIconProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
@@ -302,8 +303,10 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, o
             className={clsx(
               "group/pin relative flex items-center justify-center rounded",
               isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700",
-              // Loaded state: subtle cyan background
-              isLoaded && !isDragging && "bg-cyan-500/20 dark:bg-cyan-400/20"
+              // Active state: stronger cyan background + ring
+              isActive && !isDragging && "bg-cyan-500/40 dark:bg-cyan-400/40 ring-2 ring-cyan-500 dark:ring-cyan-400",
+              // Loaded state (non-active): subtle cyan background
+              isLoaded && !isActive && !isDragging && "bg-cyan-500/20 dark:bg-cyan-400/20"
             )}
             onMouseUp={handleClick}
           >

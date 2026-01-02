@@ -41,7 +41,7 @@ export const PinnedBar = ({
   movePin,
   iconSize,
 }: PinnedBarProps) => {
-  const { openPinnedTab, closePinnedTab, isPinnedLoaded } = useBookmarkTabsContext();
+  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive } = useBookmarkTabsContext();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -86,6 +86,7 @@ export const PinnedBar = ({
               onOpen={(s) => openPinnedTab(s.id, s.url)}
               onClose={closePinnedTab}
               isLoaded={isPinnedLoaded(site.id)}
+              isActive={isPinnedActive(site.id)}
               iconSize={iconSize}
             />
           ))}
