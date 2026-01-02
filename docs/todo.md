@@ -26,11 +26,14 @@
 
 - [x] cmd+T to create new tab, shouldn't move tab to under sidebarforArc group., if the active group is sidebarforArc.  leave the tab as in ungroup tab.
 
-- [ ] drag/drop a tab to bookmark folder, should create a new bookmark and move that tab to SideBarForArc and create a bookmark-tab association as a loaded bookmark
-
 - [x] introduce a "active" state for pinned site if the active tab is for that pinned site.
 
 - [x] when active tab is changed and the tab is from a bookmark/pinned site, highlight and jump to the bookmark row. for pinned site, show in active state.
 
-- [  ] cannot drop tab behind the last group if group is expended.  new a empty dummuy last row??
+- [x] drag/drop a tab to bookmark folder, should create a new bookmark and move that tab to SideBarForArc and create a bookmark-tab association as a loaded bookmark
+
+- [x] cannot drop tab behind the last group if group is expended.  new a empty dummuy last row??
     
+- [] pinned site's loaded state background colour is not obvious enough.
+
+
