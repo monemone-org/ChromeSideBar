@@ -33,6 +33,11 @@ function App() {
     22,
     { parse: (v) => parseInt(v, 10), serialize: (v) => v.toString() }
   );
+  const [arcStyleBookmarks, setArcStyleBookmarks] = useLocalStorage(
+    'sidebar-arc-style-bookmarks',
+    true,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  );
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -59,6 +64,7 @@ function App() {
     setHideOtherBookmarks(newSettings.hideOtherBookmarks);
     setSortGroupsFirst(newSettings.sortGroupsFirst);
     setPinnedIconSize(newSettings.pinnedIconSize);
+    setArcStyleBookmarks(newSettings.arcStyleBookmarks);
     setShowSettings(false);
   };
 
@@ -112,6 +118,7 @@ function App() {
           hideOtherBookmarks,
           sortGroupsFirst,
           pinnedIconSize,
+          arcStyleBookmarks,
         }}
         onApply={handleApplySettings}
       />
@@ -144,6 +151,7 @@ function App() {
         openAsPinnedTab={openAsPinnedTab}
         movePin={movePin}
         iconSize={pinnedIconSize}
+        arcStyleBookmarks={arcStyleBookmarks}
       />
 
       {/* Settings button with popup menu - bottom-left corner of panel */}
@@ -217,7 +225,7 @@ function App() {
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} />
+        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} arcStyleBookmarks={arcStyleBookmarks} />
         <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} />
       </div>
       </div>

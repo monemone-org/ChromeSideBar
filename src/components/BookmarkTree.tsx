@@ -260,6 +260,7 @@ interface BookmarkRowProps {
   onPointerEnter?: (id: string) => void;
   onPointerLeave?: () => void;
   // Arc-like bookmark-tab behavior
+  arcStyleBookmarks?: boolean;
   isLoaded?: boolean;
   isAudible?: boolean;
   isActive?: boolean;
@@ -292,6 +293,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   dropPosition,
   onPointerEnter,
   onPointerLeave,
+  arcStyleBookmarks = true,
   isLoaded,
   isAudible,
   isActive,
@@ -334,8 +336,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           style={style}
           className={clsx(
             "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none outline-none",
-            isActive && !isBeingDragged && "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100",
-            !isActive && !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
+            arcStyleBookmarks && isActive && !isBeingDragged && "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100",
+            !(arcStyleBookmarks && isActive) && !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
             isBeingDragged && "opacity-50",
             showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
             !isSpecialFolder && "touch-none"
@@ -347,8 +349,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
         >
           <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
 
-          {/* Speaker icon - fixed at left edge for non-folders */}
-          {!isFolder && (
+          {/* Speaker icon - fixed at left edge for non-folders (Arc-style only) */}
+          {!isFolder && arcStyleBookmarks && (
             <span className={clsx("absolute left-2 top-1/2 -translate-y-1/2", !isAudible && "invisible")}>
               <Volume2 size={18} />
             </span>
@@ -394,9 +396,12 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 } else if (e.metaKey || e.ctrlKey) {
                   // Cmd+Click: open as unmanaged new tab
                   chrome.tabs.create({ url: node.url });
-                } else if (onOpenBookmark) {
-                  // Normal click: open as managed tab in SideBarForArc group
+                } else if (arcStyleBookmarks && onOpenBookmark) {
+                  // Arc-style: open as managed tab in SideBarForArc group
                   onOpenBookmark(node.id, node.url);
+                } else {
+                  // Chrome-style: open in new active tab
+                  chrome.tabs.create({ url: node.url, active: true });
                 }
               }
             }}
@@ -416,17 +421,19 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                   <Pin size={14} />
                 </button>
               )}
-              {/* Close button or spacer - maintains alignment */}
-              {isLoaded && onCloseBookmark ? (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onCloseBookmark(node.id); }}
-                  className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400"
-                  title="Close tab"
-                >
-                  <X size={14} />
-                </button>
-              ) : (
-                <span className="p-0.5 w-[14px] h-[14px]" />
+              {/* Close button or spacer - maintains alignment (Arc-style only) */}
+              {arcStyleBookmarks && (
+                isLoaded && onCloseBookmark ? (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onCloseBookmark(node.id); }}
+                    className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400"
+                    title="Close tab"
+                  >
+                    <X size={14} />
+                  </button>
+                ) : (
+                  <span className="p-0.5 w-[14px] h-[14px]" />
+                )
               )}
             </div>
           )}
@@ -585,9 +592,10 @@ interface BookmarkTreeProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   hideOtherBookmarks?: boolean;
   externalDropTarget?: ExternalDropTarget | null;
+  arcStyleBookmarks?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, arcStyleBookmarks = true }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
 
@@ -836,6 +844,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             dropPosition={dropPosition}
             onPointerEnter={handlePointerEnter}
             onPointerLeave={handlePointerLeave}
+            arcStyleBookmarks={arcStyleBookmarks}
             isLoaded={isBookmarkLoaded(node.id)}
             isAudible={isBookmarkAudible(node.id)}
             isActive={isBookmarkActive(node.id)}

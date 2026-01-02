@@ -6,6 +6,7 @@ export interface SettingsValues {
   hideOtherBookmarks: boolean;
   sortGroupsFirst: boolean;
   pinnedIconSize: number;
+  arcStyleBookmarks: boolean;
 }
 
 interface SettingsDialogProps {
@@ -26,6 +27,7 @@ export function SettingsDialog({
   const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(settings.hideOtherBookmarks);
   const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(settings.sortGroupsFirst);
   const [tempPinnedIconSize, setTempPinnedIconSize] = useState(settings.pinnedIconSize);
+  const [tempArcStyleBookmarks, setTempArcStyleBookmarks] = useState(settings.arcStyleBookmarks);
 
   // Sync temp state when dialog opens
   useEffect(() => {
@@ -34,6 +36,7 @@ export function SettingsDialog({
       setTempHideOtherBookmarks(settings.hideOtherBookmarks);
       setTempSortGroupsFirst(settings.sortGroupsFirst);
       setTempPinnedIconSize(settings.pinnedIconSize);
+      setTempArcStyleBookmarks(settings.arcStyleBookmarks);
     }
   }, [isOpen, settings]);
 
@@ -55,6 +58,7 @@ export function SettingsDialog({
       hideOtherBookmarks: tempHideOtherBookmarks,
       sortGroupsFirst: tempSortGroupsFirst,
       pinnedIconSize: tempPinnedIconSize,
+      arcStyleBookmarks: tempArcStyleBookmarks,
     });
   };
 
@@ -131,6 +135,20 @@ export function SettingsDialog({
               Behaviour
             </label>
             <div className="space-y-2">
+              <div>
+                <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tempArcStyleBookmarks}
+                    onChange={(e) => setTempArcStyleBookmarks(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  Arc style bookmarks
+                </label>
+                <p className="ml-5 text-gray-500 dark:text-gray-400">
+                  Bookmarks act as persistent tabs similar to Arc browser
+                </p>
+              </div>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                 <input
                   type="checkbox"

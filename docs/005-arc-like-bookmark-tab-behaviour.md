@@ -19,6 +19,35 @@ Bring Arc browser's unified bookmark-tab experience to Chrome. In Arc, bookmarks
 - Applies to **all bookmarks**, including those in nested folders
 - Also applies to **pinned sites**
 
+## Settings
+
+### Arc style bookmarks (optional)
+
+This behavior is controlled by the **"Arc style bookmarks"** setting in Settings dialog.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Arc style bookmarks | ON | When enabled, bookmarks act as persistent tabs that can be reopened similar to Arc browser |
+
+**When ON (default):**
+- Bookmarks and pinned sites open as managed tabs in the SideBarForArc group
+- Close button (X) visible on loaded bookmark rows
+- Audio indicator visible when tab is playing sound
+- Active bookmark highlighted with blue background
+- Pinned sites show cyan background when loaded
+
+**When OFF:**
+- Bookmarks and pinned sites open as regular Chrome tabs (not grouped, not tracked)
+- No close button on bookmark rows
+- No audio indicator on bookmark rows
+- No active state highlighting
+- No loaded indicator on pinned sites
+- Behavior matches Chrome's native bookmark UI
+
+**Modifier keys (unchanged by setting):**
+- Cmd/Ctrl+Click: Opens as unmanaged new tab
+- Shift+Click: Opens in new window
+
 ## Tab Group Management
 
 All bookmark/pinned-site tabs are managed in a dedicated Chrome tab group:

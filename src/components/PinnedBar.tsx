@@ -29,6 +29,7 @@ interface PinnedBarProps {
   openAsPinnedTab: (site: PinnedSite) => void;
   movePin: (activeId: string, overId: string) => void;
   iconSize: number;
+  arcStyleBookmarks?: boolean;
 }
 
 export const PinnedBar = ({
@@ -36,11 +37,13 @@ export const PinnedBar = ({
   removePin,
   updatePin,
   resetFavicon,
-  // openAsPinnedTab is replaced by openPinnedTab from useBookmarkTabs
   openAsPinnedTab: _openAsPinnedTab,
   movePin,
   iconSize,
+  arcStyleBookmarks = true,
 }: PinnedBarProps) => {
+  // Note: _openAsPinnedTab is unused - we use openPinnedTab from context for Arc-style,
+  // or chrome.tabs.create for Chrome-style behavior
   const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive } = useBookmarkTabsContext();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -83,10 +86,13 @@ export const PinnedBar = ({
               onRemove={removePin}
               onUpdate={updatePin}
               onResetFavicon={resetFavicon}
-              onOpen={(s) => openPinnedTab(s.id, s.url)}
-              onClose={closePinnedTab}
-              isLoaded={isPinnedLoaded(site.id)}
-              isActive={isPinnedActive(site.id)}
+              onOpen={arcStyleBookmarks
+                ? (s) => openPinnedTab(s.id, s.url)
+                : (s) => chrome.tabs.create({ url: s.url, active: true })
+              }
+              onClose={arcStyleBookmarks ? closePinnedTab : undefined}
+              isLoaded={arcStyleBookmarks ? isPinnedLoaded(site.id) : false}
+              isActive={arcStyleBookmarks ? isPinnedActive(site.id) : false}
               iconSize={iconSize}
             />
           ))}
