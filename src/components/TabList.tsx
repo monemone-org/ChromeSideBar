@@ -1427,6 +1427,37 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       }
     }
 
+    // Check if pointer is below all tabs (end-of-list drop zone)
+    const allTabElements = document.querySelectorAll('[data-tab-id]');
+    const allGroupHeaders = document.querySelectorAll('[data-group-header-id]');
+
+    if (allTabElements.length > 0 || allGroupHeaders.length > 0)
+    {
+      // Get the bottom-most element
+      let maxBottom = 0;
+      allTabElements.forEach(el =>
+      {
+        const rect = el.getBoundingClientRect();
+        maxBottom = Math.max(maxBottom, rect.bottom);
+      });
+      allGroupHeaders.forEach(el =>
+      {
+        const rect = el.getBoundingClientRect();
+        maxBottom = Math.max(maxBottom, rect.bottom);
+      });
+
+      // If pointer is below all elements, it's end-of-list
+      if (currentY > maxBottom)
+      {
+        setDropTargetId('end-of-list');
+        setDropPosition('after');
+        clearAutoExpandTimer();
+        setLocalExternalTarget(null);
+        onExternalDropTargetChange?.(null);
+        return;
+      }
+    }
+
     // No valid target
     setDropTargetId(null);
     setDropPosition(null);
@@ -1517,7 +1548,16 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
       let targetIndex = -1;
 
-      if (isGroupHeaderTarget)
+      if (dropTargetId === 'end-of-list')
+      {
+        // Move group to very end
+        if (visibleTabs.length > 0)
+        {
+          const lastTab = visibleTabs[visibleTabs.length - 1];
+          targetIndex = lastTab.index + 1;
+        }
+      }
+      else if (isGroupHeaderTarget)
       {
         // Dropping relative to another group
         const targetGroupId = parseInt(dropTargetId.replace('group-', ''), 10);
@@ -1669,6 +1709,29 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           }
         }
       }
+      else if (dropTargetId === 'end-of-list')
+      {
+        // Move tab to very end as ungrouped
+        if (visibleTabs.length > 0)
+        {
+          const lastTab = visibleTabs[visibleTabs.length - 1];
+          let targetIndex = lastTab.index + 1;
+
+          // Account for source removal
+          if (sourceIndex < targetIndex)
+          {
+            targetIndex--;
+          }
+
+          // Ungroup if currently in a group
+          if (sourceGroupId !== -1)
+          {
+            ungroupTab(activeId as number);
+          }
+
+          moveTab(activeId as number, targetIndex);
+        }
+      }
       else
       {
         // Target is a tab
@@ -1802,12 +1865,17 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          {displayItems.map((item) =>
+          {displayItems.map((item, itemIndex) =>
           {
+            const isLastItem = itemIndex === displayItems.length - 1;
+            const isEndOfListTarget = dropTargetId === 'end-of-list';
+
             if (item.type === 'tab')
             {
               const tabId = String(item.tab.id);
               const isTarget = dropTargetId === tabId;
+              // Show end-of-list indicator on last ungrouped tab
+              const showEndOfListIndicator = isLastItem && isEndOfListTarget;
               return (
                 <DraggableTab
                   key={item.tab.id}
@@ -1815,7 +1883,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   indentLevel={1}
                   isBeingDragged={activeId === item.tab.id}
                   showDropBefore={isTarget && dropPosition === 'before'}
-                  showDropAfter={isTarget && dropPosition === 'after'}
+                  showDropAfter={(isTarget && dropPosition === 'after') || showEndOfListIndicator}
                   onClose={closeTab}
                   onActivate={activateTab}
                   onDuplicate={duplicateTab}
@@ -1840,7 +1908,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
                     showDropBefore={isTarget && dropPosition === 'before'}
-                    showDropAfter={!isDraggingGroup && isTarget && dropPosition === 'after'}
+                    showDropAfter={(!isDraggingGroup && isTarget && dropPosition === 'after') || (isLastItem && !isGroupExpanded && isEndOfListTarget)}
                     showDropInto={showDropInto}
                     afterDropIndentPx={
                       isTarget && dropPosition === 'after' && isGroupExpanded && !isDraggingGroup
@@ -1862,6 +1930,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     const isLastTab = index === item.tabs.length - 1;
                     // When dragging a group with 'after', show indicator on last tab
                     const showGroupAfterOnLastTab = isLastTab && isGroupAfterTarget;
+                    // Show end-of-list indicator on last tab of last group
+                    const showEndOfListOnLastTab = isLastItem && isLastTab && isEndOfListTarget;
                     // Indent lines for tabs in group since drop stays within group
                     const indentPx = isTabTarget ? getIndentPadding(2) : undefined;
                     return (
@@ -1871,7 +1941,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         indentLevel={2}
                         isBeingDragged={activeId === tab.id}
                         showDropBefore={isTabTarget && dropPosition === 'before'}
-                        showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab}
+                        showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab || showEndOfListOnLastTab}
                         beforeIndentPx={dropPosition === 'before' ? indentPx : undefined}
                         afterIndentPx={dropPosition === 'after' ? indentPx : undefined}
                         groupColor={item.group.color}
