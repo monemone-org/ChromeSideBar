@@ -51,6 +51,7 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps)
           <h2 className="font-bold">About</h2>
           <button
             onClick={onClose}
+            aria-label="Close about"
             className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
           >
             <X size={16} />

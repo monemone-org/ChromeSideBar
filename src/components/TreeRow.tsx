@@ -79,21 +79,23 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       )}
 
       {/* Chevron Slot - Fixed Width */}
-      <div 
-        className={clsx(
-          "flex items-center justify-center shrink-0",
-          hasChildren ? "cursor-pointer hover:text-gray-900 dark:hover:text-white" : ""
-        )}
+      <div
+        className="flex items-center justify-center shrink-0"
         style={{ width: LAYOUT.CHEVRON_WIDTH }}
-        onClick={(e) => {
-          if (hasChildren && onToggle) {
-            e.stopPropagation();
-            onToggle(e);
-          }
-        }}
       >
         {hasChildren && (
-          isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+          <button
+            type="button"
+            aria-label={isExpanded ? "Collapse" : "Expand"}
+            aria-expanded={isExpanded}
+            className="p-0 border-0 bg-transparent cursor-pointer hover:text-gray-900 dark:hover:text-white"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle?.(e);
+            }}
+          >
+            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
         )}
       </div>
 

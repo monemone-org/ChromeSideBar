@@ -166,6 +166,7 @@ const AddToGroupDialog = ({
                       : "border-transparent"
                   )}
                   title={opt.value}
+                  aria-label={`Select ${opt.value} color`}
                 />
               ))}
             </div>
@@ -272,6 +273,7 @@ const ChangeGroupColorDialog = ({
                     : "border-transparent"
                 )}
                 title={opt.value}
+                aria-label={`Select ${opt.value} color`}
               />
             ))}
           </div>
@@ -511,6 +513,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           }}
           className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
           title="Pin"
+          aria-label="Pin tab"
         >
           <Pin size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
@@ -523,6 +526,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           if (tab.id) onClose(tab.id);
         }}
         className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+        aria-label="Close tab"
       >
         <X size={14} className="text-gray-700 dark:text-gray-200" />
       </button>
@@ -1770,6 +1774,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                 onClick={(e) => handleMenuButtonClick(e, openMenu)}
                 className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
                 title="Tab options"
+                aria-label="Tab options"
               >
                 <MoreHorizontal size={14} />
               </button>

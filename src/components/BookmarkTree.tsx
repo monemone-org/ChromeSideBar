@@ -373,6 +373,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
           className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
           title="Pin"
+          aria-label="Pin bookmark"
         >
           <Pin size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
@@ -384,6 +385,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           onClick={(e) => { e.stopPropagation(); onCloseBookmark(node.id); }}
           className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900"
           title="Close tab"
+          aria-label="Close tab"
         >
           <X size={14} className="text-gray-700 dark:text-gray-200" />
         </button>

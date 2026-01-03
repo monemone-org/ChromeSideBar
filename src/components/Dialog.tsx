@@ -50,6 +50,7 @@ export const Dialog = ({
           </h3>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
           >
             <X size={16} />

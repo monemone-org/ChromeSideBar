@@ -87,7 +87,7 @@ export function SettingsDialog({
           <h2 className="font-bold">
             Settings
           </h2>
-          <button onClick={onClose} className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
+          <button onClick={onClose} aria-label="Close settings" className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
             <X size={16} />
           </button>
         </div>
