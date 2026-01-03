@@ -36,6 +36,7 @@ export function ImportDialog({
   appendPinnedSites,
 }: ImportDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isMountedRef = useRef(true);
   const [dialogState, setDialogState] = useState<DialogState>('selecting');
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [importPinnedSitesFlag, setImportPinnedSitesFlag] = useState(true);
@@ -46,6 +47,14 @@ export function ImportDialog({
   const [tabGroupsMode, setTabGroupsMode] = useState<TabGroupsImportMode>('append');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Track mount state for async operations
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Trigger file picker when dialog opens
   useEffect(() => {
@@ -77,6 +86,9 @@ export function ImportDialog({
   const handleFileSelect = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
+      // Skip if component unmounted during file read
+      if (!isMountedRef.current) return;
+
       try {
         const data = JSON.parse(e.target?.result as string);
         let backup: FullBackup;

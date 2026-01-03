@@ -232,26 +232,6 @@ export const usePinnedSites = () => {
     URL.revokeObjectURL(url);
   }, [pinnedSites]);
 
-  const importPinnedSites = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const imported = JSON.parse(e.target?.result as string) as PinnedSite[];
-        // Regenerate IDs and reorder
-        const sites = imported.map((site, index) => ({
-          ...site,
-          id: generateId(),
-          order: index,
-        }));
-        setPinnedSites(sites);
-        savePinnedSites(sites);
-      } catch {
-        setError('Invalid JSON file');
-      }
-    };
-    reader.readAsText(file);
-  }, [savePinnedSites]);
-
   // Replace all pinned sites (for full backup import)
   const replacePinnedSites = useCallback((sites: PinnedSite[]) => {
     const reordered = sites.map((site, index) => ({
@@ -287,7 +267,6 @@ export const usePinnedSites = () => {
     openAsPinnedTab,
     movePin,
     exportPinnedSites,
-    importPinnedSites,
     replacePinnedSites,
     appendPinnedSites,
     refresh: loadPinnedSites,
