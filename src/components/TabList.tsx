@@ -40,16 +40,16 @@ import clsx from 'clsx';
 // Chrome tab group color mapping (exact Chrome hex codes)
 // Light theme: badge uses darker colors, Dark theme: badge uses lighter/pastel colors
 // bg: subtle background for grouped tabs, bgStrong: stronger background when group has active tab
-const GROUP_COLORS: Record<string, { bg: string; bgStrong: string; badge: string; dot: string }> = {
-  grey:   { bg: 'bg-[#F1F3F4] dark:bg-[#5F6368]/30', bgStrong: 'bg-[#E8EAED] dark:bg-[#5F6368]/50', badge: 'bg-[#5F6368] dark:bg-[#BDC1C6]', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]' },
-  blue:   { bg: 'bg-[#E8F0FE] dark:bg-[#8AB4F8]/20', bgStrong: 'bg-[#D2E3FC] dark:bg-[#8AB4F8]/40', badge: 'bg-[#1A73E8] dark:bg-[#8AB4F8]', dot: 'bg-[#1A73E8] dark:bg-[#8AB4F8]' },
-  red:    { bg: 'bg-[#FCE8E6] dark:bg-[#F28B82]/20', bgStrong: 'bg-[#F9D0CC] dark:bg-[#F28B82]/40', badge: 'bg-[#D93025] dark:bg-[#F28B82]', dot: 'bg-[#D93025] dark:bg-[#F28B82]' },
-  yellow: { bg: 'bg-[#FEF7E0] dark:bg-[#FDD663]/20', bgStrong: 'bg-[#FCEFC7] dark:bg-[#FDD663]/40', badge: 'bg-[#E37400] dark:bg-[#FDD663]', dot: 'bg-[#E37400] dark:bg-[#FDD663]' },
-  green:  { bg: 'bg-[#E6F4EA] dark:bg-[#81C995]/20', bgStrong: 'bg-[#CEEAD6] dark:bg-[#81C995]/40', badge: 'bg-[#188038] dark:bg-[#81C995]', dot: 'bg-[#188038] dark:bg-[#81C995]' },
-  pink:   { bg: 'bg-[#FEE7F5] dark:bg-[#FF8BCB]/20', bgStrong: 'bg-[#FCCFEB] dark:bg-[#FF8BCB]/40', badge: 'bg-[#D01884] dark:bg-[#FF8BCB]', dot: 'bg-[#D01884] dark:bg-[#FF8BCB]' },
-  purple: { bg: 'bg-[#F3E8FD] dark:bg-[#D7AEFB]/20', bgStrong: 'bg-[#E8D0FB] dark:bg-[#D7AEFB]/40', badge: 'bg-[#9333EA] dark:bg-[#D7AEFB]', dot: 'bg-[#9333EA] dark:bg-[#D7AEFB]' },
-  cyan:   { bg: 'bg-[#E4F7FB] dark:bg-[#78D9EC]/20', bgStrong: 'bg-[#CBEFF7] dark:bg-[#78D9EC]/40', badge: 'bg-[#11858E] dark:bg-[#78D9EC]', dot: 'bg-[#11858E] dark:bg-[#78D9EC]' },
-  orange: { bg: 'bg-[#FEF1E8] dark:bg-[#FCAD70]/20', bgStrong: 'bg-[#FCE3D1] dark:bg-[#FCAD70]/40', badge: 'bg-[#FA903E] dark:bg-[#FCAD70]', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]' },
+const GROUP_COLORS: Record<string, { bg: string; bgStrong: string; badge: string; dot: string; border: string }> = {
+  grey:   { bg: 'bg-[#F1F3F4] dark:bg-[#5F6368]/30', bgStrong: 'bg-[#E8EAED] dark:bg-[#5F6368]/50', badge: 'bg-[#5F6368] dark:bg-[#BDC1C6]', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]', border: 'border-[#5F6368] dark:border-[#BDC1C6]' },
+  blue:   { bg: 'bg-[#E8F0FE] dark:bg-[#8AB4F8]/20', bgStrong: 'bg-[#D2E3FC] dark:bg-[#8AB4F8]/40', badge: 'bg-[#1A73E8] dark:bg-[#8AB4F8]', dot: 'bg-[#1A73E8] dark:bg-[#8AB4F8]', border: 'border-[#1A73E8] dark:border-[#8AB4F8]' },
+  red:    { bg: 'bg-[#FCE8E6] dark:bg-[#F28B82]/20', bgStrong: 'bg-[#F9D0CC] dark:bg-[#F28B82]/40', badge: 'bg-[#D93025] dark:bg-[#F28B82]', dot: 'bg-[#D93025] dark:bg-[#F28B82]', border: 'border-[#D93025] dark:border-[#F28B82]' },
+  yellow: { bg: 'bg-[#FEF7E0] dark:bg-[#FDD663]/20', bgStrong: 'bg-[#FCEFC7] dark:bg-[#FDD663]/40', badge: 'bg-[#E37400] dark:bg-[#FDD663]', dot: 'bg-[#E37400] dark:bg-[#FDD663]', border: 'border-[#E37400] dark:border-[#FDD663]' },
+  green:  { bg: 'bg-[#E6F4EA] dark:bg-[#81C995]/20', bgStrong: 'bg-[#CEEAD6] dark:bg-[#81C995]/40', badge: 'bg-[#188038] dark:bg-[#81C995]', dot: 'bg-[#188038] dark:bg-[#81C995]', border: 'border-[#188038] dark:border-[#81C995]' },
+  pink:   { bg: 'bg-[#FEE7F5] dark:bg-[#FF8BCB]/20', bgStrong: 'bg-[#FCCFEB] dark:bg-[#FF8BCB]/40', badge: 'bg-[#D01884] dark:bg-[#FF8BCB]', dot: 'bg-[#D01884] dark:bg-[#FF8BCB]', border: 'border-[#D01884] dark:border-[#FF8BCB]' },
+  purple: { bg: 'bg-[#F3E8FD] dark:bg-[#D7AEFB]/20', bgStrong: 'bg-[#E8D0FB] dark:bg-[#D7AEFB]/40', badge: 'bg-[#9333EA] dark:bg-[#D7AEFB]', dot: 'bg-[#9333EA] dark:bg-[#D7AEFB]', border: 'border-[#9333EA] dark:border-[#D7AEFB]' },
+  cyan:   { bg: 'bg-[#E4F7FB] dark:bg-[#78D9EC]/20', bgStrong: 'bg-[#CBEFF7] dark:bg-[#78D9EC]/40', badge: 'bg-[#11858E] dark:bg-[#78D9EC]', dot: 'bg-[#11858E] dark:bg-[#78D9EC]', border: 'border-[#11858E] dark:border-[#78D9EC]' },
+  orange: { bg: 'bg-[#FEF1E8] dark:bg-[#FCAD70]/20', bgStrong: 'bg-[#FCE3D1] dark:bg-[#FCAD70]/40', badge: 'bg-[#FA903E] dark:bg-[#FCAD70]', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]', border: 'border-[#FA903E] dark:border-[#FCAD70]' },
 };
 
 // Chrome tab group color options for new group creation
@@ -547,17 +547,27 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
     </div>
   );
 
-  // Computed class for coloring
+  // Computed class for coloring - restore original rounding for background
   const rowClassName = clsx(
-    isLastInGroup ? "rounded-b-lg rounded-t-none" : "rounded-none",
+    groupColor ? (isLastInGroup ? "rounded-b-lg rounded-t-none" : "rounded-none") : "",
     tab.active
       ? groupColor
         ? clsx(GROUP_COLORS[groupColor]?.bgStrong, "text-gray-900 dark:text-gray-100")
         : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
       : groupColor
-        ? clsx(GROUP_COLORS[groupColor]?.bg, "hover:brightness-95 dark:hover:brightness-110 text-gray-700 dark:text-gray-200")
-        : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
+        ? clsx(GROUP_COLORS[groupColor]?.bg, "text-gray-700 dark:text-gray-200")
+        : "hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200"
   );
+
+  // Border overlay for grouped tabs (rounded corners independent of background)
+  // Shows on hover for both active and inactive tabs, using the group color
+  const borderOverlay = groupColor ? (
+    <div className={clsx(
+      "absolute inset-0 rounded-md border-2 pointer-events-none",
+      GROUP_COLORS[groupColor]?.border,
+      "opacity-0 group-hover:opacity-100"
+    )} />
+  ) : null;
 
   return (
     <ContextMenu.Root>
@@ -580,6 +590,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           data-tab-id={tab.id}
           data-group-id={tab.groupId ?? -1}
         >
+          {borderOverlay}
           <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
         </TreeRow>
       </ContextMenu.Trigger>
@@ -704,6 +715,15 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
     </span>
   );
 
+  // Hover border overlay for group header (rounded corners independent of background)
+  const hoverBorderOverlay = !showDropInto ? (
+    <div className={clsx(
+      "absolute inset-0 rounded-md border-2 pointer-events-none",
+      colorStyle.border,
+      "opacity-0 group-hover:opacity-100"
+    )} />
+  ) : null;
+
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
@@ -721,14 +741,15 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           dndAttributes={attributes}
           dndListeners={listeners}
           className={clsx(
-            "rounded-t-lg rounded-b-none", // Override default rounded-md
+            "rounded-t-lg rounded-b-none", // Original rounding for background
             showDropInto
               ? "bg-blue-100 dark:bg-blue-900/50"
-              : clsx(colorStyle.bg, "hover:brightness-95 dark:hover:brightness-110")
+              : colorStyle.bg
           )}
           data-group-header-id={group.id}
           data-is-group-header="true"
         >
+          {hoverBorderOverlay}
           {showDropInto && (
             <div className="absolute inset-0 rounded-lg ring-2 ring-blue-500 pointer-events-none" />
           )}

@@ -59,7 +59,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       {...dndListeners}
       className={clsx(
         'group flex items-center h-8 rounded-md cursor-default select-none transition-colors relative pr-2',
-        isActive ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200',
+        isActive ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100' : 'hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200',
         isDragging && 'opacity-50',
         className
       )}
