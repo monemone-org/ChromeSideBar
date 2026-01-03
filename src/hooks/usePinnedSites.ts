@@ -184,17 +184,6 @@ export const usePinnedSites = () => {
     savePinnedSites(compacted);
   }, [pinnedSites, savePinnedSites]);
 
-  const exportPinnedSites = useCallback(() => {
-    const data = JSON.stringify(pinnedSites, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'pinned-sites.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [pinnedSites]);
-
   // Replace all pinned sites (for full backup import)
   const replacePinnedSites = useCallback((sites: PinnedSite[]) => {
     const reordered = sites.map((site, index) => ({
@@ -228,7 +217,6 @@ export const usePinnedSites = () => {
     updatePin,
     resetFavicon,
     movePin,
-    exportPinnedSites,
     replacePinnedSites,
     appendPinnedSites,
     refresh: loadPinnedSites,

@@ -340,7 +340,6 @@ export const useBookmarks = () => {
     getBookmark,
     getChildren,
     clearFolder,
-    refresh: fetchBookmarks,
     error
   };
 };

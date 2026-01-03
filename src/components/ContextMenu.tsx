@@ -301,14 +301,3 @@ export const Separator = forwardRef<HTMLDivElement, SeparatorProps>(
   )
 );
 Separator.displayName = 'ContextMenu.Separator';
-
-// --- Unused but exported for API compatibility ---
-export const Sub = ({ children }: { children: ReactNode }) => <>{children}</>;
-export const SubTrigger = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ children, ...props }, ref) => <div ref={ref} {...props}>{children}</div>
-);
-SubTrigger.displayName = 'ContextMenu.SubTrigger';
-export const SubContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ children, ...props }, ref) => <div ref={ref} {...props}>{children}</div>
-);
-SubContent.displayName = 'ContextMenu.SubContent';

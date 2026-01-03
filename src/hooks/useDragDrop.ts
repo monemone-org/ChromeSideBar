@@ -53,15 +53,6 @@ export const useDragDrop = <TActiveId extends string | number>() =>
     [clearAutoExpandTimer]
   );
 
-  // Reset all drag state
-  const resetDragState = useCallback(() =>
-  {
-    setActiveId(null);
-    setDropTargetId(null);
-    setDropPosition(null);
-    clearAutoExpandTimer();
-  }, [clearAutoExpandTimer]);
-
   return {
     // State
     activeId,
@@ -78,6 +69,5 @@ export const useDragDrop = <TActiveId extends string | number>() =>
     // Methods
     setAutoExpandTimer,
     clearAutoExpandTimer,
-    resetDragState,
   };
 };
