@@ -84,7 +84,7 @@ Built with the usual modern web stack:
 - [Lucide React](https://lucide.dev/) for icons
 - [@dnd-kit/core](https://dndkit.com/) for drag & drop
 - [Radix UI](https://www.radix-ui.com/) for context menus
-- Chrome Manifest V3 APIs (`sidePanel`, `bookmarks`, `tabs`, `tabGroups`, `storage`, `favicon`, `scripting`)
+- Chrome Manifest V3 APIs (`sidePanel`, `bookmarks`, `tabs`, `tabGroups`, `storage`, `favicon`)
 
 ## Project Structure
 

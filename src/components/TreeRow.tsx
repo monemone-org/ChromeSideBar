@@ -1,0 +1,136 @@
+import React, { forwardRef } from 'react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
+import clsx from 'clsx';
+import { LAYOUT, getIndentStyle } from '../utils/indent';
+
+export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
+  depth: number;
+  title: React.ReactNode;
+  icon?: React.ReactNode;
+  isExpanded?: boolean;
+  hasChildren?: boolean;
+  onToggle?: (e: React.MouseEvent) => void;
+  // onClick, onContextMenu, onPointerEnter, onPointerLeave are covered by HTMLAttributes but we can keep specific overrides if needed
+  isActive?: boolean;
+  isDragging?: boolean;
+  // Slots for extra content
+  leadingIndicator?: React.ReactNode; // Fixed at absolute left edge, before indent (e.g. speaker icon)
+  indicators?: React.ReactNode; // Content to the left of the title - CAREFUL: this will shift title
+  actions?: React.ReactNode;    // Content to the right of the title (hover actions)
+  badges?: React.ReactNode;     // Content after the title (e.g. tab count, pin)
+  children?: React.ReactNode;   // For absolute overlays like drop indicators
+  
+  // DND props
+  dndAttributes?: any;
+  dndListeners?: any;
+  
+  // Custom styles
+  // className and style are in HTMLAttributes
+}
+
+export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
+  depth,
+  title,
+  icon,
+  isExpanded,
+  hasChildren,
+  onToggle,
+  // Removed explicit handlers that are now in ...props or handled specifically if needed
+  isActive,
+  isDragging,
+  leadingIndicator,
+  indicators,
+  actions,
+  badges,
+  children,
+  dndAttributes,
+  dndListeners,
+  className,
+  style,
+  ...props // Capture remaining props (including those from ContextMenu.Trigger)
+}, ref) => {
+  return (
+    <div
+      ref={ref}
+      {...props} // Spread standard HTML attributes and injected props first
+      {...dndAttributes}
+      {...dndListeners}
+      className={clsx(
+        'group flex items-center h-8 rounded-md cursor-default select-none transition-colors relative pr-2',
+        isActive ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100' : 'hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200',
+        isDragging && 'opacity-50',
+        className
+      )}
+      style={{
+        ...getIndentStyle(depth),
+        ...style,
+      }}
+    >
+      {/* Drop Indicators & Overlays */}
+      {children}
+
+      {/* Leading Indicator - Fixed at absolute left edge (e.g. speaker icon) */}
+      {leadingIndicator && (
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center">
+          {leadingIndicator}
+        </div>
+      )}
+
+      {/* Chevron Slot - Fixed Width */}
+      <div 
+        className={clsx(
+          "flex items-center justify-center shrink-0",
+          hasChildren ? "cursor-pointer hover:text-gray-900 dark:hover:text-white" : ""
+        )}
+        style={{ width: LAYOUT.CHEVRON_WIDTH }}
+        onClick={(e) => {
+          if (hasChildren && onToggle) {
+            e.stopPropagation();
+            onToggle(e);
+          }
+        }}
+      >
+        {hasChildren && (
+          isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+        )}
+      </div>
+
+      {/* Icon Slot - Fixed Width */}
+      <div 
+        className="flex items-center justify-center shrink-0"
+        style={{ width: LAYOUT.ICON_WIDTH, marginRight: LAYOUT.GAP }}
+      >
+        {icon}
+      </div>
+
+      {/* Indicators (Left of Title) - Optional */}
+      {/* Use sparingly as this shifts alignment */}
+      {indicators && (
+        <div className="flex items-center gap-1 shrink-0 mr-1">
+          {indicators}
+        </div>
+      )}
+
+      {/* Title */}
+      <div className="flex-1 truncate min-w-0 mr-2">
+        {title}
+      </div>
+
+      {/* Badges (Right of Title, visible always) */}
+      {badges && (
+        <div className="flex items-center gap-1 shrink-0">
+          {badges}
+        </div>
+      )}
+
+      {/* Actions (Right aligned, hover only usually) */}
+      {actions && (
+        <div className="flex items-center shrink-0 ml-1">
+          {actions}
+        </div>
+      )}
+    </div>
+  );
+});
+
+TreeRow.displayName = 'TreeRow';

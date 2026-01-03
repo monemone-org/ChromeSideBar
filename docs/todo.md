@@ -35,3 +35,18 @@
     
 - [x] pinned site's loaded state background colour is not obvious enough.
 
+- [x] add a line to separate the bookmark and tabs sections. 
+    remove "Activee Tabs" and replace with a  `+ New Tab       [...]` row with action button that show the original "Active Rows"'s popup menu to allow sort and close all tabs.
+
+   bugs:
+   - [x] tab and group row indentation
+
+   - [x] dropping to top 25% of group header should place the tab before the group header as ungrouped tab. right now it moves the tab into the group.
+   - [x] speaker icon should be at the beginning of the row
+
+   - dragdrop is broken
+      - background colour of group:
+         group header row: only top left/right corner has rounding.  the bottom left/right corner - no rounding
+         last grouped tab row: only bottom left/right corner has rounding
+         all other grouped tab: no rounding corners
+        

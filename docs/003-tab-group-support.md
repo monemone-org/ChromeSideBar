@@ -65,16 +65,16 @@ Ungrouped tabs appear at the same level as group headers, matching Chrome's tab 
 
 ```
 ┌──────────────────────────────────────┐
-│ ▼ Active Tabs                    ⋮   │
+│ + New Tabs                    ⋮   │
 ├──────────────────────────────────────┤
-│   📄 Gmail                       ✕   │  ← Ungrouped tab (no indent)
-│   ● Work (blue)                  ▼   │  ← Group header with color dot
-│     ├─ 📄 GitHub PR #123         ✕   │  ← Tabs indented under group
-│     ├─ 📄 Jira Task              ✕   │
-│     └─ 📄 VS Code Docs           ✕   │
-│   📄 YouTube                     ✕   │  ← Ungrouped tab between groups
-│   ● Research (green)             ▶   │  ← Collapsed group
-│   📄 Settings                    ✕   │  ← Ungrouped tab at end
+│ 📄 Gmail                       ✕   │  ← Ungrouped tab (no indent)
+│ v Work (blue)                  ▼   │  ← Group header with color dot
+│   ├─ 📄 GitHub PR #123         ✕   │  ← Tabs indented under group
+│   ├─ 📄 Jira Task              ✕   │
+│   └─ 📄 VS Code Docs           ✕   │
+│ 📄 YouTube                     ✕   │  ← Ungrouped tab between groups
+│ > Research (green)             ▶   │  ← Collapsed group
+│ 📄 Settings                    ✕   │  ← Ungrouped tab at end
 └──────────────────────────────────────┘
 
 Legend:

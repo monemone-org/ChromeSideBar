@@ -14,7 +14,8 @@ export interface ExternalDropTarget
 }
 import { Dialog } from './Dialog';
 import { Toast } from './Toast';
-import { Globe, ChevronRight, ChevronDown, Layers, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy } from 'lucide-react';
+import { TreeRow } from './TreeRow';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, MoreHorizontal, SquareStack } from 'lucide-react';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
@@ -472,13 +473,10 @@ interface DraggableTabProps {
   listeners?: SyntheticListenerMap;
 }
 
-// Fixed indentation for all tab rows: [speaker][pin][icon] label
-const TAB_ROW_PADDING = 12;
-
 // --- Pure UI Row Component ---
 const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   tab,
-  indentLevel: _indentLevel,
+  indentLevel,
   isBeingDragged,
   showDropBefore,
   showDropAfter,
@@ -494,81 +492,91 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   attributes,
   listeners
 }, ref) => {
-  return (
-    <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>
-        <div
-          ref={ref}
-          data-tab-id={tab.id}
-          data-group-id={tab.groupId ?? -1}
-          style={{ paddingLeft: `${TAB_ROW_PADDING}px` }}
-          {...attributes}
-          {...listeners}
-          className={clsx(
-            "group/tab relative hover:z-10 flex items-center py-1 px-2 cursor-pointer outline-none",
-            isLastInGroup ? "rounded-b-lg" : "rounded-none",
-            isBeingDragged && "opacity-50",
-            tab.active
-              ? groupColor
-                ? clsx(GROUP_COLORS[groupColor]?.bgStrong, "text-gray-900 dark:text-gray-100")
-                : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
-              : groupColor
-                ? clsx(GROUP_COLORS[groupColor]?.bg, "hover:brightness-95 dark:hover:brightness-110 text-gray-700 dark:text-gray-200")
-                : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
-          )}
-          onClick={() => onActivate(tab.id!)}
-        >
-      <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
+  const icon = tab.favIconUrl ? (
+    <img src={tab.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />
+  ) : (
+    <Globe className="w-4 h-4 text-gray-400 flex-shrink-0" />
+  );
 
-      {/* Speaker indicator */}
-      <span className={clsx("mr-1", !tab.audible && "invisible")}>
-        <Volume2 size={18} />
-      </span>
-      {/* Pin indicator for Chrome pinned tabs */}
-      <span className={clsx("mr-1 p-0.5", !tab.pinned && "invisible")}>
-        <Pin size={14} className="text-gray-400" />
-      </span>
-      {tab.favIconUrl ? (
-        <img src={tab.favIconUrl} alt="" className="w-4 h-4 mr-2 flex-shrink-0" />
-      ) : (
-        <Globe className="w-4 h-4 mr-2 text-gray-400 flex-shrink-0" />
-      )}
-      <span className="flex-1 truncate pr-1">
-        {tab.title}
-      </span>
-      {/* Fast URL tooltip */}
-      <div className="absolute left-0 top-full mt-1 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white rounded max-w-xs truncate invisible group-hover/tab:visible pointer-events-none z-50">
-        {tab.url}
-      </div>
-      {/* Action buttons */}
-      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover/tab:opacity-100 bg-white dark:bg-gray-900 rounded">
-        {onPin && tab.url && !tab.pinned && (
-          <button
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) =>
-            {
-              e.stopPropagation();
-              onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl);
-            }}
-            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
-            title="Pin"
-          >
-            <Pin size={14} className="text-gray-700 dark:text-gray-200" />
-          </button>
-        )}
+  const actions = (
+    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-900 rounded">
+      {onPin && tab.url && !tab.pinned && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) =>
           {
             e.stopPropagation();
-            if (tab.id) onClose(tab.id);
+            onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl);
           }}
           className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+          title="Pin"
         >
-          <X size={14} className="text-gray-700 dark:text-gray-200" />
+          <Pin size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
-      </div>
-        </div>
+      )}
+      <button
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) =>
+        {
+          e.stopPropagation();
+          if (tab.id) onClose(tab.id);
+        }}
+        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+      >
+        <X size={14} className="text-gray-700 dark:text-gray-200" />
+      </button>
+    </div>
+  );
+
+  // Speaker indicator - at absolute left edge
+  const leadingIndicator = tab.audible ? <Volume2 size={16} /> : undefined;
+
+  const badges = (
+    <div className="flex items-center gap-1">
+      {/* Pin indicator for Chrome pinned tabs */}
+      {tab.pinned && (
+        <span className="text-gray-400">
+          <Pin size={14} />
+        </span>
+      )}
+    </div>
+  );
+
+  // Computed class for coloring
+  const rowClassName = clsx(
+    isLastInGroup ? "rounded-b-lg" : "rounded-none",
+    tab.active
+      ? groupColor
+        ? clsx(GROUP_COLORS[groupColor]?.bgStrong, "text-gray-900 dark:text-gray-100")
+        : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
+      : groupColor
+        ? clsx(GROUP_COLORS[groupColor]?.bg, "hover:brightness-95 dark:hover:brightness-110 text-gray-700 dark:text-gray-200")
+        : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200"
+  );
+
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild>
+        <TreeRow
+          ref={ref}
+          depth={indentLevel}
+          title={tab.title}
+          icon={icon}
+          hasChildren={false}
+          isActive={false} // Disable default active style, we handle it via className
+          isDragging={isBeingDragged}
+          dndAttributes={attributes}
+          dndListeners={listeners}
+          className={rowClassName}
+          onClick={() => onActivate(tab.id!)}
+          leadingIndicator={leadingIndicator}
+          actions={actions}
+          badges={badges}
+          data-tab-id={tab.id}
+          data-group-id={tab.groupId ?? -1}
+        >
+          <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
+        </TreeRow>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content>
@@ -684,38 +692,43 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
 {
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
 
+  // Render badge as the title component
+  const titleComponent = (
+    <span className={clsx("px-2 py-0.5 rounded-full font-medium truncate text-white dark:text-black", colorStyle.badge)}>
+      {group.title || 'Unnamed Group'}
+    </span>
+  );
+
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
-        <div
+        <TreeRow
           ref={ref}
-          data-group-header-id={group.id}
-          data-is-group-header="true"
-          {...attributes}
-          {...listeners}
+          depth={0}
+          title={titleComponent}
+          icon={<SquareStack size={16} className="text-gray-500" />}
+          hasChildren={true} // It's a group
+          isExpanded={isExpanded}
+          onToggle={(e) => { e.stopPropagation(); onToggle(); }}
+          onClick={onToggle}
+          isActive={false}
+          isDragging={isDragging}
+          dndAttributes={attributes}
+          dndListeners={listeners}
           className={clsx(
-            "group relative flex items-center py-1 px-2 rounded-t-lg cursor-pointer select-none outline-none",
-            isDragging && "opacity-50 pointer-events-none",
+            "rounded-t-lg", // Override default rounded-md
             showDropInto
               ? "bg-blue-100 dark:bg-blue-900/50"
               : clsx(colorStyle.bg, "hover:brightness-95 dark:hover:brightness-110")
           )}
-          style={{ paddingLeft: `${getIndentPadding(1)}px` }}
-          onClick={onToggle}
+          data-group-header-id={group.id}
+          data-is-group-header="true"
         >
-          {/* Drop-into ring indicator with fully rounded corners */}
           {showDropInto && (
             <div className="absolute inset-0 rounded-lg ring-2 ring-blue-500 pointer-events-none" />
           )}
           <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} afterIndentPx={afterDropIndentPx} />
-
-          <span className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
-            {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </span>
-          <span className={clsx("px-2 py-0.5 rounded-full font-medium truncate text-white dark:text-black", colorStyle.badge)}>
-            {group.title || 'Unnamed Group'}
-          </span>
-        </div>
+        </TreeRow>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content>
@@ -778,9 +791,9 @@ const DraggableGroupHeader = ({ group, tabCount, ...props }: DraggableGroupHeade
 const GroupDragOverlay = ({ group, tabCount }: { group: chrome.tabGroups.TabGroup; tabCount: number }) =>
 {
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
-  return (
-    <div className="flex items-center py-1 px-2 pointer-events-none">
-      <ChevronRight size={14} className="mr-1" />
+  
+  const titleComponent = (
+    <div className="flex items-center">
       <span className={clsx("px-2 py-0.5 rounded-full font-medium text-white dark:text-black", colorStyle.badge)}>
         {group.title || 'Unnamed Group'}
       </span>
@@ -789,26 +802,35 @@ const GroupDragOverlay = ({ group, tabCount }: { group: chrome.tabGroups.TabGrou
       </span>
     </div>
   );
+
+  return (
+    <TreeRow
+      depth={0}
+      title={titleComponent}
+      icon={<SquareStack size={16} className="text-gray-500" />}
+      hasChildren={true}
+      className="pointer-events-none"
+    />
+  );
 };
 
 // Drag overlay content - matches tab row layout with transparent background
 const TabDragOverlay = ({ tab }: { tab: chrome.tabs.Tab }) =>
 {
+  const icon = tab.favIconUrl ? (
+    <img src={tab.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />
+  ) : (
+    <Globe className="w-4 h-4 text-gray-400 flex-shrink-0" />
+  );
+
   return (
-    <div className="flex items-center py-1 px-2 pointer-events-none">
-      {/* Speaker placeholder - invisible to match layout */}
-      <span className="mr-1 invisible">
-        <Volume2 size={18} />
-      </span>
-      {tab.favIconUrl ? (
-        <img src={tab.favIconUrl} alt="" className="w-4 h-4 mr-2 flex-shrink-0" />
-      ) : (
-        <Globe className="w-4 h-4 mr-2 text-gray-400 flex-shrink-0" />
-      )}
-      <span className="truncate max-w-48 bg-blue-100 dark:bg-blue-900/50 px-1 rounded">
-        {tab.title}
-      </span>
-    </div>
+    <TreeRow
+      depth={0}
+      title={tab.title}
+      icon={icon}
+      hasChildren={false}
+      className="pointer-events-none bg-blue-100 dark:bg-blue-900/50 rounded"
+    />
   );
 };
 
@@ -843,7 +865,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   {
     return tabGroups.filter(g => g.title !== SIDEBAR_GROUP_NAME);
   }, [tabGroups]);
-  const [isExpanded, setIsExpanded] = useState(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Add to Group dialog state
@@ -1565,7 +1586,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
             if (dropPosition === 'before')
             {
               // Place before the group (as sibling, outside)
-              const targetIndex = groupTabs[0].index;
+              let targetIndex = groupTabs[0].index;
+              // Account for source removal when moving forward
+              if (sourceIndex < targetIndex)
+              {
+                targetIndex--;
+              }
               if (sourceGroupId !== -1)
               {
                 ungroupTab(activeId as number);
@@ -1714,46 +1740,59 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     });
   };
 
+  // Handler for the [...] menu button click
+  const handleMenuButtonClick = (e: React.MouseEvent<HTMLButtonElement>, openMenu: (x: number, y: number) => void) =>
+  {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    openMenu(rect.right, rect.bottom);
+  };
+
   return (
     <>
-      {/* Virtual Active Tabs Root */}
+      {/* + New Tab [...] Row */}
       <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>
-          <div
-            className="group relative flex items-center py-1 rounded cursor-pointer select-none outline-none hover:bg-gray-100 dark:hover:bg-gray-800 border-2 border-transparent"
-            style={{ paddingLeft: `${getIndentPadding(0)}px`, paddingRight: '8px' }}
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            <span className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
-              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </span>
-            <span className="mr-2 text-gray-500">
-              <Layers size={16} />
-            </span>
-            <span className="flex-1 font-medium">Active Tabs</span>
-          </div>
-        </ContextMenu.Trigger>
-        <ContextMenu.Portal>
-          <ContextMenu.Content>
-            <ContextMenu.Item onSelect={createTab}>
-              <Plus size={14} className="mr-2" /> New Tab
-            </ContextMenu.Item>
-            <ContextMenu.Separator />
-            <ContextMenu.Item onSelect={() => sortTabs('asc', visibleTabGroups, sortGroupsFirst)}>
-              <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
-            </ContextMenu.Item>
-            <ContextMenu.Item onSelect={() => sortTabs('desc', visibleTabGroups, sortGroupsFirst)}>
-              <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
-            </ContextMenu.Item>
-            <ContextMenu.Item danger onSelect={closeAllTabs}>
-              <Trash size={14} className="mr-2" /> Close All Tabs
-            </ContextMenu.Item>
-          </ContextMenu.Content>
-        </ContextMenu.Portal>
+        {({ open: openMenu }) => (
+          <>
+            <div
+              className="group relative flex items-center py-1 rounded select-none outline-none border-2 border-transparent"
+              style={{ paddingLeft: `${getIndentPadding(0)}px`, paddingRight: '8px' }}
+            >
+              <button
+                onClick={createTab}
+                className="flex items-center flex-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
+              >
+                <Plus size={14} className="mr-1" />
+                <span>New Tab</span>
+              </button>
+              <button
+                onClick={(e) => handleMenuButtonClick(e, openMenu)}
+                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+                title="Tab options"
+              >
+                <MoreHorizontal size={14} />
+              </button>
+            </div>
+            <ContextMenu.Portal>
+              <ContextMenu.Content>
+                <ContextMenu.Item onSelect={() => sortTabs('asc', visibleTabGroups, sortGroupsFirst)}>
+                  <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
+                </ContextMenu.Item>
+                <ContextMenu.Item onSelect={() => sortTabs('desc', visibleTabGroups, sortGroupsFirst)}>
+                  <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
+                </ContextMenu.Item>
+                <ContextMenu.Separator />
+                <ContextMenu.Item danger onSelect={closeAllTabs}>
+                  <Trash size={14} className="mr-2" /> Close All Tabs
+                </ContextMenu.Item>
+              </ContextMenu.Content>
+            </ContextMenu.Portal>
+          </>
+        )}
       </ContextMenu.Root>
 
-      {isExpanded && (
-        <DndContext
+      {/* Tabs list */}
+      <DndContext
           sensors={sensors}
           autoScroll={{
             threshold: { x: 0.1, y: 0.1 },
@@ -1780,7 +1819,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                 <DraggableTab
                   key={item.tab.id}
                   tab={item.tab}
-                  indentLevel={1}
+                  indentLevel={0}
                   isBeingDragged={activeId === item.tab.id}
                   showDropBefore={isTarget && dropPosition === 'before'}
                   showDropAfter={(isTarget && dropPosition === 'after') || showEndOfListIndicator}
@@ -1799,7 +1838,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
               const isTarget = dropTargetId === groupTargetId;
               // When dragging a group, never show 'into' indicator (groups can't nest)
               const showDropInto = !isDraggingGroup && isTarget && dropPosition === 'into';
-              // When dragging a group with 'after' position, show on last tab instead of header
+              // When dragging a group with 'after', show indicator on last tab instead of header
               const isGroupAfterTarget = isDraggingGroup && isTarget && dropPosition === 'after';
               return (
                 <div key={`group-${item.group.id}`}>
@@ -1812,7 +1851,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     showDropInto={showDropInto}
                     afterDropIndentPx={
                       isTarget && dropPosition === 'after' && isGroupExpanded && !isDraggingGroup
-                        ? getIndentPadding(2)
+                        ? getIndentPadding(1)
                         : undefined
                     }
                     onToggle={() => toggleGroup(item.group.id)}
@@ -1833,12 +1872,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     // Show end-of-list indicator on last tab of last group
                     const showEndOfListOnLastTab = isLastItem && isLastTab && isEndOfListTarget;
                     // Indent lines for tabs in group since drop stays within group
-                    const indentPx = isTabTarget ? getIndentPadding(2) : undefined;
+                    const indentPx = isTabTarget ? getIndentPadding(1) : undefined;
                     return (
                       <DraggableTab
                         key={tab.id}
                         tab={tab}
-                        indentLevel={2}
+                        indentLevel={1}
                         isBeingDragged={activeId === tab.id}
                         showDropBefore={isTabTarget && dropPosition === 'before'}
                         showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab || showEndOfListOnLastTab}
@@ -1864,7 +1903,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
             {activeGroup && <GroupDragOverlay group={activeGroup.group} tabCount={activeGroup.tabCount} />}
           </DragOverlay>
         </DndContext>
-      )}
 
       <AddToGroupDialog
         isOpen={addToGroupDialog.isOpen}

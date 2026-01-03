@@ -5,6 +5,7 @@ Project-specific instructions for coding agent
 ## Project Overview
 
 Chrome sidebar extension built with React, TypeScript, and Tailwind CSS.
+Read `READEME.md` for more details about the extension.
 
 ## Development Workflow
 

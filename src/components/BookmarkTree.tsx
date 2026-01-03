@@ -8,10 +8,9 @@ import { DropIndicators } from './DropIndicators';
 import { ExternalDropTarget } from './TabList';
 import { Dialog } from './Dialog';
 import * as ContextMenu from './ContextMenu';
+import { TreeRow } from './TreeRow';
 import { useInView } from '../hooks/useInView';
 import {
-  ChevronRight,
-  ChevronDown,
   Folder,
   Globe,
   Trash,
@@ -257,8 +256,6 @@ interface BookmarkRowProps {
   activeId?: string | null;
   dropTargetId?: string | null;
   dropPosition?: DropPosition;
-  onPointerEnter?: (id: string) => void;
-  onPointerLeave?: () => void;
   // Arc-like bookmark-tab behavior
   arcStyleBookmarks?: boolean;
   isLoaded?: boolean;
@@ -287,12 +284,10 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onCreateFolder,
   onSort,
   onPin,
-  isDragging,
+  isDragging: _isDragging,
   activeId,
   dropTargetId,
   dropPosition,
-  onPointerEnter,
-  onPointerLeave,
   arcStyleBookmarks = true,
   isLoaded,
   isAudible,
@@ -305,10 +300,6 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
 }, ref) => {
   const isFolder = !node.url;
   const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
-
-  const style: React.CSSProperties = {
-    paddingLeft: `${getIndentPadding(depth) + (isFolder ? 0 : 26)}px`,
-  };
 
   const isBeingDragged = activeId === node.id;
   const isDropTarget = dropTargetId === node.id;
@@ -325,119 +316,114 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     ? getIndentPadding(isFolder && expandedState[node.id] ? depth + 1 : depth)
     : undefined;
 
+  const handleRowClick = (e: React.MouseEvent) => {
+    if (isFolder) {
+      toggleFolder(node.id, !expandedState[node.id]);
+    } else if (node.url) {
+      if (e.shiftKey) {
+        // Shift+Click: open in new window
+        chrome.windows.create({ url: node.url });
+      } else if (e.metaKey || e.ctrlKey) {
+        // Cmd+Click: open as unmanaged new tab
+        chrome.tabs.create({ url: node.url });
+      } else if (arcStyleBookmarks && onOpenBookmark) {
+        // Arc-style: open as managed tab in SideBarForArc group
+        onOpenBookmark(node.id, node.url);
+      } else {
+        // Chrome-style: open in new active tab
+        chrome.tabs.create({ url: node.url, active: true });
+      }
+    }
+  };
+
+  const icon = isFolder ? (
+    <Folder size={16} className="text-gray-500" />
+  ) : node.url ? (
+    <img
+      src={getFaviconUrl(node.url)}
+      alt=""
+      className="w-4 h-4"
+      onError={(e) => {
+        e.currentTarget.style.display = 'none';
+        e.currentTarget.nextElementSibling?.classList.remove('hidden');
+      }}
+    />
+  ) : (
+    <Globe size={16} className="text-gray-500" />
+  );
+
+  // Hidden fallback globe
+  const fallbackIcon = !isFolder && node.url && (
+    <Globe size={16} className="hidden text-gray-500" />
+  );
+
+  const combinedIcon = (
+    <>
+      {icon}
+      {fallbackIcon}
+    </>
+  );
+
+  const actions = (
+    <div className="flex items-center gap-0.5">
+       {/* Pin button - only on hover */}
+       {!isFolder && onPin && node.url && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
+          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
+          title="Pin"
+        >
+          <Pin size={14} className="text-gray-700 dark:text-gray-200" />
+        </button>
+      )}
+      {/* Close button - always visible when tab is loaded (Arc-style only) */}
+      {!isFolder && arcStyleBookmarks && isLoaded && onCloseBookmark && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onCloseBookmark(node.id); }}
+          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900"
+          title="Close tab"
+        >
+          <X size={14} className="text-gray-700 dark:text-gray-200" />
+        </button>
+      )}
+    </div>
+  );
+
+  // Speaker indicator - at absolute left edge
+  const leadingIndicator = !isFolder && arcStyleBookmarks && isAudible
+    ? <Volume2 size={16} />
+    : undefined;
+
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
-        <div
+        <TreeRow
           ref={ref}
+          depth={depth}
+          title={node.title}
+          icon={combinedIcon}
+          hasChildren={isFolder}
+          isExpanded={expandedState[node.id]}
+          onToggle={() => toggleFolder(node.id, !expandedState[node.id])}
+          onClick={handleRowClick}
+          isActive={arcStyleBookmarks && isActive}
+          isDragging={isBeingDragged}
+          dndAttributes={attributes}
+          dndListeners={listeners}
           data-bookmark-id={node.id}
           data-is-folder={isFolder}
           data-depth={depth}
-          style={style}
           className={clsx(
-            "group relative flex items-center py-1 pr-2 rounded cursor-pointer select-none outline-none",
-            arcStyleBookmarks && isActive && !isBeingDragged && "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100",
-            !(arcStyleBookmarks && isActive) && !isDragging && "hover:bg-gray-100 dark:hover:bg-gray-800",
-            isBeingDragged && "opacity-50",
             showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
             !isSpecialFolder && "touch-none"
           )}
-          onPointerEnter={() => isDragging && onPointerEnter?.(node.id)}
-          onPointerLeave={() => isDragging && onPointerLeave?.()}
-          {...attributes}
-          {...listeners}
+          actions={actions}
+          leadingIndicator={leadingIndicator}
         >
           <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
-
-          {/* Speaker icon - fixed at left edge for non-folders (Arc-style only) */}
-          {!isFolder && arcStyleBookmarks && (
-            <span className={clsx("absolute left-2 top-1/2 -translate-y-1/2", !isAudible && "invisible")}>
-              <Volume2 size={18} />
-            </span>
-          )}
-
-          {isFolder && (
-            <span
-              className="mr-1 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-              onClick={(e) => { e.stopPropagation(); toggleFolder(node.id, !expandedState[node.id]); }}
-            >
-              {expandedState[node.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            </span>
-          )}
-
-          <span className="mr-2 text-gray-500 flex-shrink-0">
-            {isFolder ? (
-              <Folder size={16} />
-            ) : node.url ? (
-              <img
-                src={getFaviconUrl(node.url)}
-                alt=""
-                className="w-4 h-4"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                }}
-              />
-            ) : (
-              <Globe size={16} />
-            )}
-            {!isFolder && <Globe size={16} className="hidden" />}
-          </span>
-
-          <span
-            className="flex-1 truncate"
-            onClick={(e) => {
-              if (isFolder) {
-                toggleFolder(node.id, !expandedState[node.id]);
-              } else if (node.url) {
-                if (e.shiftKey) {
-                  // Shift+Click: open in new window
-                  chrome.windows.create({ url: node.url });
-                } else if (e.metaKey || e.ctrlKey) {
-                  // Cmd+Click: open as unmanaged new tab
-                  chrome.tabs.create({ url: node.url });
-                } else if (arcStyleBookmarks && onOpenBookmark) {
-                  // Arc-style: open as managed tab in SideBarForArc group
-                  onOpenBookmark(node.id, node.url);
-                } else {
-                  // Chrome-style: open in new active tab
-                  chrome.tabs.create({ url: node.url, active: true });
-                }
-              }
-            }}
-          >
-            {node.title}
-          </span>
-
-          {!isFolder && node.url && (
-            <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-900 rounded">
-              {/* Pin button - only on hover */}
-              {onPin && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100"
-                  title="Pin"
-                >
-                  <Pin size={14} />
-                </button>
-              )}
-              {/* Close button or spacer - maintains alignment (Arc-style only) */}
-              {arcStyleBookmarks && (
-                isLoaded && onCloseBookmark ? (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onCloseBookmark(node.id); }}
-                    className="p-0.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-gray-500 dark:text-gray-400"
-                    title="Close tab"
-                  >
-                    <X size={14} />
-                  </button>
-                ) : (
-                  <span className="p-0.5 w-[14px] h-[14px]" />
-                )
-              )}
-            </div>
-          )}
-        </div>
+        </TreeRow>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content>
@@ -559,32 +545,27 @@ interface DragOverlayContentProps {
 
 const DragOverlayContent = ({ node, depth }: DragOverlayContentProps) => {
   const isFolder = !node.url;
+  
+  const icon = isFolder ? (
+    <Folder size={16} className="text-gray-500" />
+  ) : node.url ? (
+    <img
+      src={getFaviconUrl(node.url)}
+      alt=""
+      className="w-4 h-4"
+    />
+  ) : (
+    <Globe size={16} className="text-gray-500" />
+  );
+
   return (
-    <div
-      className="flex items-center py-1 pr-2 pointer-events-none"
-      style={{ paddingLeft: `${getIndentPadding(depth)}px` }}
-    >
-      {/* Chevron placeholder - same spacing as BookmarkItem */}
-      <span className="mr-1 p-0.5 invisible">
-        <ChevronRight size={14} />
-      </span>
-      <span className="mr-2 text-gray-500 flex-shrink-0">
-        {isFolder ? (
-          <Folder size={16} />
-        ) : node.url ? (
-          <img
-            src={getFaviconUrl(node.url)}
-            alt=""
-            className="w-4 h-4"
-          />
-        ) : (
-          <Globe size={16} />
-        )}
-      </span>
-      <span className="truncate max-w-48 bg-blue-100 dark:bg-blue-900/50 px-1 rounded">
-        {node.title}
-      </span>
-    </div>
+    <TreeRow
+      depth={depth}
+      title={node.title}
+      icon={icon}
+      hasChildren={isFolder}
+      className="pointer-events-none"
+    />
   );
 };
 
@@ -803,15 +784,6 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setDropPosition(null);
   }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
-  // Pointer enter/leave handlers for tracking hover
-  const handlePointerEnter = useCallback((_id: string) => {
-    // Tracking is done in handleDragMove, but we keep this for potential future use
-  }, []);
-
-  const handlePointerLeave = useCallback(() => {
-    // Clear target when leaving
-  }, []);
-
   return (
     <>
       <DndContext
@@ -842,8 +814,6 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             activeId={activeId}
             dropTargetId={dropTargetId}
             dropPosition={dropPosition}
-            onPointerEnter={handlePointerEnter}
-            onPointerLeave={handlePointerLeave}
             arcStyleBookmarks={arcStyleBookmarks}
             isLoaded={isBookmarkLoaded(node.id)}
             isAudible={isBookmarkAudible(node.id)}

@@ -226,6 +226,7 @@ function App() {
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
         <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} arcStyleBookmarks={arcStyleBookmarks} />
+        <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
         <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} />
       </div>
       </div>

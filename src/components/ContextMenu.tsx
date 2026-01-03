@@ -39,9 +39,16 @@ const useContextMenuState = () =>
 };
 
 // --- Root ---
+interface RootRenderProps
+{
+  isOpen: boolean;
+  open: (x: number, y: number) => void;
+  close: () => void;
+}
+
 interface RootProps
 {
-  children: ReactNode;
+  children: ReactNode | ((props: RootRenderProps) => ReactNode);
 }
 
 export const Root = ({ children }: RootProps) =>
@@ -60,9 +67,11 @@ export const Root = ({ children }: RootProps) =>
     setIsOpen(false);
   }, []);
 
+  const renderProps: RootRenderProps = { isOpen, open, close };
+
   return (
     <ContextMenuContext.Provider value={{ isOpen, position, open, close }}>
-      {children}
+      {typeof children === 'function' ? children(renderProps) : children}
     </ContextMenuContext.Provider>
   );
 };
