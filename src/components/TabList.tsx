@@ -4,6 +4,7 @@ import { useTabGroups } from '../hooks/useTabGroups';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
+import { SIDEBAR_TAB_GROUP_NAME } from '../constants';
 
 // External drop target type for tab → bookmark drops
 export interface ExternalDropTarget
@@ -845,7 +846,7 @@ interface TabListProps {
   onExternalDropTargetChange?: (target: ExternalDropTarget | null) => void;
 }
 
-const SIDEBAR_GROUP_NAME = 'SideBarForArc';
+const SIDEBAR_GROUP_NAME = SIDEBAR_TAB_GROUP_NAME;
 
 export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange }: TabListProps) =>
 {

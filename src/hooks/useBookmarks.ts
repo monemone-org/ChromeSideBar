@@ -321,7 +321,7 @@ export const useBookmarks = () => {
       for (const item of items)
       {
         console.log('Creating bookmark:', item);
-        const result = await createBookmark(parentId, item.title, item.url);
+        await createBookmark(parentId, item.title, item.url);
       }
     }
     finally

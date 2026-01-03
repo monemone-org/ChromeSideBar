@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { SIDEBAR_TAB_GROUP_NAME } from '../constants';
 
-const TAB_GROUP_NAME = 'SideBarForArc';
+const TAB_GROUP_NAME = SIDEBAR_TAB_GROUP_NAME;
 const STORAGE_KEY = 'tabAssociations';
 
 // Helper to create item keys
