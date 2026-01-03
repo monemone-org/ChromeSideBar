@@ -1740,10 +1740,30 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     });
   };
 
+  // Track if menu was just closed to prevent immediate reopen
+  const menuJustClosedRef = useRef(false);
+
+  // Handler for the [...] menu button mousedown - detect if menu is open before it closes
+  const handleMenuButtonMouseDown = (_e: React.MouseEvent<HTMLButtonElement>, isOpen: boolean) =>
+  {
+    // Don't stop propagation - let the outside click handler close the menu.
+    // Just record that the menu was open so the click handler knows not to reopen.
+    if (isOpen)
+    {
+      menuJustClosedRef.current = true;
+    }
+  };
+
   // Handler for the [...] menu button click
   const handleMenuButtonClick = (e: React.MouseEvent<HTMLButtonElement>, openMenu: (x: number, y: number) => void) =>
   {
     e.stopPropagation();
+    // If menu was just closed by mousedown, don't reopen
+    if (menuJustClosedRef.current)
+    {
+      menuJustClosedRef.current = false;
+      return;
+    }
     const rect = e.currentTarget.getBoundingClientRect();
     openMenu(rect.right, rect.bottom);
   };
@@ -1752,7 +1772,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     <>
       {/* + New Tab [...] Row */}
       <ContextMenu.Root>
-        {({ open: openMenu }) => (
+        {({ open: openMenu, isOpen: isMenuOpen }) => (
           <>
             <div
               className="group relative flex items-center py-1 rounded select-none outline-none border-2 border-transparent"
@@ -1766,6 +1786,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                 <span>New Tab</span>
               </button>
               <button
+                onMouseDown={(e) => handleMenuButtonMouseDown(e, isMenuOpen)}
                 onClick={(e) => handleMenuButtonClick(e, openMenu)}
                 className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
                 title="Tab options"
