@@ -544,7 +544,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
 
   // Computed class for coloring
   const rowClassName = clsx(
-    isLastInGroup ? "rounded-b-lg" : "rounded-none",
+    isLastInGroup ? "rounded-b-lg rounded-t-none" : "rounded-none",
     tab.active
       ? groupColor
         ? clsx(GROUP_COLORS[groupColor]?.bgStrong, "text-gray-900 dark:text-gray-100")
@@ -716,7 +716,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           dndAttributes={attributes}
           dndListeners={listeners}
           className={clsx(
-            "rounded-t-lg", // Override default rounded-md
+            "rounded-t-lg rounded-b-none", // Override default rounded-md
             showDropInto
               ? "bg-blue-100 dark:bg-blue-900/50"
               : clsx(colorStyle.bg, "hover:brightness-95 dark:hover:brightness-110")
