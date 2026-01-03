@@ -1090,6 +1090,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     });
   }, [visibleTabGroups]);
 
+  // Ref for end-of-list drop zone detection
+  const endOfListRef = useRef<HTMLDivElement>(null);
+
   // Auto-scroll to active tab when it changes
   const prevActiveTabIdRef = useRef<number | null>(null);
   useEffect(() =>
@@ -1348,35 +1351,16 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       }
     }
 
-    // Check if pointer is below all tabs (end-of-list drop zone)
-    const allTabElements = document.querySelectorAll('[data-tab-id]');
-    const allGroupHeaders = document.querySelectorAll('[data-group-header-id]');
-
-    if (allTabElements.length > 0 || allGroupHeaders.length > 0)
+    // Check if pointer is in end-of-list drop zone (using sentinel element)
+    const endOfListRect = endOfListRef.current?.getBoundingClientRect();
+    if (endOfListRect && currentY >= endOfListRect.top)
     {
-      // Get the bottom-most element
-      let maxBottom = 0;
-      allTabElements.forEach(el =>
-      {
-        const rect = el.getBoundingClientRect();
-        maxBottom = Math.max(maxBottom, rect.bottom);
-      });
-      allGroupHeaders.forEach(el =>
-      {
-        const rect = el.getBoundingClientRect();
-        maxBottom = Math.max(maxBottom, rect.bottom);
-      });
-
-      // If pointer is below all elements, it's end-of-list
-      if (currentY > maxBottom)
-      {
-        setDropTargetId('end-of-list');
-        setDropPosition('after');
-        clearAutoExpandTimer();
-        setLocalExternalTarget(null);
-        onExternalDropTargetChange?.(null);
-        return;
-      }
+      setDropTargetId('end-of-list');
+      setDropPosition('after');
+      clearAutoExpandTimer();
+      setLocalExternalTarget(null);
+      onExternalDropTargetChange?.(null);
+      return;
     }
 
     // No valid target
@@ -1911,7 +1895,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           })}
 
           {/* Empty row at end for end-of-list drop zone */}
-          <div className="relative h-4">
+          <div ref={endOfListRef} className="relative h-4">
             {dropTargetId === 'end-of-list' && (
               <div
                 className="absolute left-0 right-0 top-0 h-0.5 bg-blue-500 z-20"
