@@ -6,6 +6,7 @@ import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
 import { ExternalDropTarget } from './TabList';
+import { BookmarkOpenMode } from './SettingsDialog';
 import { Dialog } from './Dialog';
 import * as ContextMenu from './ContextMenu';
 import { TreeRow } from './TreeRow';
@@ -256,8 +257,8 @@ interface BookmarkRowProps {
   activeId?: string | null;
   dropTargetId?: string | null;
   dropPosition?: DropPosition;
-  // Arc-like bookmark-tab behavior
-  arcStyleBookmarks?: boolean;
+  // Bookmark opening behavior
+  bookmarkOpenMode?: BookmarkOpenMode;
   isLoaded?: boolean;
   isAudible?: boolean;
   isActive?: boolean;
@@ -288,7 +289,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   activeId,
   dropTargetId,
   dropPosition,
-  arcStyleBookmarks = true,
+  bookmarkOpenMode = 'arc',
   isLoaded,
   isAudible,
   isActive,
@@ -330,11 +331,14 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             chrome.tabs.ungroup(tab.id);
           }
         });
-      } else if (arcStyleBookmarks && onOpenBookmark) {
+      } else if (bookmarkOpenMode === 'arc' && onOpenBookmark) {
         // Arc-style: open as managed tab in SideBarForArc group
         onOpenBookmark(node.id, node.url);
+      } else if (bookmarkOpenMode === 'activeTab') {
+        // Replace current tab with bookmark
+        chrome.tabs.update({ url: node.url });
       } else {
-        // Chrome-style: open in new active tab
+        // newTab: open in new active tab
         chrome.tabs.create({ url: node.url, active: true });
       }
     }
@@ -383,7 +387,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
         </button>
       )}
       {/* Close button - always visible when tab is loaded (Arc-style only) */}
-      {!isFolder && arcStyleBookmarks && isLoaded && onCloseBookmark && (
+      {!isFolder && bookmarkOpenMode === 'arc' && isLoaded && onCloseBookmark && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onCloseBookmark(node.id); }}
@@ -397,8 +401,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     </div>
   );
 
-  // Speaker indicator - at absolute left edge
-  const leadingIndicator = !isFolder && arcStyleBookmarks && isAudible
+  // Speaker indicator - at absolute left edge (Arc-style only)
+  const leadingIndicator = !isFolder && bookmarkOpenMode === 'arc' && isAudible
     ? <Volume2 size={16} />
     : undefined;
 
@@ -414,7 +418,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           isExpanded={expandedState[node.id]}
           onToggle={() => toggleFolder(node.id, !expandedState[node.id])}
           onClick={handleRowClick}
-          isActive={arcStyleBookmarks && isActive}
+          isActive={bookmarkOpenMode === 'arc' && isActive}
           isDragging={isBeingDragged}
           dndAttributes={attributes}
           dndListeners={listeners}
@@ -579,10 +583,10 @@ interface BookmarkTreeProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   hideOtherBookmarks?: boolean;
   externalDropTarget?: ExternalDropTarget | null;
-  arcStyleBookmarks?: boolean;
+  bookmarkOpenMode?: BookmarkOpenMode;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, arcStyleBookmarks = true }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc' }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
 
@@ -820,7 +824,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             activeId={activeId}
             dropTargetId={dropTargetId}
             dropPosition={dropPosition}
-            arcStyleBookmarks={arcStyleBookmarks}
+            bookmarkOpenMode={bookmarkOpenMode}
             isLoaded={isBookmarkLoaded(node.id)}
             isAudible={isBookmarkAudible(node.id)}
             isActive={isBookmarkActive(node.id)}

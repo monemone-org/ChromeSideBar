@@ -60,7 +60,10 @@ Import/Export
 
 Settings
 - Font size and icon size
-- Choose how bookmarks open
+- Choose how bookmarks open:
+  - Arc style: Persistent tabs in a group (like Arc browser)
+  - In new tab: Opens in a new background tab
+  - In active tab: Replaces the current tab
 
 Others
 - Toggle sidebar: Cmd+Shift+E (Mac) / Ctrl+Shift+E (Windows)

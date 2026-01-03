@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { BookmarkTree } from './components/BookmarkTree';
 import { TabList, ExternalDropTarget } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
-import { SettingsDialog, SettingsValues } from './components/SettingsDialog';
+import { SettingsDialog, SettingsValues, BookmarkOpenMode } from './components/SettingsDialog';
 import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
@@ -34,10 +34,18 @@ function App() {
     22,
     { parse: (v) => parseInt(v, 10), serialize: (v) => v.toString() }
   );
-  const [arcStyleBookmarks, setArcStyleBookmarks] = useLocalStorage(
-    'sidebar-arc-style-bookmarks',
-    true,
-    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  const [bookmarkOpenMode, setBookmarkOpenMode] = useLocalStorage<BookmarkOpenMode>(
+    'sidebar-bookmark-open-mode',
+    'arc',
+    {
+      parse: (v) => {
+        // Migration from old boolean setting
+        if (v === 'true') return 'arc';
+        if (v === 'false') return 'newTab';
+        return v as BookmarkOpenMode;
+      },
+      serialize: (v) => v
+    }
   );
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -60,8 +68,8 @@ function App() {
   const { bookmarks } = useBookmarks();
 
   const handleApplySettings = (newSettings: SettingsValues) => {
-    // If switching from Arc-style to traditional, ungroup managed tabs
-    if (arcStyleBookmarks && !newSettings.arcStyleBookmarks) {
+    // If switching from Arc-style to other mode, ungroup managed tabs
+    if (bookmarkOpenMode === 'arc' && newSettings.bookmarkOpenMode !== 'arc') {
       chrome.windows.getCurrent((window) => {
         chrome.tabGroups.query({ windowId: window.id, title: SIDEBAR_TAB_GROUP_NAME }, (groups) => {
           if (groups.length > 0) {
@@ -81,7 +89,7 @@ function App() {
     setHideOtherBookmarks(newSettings.hideOtherBookmarks);
     setSortGroupsFirst(newSettings.sortGroupsFirst);
     setPinnedIconSize(newSettings.pinnedIconSize);
-    setArcStyleBookmarks(newSettings.arcStyleBookmarks);
+    setBookmarkOpenMode(newSettings.bookmarkOpenMode);
     setShowSettings(false);
   };
 
@@ -135,7 +143,7 @@ function App() {
           hideOtherBookmarks,
           sortGroupsFirst,
           pinnedIconSize,
-          arcStyleBookmarks,
+          bookmarkOpenMode,
         }}
         onApply={handleApplySettings}
       />
@@ -167,7 +175,7 @@ function App() {
         resetFavicon={resetFavicon}
         movePin={movePin}
         iconSize={pinnedIconSize}
-        arcStyleBookmarks={arcStyleBookmarks}
+        bookmarkOpenMode={bookmarkOpenMode}
       />
 
       {/* Settings button with popup menu - bottom-left corner of panel */}
@@ -241,7 +249,7 @@ function App() {
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} arcStyleBookmarks={arcStyleBookmarks} />
+        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} bookmarkOpenMode={bookmarkOpenMode} />
         <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
         <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} />
       </div>

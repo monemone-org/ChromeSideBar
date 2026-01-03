@@ -15,6 +15,7 @@ import {
 import { PinnedIcon } from './PinnedIcon';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
+import { BookmarkOpenMode } from './SettingsDialog';
 
 interface PinnedBarProps {
   pinnedSites: PinnedSite[];
@@ -28,7 +29,7 @@ interface PinnedBarProps {
   resetFavicon: (id: string) => void;
   movePin: (activeId: string, overId: string) => void;
   iconSize: number;
-  arcStyleBookmarks?: boolean;
+  bookmarkOpenMode?: BookmarkOpenMode;
 }
 
 export const PinnedBar = ({
@@ -38,7 +39,7 @@ export const PinnedBar = ({
   resetFavicon,
   movePin,
   iconSize,
-  arcStyleBookmarks = true,
+  bookmarkOpenMode = 'arc',
 }: PinnedBarProps) => {
   const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible } = useBookmarkTabsContext();
   const sensors = useSensors(
@@ -82,14 +83,17 @@ export const PinnedBar = ({
               onRemove={removePin}
               onUpdate={updatePin}
               onResetFavicon={resetFavicon}
-              onOpen={arcStyleBookmarks
-                ? (s) => openPinnedTab(s.id, s.url)
-                : (s) => chrome.tabs.create({ url: s.url, active: true })
+              onOpen={
+                bookmarkOpenMode === 'arc'
+                  ? (s) => openPinnedTab(s.id, s.url)
+                  : bookmarkOpenMode === 'activeTab'
+                    ? (s) => chrome.tabs.update({ url: s.url })
+                    : (s) => chrome.tabs.create({ url: s.url, active: true })
               }
-              onClose={arcStyleBookmarks ? closePinnedTab : undefined}
-              isLoaded={arcStyleBookmarks ? isPinnedLoaded(site.id) : false}
-              isActive={arcStyleBookmarks ? isPinnedActive(site.id) : false}
-              isAudible={arcStyleBookmarks ? isPinnedAudible(site.id) : false}
+              onClose={bookmarkOpenMode === 'arc' ? closePinnedTab : undefined}
+              isLoaded={bookmarkOpenMode === 'arc' ? isPinnedLoaded(site.id) : false}
+              isActive={bookmarkOpenMode === 'arc' ? isPinnedActive(site.id) : false}
+              isAudible={bookmarkOpenMode === 'arc' ? isPinnedAudible(site.id) : false}
               iconSize={iconSize}
             />
           ))}

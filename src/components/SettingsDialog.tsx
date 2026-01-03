@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 
+export type BookmarkOpenMode = 'arc' | 'newTab' | 'activeTab';
+
 export interface SettingsValues {
   fontSize: number;
   hideOtherBookmarks: boolean;
   sortGroupsFirst: boolean;
   pinnedIconSize: number;
-  arcStyleBookmarks: boolean;
+  bookmarkOpenMode: BookmarkOpenMode;
 }
 
 interface SettingsDialogProps {
@@ -27,7 +29,7 @@ export function SettingsDialog({
   const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(settings.hideOtherBookmarks);
   const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(settings.sortGroupsFirst);
   const [tempPinnedIconSize, setTempPinnedIconSize] = useState(settings.pinnedIconSize);
-  const [tempArcStyleBookmarks, setTempArcStyleBookmarks] = useState(settings.arcStyleBookmarks);
+  const [tempBookmarkOpenMode, setTempBookmarkOpenMode] = useState(settings.bookmarkOpenMode);
 
   // Sync temp state when dialog opens
   useEffect(() => {
@@ -36,7 +38,7 @@ export function SettingsDialog({
       setTempHideOtherBookmarks(settings.hideOtherBookmarks);
       setTempSortGroupsFirst(settings.sortGroupsFirst);
       setTempPinnedIconSize(settings.pinnedIconSize);
-      setTempArcStyleBookmarks(settings.arcStyleBookmarks);
+      setTempBookmarkOpenMode(settings.bookmarkOpenMode);
     }
   }, [isOpen, settings]);
 
@@ -58,7 +60,7 @@ export function SettingsDialog({
       hideOtherBookmarks: tempHideOtherBookmarks,
       sortGroupsFirst: tempSortGroupsFirst,
       pinnedIconSize: tempPinnedIconSize,
-      arcStyleBookmarks: tempArcStyleBookmarks,
+      bookmarkOpenMode: tempBookmarkOpenMode,
     });
   };
 
@@ -136,17 +138,22 @@ export function SettingsDialog({
             </label>
             <div className="space-y-2">
               <div>
-                <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tempArcStyleBookmarks}
-                    onChange={(e) => setTempArcStyleBookmarks(e.target.checked)}
-                    className="rounded border-gray-300 dark:border-gray-600"
-                  />
-                  Arc style bookmarks
+                <label className="block text-gray-700 dark:text-gray-300 mb-1">
+                  Open bookmark
                 </label>
-                <p className="ml-5 text-gray-500 dark:text-gray-400">
-                  Bookmarks act as persistent tabs similar to Arc browser
+                <select
+                  value={tempBookmarkOpenMode}
+                  onChange={(e) => setTempBookmarkOpenMode(e.target.value as BookmarkOpenMode)}
+                  className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="arc">Arc style</option>
+                  <option value="newTab">In new tab</option>
+                  <option value="activeTab">In active tab</option>
+                </select>
+                <p className="mt-1 text-gray-500 dark:text-gray-400">
+                  {tempBookmarkOpenMode === 'arc' && 'Bookmarks act as persistent tabs in a group'}
+                  {tempBookmarkOpenMode === 'newTab' && 'Opens bookmark in a new background tab'}
+                  {tempBookmarkOpenMode === 'activeTab' && 'Replaces the current tab with the bookmark'}
                 </p>
               </div>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
