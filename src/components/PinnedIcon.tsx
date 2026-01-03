@@ -207,8 +207,12 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, o
       // Shift+click: open in new window
       chrome.windows.create({ url: site.url });
     } else if (e.metaKey || e.ctrlKey) {
-      // Cmd+click (Mac) or Ctrl+click (Windows/Linux): open in new tab
-      chrome.tabs.create({ url: site.url });
+      // Cmd+click (Mac) or Ctrl+click (Windows/Linux): open in new tab (ungrouped)
+      chrome.tabs.create({ url: site.url }, (tab) => {
+        if (tab?.id) {
+          chrome.tabs.ungroup(tab.id);
+        }
+      });
     } else {
       // Normal click: open as new pinned tab
       onOpen(site);

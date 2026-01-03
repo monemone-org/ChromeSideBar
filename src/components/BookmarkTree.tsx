@@ -324,8 +324,12 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
         // Shift+Click: open in new window
         chrome.windows.create({ url: node.url });
       } else if (e.metaKey || e.ctrlKey) {
-        // Cmd+Click: open as unmanaged new tab
-        chrome.tabs.create({ url: node.url });
+        // Cmd+Click: open as unmanaged new tab (ungrouped)
+        chrome.tabs.create({ url: node.url }, (tab) => {
+          if (tab?.id) {
+            chrome.tabs.ungroup(tab.id);
+          }
+        });
       } else if (arcStyleBookmarks && onOpenBookmark) {
         // Arc-style: open as managed tab in SideBarForArc group
         onOpenBookmark(node.id, node.url);
