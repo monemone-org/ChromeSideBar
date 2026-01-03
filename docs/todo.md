@@ -57,3 +57,8 @@ bugs:
       **Suggested fix:** Add validation `typeof newGroupId !== 'number'` before calling `chrome.tabGroups.update` in both the error recovery path (line ~379) and normal create path (line ~443).
       **Status:** Cannot reproduce consistently. May be a transient race condition.
 
+
+- [x] inefficent batch operation 
+   - delete group causes fetchTabs to be called many times (148)
+
+- [ ] when switch from arc style bookmark to traditional style, move all tabs under SideBarForArc group to ungrouped
