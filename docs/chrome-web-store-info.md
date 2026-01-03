@@ -1,69 +1,74 @@
-
-
 ## Changes since version 1.0.52
 
-v1.0.94 New Features
-- Arc Style Bookmarks: Optional mode where bookmarks act as persistent tabs like Arc browser
-- Tab Group Drag-Drop: Reorder tab groups, move tabs between groups
-- Export Tab Group: Save a tab group as a bookmark folder
-- Drag Tabs to Bookmarks: Create bookmarks by dragging tabs to bookmark folders
-- Full Import/Export: Backup and restore pinned sites, bookmarks, and tabs/groups as JSON
-- Duplicate Tab: Right-click any tab to duplicate it
+Version 1.0.94 
 
-  
+New Features
+- Arc Style Bookmarks: Bookmarks act as persistent tabs, just like Arc
+- Tab Group Drag-Drop: Reorder groups, move tabs between groups
+- Export Tab Group: Save a group as a bookmark folder
+- Drag Tabs to Bookmarks: Drop tabs into bookmark folders to create bookmarks
+- Full Import/Export: Backup everything as JSON
+- Duplicate Tab: Right-click to duplicate tabs
+
+
 ## Description
 
 Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
 
-Brings Arc Browser's sidebar experience to Chrome. Displays pinned sites, bookmarks, and active tabs in a vertical side panel.
+I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, bookmarks, and tabs all in one vertical list. So I built this extension to bring that experience to Chrome.
 
 FEATURES
 
-Pinned Sites (Arc-style Favorites)
-• Icon bar at top of panel for frequently used sites
-• Custom icons and colors
-• Drag-and-drop to reorder
-• Pinned from bookmarks or tabs 
-• Cmd/Ctrl+Click to open in new tab
-• Shift+Click to open in new window
+Pinned Sites
+- Quick-access icon bar at the top
+- Pin your favorite sites from bookmarks or tabs
+- Customize with icons and colors
+- Drag to reorder
+- Cmd/Ctrl+Click to open in new tab
+- Shift+Click to open in new window
 
 Bookmarks
-• Tree view with drag-and-drop organization
-• Sort by name or date
-• Drag tabs to bookmark folder to create bookmarks
-• Cmd/Ctrl+Click to open in new tab
-• Shift+Click to open in new window
+- Tree view with bookmark folders
+- Drag-and-drop to organize bookmarks and folders
+- Sort by name or date
+- Drag tabs into folders to create bookmarks
+- Cmd/Ctrl+Click to open in new tab
+- Shift+Click to open in new window
 
 Active Tabs
-• All tabs in current window with drag-and-drop reordering
-• Sort by domain, duplicate tab, audio indicator
+- All tabs from current window
+- Drag to reorder tabs
+- Drag to add tabs to tab groups
+- Sort by domain in ascending or descending order.
+- Audio indicator for tabs playing sound
 
 Tab Groups
-• Full Chrome tab group support
-• Drag tabs between groups
-• Reorder groups, rename and change colors
-• export group to bookmarks as a folder
+- Works with Chrome's tab groups
+- Drag tabs between groups or ungroup
+- Drag to Reorder group 
+- Rename groups and change group color
+- Export a group as a bookmark folder
 
-Arc Style Bookmarks (Optional)
-• Bookmarks/Pinned sites act as persistent tabs like Arc browser
-• Close tab without deleting bookmark
+Arc Style Bookmarks Persistent Tabs (Optional)
+- Bookmarks/Pinned sites become persistent tabs, just like Arc
+- Click to open, click again to switch to it
+- Close the tab without losing the bookmark
 
 Import/Export
-• Backup pinned sites, bookmarks, and tabs/groups as JSON file
-• Selective import with append or replace options
+- Back up pinned sites, bookmarks, and tab groups as JSON
+- Import with append or replace options
 
 Settings
-• Font size and pinned icon size
-• Loading mode options: Arc style bookmarks, In new tab or in active tab.
-
-Permissions
-• sidePanel, bookmarks, tabs, tabGroups: Core functionality
-• storage: Save pinned sites and settings locally
-• favicon: Display website icons
+- Font size and icon size
+- Choose how bookmarks open
 
 Others
-• Keyboard Shortcuts to toggle sidebar: Cmd+Shift+E (Mac) / Ctrl+Shift+E (Windows/Linux)
-• Support Dark/light mode (follows system)
+- Toggle sidebar: Cmd+Shift+E (Mac) / Ctrl+Shift+E (Windows)
+- Dark mode follows system
 
-Open Source
-Source code available on GitHub (https://github.com/monemone-org/ChromeSideBar).
+Permissions
+- sidePanel, bookmarks, tabs, tabGroups: Core features
+- storage: Save your settings locally
+- favicon: Show website icons
+
+Open source on GitHub: https://github.com/monemone-org/ChromeSideBar

@@ -62,3 +62,13 @@ bugs:
    - delete group causes fetchTabs to be called many times (148)
 
 - [ ] when switch from arc style bookmark to traditional style, move all tabs under SideBarForArc group to ungrouped
+
+- [ ] drag group to bookmark folder to create bookmark subfolder
+
+- [ ] multiple selection : drag/drop, copy/paste and delete
+
+- [ ] settings: 
+      Behaviour:
+         Open bookmark:  Arc style | In new tab | In active tab
+             [ explaination of the selected open bookmark style ] 
+                         
