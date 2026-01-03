@@ -9,6 +9,9 @@ const compareDomainTitle = (a: chrome.tabs.Tab, b: chrome.tabs.Tab): number =>
   return (a.title || '').localeCompare(b.title || '');
 };
 
+// Module-level flag shared across all hook instances
+let isBatchOperation = false;
+
 export const useTabs = () => {
   const [tabs, setTabs] = useState<chrome.tabs.Tab[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +28,7 @@ export const useTabs = () => {
   }, []);
 
   const fetchTabs = useCallback(() => {
+    console.log('fetchTabs started');
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.query({ currentWindow: true }, (result) => {
         if (!handleError('fetch')) {
@@ -47,12 +51,21 @@ export const useTabs = () => {
       chrome.tabs?.onActivated,
     ];
 
-    const handleUpdate = () => fetchTabs();
+    // Debounce to coalesce rapid events (e.g., tab creation fires multiple events)
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleUpdate = () => {
+      if (isBatchOperation) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchTabs();
+      }, 50);
+    };
 
     listeners.forEach((listener: any) => listener?.addListener(handleUpdate));
 
     return () => {
       listeners.forEach((listener: any) => listener?.removeListener(handleUpdate));
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [fetchTabs]);
 
@@ -61,6 +74,17 @@ export const useTabs = () => {
       handleError('close');
     });
   }, [handleError]);
+
+  // Close multiple tabs with batch mode to suppress individual onRemoved events
+  const closeTabs = useCallback((tabIds: number[]) => {
+    if (tabIds.length === 0) return;
+    isBatchOperation = true;
+    chrome.tabs.remove(tabIds, () => {
+      handleError('close tabs');
+      isBatchOperation = false;
+      fetchTabs();
+    });
+  }, [handleError, fetchTabs]);
 
   const activateTab = useCallback((tabId: number) => {
     chrome.tabs.update(tabId, { active: true }, () => {
@@ -74,9 +98,9 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
-  const sortTabs = useCallback((direction: 'asc' | 'desc' = 'asc',
-                               tabGroups: chrome.tabGroups.TabGroup[] = [],
-                               groupsFirst: boolean = true) =>
+  const sortTabs = useCallback(async (direction: 'asc' | 'desc' = 'asc',
+                                      tabGroups: chrome.tabGroups.TabGroup[] = [],
+                                      groupsFirst: boolean = true) =>
   {
     // Build group info map (id -> {title, color})
     const groupInfoMap = new Map<number, { title: string; color: chrome.tabGroups.ColorEnum }>();
@@ -137,47 +161,87 @@ export const useTabs = () => {
     // Get all grouped tab IDs
     const allGroupedTabIds = groupOrder.flatMap(gid => tabsByGroup.get(gid)!);
 
-    if (allGroupedTabIds.length > 0)
+    // Batch mode: suppress listener-triggered refetches during sort operations
+    isBatchOperation = true;
+    try
     {
-      // Step 1: Ungroup all grouped tabs first
-      chrome.tabs.ungroup(allGroupedTabIds, () =>
+      if (allGroupedTabIds.length > 0)
       {
-        if (handleError('ungroup for sort')) return;
-
-        // Step 2: Move tabs to sorted positions
-        sorted.forEach((tab, index) =>
+        // Step 1: Ungroup all grouped tabs first
+        await new Promise<void>((resolve) =>
         {
-          chrome.tabs.move(tab.id!, { index }, () => handleError('sort'));
+          chrome.tabs.ungroup(allGroupedTabIds, () =>
+          {
+            handleError('ungroup for sort');
+            resolve();
+          });
         });
 
+        // Step 2: Move tabs to sorted positions
+        for (const [index, tab] of sorted.entries())
+        {
+          await new Promise<void>((resolve) =>
+          {
+            chrome.tabs.move(tab.id!, { index }, () =>
+            {
+              handleError('sort');
+              resolve();
+            });
+          });
+        }
+
         // Step 3: Recreate groups and re-group tabs (in encounter order)
-        groupOrder.forEach((origGroupId) =>
+        for (const origGroupId of groupOrder)
         {
           const tabIds = tabsByGroup.get(origGroupId)!;
           const info = groupInfoMap.get(origGroupId);
-          chrome.tabs.group({ tabIds }, (newGroupId) =>
+          await new Promise<void>((resolve) =>
           {
-            if (handleError('regroup')) return;
-            if (info)
+            chrome.tabs.group({ tabIds }, (newGroupId) =>
             {
-              chrome.tabGroups.update(newGroupId, { title: info.title, color: info.color }, () =>
+              if (handleError('regroup'))
               {
-                handleError('update group');
-              });
-            }
+                resolve();
+                return;
+              }
+              if (info)
+              {
+                chrome.tabGroups.update(newGroupId, { title: info.title, color: info.color }, () =>
+                {
+                  handleError('update group');
+                  resolve();
+                });
+              }
+              else
+              {
+                resolve();
+              }
+            });
           });
-        });
-      });
-    }
-    else
-    {
-      // No grouped tabs, just move
-      sorted.forEach((tab, index) =>
+        }
+      }
+      else
       {
-        chrome.tabs.move(tab.id!, { index }, () => handleError('sort'));
-      });
+        // No grouped tabs, just move
+        for (const [index, tab] of sorted.entries())
+        {
+          await new Promise<void>((resolve) =>
+          {
+            chrome.tabs.move(tab.id!, { index }, () =>
+            {
+              handleError('sort');
+              resolve();
+            });
+          });
+        }
+      }
     }
-  }, [tabs, handleError]);
+    finally
+    {
+      isBatchOperation = false;
+      fetchTabs();
+    }
+  }, [tabs, handleError, fetchTabs]);
 
   const closeAllTabs = useCallback(() => {
     const tabIds = tabs.map(t => t.id!);
@@ -258,7 +322,7 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
-  const sortGroupTabs = useCallback((groupId: number, direction: 'asc' | 'desc' = 'asc') =>
+  const sortGroupTabs = useCallback(async (groupId: number, direction: 'asc' | 'desc' = 'asc') =>
   {
     // Get tabs in this group
     const groupTabs = tabs.filter(t => t.groupId === groupId);
@@ -274,16 +338,34 @@ export const useTabs = () => {
       return direction === 'asc' ? cmp : -cmp;
     });
 
-    // Move each tab to its new position within the group
-    sorted.forEach((tab, i) =>
+    // Batch mode: suppress listener-triggered refetches during moves
+    isBatchOperation = true;
+    try
     {
-      chrome.tabs.move(tab.id!, { index: startIndex + i }, () => handleError('sort group'));
-    });
-  }, [tabs, handleError]);
+      // Move each tab to its new position within the group
+      for (const [i, tab] of sorted.entries())
+      {
+        await new Promise<void>((resolve) =>
+        {
+          chrome.tabs.move(tab.id!, { index: startIndex + i }, () =>
+          {
+            handleError('sort group');
+            resolve();
+          });
+        });
+      }
+    }
+    finally
+    {
+      isBatchOperation = false;
+      fetchTabs();
+    }
+  }, [tabs, handleError, fetchTabs]);
 
   return {
     tabs,
     closeTab,
+    closeTabs,
     activateTab,
     moveTab,
     groupTab,

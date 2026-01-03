@@ -849,7 +849,7 @@ const SIDEBAR_GROUP_NAME = 'SideBarForArc';
 
 export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange }: TabListProps) =>
 {
-  const { tabs, closeTab, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
+  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { groupId: sidebarGroupId } = useBookmarkTabsContext();
 
@@ -917,7 +917,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   }, []);
 
   // Bookmarks functions for export and tab-to-bookmark drops
-  const { findFolderInParent, createFolder, createBookmark, getBookmark, getChildren, clearFolder } = useBookmarks();
+  const { findFolderInParent, createFolder, createBookmark, createBookmarksBatch, getBookmark, getChildren, clearFolder } = useBookmarks();
   const OTHER_BOOKMARKS_ID = '2';
 
   const [exportConflictDialog, setExportConflictDialog] = useState<{
@@ -951,20 +951,19 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     );
   }, []);
 
-  // Create bookmarks in a folder
+  // Create bookmarks in a folder (batch operation for performance)
   const createBookmarksInFolder = useCallback(async (
     folderId: string,
     tabList: chrome.tabs.Tab[]
   ) =>
   {
-    for (const tab of tabList)
-    {
-      if (tab.url && tab.title)
-      {
-        await createBookmark(folderId, tab.title, tab.url);
-      }
-    }
-  }, [createBookmark]);
+    console.log('createBookmarksInFolder called', { folderId, tabCount: tabList.length });
+    const items = tabList
+      .filter(tab => tab.url && tab.title)
+      .map(tab => ({ title: tab.title!, url: tab.url! }));
+    console.log('Filtered items:', items);
+    await createBookmarksBatch(folderId, items);
+  }, [createBookmarksBatch]);
 
   // Handle export to bookmarks
   const handleExportToBookmarks = useCallback(async (
@@ -1734,10 +1733,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
   const closeGroup = (groupTabs: chrome.tabs.Tab[]) =>
   {
-    groupTabs.forEach((tab) =>
-    {
-      if (tab.id) closeTab(tab.id);
-    });
+    const tabIds = groupTabs.map(tab => tab.id).filter((id): id is number => id !== undefined);
+    closeTabs(tabIds);
   };
 
   // Track if menu was just closed to prevent immediate reopen

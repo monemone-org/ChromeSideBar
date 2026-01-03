@@ -2,6 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 
 export type SortOption = 'none' | 'name' | 'dateAdded';
 
+// Module-level flag shared across all hook instances
+let isBatchOperation = false;
+
+// Registry of refresh callbacks from all hook instances
+const refreshCallbacks = new Set<() => void>();
+
+// Refresh all hook instances
+const refreshAll = () => {
+  refreshCallbacks.forEach(cb => cb());
+};
+
 export const useBookmarks = () => {
   const [bookmarks, setBookmarks] = useState<chrome.bookmarks.BookmarkTreeNode[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +29,7 @@ export const useBookmarks = () => {
   }, []);
 
   const fetchBookmarks = useCallback(() => {
+    console.log('fetchBookmarks started');
     if (typeof chrome !== 'undefined' && chrome.bookmarks) {
       chrome.bookmarks.getTree((tree) => {
         if (!handleError('fetch')) {
@@ -32,6 +44,9 @@ export const useBookmarks = () => {
   useEffect(() => {
     fetchBookmarks();
 
+    // Register this instance's refresh callback
+    refreshCallbacks.add(fetchBookmarks);
+
     const listeners = [
       chrome.bookmarks?.onCreated,
       chrome.bookmarks?.onRemoved,
@@ -40,12 +55,22 @@ export const useBookmarks = () => {
       chrome.bookmarks?.onChildrenReordered,
     ];
 
-    const handleUpdate = () => fetchBookmarks();
+    // Debounce to coalesce rapid events
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleUpdate = () => {
+      if (isBatchOperation) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        fetchBookmarks();
+      }, 50);
+    };
 
     listeners.forEach(listener => listener?.addListener(handleUpdate));
 
     return () => {
       listeners.forEach(listener => listener?.removeListener(handleUpdate));
+      refreshCallbacks.delete(fetchBookmarks);
+      if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [fetchBookmarks]);
 
@@ -80,7 +105,7 @@ export const useBookmarks = () => {
   const sortBookmarks = useCallback((folderId: string, sortBy: SortOption) => {
     if (sortBy === 'none') return;
 
-    chrome.bookmarks.getChildren(folderId, (children) => {
+    chrome.bookmarks.getChildren(folderId, async (children) => {
       if (handleError('get children') || !children) return;
 
       // Separate folders and bookmarks
@@ -103,12 +128,22 @@ export const useBookmarks = () => {
       // Folders first, then bookmarks
       const sorted = [...folders, ...bookmarkItems];
 
-      // Move each item to its new position
-      sorted.forEach((item, index) => {
-        chrome.bookmarks.move(item.id, { parentId: folderId, index }, () => {
-          handleError('sort move');
-        });
-      });
+      // Batch mode: suppress listener-triggered refetches during moves
+      isBatchOperation = true;
+      try {
+        // Move each item to its new position
+        for (const [index, item] of sorted.entries()) {
+          await new Promise<void>((resolve) => {
+            chrome.bookmarks.move(item.id, { parentId: folderId, index }, () => {
+              handleError('sort move');
+              resolve();
+            });
+          });
+        }
+      } finally {
+        isBatchOperation = false;
+        refreshAll();
+      }
     });
   }, [handleError]);
 
@@ -243,19 +278,58 @@ export const useBookmarks = () => {
   // Remove all children from a folder
   const clearFolder = useCallback(async (folderId: string): Promise<void> =>
   {
+    console.log('clearFolder started');
     const children = await getChildren(folderId);
-    for (const child of children)
+
+    if (children.length === 0) return;
+
+    // Batch mode: suppress listener-triggered refetches during removals
+    isBatchOperation = true;
+    try
     {
-      await new Promise<void>((resolve) =>
+      for (const child of children)
       {
-        chrome.bookmarks.removeTree(child.id, () =>
+        await new Promise<void>((resolve) =>
         {
-          handleError('clear folder');
-          resolve();
+          chrome.bookmarks.removeTree(child.id, () =>
+          {
+            handleError('clear folder');
+            resolve();
+          });
         });
-      });
+      }
+    }
+    finally
+    {
+      isBatchOperation = false;
+      refreshAll();
     }
   }, [getChildren, handleError]);
+
+  // Batch create multiple bookmarks with single refetch at end
+  const createBookmarksBatch = useCallback(async (
+    parentId: string,
+    items: Array<{ title: string; url: string }>
+  ): Promise<void> =>
+  {
+    console.log('createBookmarksBatch called', { parentId, itemCount: items.length, items });
+    if (items.length === 0) return;
+
+    isBatchOperation = true;
+    try
+    {
+      for (const item of items)
+      {
+        console.log('Creating bookmark:', item);
+        const result = await createBookmark(parentId, item.title, item.url);
+      }
+    }
+    finally
+    {
+      isBatchOperation = false;
+      refreshAll();
+    }
+  }, [createBookmark]);
 
   return {
     bookmarks,
@@ -266,6 +340,7 @@ export const useBookmarks = () => {
     moveBookmark,
     findFolderInParent,
     createBookmark,
+    createBookmarksBatch,
     getBookmark,
     getChildren,
     clearFolder,
