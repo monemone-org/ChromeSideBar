@@ -6,7 +6,6 @@ export interface PinnedSite {
   title: string;
   favicon?: string;
   order: number;
-  tabId?: number;  // Remembered tab ID (may be stale if tab was closed)
   customIconName?: string;  // Lucide icon name when using custom icon
   iconColor?: string;       // Custom icon color (hex, e.g., "#ef4444")
 }
@@ -170,42 +169,6 @@ export const usePinnedSites = () => {
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
 
-  // Update stored tabId when a new tab is created for a pinned site
-  const updateTabId = useCallback((id: string, newTabId: number) => {
-    const updatedSites = pinnedSites.map(site =>
-      site.id === id ? { ...site, tabId: newTabId } : site
-    );
-    setPinnedSites(updatedSites);
-    savePinnedSites(updatedSites);
-  }, [pinnedSites, savePinnedSites]);
-
-  // Open pinned site: activate existing tab if it exists, otherwise create new pinned tab
-  const openAsPinnedTab = useCallback((site: PinnedSite) => {
-    if (site.tabId) {
-      // Check if the tab still exists
-      chrome.tabs.get(site.tabId, (tab) => {
-        if (chrome.runtime.lastError || !tab) {
-          // Tab doesn't exist - create new pinned tab and remember tabId
-          chrome.tabs.create({ url: site.url, pinned: true }, (newTab) => {
-            if (newTab?.id) {
-              updateTabId(site.id, newTab.id);
-            }
-          });
-        } else {
-          // Tab exists - activate it
-          chrome.tabs.update(site.tabId!, { active: true });
-        }
-      });
-    } else {
-      // No tabId stored - create new pinned tab and remember tabId
-      chrome.tabs.create({ url: site.url, pinned: true }, (newTab) => {
-        if (newTab?.id) {
-          updateTabId(site.id, newTab.id);
-        }
-      });
-    }
-  }, [updateTabId]);
-
   const movePin = useCallback((activeId: string, overId: string) => {
     const oldIndex = pinnedSites.findIndex(s => s.id === activeId);
     const newIndex = pinnedSites.findIndex(s => s.id === overId);
@@ -264,7 +227,6 @@ export const usePinnedSites = () => {
     removePin,
     updatePin,
     resetFavicon,
-    openAsPinnedTab,
     movePin,
     exportPinnedSites,
     replacePinnedSites,

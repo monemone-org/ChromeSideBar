@@ -52,7 +52,6 @@ function App() {
     removePin,
     updatePin,
     resetFavicon,
-    openAsPinnedTab,
     movePin,
     replacePinnedSites,
     appendPinnedSites,
@@ -148,7 +147,6 @@ function App() {
         removePin={removePin}
         updatePin={updatePin}
         resetFavicon={resetFavicon}
-        openAsPinnedTab={openAsPinnedTab}
         movePin={movePin}
         iconSize={pinnedIconSize}
         arcStyleBookmarks={arcStyleBookmarks}

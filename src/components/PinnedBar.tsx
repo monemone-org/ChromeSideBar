@@ -26,7 +26,6 @@ interface PinnedBarProps {
               customIconName?: string,
               iconColor?: string) => void;
   resetFavicon: (id: string) => void;
-  openAsPinnedTab: (site: PinnedSite) => void;
   movePin: (activeId: string, overId: string) => void;
   iconSize: number;
   arcStyleBookmarks?: boolean;
@@ -37,13 +36,10 @@ export const PinnedBar = ({
   removePin,
   updatePin,
   resetFavicon,
-  openAsPinnedTab: _openAsPinnedTab,
   movePin,
   iconSize,
   arcStyleBookmarks = true,
 }: PinnedBarProps) => {
-  // Note: _openAsPinnedTab is unused - we use openPinnedTab from context for Arc-style,
-  // or chrome.tabs.create for Chrome-style behavior
   const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible } = useBookmarkTabsContext();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
