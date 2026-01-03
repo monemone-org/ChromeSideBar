@@ -1,6 +1,8 @@
 import React, { forwardRef } from 'react';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
+import { DraggableAttributes } from '@dnd-kit/core';
+import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { LAYOUT, getIndentStyle } from '../utils/indent';
 
 export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
@@ -21,8 +23,8 @@ export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
   children?: React.ReactNode;   // For absolute overlays like drop indicators
   
   // DND props
-  dndAttributes?: any;
-  dndListeners?: any;
+  dndAttributes?: DraggableAttributes;
+  dndListeners?: SyntheticListenerMap;
   
   // Custom styles
   // className and style are in HTMLAttributes
