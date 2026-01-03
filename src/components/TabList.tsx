@@ -1825,17 +1825,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          {displayItems.map((item, itemIndex) =>
+          {displayItems.map((item) =>
           {
-            const isLastItem = itemIndex === displayItems.length - 1;
-            const isEndOfListTarget = dropTargetId === 'end-of-list';
-
             if (item.type === 'tab')
             {
               const tabId = String(item.tab.id);
               const isTarget = dropTargetId === tabId;
-              // Show end-of-list indicator on last ungrouped tab
-              const showEndOfListIndicator = isLastItem && isEndOfListTarget;
               return (
                 <DraggableTab
                   key={item.tab.id}
@@ -1843,7 +1838,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   indentLevel={0}
                   isBeingDragged={activeId === item.tab.id}
                   showDropBefore={isTarget && dropPosition === 'before'}
-                  showDropAfter={(isTarget && dropPosition === 'after') || showEndOfListIndicator}
+                  showDropAfter={isTarget && dropPosition === 'after'}
                   onClose={closeTab}
                   onActivate={activateTab}
                   onDuplicate={duplicateTab}
@@ -1868,7 +1863,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
                     showDropBefore={isTarget && dropPosition === 'before'}
-                    showDropAfter={(!isDraggingGroup && isTarget && dropPosition === 'after') || (isLastItem && !isGroupExpanded && isEndOfListTarget)}
+                    showDropAfter={!isDraggingGroup && isTarget && dropPosition === 'after'}
                     showDropInto={showDropInto}
                     afterDropIndentPx={
                       isTarget && dropPosition === 'after' && isGroupExpanded && !isDraggingGroup
@@ -1890,8 +1885,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     const isLastTab = index === item.tabs.length - 1;
                     // When dragging a group with 'after', show indicator on last tab
                     const showGroupAfterOnLastTab = isLastTab && isGroupAfterTarget;
-                    // Show end-of-list indicator on last tab of last group
-                    const showEndOfListOnLastTab = isLastItem && isLastTab && isEndOfListTarget;
                     // Indent lines for tabs in group since drop stays within group
                     const indentPx = isTabTarget ? getIndentPadding(1) : undefined;
                     return (
@@ -1901,7 +1894,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         indentLevel={1}
                         isBeingDragged={activeId === tab.id}
                         showDropBefore={isTabTarget && dropPosition === 'before'}
-                        showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab || showEndOfListOnLastTab}
+                        showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab}
                         beforeIndentPx={dropPosition === 'before' ? indentPx : undefined}
                         afterIndentPx={dropPosition === 'after' ? indentPx : undefined}
                         groupColor={item.group.color}
@@ -1918,6 +1911,15 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
               );
             }
           })}
+
+          {/* Empty row at end for end-of-list drop zone */}
+          <div className="relative h-4">
+            {dropTargetId === 'end-of-list' && (
+              <div
+                className="absolute left-0 right-0 top-0 h-0.5 bg-blue-500 z-20"
+              />
+            )}
+          </div>
 
           <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
             {activeTab && <TabDragOverlay tab={activeTab} />}
