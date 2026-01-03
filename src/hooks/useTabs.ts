@@ -28,7 +28,6 @@ export const useTabs = () => {
   }, []);
 
   const fetchTabs = useCallback(() => {
-    console.log('fetchTabs started');
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.query({ currentWindow: true }, (result) => {
         if (!handleError('fetch')) {

@@ -958,11 +958,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     tabList: chrome.tabs.Tab[]
   ) =>
   {
-    console.log('createBookmarksInFolder called', { folderId, tabCount: tabList.length });
     const items = tabList
       .filter(tab => tab.url && tab.title)
       .map(tab => ({ title: tab.title!, url: tab.url! }));
-    console.log('Filtered items:', items);
     await createBookmarksBatch(folderId, items);
   }, [createBookmarksBatch]);
 

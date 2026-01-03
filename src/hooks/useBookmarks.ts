@@ -29,7 +29,6 @@ export const useBookmarks = () => {
   }, []);
 
   const fetchBookmarks = useCallback(() => {
-    console.log('fetchBookmarks started');
     if (typeof chrome !== 'undefined' && chrome.bookmarks) {
       chrome.bookmarks.getTree((tree) => {
         if (!handleError('fetch')) {
@@ -278,7 +277,6 @@ export const useBookmarks = () => {
   // Remove all children from a folder
   const clearFolder = useCallback(async (folderId: string): Promise<void> =>
   {
-    console.log('clearFolder started');
     const children = await getChildren(folderId);
 
     if (children.length === 0) return;
@@ -312,7 +310,6 @@ export const useBookmarks = () => {
     items: Array<{ title: string; url: string }>
   ): Promise<void> =>
   {
-    console.log('createBookmarksBatch called', { parentId, itemCount: items.length, items });
     if (items.length === 0) return;
 
     isBatchOperation = true;
@@ -320,7 +317,6 @@ export const useBookmarks = () => {
     {
       for (const item of items)
       {
-        console.log('Creating bookmark:', item);
         await createBookmark(parentId, item.title, item.url);
       }
     }
