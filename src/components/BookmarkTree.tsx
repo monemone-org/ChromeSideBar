@@ -94,7 +94,7 @@ const EditModal = ({ isOpen, node, onSave, onClose }: EditModalProps) =>
     >
       <form onSubmit={handleSubmit} className="p-4 space-y-3">
         <div>
-          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Folder Name</label>
+          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Name</label>
           <input
             ref={inputRef}
             className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
@@ -462,7 +462,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           {!isSpecialFolder && (
             <>
               <ContextMenu.Item onSelect={() => onEdit(node)}>
-                <Edit size={14} className="mr-2" /> Rename Folder
+                <Edit size={14} className="mr-2" /> Edit
               </ContextMenu.Item>
               <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
                 <Trash size={14} className="mr-2" /> Delete
