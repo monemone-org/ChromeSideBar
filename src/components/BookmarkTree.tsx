@@ -11,6 +11,7 @@ import { Dialog } from './Dialog';
 import * as ContextMenu from './ContextMenu';
 import { TreeRow } from './TreeRow';
 import { useInView } from '../hooks/useInView';
+import { SPEAKER_ICON_SIZE } from '../constants';
 import {
   Folder,
   Globe,
@@ -422,7 +423,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
 
   // Speaker indicator - at absolute left edge (Arc-style only)
   const leadingIndicator = !isFolder && bookmarkOpenMode === 'arc' && isAudible
-    ? <Volume2 size={16} />
+    ? <Volume2 size={SPEAKER_ICON_SIZE} />
     : undefined;
 
   return (

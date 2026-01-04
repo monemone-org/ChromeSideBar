@@ -4,7 +4,7 @@ import { useTabGroups } from '../hooks/useTabGroups';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { SIDEBAR_TAB_GROUP_NAME } from '../constants';
+import { SIDEBAR_TAB_GROUP_NAME, SPEAKER_ICON_SIZE } from '../constants';
 
 // External drop target type for tab → bookmark drops
 export interface ExternalDropTarget
@@ -541,7 +541,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   );
 
   // Speaker indicator - at absolute left edge
-  const leadingIndicator = tab.audible ? <Volume2 size={16} /> : undefined;
+  const leadingIndicator = tab.audible ? <Volume2 size={SPEAKER_ICON_SIZE} /> : undefined;
 
   const badges = (
     <div className="flex items-center gap-1">
@@ -1874,7 +1874,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
   return (
     <>
-      {/* + New Tab [...] Row */}
+      {/* Tabs Label Row */}
       <ContextMenu.Root>
         {({ open: openMenu, isOpen: isMenuOpen }) => (
           <>
@@ -1882,13 +1882,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
               className="group relative flex items-center py-1 rounded select-none outline-none border-2 border-transparent"
               style={{ paddingLeft: `${getIndentPadding(0)}px`, paddingRight: '8px' }}
             >
-              <button
-                onClick={createTab}
-                className="flex items-center flex-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
-              >
-                <Plus size={14} className="mr-1" />
-                <span>New Tab</span>
-              </button>
+              <span className="flex-1 text-gray-500 dark:text-gray-400">
+                Tabs
+              </span>
               <button
                 onMouseDown={(e) => handleMenuButtonMouseDown(e, isMenuOpen)}
                 onClick={(e) => handleMenuButtonClick(e, openMenu)}
@@ -2019,14 +2015,22 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
             }
           })}
 
-          {/* Empty row at end for end-of-list drop zone */}
-          <div ref={endOfListRef} className="relative h-4">
+          {/* + New Tab Row (also serves as end-of-list drop zone) */}
+          <TreeRow
+            ref={endOfListRef}
+            depth={0}
+            icon={<Plus size={14} />}
+            title="New Tab"
+            hasChildren={false}
+            onClick={createTab}
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
+          >
             {dropTargetId === 'end-of-list' && (
               <div
                 className="absolute left-0 right-0 top-0 h-0.5 bg-blue-500 z-20"
               />
             )}
-          </div>
+          </TreeRow>
 
           <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
             {activeTab && <TabDragOverlay tab={activeTab} />}

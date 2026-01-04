@@ -74,5 +74,4 @@ bugs:
                          
 - [x] while dragging tabs/group over bookmark folders, when hover for 1sec+, the folder doesn't auto expand.
 
-- [ ] when collapse a group in sidebar, also collapse in Chrome's tab bar
 
