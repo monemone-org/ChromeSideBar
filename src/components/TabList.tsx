@@ -770,7 +770,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item onSelect={onExportToBookmarks}>
-            <FolderPlus size={14} className="mr-2" /> Export to Other Bookmarks
+            <FolderPlus size={14} className="mr-2" /> Save to Other Bookmarks
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item onSelect={onRename}>
@@ -1023,7 +1023,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       createFolder(OTHER_BOOKMARKS_ID, folderName, async (newFolder) =>
       {
         await createBookmarksInFolder(newFolder.id, bookmarkableTabs);
-        showToast(`Exported ${bookmarkableTabs.length} tabs to "${folderName}"`);
+        showToast(`Bookmark folder "${folderName}" is created`);
       });
     }
   }, [filterBookmarkableTabs, findFolderInParent, createFolder, createBookmarksInFolder, showToast]);
@@ -1039,7 +1039,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       // Clear existing bookmarks and add new ones
       await clearFolder(existingFolder.id);
       await createBookmarksInFolder(existingFolder.id, tabsToExport);
-      showToast(`Exported ${tabsToExport.length} tabs to "${folderName}"`);
+      showToast(`Bookmark folder "${folderName}" is updated`);
     }
     else
     {
@@ -1346,31 +1346,37 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       }
     }
 
-    // Check for bookmark item (external drop target) - only for tab drags, not group drags
-    if (!isDraggingGroupNow)
+    // Check for bookmark item (external drop target) - for both tab and group drags
+    const bookmarkElement = elements.find(el =>
+      el.hasAttribute('data-bookmark-id')
+    ) as HTMLElement | undefined;
+
+    if (bookmarkElement)
     {
-      const bookmarkElement = elements.find(el =>
-        el.hasAttribute('data-bookmark-id')
-      ) as HTMLElement | undefined;
+      const bookmarkId = bookmarkElement.getAttribute('data-bookmark-id');
+      const isFolder = bookmarkElement.getAttribute('data-is-folder') === 'true';
 
-      if (bookmarkElement)
+      if (bookmarkId)
       {
-        const bookmarkId = bookmarkElement.getAttribute('data-bookmark-id');
-        const isFolder = bookmarkElement.getAttribute('data-is-folder') === 'true';
+        let position = calculateDropPosition(bookmarkElement, currentY, isFolder);
 
-        if (bookmarkId)
+        // For groups on non-folders: only allow before/after (no "into")
+        if (isDraggingGroupNow && !isFolder && position === 'into')
         {
-          const position = calculateDropPosition(bookmarkElement, currentY, isFolder);
-          const newTarget: ExternalDropTarget = { bookmarkId, position: position!, isFolder };
-
-          setLocalExternalTarget(newTarget);
-          onExternalDropTargetChange?.(newTarget);
-          // Clear internal drop targets
-          setDropTargetId(null);
-          setDropPosition(null);
-          clearAutoExpandTimer();
-          return;
+          // This shouldn't happen since calculateDropPosition only returns "into" for containers
+          // But just in case, default to 'after'
+          position = 'after';
         }
+
+        const newTarget: ExternalDropTarget = { bookmarkId, position: position!, isFolder };
+
+        setLocalExternalTarget(newTarget);
+        onExternalDropTargetChange?.(newTarget);
+        // Clear internal drop targets
+        setDropTargetId(null);
+        setDropPosition(null);
+        clearAutoExpandTimer();
+        return;
       }
     }
 
@@ -1435,6 +1441,81 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
         // Create bookmark at the calculated position (tab remains as regular tab)
         await createBookmark(parentId, tab.title, tab.url, index);
+      }
+
+      // Clear all state
+      wasValidDropRef.current = true;
+      setActiveId(null);
+      setActiveTab(null);
+      setActiveGroup(null);
+      setDropTargetId(null);
+      setDropPosition(null);
+      setLocalExternalTarget(null);
+      onExternalDropTargetChange?.(null);
+      return;
+    }
+
+    // Handle external drop (group → bookmark) - creates subfolder with group tabs
+    if (localExternalTarget && activeGroup)
+    {
+      const { group, tabCount: _ } = activeGroup;
+      const groupTabs = visibleTabs.filter(t => t.groupId === group.id);
+      const bookmarkableTabs = filterBookmarkableTabs(groupTabs);
+
+      if (bookmarkableTabs.length === 0)
+      {
+        showToast('No bookmarkable tabs to export');
+      }
+      else
+      {
+        const { bookmarkId: targetBookmarkId, position, isFolder } = localExternalTarget;
+        const folderName = group.title || 'Unnamed Group';
+
+        let parentId: string;
+        let folderIndex: number | undefined;
+
+        if (position === 'into' && isFolder)
+        {
+          // Drop into folder - create subfolder at the end
+          parentId = targetBookmarkId;
+          const children = await getChildren(targetBookmarkId);
+          folderIndex = children.length;
+        }
+        else
+        {
+          // Drop before/after a bookmark - create subfolder as sibling
+          const targetBookmark = await getBookmark(targetBookmarkId);
+          if (targetBookmark && targetBookmark.parentId !== undefined && targetBookmark.index !== undefined)
+          {
+            parentId = targetBookmark.parentId;
+            folderIndex = position === 'before' ? targetBookmark.index : targetBookmark.index + 1;
+          }
+          else
+          {
+            // Fallback: create in target (shouldn't happen)
+            parentId = targetBookmarkId;
+            folderIndex = undefined;
+          }
+        }
+
+        // Create subfolder with the group name at the specified position
+        const createArg: chrome.bookmarks.BookmarkCreateArg = { parentId, title: folderName };
+        if (folderIndex !== undefined)
+        {
+          createArg.index = folderIndex;
+        }
+
+        chrome.bookmarks.create(createArg, async (newFolder) =>
+        {
+          if (chrome.runtime.lastError || !newFolder)
+          {
+            console.error('Failed to create bookmark folder:', chrome.runtime.lastError?.message);
+            return;
+          }
+          // Bookmark all tabs in the new folder
+          await createBookmarksInFolder(newFolder.id, bookmarkableTabs);
+          showToast(`Bookmark folder "${folderName}" is created`);
+        });
       }
 
       // Clear all state

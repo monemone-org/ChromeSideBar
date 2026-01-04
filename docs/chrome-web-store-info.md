@@ -5,7 +5,8 @@ Version 1.0.94
 New Features
 - Arc Style Bookmarks: Bookmarks act as persistent tabs, just like Arc
 - Tab Group Drag-Drop: Reorder groups, move tabs between groups
-- Export Tab Group: Save a group as a bookmark folder
+- Save Tab Group: Save a group as a bookmark folder
+- Drag Tab Groups to Bookmarks: Drop a group onto bookmarks to save all tabs as a new folder
 - Drag Tabs to Bookmarks: Drop tabs into bookmark folders to create bookmarks
 - Full Import/Export: Backup everything as JSON
 - Duplicate Tab: Right-click to duplicate tabs
@@ -45,9 +46,10 @@ Active Tabs
 Tab Groups
 - Works with Chrome's tab groups
 - Drag tabs between groups or ungroup
-- Drag to Reorder group 
+- Drag to reorder groups
 - Rename groups and change group color
-- Export a group as a bookmark folder
+- Save a group as a bookmark folder
+- Drag group to bookmarks to save as a folder
 
 Arc Style Bookmarks Persistent Tabs (Optional)
 - Bookmarks/Pinned sites become persistent tabs, just like Arc

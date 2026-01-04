@@ -5,7 +5,7 @@ Export a tab group as a bookmark folder under "Other Bookmarks", allowing users 
 ## User Workflow
 
 1. Right-click on a tab group header
-2. Select "Export to Other Bookmarks" from context menu
+2. Select "Save to Other Bookmarks" from context menu
 3. A new folder is created in "Other Bookmarks" with:
    - Folder name = group title (or "Unnamed Group" if untitled)
    - Bookmarks for each tab in the group, preserving tab order
@@ -31,7 +31,7 @@ Export a tab group as a bookmark folder under "Other Bookmarks", allowing users 
 │ Sort by Domain (A-Z)            │
 │ Sort by Domain (Z-A)            │
 ├─────────────────────────────────┤
-│ Export to Other Bookmarks       │  ← NEW (FolderPlus icon)
+│ Save to Other Bookmark  s       │  ← NEW (FolderPlus icon)
 ├─────────────────────────────────┤
 │ Rename Group                    │
 │ Change Color                    │
