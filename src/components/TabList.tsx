@@ -1404,7 +1404,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setLocalExternalTarget(null);
     onExternalDropTargetChange?.(null);
     clearAutoExpandTimer();
-  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange]);
+  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange, expandedGroups]);
 
   const handleDragEnd = useCallback(async (_event: DragEndEvent) =>
   {

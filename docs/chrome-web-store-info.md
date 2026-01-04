@@ -1,17 +1,3 @@
-## Changes since version 1.0.52
-
-Version 1.0.103
-
-New Features
-- Arc Style Bookmarks: Bookmarks act as persistent tabs, similar to Arc
-- Tab Group Drag-Drop: Reorder groups, move tabs between groups
-- Save Tab Group: Save a group as a bookmark folder
-- Drag Tab Groups to Bookmarks: Drop a group onto bookmarks to save all tabs as a new folder
-- Drag Tabs to Bookmarks: Drop tabs into bookmark folders to create bookmarks
-- Full Import/Export: Backup everything as JSON
-- Duplicate Tab: Right-click to duplicate tabs
-
-
 ## Description
 
 Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
@@ -19,6 +5,11 @@ Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
 I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, bookmarks, and tabs all in one vertical list. So I built this extension to bring that experience to Chrome.
 
 FEATURES
+
+Arc Style Bookmarks Persistent Tabs (Optional)
+- Bookmarks/Pinned sites become persistent tabs, just like Arc
+- Click to open, click again to switch to it
+- Close the tab without losing the bookmark
 
 Pinned Sites
 - Quick-access icon bar at the top
@@ -51,10 +42,6 @@ Tab Groups
 - Save a group as a bookmark folder
 - Drag group to bookmarks to save as a folder
 
-Arc Style Bookmarks Persistent Tabs (Optional)
-- Bookmarks/Pinned sites become persistent tabs, just like Arc
-- Click to open, click again to switch to it
-- Close the tab without losing the bookmark
 
 Import/Export
 - Back up pinned sites, bookmarks, and tab groups as JSON
@@ -77,3 +64,20 @@ Permissions
 - favicon: Show website icons
 
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
+
+
+## Changes since version 1.0.52
+
+Version 1.0.103
+
+New Features
+- Arc Style Bookmarks: Bookmarks act as persistent tabs, similar to Arc
+- Tab Group Drag-Drop: Reorder groups, move tabs between groups
+- Save Tab Group: Save a group as a bookmark folder
+- Drag Tab Groups to Bookmarks: Drop a group onto bookmarks to save all tabs as a new folder
+- Drag Tabs to Bookmarks: Drop tabs into bookmark folders to create bookmarks
+- Full Import/Export: Backup everything as JSON
+- Duplicate Tab: Right-click to duplicate tabs
+
+
+
