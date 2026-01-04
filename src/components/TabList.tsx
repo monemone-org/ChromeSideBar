@@ -13,6 +13,13 @@ export interface ExternalDropTarget
   position: DropPosition;
   isFolder: boolean;
 }
+
+// Function type for resolving bookmark drop targets
+export type ResolveBookmarkDropTarget = (
+  x: number,
+  y: number,
+  excludeId?: string
+) => ExternalDropTarget | null;
 import { Dialog } from './Dialog';
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
@@ -869,11 +876,12 @@ interface TabListProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   sortGroupsFirst?: boolean;
   onExternalDropTargetChange?: (target: ExternalDropTarget | null) => void;
+  resolveBookmarkDropTarget?: () => ResolveBookmarkDropTarget | null;
 }
 
 const SIDEBAR_GROUP_NAME = SIDEBAR_TAB_GROUP_NAME;
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
@@ -943,7 +951,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   }, []);
 
   // Bookmarks functions for export and tab-to-bookmark drops
-  const { findFolderInParent, createFolder, createBookmark, createBookmarksBatch, getBookmark, getChildren, clearFolder } = useBookmarks();
+  const { findFolderInParent, createFolder, createBookmark, createBookmarksBatch, getBookmark, getChildren, clearFolder, getBookmarkPath } = useBookmarks();
   const OTHER_BOOKMARKS_ID = '2';
 
   const [exportConflictDialog, setExportConflictDialog] = useState<{
@@ -1260,7 +1268,14 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         }
 
         // When dragging a tab: allow before/after/into (isContainer=true)
-        const position = calculateDropPosition(groupHeaderElement, currentY, true);
+        let position = calculateDropPosition(groupHeaderElement, currentY, true);
+
+        // For expanded groups, 'after' (bottom 25%) becomes 'intoFirst' (insert at index 0)
+        if (expandedGroups[targetGroupId] && position === 'after')
+        {
+          position = 'intoFirst';
+        }
+
         setDropTargetId(`group-${groupId}`);
         setDropPosition(position);
 
@@ -1346,38 +1361,29 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       }
     }
 
-    // Check for bookmark item (external drop target) - for both tab and group drags
-    const bookmarkElement = elements.find(el =>
-      el.hasAttribute('data-bookmark-id')
-    ) as HTMLElement | undefined;
+    // Check for bookmark item (external drop target) - use shared resolver
+    const resolver = resolveBookmarkDropTarget?.();
+    const bookmarkTarget = resolver?.(currentX, currentY);
 
-    if (bookmarkElement)
+    if (bookmarkTarget)
     {
-      const bookmarkId = bookmarkElement.getAttribute('data-bookmark-id');
-      const isFolder = bookmarkElement.getAttribute('data-is-folder') === 'true';
+      let { position } = bookmarkTarget;
 
-      if (bookmarkId)
+      // For groups on non-folders: only allow before/after (no "into")
+      if (isDraggingGroupNow && !bookmarkTarget.isFolder && position === 'into')
       {
-        let position = calculateDropPosition(bookmarkElement, currentY, isFolder);
-
-        // For groups on non-folders: only allow before/after (no "into")
-        if (isDraggingGroupNow && !isFolder && position === 'into')
-        {
-          // This shouldn't happen since calculateDropPosition only returns "into" for containers
-          // But just in case, default to 'after'
-          position = 'after';
-        }
-
-        const newTarget: ExternalDropTarget = { bookmarkId, position: position!, isFolder };
-
-        setLocalExternalTarget(newTarget);
-        onExternalDropTargetChange?.(newTarget);
-        // Clear internal drop targets
-        setDropTargetId(null);
-        setDropPosition(null);
-        clearAutoExpandTimer();
-        return;
+        position = 'after';
       }
+
+      const newTarget: ExternalDropTarget = { ...bookmarkTarget, position: position! };
+
+      setLocalExternalTarget(newTarget);
+      onExternalDropTargetChange?.(newTarget);
+      // Clear internal drop targets
+      setDropTargetId(null);
+      setDropPosition(null);
+      // Auto-expand timer is managed by the resolver
+      return;
     }
 
     // Check if pointer is in end-of-list drop zone (using sentinel element)
@@ -1421,6 +1427,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           parentId = targetBookmarkId;
           const children = await getChildren(targetBookmarkId);
           index = children.length;
+        }
+        else if (position === 'intoFirst')
+        {
+          // Drop into expanded folder at beginning (bottom 25% of expanded folder)
+          parentId = targetBookmarkId;
+          index = 0;
         }
         else
         {
@@ -1481,6 +1493,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           const children = await getChildren(targetBookmarkId);
           folderIndex = children.length;
         }
+        else if (position === 'intoFirst')
+        {
+          // Drop into expanded folder at beginning (bottom 25% of expanded folder)
+          parentId = targetBookmarkId;
+          folderIndex = 0;
+        }
         else
         {
           // Drop before/after a bookmark - create subfolder as sibling
@@ -1514,7 +1532,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           }
           // Bookmark all tabs in the new folder
           await createBookmarksInFolder(newFolder.id, bookmarkableTabs);
-          showToast(`Bookmark folder "${folderName}" is created`);
+          // Get the full path for the toast message
+          const folderPath = await getBookmarkPath(newFolder.id);
+          showToast(`Bookmark folder "${folderPath}" is created`);
         });
       }
 
@@ -1667,7 +1687,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         }
         else
         {
-          // 'before' or 'after' on group header
+          // 'before', 'after', or 'intoFirst' on group header
           const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
           if (groupTabs.length > 0)
           {
@@ -1686,39 +1706,35 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
               }
               moveTab(activeId as number, targetIndex);
             }
+            else if (dropPosition === 'intoFirst')
+            {
+              // Insert inside group at index 0 (expanded folder, bottom 25% zone)
+              const firstTabIndex = groupTabs[0].index;
+              let targetIndex = firstTabIndex;
+              if (sourceIndex < targetIndex)
+              {
+                targetIndex--;
+              }
+              moveTab(activeId as number, targetIndex);
+              if (sourceGroupId !== targetGroupId)
+              {
+                groupTab(activeId as number, targetGroupId);
+              }
+            }
             else
             {
-              // 'after' behavior depends on expanded state
-              if (expandedGroups[targetGroupId])
+              // 'after': sibling after group (after last tab in group)
+              const lastTabIndex = groupTabs[groupTabs.length - 1].index;
+              let targetIndex = lastTabIndex + 1;
+              if (sourceIndex < targetIndex)
               {
-                // Expanded: inside group at index 0
-                const firstTabIndex = groupTabs[0].index;
-                let targetIndex = firstTabIndex;
-                if (sourceIndex < targetIndex)
-                {
-                  targetIndex--;
-                }
-                moveTab(activeId as number, targetIndex);
-                if (sourceGroupId !== targetGroupId)
-                {
-                  groupTab(activeId as number, targetGroupId);
-                }
+                targetIndex--;
               }
-              else
+              if (sourceGroupId !== -1)
               {
-                // Collapsed: sibling after group (after last tab in group)
-                const lastTabIndex = groupTabs[groupTabs.length - 1].index;
-                let targetIndex = lastTabIndex + 1;
-                if (sourceIndex < targetIndex)
-                {
-                  targetIndex--;
-                }
-                if (sourceGroupId !== -1)
-                {
-                  ungroupTab(activeId as number);
-                }
-                moveTab(activeId as number, targetIndex);
+                ungroupTab(activeId as number);
               }
+              moveTab(activeId as number, targetIndex);
             }
           }
         }
@@ -1943,6 +1959,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
               const showDropInto = !isDraggingGroup && isTarget && dropPosition === 'into';
               // When dragging a group with 'after', show indicator on last tab instead of header
               const isGroupAfterTarget = isDraggingGroup && isTarget && dropPosition === 'after';
+              // Show 'after' indicator for both 'after' and 'intoFirst' positions
+              const showDropAfter = !isDraggingGroup && isTarget && (dropPosition === 'after' || dropPosition === 'intoFirst');
               return (
                 <div key={`group-${item.group.id}`}>
                   <DraggableGroupHeader
@@ -1950,10 +1968,10 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
                     showDropBefore={isTarget && dropPosition === 'before'}
-                    showDropAfter={!isDraggingGroup && isTarget && dropPosition === 'after'}
+                    showDropAfter={showDropAfter}
                     showDropInto={showDropInto}
                     afterDropIndentPx={
-                      isTarget && dropPosition === 'after' && isGroupExpanded && !isDraggingGroup
+                      isTarget && dropPosition === 'intoFirst' && !isDraggingGroup
                         ? getIndentPadding(1)
                         : undefined
                     }

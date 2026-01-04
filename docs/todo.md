@@ -62,7 +62,8 @@ bugs:
 
 - [x] when switch from arc style bookmark to traditional style, move all tabs under SideBarForArc group to ungrouped
 
-- [-] drag group to bookmark folder to create bookmark subfolder
+- [x] drag group to bookmark folder to create bookmark subfolder
+- [x] change toast message from "Export
 
 - [ ] multiple selection : drag/drop, copy/paste and delete
 
@@ -71,3 +72,7 @@ bugs:
          Open bookmark:  Arc style | In new tab | In active tab
              [ explaination of the selected open bookmark style ] 
                          
+- [x] while dragging tabs/group over bookmark folders, when hover for 1sec+, the folder doesn't auto expand.
+
+- [ ] when collapse a group in sidebar, also collapse in Chrome's tab bar
+

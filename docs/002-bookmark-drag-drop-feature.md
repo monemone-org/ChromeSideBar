@@ -30,12 +30,14 @@ Each bookmark/folder item has drop zones based on cursor position:
 
 | Item Type | Top 25% | Middle 50% | Bottom 25% |
 |-----------|---------|------------|------------|
-| Folder    | Before  | Into       | After      |
+| Folder (collapsed) | Before | Into | After |
+| Folder (expanded)  | Before | Into | IntoFirst |
 | Bookmark  | Before  | —          | After      |
 
 - **Before**: Insert dragged item above the target
-- **After**: Insert dragged item below the target
-- **Into**: Move dragged item inside the folder (first position)
+- **After**: Insert dragged item below the target (as sibling)
+- **Into**: Move dragged item inside the folder (at end)
+- **IntoFirst**: Move dragged item inside the folder at index 0 (for expanded folders, bottom 25% zone)
 
 ### Visual Indicators
 
@@ -127,7 +129,8 @@ Hovering over a collapsed folder for ~1 second automatically toggles its expand/
 
 ## Edge Cases
 
-- **Expanded folder with "after" drop**: Line appears after folder row, not after last child
+- **Expanded folder bottom 25%**: Returns `intoFirst` position - item inserted at index 0 inside folder
+- **Collapsed folder bottom 25%**: Returns `after` position - item inserted as sibling after folder
 - **Collapsed folder**: "Into" drop still works, folder expands after drop
 - **Rapid dragging**: Pointer position tracked via pointermove event for accuracy
 - **Nested folders**: Each level maintains independent drop zones
@@ -164,15 +167,12 @@ Enable reorganization of tabs and tab groups within the sidebar. Users can:
 
 #### Group Header Drop Zones (when dragging a tab)
 
-| Zone | Position | Action |
-|------|----------|--------|
-| Top 25% | Before | Place tab before group as ungrouped |
-| Middle 50% | Into | Add tab to the group |
-| Bottom 25% | After | Depends on expanded state (see below) |
-
-**"After" on group header:**
-- **Expanded group**: Insert tab at index 0 inside the group
-- **Collapsed group**: Place tab after the group as ungrouped
+| Zone | Group State | Position | Action |
+|------|-------------|----------|--------|
+| Top 25% | Any | Before | Place tab before group as ungrouped |
+| Middle 50% | Any | Into | Add tab to the group (at end) |
+| Bottom 25% | Collapsed | After | Place tab after the group as ungrouped |
+| Bottom 25% | Expanded | IntoFirst | Insert tab at index 0 inside the group |
 
 #### Group Header Drop Zones (when dragging a group)
 
@@ -284,6 +284,9 @@ Both bookmark rows and tab rows use the shared `TreeRow` component for consisten
 ## Position Calculation
 
 ```typescript
+// DropPosition type in src/utils/dragDrop.ts
+type DropPosition = 'before' | 'after' | 'into' | 'intoFirst' | null;
+
 // Shared utility in src/utils/dragDrop.ts
 function calculateDropPosition(
   element: HTMLElement,
@@ -304,6 +307,11 @@ function calculateDropPosition(
     return relativeY < height * 0.5 ? 'before' : 'after';
   }
 }
+
+// Note: 'after' is converted to 'intoFirst' by the resolver when:
+// - Target is an expanded folder/group
+// - Position is in the bottom 25% zone
+// This allows drop handlers to use position alone without checking expanded state.
 ```
 
 ## useDragDrop Hook

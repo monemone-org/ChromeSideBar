@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { BookmarkTree } from './components/BookmarkTree';
-import { TabList, ExternalDropTarget } from './components/TabList';
+import { TabList, ExternalDropTarget, ResolveBookmarkDropTarget } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
 import { SettingsDialog, SettingsValues, BookmarkOpenMode } from './components/SettingsDialog';
 import { AboutDialog } from './components/AboutDialog';
@@ -53,6 +53,7 @@ function App() {
   const [showImport, setShowImport] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [externalDropTarget, setExternalDropTarget] = useState<ExternalDropTarget | null>(null);
+  const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const {
@@ -249,9 +250,9 @@ function App() {
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} bookmarkOpenMode={bookmarkOpenMode} />
+        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} bookmarkOpenMode={bookmarkOpenMode} onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }} />
         <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
-        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} />
+        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current} />
       </div>
       </div>
       </BookmarkTabsProvider>

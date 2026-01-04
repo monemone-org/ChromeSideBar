@@ -5,7 +5,7 @@ import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
-import { ExternalDropTarget } from './TabList';
+import { ExternalDropTarget, ResolveBookmarkDropTarget } from './TabList';
 import { BookmarkOpenMode } from './SettingsDialog';
 import { Dialog } from './Dialog';
 import * as ContextMenu from './ContextMenu';
@@ -308,14 +308,30 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   const isExternalDropTarget = externalDropTarget?.bookmarkId === node.id;
   const effectiveDropPosition = isExternalDropTarget ? externalDropTarget.position : dropPosition;
   const showDropBefore = (isDropTarget || isExternalDropTarget) && effectiveDropPosition === 'before';
-  const showDropAfter = (isDropTarget || isExternalDropTarget) && effectiveDropPosition === 'after';
+  const showDropAfter = (isDropTarget || isExternalDropTarget) && (effectiveDropPosition === 'after' || effectiveDropPosition === 'intoFirst');
   const showDropInto = (isDropTarget || isExternalDropTarget) && effectiveDropPosition === 'into' && isFolder;
 
   const insideFolder = depth > 0;
   const beforeIndentPx = showDropBefore && insideFolder ? getIndentPadding(depth) : undefined;
-  const afterIndentPx = showDropAfter && (insideFolder || (isFolder && expandedState[node.id]))
-    ? getIndentPadding(isFolder && expandedState[node.id] ? depth + 1 : depth)
-    : undefined;
+  // Calculate afterIndentPx based on position type
+  let afterIndentPx: number | undefined;
+  if (showDropAfter)
+  {
+    if (effectiveDropPosition === 'intoFirst')
+    {
+      // 'intoFirst' always indented (going inside folder at first position)
+      afterIndentPx = getIndentPadding(depth + 1);
+    }
+    else if (insideFolder)
+    {
+      // Inside a folder: indent to current depth
+      afterIndentPx = getIndentPadding(depth);
+    }
+    else
+    {
+      afterIndentPx = undefined;
+    }
+  }
 
   const handleRowClick = (e: React.MouseEvent) => {
     if (isFolder) {
@@ -584,9 +600,10 @@ interface BookmarkTreeProps {
   hideOtherBookmarks?: boolean;
   externalDropTarget?: ExternalDropTarget | null;
   bookmarkOpenMode?: BookmarkOpenMode;
+  onResolverReady?: (resolver: ResolveBookmarkDropTarget) => void;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc' }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
 
@@ -656,6 +673,65 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     return search(bookmarks);
   }, [bookmarks]);
 
+  // Resolve bookmark drop target - shared logic for internal and external drops
+  const resolveBookmarkDropTarget = useCallback((
+    x: number,
+    y: number,
+    excludeId?: string
+  ): ExternalDropTarget | null =>
+  {
+    // Find the bookmark element under the pointer
+    const elements = document.elementsFromPoint(x, y);
+    const targetElement = elements.find(el =>
+      el.hasAttribute('data-bookmark-id') &&
+      el.getAttribute('data-bookmark-id') !== excludeId
+    ) as HTMLElement | undefined;
+
+    if (!targetElement)
+    {
+      clearAutoExpandTimer();
+      return null;
+    }
+
+    const bookmarkId = targetElement.getAttribute('data-bookmark-id');
+    if (!bookmarkId)
+    {
+      clearAutoExpandTimer();
+      return null;
+    }
+
+    const isFolder = targetElement.getAttribute('data-is-folder') === 'true';
+    let position = calculateDropPosition(targetElement, y, isFolder);
+    const isExpandedFolder = isFolder && !!expandedState[bookmarkId];
+
+    // For expanded folders, 'after' (bottom 25%) becomes 'intoFirst' (insert at index 0)
+    if (isExpandedFolder && position === 'after')
+    {
+      position = 'intoFirst';
+    }
+
+    // Handle auto-expand timer for folders in middle 50% zone
+    if (isFolder && position === 'into')
+    {
+      setAutoExpandTimer(bookmarkId, () =>
+      {
+        setExpandedState(prev => ({ ...prev, [bookmarkId]: !prev[bookmarkId] }));
+      });
+    }
+    else
+    {
+      clearAutoExpandTimer();
+    }
+
+    return { bookmarkId, position: position!, isFolder };
+  }, [expandedState, setAutoExpandTimer, clearAutoExpandTimer]);
+
+  // Provide the resolver function to parent
+  useEffect(() =>
+  {
+    onResolverReady?.(resolveBookmarkDropTarget);
+  }, [onResolverReady, resolveBookmarkDropTarget]);
+
   // Configure sensors with 8px activation constraint
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -685,68 +761,46 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   // Drag move handler - calculate drop position based on pointer
   const handleDragMove = useCallback((event: DragMoveEvent) => {
     const { active } = event;
+    const sourceId = active.id as string;
 
     // Use tracked pointer position (accurate during scroll)
     const currentX = pointerPositionRef.current.x;
     const currentY = pointerPositionRef.current.y;
 
-    // Find the element under the pointer
-    const elements = document.elementsFromPoint(currentX, currentY);
-    const targetElement = elements.find(el =>
-      el.hasAttribute('data-bookmark-id') &&
-      el.getAttribute('data-bookmark-id') !== active.id
-    ) as HTMLElement | undefined;
+    // Use shared resolver to get drop target
+    const target = resolveBookmarkDropTarget(currentX, currentY, sourceId);
 
-    if (!targetElement) {
+    if (!target)
+    {
       setDropTargetId(null);
       setDropPosition(null);
       return;
     }
 
-    const targetId = targetElement.getAttribute('data-bookmark-id');
-    if (!targetId) return;
-
-    // Check restrictions
-    const sourceId = active.id as string;
-
-    // Can't drop on self
-    if (targetId === sourceId) {
-      setDropTargetId(null);
-      setDropPosition(null);
-      return;
-    }
+    // Additional validation for internal bookmark drags
 
     // Can't drop folder into its own descendants
-    if (isDescendant(sourceId, targetId, bookmarks)) {
+    if (isDescendant(sourceId, target.bookmarkId, bookmarks))
+    {
       setDropTargetId(null);
       setDropPosition(null);
+      clearAutoExpandTimer();
       return;
     }
 
     // Can't move special folders (Bookmarks Bar, Other Bookmarks)
     const sourceNode = findNode(sourceId);
-    if (sourceNode && SPECIAL_FOLDER_IDS.includes(sourceNode.id)) {
+    if (sourceNode && SPECIAL_FOLDER_IDS.includes(sourceNode.id))
+    {
       setDropTargetId(null);
       setDropPosition(null);
+      clearAutoExpandTimer();
       return;
     }
 
-    const isFolder = targetElement.getAttribute('data-is-folder') === 'true';
-    const position = calculateDropPosition(targetElement, currentY, isFolder);
-
-    setDropTargetId(targetId);
-    setDropPosition(position);
-
-    // Auto-expand/collapse folder on hover
-    if (isFolder && position === 'into') {
-      setAutoExpandTimer(targetId, () => {
-        // Toggle: expand if collapsed, collapse if expanded
-        setExpandedState(prev => ({ ...prev, [targetId]: !prev[targetId] }));
-      });
-    } else {
-      clearAutoExpandTimer();
-    }
-  }, [bookmarks, findNode, setAutoExpandTimer, clearAutoExpandTimer, setDropTargetId, setDropPosition]);
+    setDropTargetId(target.bookmarkId);
+    setDropPosition(target.position);
+  }, [bookmarks, findNode, resolveBookmarkDropTarget, clearAutoExpandTimer, setDropTargetId, setDropPosition]);
 
   // Drag end handler
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -761,14 +815,10 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
 
     // Perform the move if we have a valid drop target
     if (isValidDrop) {
-      // Check if target is an expanded folder
-      const targetNode = findNode(dropTargetId);
-      const isExpandedFolder = !!(targetNode && !targetNode.url && expandedState[dropTargetId!]);
-
-      moveBookmark(sourceId, dropTargetId!, dropPosition!, isExpandedFolder);
+      moveBookmark(sourceId, dropTargetId!, dropPosition!);
 
       // Auto-expand folder if dropping into it
-      if ((dropPosition === 'into' || (dropPosition === 'after' && isExpandedFolder)) && !expandedState[dropTargetId!]) {
+      if ((dropPosition === 'into') && !expandedState[dropTargetId!]) {
         setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
       }
     }

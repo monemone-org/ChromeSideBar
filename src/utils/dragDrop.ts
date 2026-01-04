@@ -1,4 +1,4 @@
-export type DropPosition = 'before' | 'after' | 'into' | null;
+export type DropPosition = 'before' | 'after' | 'into' | 'intoFirst' | null;
 
 /**
  * Calculate drop position based on pointer Y relative to element.

@@ -149,8 +149,7 @@ export const useBookmarks = () => {
   const moveBookmark = useCallback((
     sourceId: string,
     destinationId: string,
-    position: 'before' | 'after' | 'into',
-    isExpandedFolder?: boolean
+    position: 'before' | 'after' | 'into' | 'intoFirst'
   ) => {
     if (position === 'into') {
       // Move into folder at the end
@@ -161,8 +160,8 @@ export const useBookmarks = () => {
           handleError('move');
         });
       });
-    } else if (position === 'after' && isExpandedFolder) {
-      // For expanded folders, 'after' means insert at the beginning of children
+    } else if (position === 'intoFirst') {
+      // Move into folder at the beginning (for expanded folders, bottom 25% zone)
       chrome.bookmarks.move(sourceId, { parentId: destinationId, index: 0 }, () => {
         handleError('move');
       });
@@ -327,6 +326,29 @@ export const useBookmarks = () => {
     }
   }, [createBookmark]);
 
+  // Get the full path of a bookmark/folder (e.g., "Other Bookmarks/FolderA/FolderB")
+  const getBookmarkPath = useCallback(async (bookmarkId: string): Promise<string> =>
+  {
+    const pathParts: string[] = [];
+    let currentId: string | undefined = bookmarkId;
+
+    while (currentId)
+    {
+      const node = await getBookmark(currentId);
+      if (!node) break;
+
+      // Skip the root node (id "0") which has no title
+      if (node.id !== '0' && node.title)
+      {
+        pathParts.unshift(node.title);
+      }
+
+      currentId = node.parentId;
+    }
+
+    return pathParts.join('/');
+  }, [getBookmark]);
+
   return {
     bookmarks,
     removeBookmark,
@@ -340,6 +362,7 @@ export const useBookmarks = () => {
     getBookmark,
     getChildren,
     clearFolder,
+    getBookmarkPath,
     error
   };
 };
