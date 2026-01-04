@@ -21,7 +21,8 @@ export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
   actions?: React.ReactNode;    // Content to the right of the title (hover actions)
   badges?: React.ReactNode;     // Content after the title (e.g. tab count, pin)
   children?: React.ReactNode;   // For absolute overlays like drop indicators
-  
+  hideIcon?: boolean;           // Hide the icon slot entirely (removes space)
+
   // DND props
   dndAttributes?: DraggableAttributes;
   dndListeners?: SyntheticListenerMap;
@@ -45,6 +46,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
   actions,
   badges,
   children,
+  hideIcon,
   dndAttributes,
   dndListeners,
   className,
@@ -58,7 +60,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       {...dndAttributes}
       {...dndListeners}
       className={clsx(
-        'group flex items-center h-8 rounded-md cursor-default select-none transition-colors relative pr-2',
+        'group flex items-center h-7 rounded-md cursor-default select-none transition-colors relative pr-2',
         isActive ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100' : 'hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200',
         isDragging && 'opacity-50',
         className
@@ -99,13 +101,17 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
         )}
       </div>
 
-      {/* Icon Slot - Fixed Width */}
-      <div 
-        className="flex items-center justify-center shrink-0"
-        style={{ width: LAYOUT.ICON_WIDTH, marginRight: LAYOUT.GAP }}
-      >
-        {icon}
-      </div>
+      {/* Icon Slot - Fixed Width (hidden when hideIcon is true) */}
+      {hideIcon ? (
+        <div className="shrink-0" style={{ width: 2 }} />
+      ) : (
+        <div
+          className="flex items-center justify-center shrink-0"
+          style={{ width: LAYOUT.ICON_WIDTH, marginRight: LAYOUT.GAP }}
+        >
+          {icon}
+        </div>
+      )}
 
       {/* Indicators (Left of Title) - Optional */}
       {/* Use sparingly as this shifts alignment */}

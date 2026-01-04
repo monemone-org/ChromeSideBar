@@ -738,7 +738,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           ref={ref}
           depth={0}
           title={titleComponent}
-          icon={<SquareStack size={16} className="text-gray-500" />}
+          hideIcon
           hasChildren={true} // It's a group
           isExpanded={isExpanded}
           onToggle={(e) => { e.stopPropagation(); onToggle(); }}
