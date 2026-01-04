@@ -23,6 +23,7 @@ export type ResolveBookmarkDropTarget = (
 import { Dialog } from './Dialog';
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
+import { FolderPickerDialog } from './FolderPickerDialog';
 import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, MoreHorizontal, SquareStack } from 'lucide-react';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
@@ -779,7 +780,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item onSelect={onExportToBookmarks}>
-            <FolderPlus size={14} className="mr-2" /> Save to Other Bookmarks
+            <FolderPlus size={14} className="mr-2" /> Save to Bookmarks
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item onSelect={onRename}>
@@ -954,14 +955,20 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
   // Bookmarks functions for export and tab-to-bookmark drops
   const { findFolderInParent, createFolder, createBookmark, createBookmarksBatch, getBookmark, getChildren, clearFolder, getBookmarkPath } = useBookmarks();
-  const OTHER_BOOKMARKS_ID = '2';
 
   const [exportConflictDialog, setExportConflictDialog] = useState<{
     isOpen: boolean;
     folderName: string;
     existingFolder: chrome.bookmarks.BookmarkTreeNode | null;
     tabsToExport: chrome.tabs.Tab[];
-  }>({ isOpen: false, folderName: '', existingFolder: null, tabsToExport: [] });
+    parentFolderId: string;
+  }>({ isOpen: false, folderName: '', existingFolder: null, tabsToExport: [], parentFolderId: '2' });
+
+  const [folderPickerDialog, setFolderPickerDialog] = useState<{
+    isOpen: boolean;
+    group: chrome.tabGroups.TabGroup | null;
+    groupTabs: chrome.tabs.Tab[];
+  }>({ isOpen: false, group: null, groupTabs: [] });
 
   const [toastState, setToastState] = useState<{
     isVisible: boolean;
@@ -999,13 +1006,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     await createBookmarksBatch(folderId, items);
   }, [createBookmarksBatch]);
 
-  // Handle export to bookmarks
-  const handleExportToBookmarks = useCallback(async (
+  // Handle export to bookmarks - opens folder picker dialog
+  const handleExportToBookmarks = useCallback((
     group: chrome.tabGroups.TabGroup,
     groupTabs: chrome.tabs.Tab[]
   ) =>
   {
-    const folderName = group.title || 'Unnamed Group';
     const bookmarkableTabs = filterBookmarkableTabs(groupTabs);
 
     if (bookmarkableTabs.length === 0)
@@ -1014,42 +1020,71 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       return;
     }
 
-    // Check for existing folder
-    const existingFolder = await findFolderInParent(OTHER_BOOKMARKS_ID, folderName);
+    // Open folder picker dialog
+    setFolderPickerDialog({
+      isOpen: true,
+      group,
+      groupTabs: bookmarkableTabs
+    });
+  }, [filterBookmarkableTabs, showToast]);
+
+  // Handle folder selection from folder picker
+  const handleFolderSelected = useCallback(async (parentFolderId: string) =>
+  {
+    const { group, groupTabs } = folderPickerDialog;
+    if (!group) return;
+
+    const folderName = group.title || 'Unnamed Group';
+
+    // Close folder picker
+    setFolderPickerDialog({ isOpen: false, group: null, groupTabs: [] });
+
+    // Check for existing folder with same name in selected parent
+    const existingFolder = await findFolderInParent(parentFolderId, folderName);
 
     if (existingFolder)
     {
-      // Show conflict dialog
+      // Show conflict dialog (reuse existing)
       setExportConflictDialog({
         isOpen: true,
         folderName,
         existingFolder,
-        tabsToExport: bookmarkableTabs
+        tabsToExport: groupTabs,
+        parentFolderId
       });
     }
     else
     {
-      // Create new folder and add bookmarks
-      createFolder(OTHER_BOOKMARKS_ID, folderName, async (newFolder) =>
+      // Create new subfolder and add bookmarks
+      createFolder(parentFolderId, folderName, async (newFolder) =>
       {
-        await createBookmarksInFolder(newFolder.id, bookmarkableTabs);
-        showToast(`Bookmark folder "${folderName}" is created`);
+        await createBookmarksInFolder(newFolder.id, groupTabs);
+        const folderPath = await getBookmarkPath(newFolder.id);
+        showToast(`Bookmark folder "${folderPath}" is created`);
       });
     }
-  }, [filterBookmarkableTabs, findFolderInParent, createFolder, createBookmarksInFolder, showToast]);
+  }, [folderPickerDialog, findFolderInParent, createFolder, createBookmarksInFolder, getBookmarkPath, showToast]);
+
+  const closeFolderPickerDialog = useCallback(() =>
+  {
+    setFolderPickerDialog({ isOpen: false, group: null, groupTabs: [] });
+  }, []);
 
   // Handle conflict dialog confirmation
   const handleExportConflictConfirm = useCallback(async (mode: ExportConflictMode) =>
   {
-    const { existingFolder, tabsToExport, folderName } = exportConflictDialog;
+    const { existingFolder, tabsToExport } = exportConflictDialog;
     if (!existingFolder) return;
+
+    // Get the full path for toast messages
+    const folderPath = await getBookmarkPath(existingFolder.id);
 
     if (mode === 'overwrite')
     {
       // Clear existing bookmarks and add new ones
       await clearFolder(existingFolder.id);
       await createBookmarksInFolder(existingFolder.id, tabsToExport);
-      showToast(`Bookmark folder "${folderName}" is updated`);
+      showToast(`Bookmark folder "${folderPath}" is updated`);
     }
     else
     {
@@ -1066,18 +1101,18 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       if (newTabs.length > 0)
       {
         await createBookmarksInFolder(existingFolder.id, newTabs);
-        showToast(`Added ${newTabs.length} new bookmarks to "${folderName}"`);
+        showToast(`Added ${newTabs.length} new bookmarks to "${folderPath}"`);
       }
       else
       {
         showToast('All tabs already exist in folder');
       }
     }
-  }, [exportConflictDialog, clearFolder, createBookmarksInFolder, getChildren, showToast]);
+  }, [exportConflictDialog, clearFolder, createBookmarksInFolder, getChildren, getBookmarkPath, showToast]);
 
   const closeExportConflictDialog = useCallback(() =>
   {
-    setExportConflictDialog({ isOpen: false, folderName: '', existingFolder: null, tabsToExport: [] });
+    setExportConflictDialog({ isOpen: false, folderName: '', existingFolder: null, tabsToExport: [], parentFolderId: '2' });
   }, []);
 
   // Shared drag-drop state from hook (supports both tab IDs and group IDs like "group-123")
@@ -2060,6 +2095,13 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         group={renameGroupDialog.group}
         onRename={(groupId, title) => updateGroup(groupId, { title })}
         onClose={closeRenameGroupDialog}
+      />
+
+      <FolderPickerDialog
+        isOpen={folderPickerDialog.isOpen}
+        title="Select Destination Folder"
+        onSelect={handleFolderSelected}
+        onClose={closeFolderPickerDialog}
       />
 
       <ExportConflictDialog

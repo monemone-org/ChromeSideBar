@@ -73,12 +73,19 @@ Permissions
 
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
+## Version 1.0.
 
-## Changes since version 1.0.52
+Change since version 1.0.103
 
-Version 1.0.103
+- Moved "+ New Tab" row to the bottom of the Tabs section
+- Added duplicate option for bookmarks and pinned sites in context menu
+- Tab groups can now be saved to any bookmark folder, not just "Other Bookmarks"
 
-New Features
+
+## Version 1.0.103
+
+Changes since version 1.0.52
+
 - Arc Style Bookmarks: Bookmarks act as persistent tabs, similar to Arc
 - Tab Group Drag-Drop: Reorder groups, move tabs between groups
 - Save Tab Group: Save a group as a bookmark folder
@@ -86,6 +93,7 @@ New Features
 - Drag Tabs to Bookmarks: Drop tabs into bookmark folders to create bookmarks
 - Full Import/Export: Backup everything as JSON
 - Duplicate Tab: Right-click to duplicate tabs
+
 
 
 
