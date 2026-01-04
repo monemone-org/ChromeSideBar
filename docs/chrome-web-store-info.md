@@ -1,9 +1,9 @@
 ## Changes since version 1.0.52
 
-Version 1.0.94 
+Version 1.0.103
 
 New Features
-- Arc Style Bookmarks: Bookmarks act as persistent tabs, just like Arc
+- Arc Style Bookmarks: Bookmarks act as persistent tabs, similar to Arc
 - Tab Group Drag-Drop: Reorder groups, move tabs between groups
 - Save Tab Group: Save a group as a bookmark folder
 - Drag Tab Groups to Bookmarks: Drop a group onto bookmarks to save all tabs as a new folder
