@@ -73,7 +73,7 @@ Permissions
 
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
-## Version 1.0.
+## Version 1.0.111
 
 Change since version 1.0.103
 
