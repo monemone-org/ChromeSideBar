@@ -63,6 +63,7 @@ function App() {
     updatePin,
     resetFavicon,
     movePin,
+    duplicatePin,
     replacePinnedSites,
     appendPinnedSites,
   } = usePinnedSites();
@@ -175,6 +176,7 @@ function App() {
         updatePin={updatePin}
         resetFavicon={resetFavicon}
         movePin={movePin}
+        duplicatePin={duplicatePin}
         iconSize={pinnedIconSize}
         bookmarkOpenMode={bookmarkOpenMode}
       />

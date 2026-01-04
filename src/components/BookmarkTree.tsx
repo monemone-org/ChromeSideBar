@@ -21,7 +21,8 @@ import {
   Calendar,
   Pin,
   X,
-  Volume2
+  Volume2,
+  Copy
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -252,6 +253,7 @@ interface BookmarkRowProps {
   onEdit: (node: chrome.bookmarks.BookmarkTreeNode) => void;
   onCreateFolder: (parentId: string) => void;
   onSort: (folderId: string, sortBy: SortOption) => void;
+  onDuplicate: (id: string) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   isDragging?: boolean;
   activeId?: string | null;
@@ -284,6 +286,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onEdit,
   onCreateFolder,
   onSort,
+  onDuplicate,
   onPin,
   isDragging: _isDragging,
   activeId,
@@ -472,7 +475,6 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onPin(node.url!, node.title, getFaviconUrl(node.url!))}>
                 <Pin size={14} className="mr-2" /> Pin to Sidebar
               </ContextMenu.Item>
-              <ContextMenu.Separator />
             </>
           )}
           {!isSpecialFolder && (
@@ -480,6 +482,11 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onEdit(node)}>
                 <Edit size={14} className="mr-2" /> Edit
               </ContextMenu.Item>
+              {!isFolder && (
+                <ContextMenu.Item onSelect={() => onDuplicate(node.id)}>
+                  <Copy size={14} className="mr-2" /> Duplicate
+                </ContextMenu.Item>
+              )}
               <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
                 <Trash size={14} className="mr-2" /> Delete
               </ContextMenu.Item>
@@ -604,7 +611,7 @@ interface BookmarkTreeProps {
 }
 
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady }: BookmarkTreeProps) => {
-  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark } = useBookmarks();
+  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
 
   // Filter out "Other Bookmarks" (id "2") if hidden
@@ -869,6 +876,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             onEdit={setEditingNode}
             onCreateFolder={handleCreateFolder}
             onSort={sortBookmarks}
+            onDuplicate={duplicateBookmark}
             onPin={onPin}
             isDragging={!!activeId}
             activeId={activeId}

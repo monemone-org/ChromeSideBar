@@ -308,13 +308,30 @@ export const useTabs = () => {
     {
       if (handleError('get tab') || !tab.url) return;
 
-      chrome.tabs.create({ url: tab.url, index: tab.index + 1, active: true }, (newTab) =>
+      chrome.tabs.create({ url: tab.url, active: true }, (newTab) =>
       {
-        if (!handleError('create tab') && tab.groupId && tab.groupId !== -1)
+        if (handleError('create tab') || !newTab.id) return;
+
+        if (tab.groupId && tab.groupId !== -1)
         {
-          chrome.tabs.group({ tabIds: [newTab.id!], groupId: tab.groupId }, () =>
+          // Add to group first, then move to position after original
+          chrome.tabs.group({ tabIds: [newTab.id], groupId: tab.groupId }, () =>
           {
-            handleError('add to group');
+            if (!handleError('add to group'))
+            {
+              chrome.tabs.move(newTab.id!, { index: tab.index + 1 }, () =>
+              {
+                handleError('move tab');
+              });
+            }
+          });
+        }
+        else
+        {
+          // Not in a group, just move to position after original
+          chrome.tabs.move(newTab.id, { index: tab.index + 1 }, () =>
+          {
+            handleError('move tab');
           });
         }
       });

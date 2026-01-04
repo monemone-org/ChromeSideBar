@@ -349,6 +349,15 @@ export const useBookmarks = () => {
     return pathParts.join('/');
   }, [getBookmark]);
 
+  // Duplicate a bookmark (not folder) right after the original
+  const duplicateBookmark = useCallback(async (bookmarkId: string): Promise<void> =>
+  {
+    const node = await getBookmark(bookmarkId);
+    if (!node || !node.url || !node.parentId || node.index === undefined) return;
+
+    await createBookmark(node.parentId, node.title, node.url, node.index + 1);
+  }, [getBookmark, createBookmark]);
+
   return {
     bookmarks,
     removeBookmark,
@@ -363,6 +372,7 @@ export const useBookmarks = () => {
     getChildren,
     clearFolder,
     getBookmarkPath,
+    duplicateBookmark,
     error
   };
 };

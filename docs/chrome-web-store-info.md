@@ -4,12 +4,20 @@ Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
 
 I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, bookmarks, and tabs all in one vertical list. So I built this extension to bring that experience to Chrome.
 
-FEATURES
+### Arc-Style Persistent Tabs
 
-Arc Style Bookmarks Persistent Tabs (Optional)
-- Bookmarks/Pinned sites become persistent tabs, just like Arc
-- Click to open, click again to switch to it
-- Close the tab without losing the bookmark
+In Arc, bookmarks aren't just links—they're live pages that stay in your sidebar even after you close them. Click to load, click again to jump back.
+
+I finally got this working in Chrome. Now your bookmarks can be live pages while staying organized in folders, instead of drowning in a sea of tabs. You can see what's loaded right from the sidebar.
+
+
+### FEATURES
+
+Arc Style Persistent Tabs (Optional)
+- Bookmarks and pinned sites as live pages
+- Click to load, click again to switch
+- Close tabs freely - bookmarks stay
+- Enable in Settings (On by default)
 
 Pinned Sites
 - Quick-access icon bar at the top

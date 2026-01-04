@@ -184,6 +184,24 @@ export const usePinnedSites = () => {
     savePinnedSites(compacted);
   }, [pinnedSites, savePinnedSites]);
 
+  const duplicatePin = useCallback((id: string) => {
+    const index = pinnedSites.findIndex(s => s.id === id);
+    if (index === -1) return;
+
+    const original = pinnedSites[index];
+    const duplicate: PinnedSite = {
+      ...original,
+      id: generateId(),
+    };
+
+    const updatedSites = [...pinnedSites];
+    updatedSites.splice(index + 1, 0, duplicate);
+
+    const compacted = compactOrders(updatedSites);
+    setPinnedSites(compacted);
+    savePinnedSites(compacted);
+  }, [pinnedSites, savePinnedSites]);
+
   // Replace all pinned sites (for full backup import)
   const replacePinnedSites = useCallback((sites: PinnedSite[]) => {
     const reordered = sites.map((site, index) => ({
@@ -217,6 +235,7 @@ export const usePinnedSites = () => {
     updatePin,
     resetFavicon,
     movePin,
+    duplicatePin,
     replacePinnedSites,
     appendPinnedSites,
     refresh: loadPinnedSites,

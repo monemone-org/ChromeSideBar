@@ -28,6 +28,7 @@ interface PinnedBarProps {
               iconColor?: string) => void;
   resetFavicon: (id: string) => void;
   movePin: (activeId: string, overId: string) => void;
+  duplicatePin: (id: string) => void;
   iconSize: number;
   bookmarkOpenMode?: BookmarkOpenMode;
 }
@@ -38,6 +39,7 @@ export const PinnedBar = ({
   updatePin,
   resetFavicon,
   movePin,
+  duplicatePin,
   iconSize,
   bookmarkOpenMode = 'arc',
 }: PinnedBarProps) => {
@@ -83,6 +85,7 @@ export const PinnedBar = ({
               onRemove={removePin}
               onUpdate={updatePin}
               onResetFavicon={resetFavicon}
+              onDuplicate={duplicatePin}
               onOpen={
                 bookmarkOpenMode === 'arc'
                   ? (s) => openPinnedTab(s.id, s.url)

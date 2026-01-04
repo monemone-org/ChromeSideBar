@@ -603,19 +603,21 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content>
-          {onDuplicate && tab.url && (
-            <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
-              <Copy size={14} className="mr-2" /> Duplicate
-            </ContextMenu.Item>
-          )}
           {onPin && tab.url && !tab.pinned && (
-            <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
-              <Pin size={14} className="mr-2" /> Pin to Sidebar
-            </ContextMenu.Item>
+            <>
+              <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
+                <Pin size={14} className="mr-2" /> Pin to Sidebar
+              </ContextMenu.Item>
+             </>
           )}
           {onOpenAddToGroupDialog && (
             <ContextMenu.Item onSelect={() => onOpenAddToGroupDialog(tab.id!, tab.groupId)}>
               <FolderPlus size={14} className="mr-2" /> Add to Group
+            </ContextMenu.Item>
+          )}
+          {onDuplicate && tab.url && (
+            <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
+              <Copy size={14} className="mr-2" /> Duplicate
             </ContextMenu.Item>
           )}
           <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>

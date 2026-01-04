@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { Globe, Edit, Trash, X, RotateCcw, Search, Play } from 'lucide-react';
+import { Globe, Edit, Trash, X, RotateCcw, Search, Play, Copy } from 'lucide-react';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -71,6 +71,7 @@ interface PinnedIconProps {
              customIconName?: string,
              iconColor?: string) => void;
   onResetFavicon: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onOpen: (site: PinnedSite) => void;
   onClose?: (id: string) => void;
   isLoaded?: boolean;
@@ -79,7 +80,7 @@ interface PinnedIconProps {
   iconSize: number;
 }
 
-export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, onClose, isLoaded, isActive, isAudible, iconSize }: PinnedIconProps) => {
+export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onDuplicate, onOpen, onClose, isLoaded, isActive, isAudible, iconSize }: PinnedIconProps) => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editTitle, setEditTitle] = useState(site.title);
   const [editUrl, setEditUrl] = useState(site.url);
@@ -362,6 +363,9 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onOpen, o
             )}
             <ContextMenu.Item onSelect={handleEdit}>
               <Edit size={14} className="mr-2" /> Edit
+            </ContextMenu.Item>
+            <ContextMenu.Item onSelect={() => onDuplicate(site.id)}>
+              <Copy size={14} className="mr-2" /> Duplicate
             </ContextMenu.Item>
             <ContextMenu.Item danger onSelect={handleUnpin}>
               <Trash size={14} className="mr-2" /> Unpin
