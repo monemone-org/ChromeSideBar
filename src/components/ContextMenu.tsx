@@ -145,18 +145,10 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
     const fontSize = useFontSize();
     const menuRef = useRef<HTMLDivElement | null>(null);
 
-    // Handle click outside and escape key
+    // Handle escape key (clicks are handled by overlay)
     useEffect(() =>
     {
       if (!isOpen) return;
-
-      const handleClickOutside = (e: MouseEvent) =>
-      {
-        if (menuRef.current && !menuRef.current.contains(e.target as Node))
-        {
-          close();
-        }
-      };
 
       const handleEscape = (e: KeyboardEvent) =>
       {
@@ -166,18 +158,10 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
         }
       };
 
-      // Use setTimeout to avoid closing immediately from the same click
-      const timeoutId = setTimeout(() =>
-      {
-        document.addEventListener('mousedown', handleClickOutside);
-      }, 0);
-
       document.addEventListener('keydown', handleEscape);
 
       return () =>
       {
-        clearTimeout(timeoutId);
-        document.removeEventListener('mousedown', handleClickOutside);
         document.removeEventListener('keydown', handleEscape);
       };
     }, [isOpen, close]);
@@ -215,33 +199,45 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
     if (!isOpen) return null;
 
     return (
-      <div
-        ref={(node) =>
-        {
-          menuRef.current = node;
-          if (typeof ref === 'function')
+      <>
+        {/* Transparent overlay to intercept clicks outside the menu */}
+        <div
+          className="fixed inset-0 z-40"
+          onClick={close}
+          onContextMenu={(e) =>
           {
-            ref(node);
-          }
-          else if (ref)
+            e.preventDefault();
+            close();
+          }}
+        />
+        <div
+          ref={(node) =>
           {
-            ref.current = node;
-          }
-        }}
-        className={clsx(
-          "fixed z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
-          className
-        )}
-        style={{
-          left: adjustedPosition.x,
-          top: adjustedPosition.y,
-          fontSize: `${fontSize}px`,
-          ...style
-        }}
-        {...props}
-      >
-        {children}
-      </div>
+            menuRef.current = node;
+            if (typeof ref === 'function')
+            {
+              ref(node);
+            }
+            else if (ref)
+            {
+              ref.current = node;
+            }
+          }}
+          className={clsx(
+            "fixed z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
+            className
+          )}
+          style={{
+            left: adjustedPosition.x,
+            top: adjustedPosition.y,
+            fontSize: `${fontSize}px`,
+            ...style
+          }}
+          {...props}
+        >
+          {children}
+        </div>
+      </>
     );
   }
 );

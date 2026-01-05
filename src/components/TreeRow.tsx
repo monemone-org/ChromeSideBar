@@ -75,7 +75,9 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
 
       {/* Leading Indicator - Fixed at absolute left edge (e.g. speaker icon) */}
       {leadingIndicator && (
-        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center">
+        <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center"
+            style={{ width: LAYOUT.CHEVRON_WIDTH }}
+        >
           {leadingIndicator}
         </div>
       )}
@@ -103,7 +105,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
 
       {/* Icon Slot - Fixed Width (hidden when hideIcon is true) */}
       {hideIcon ? (
-        <div className="shrink-0" style={{ width: 2 }} />
+        <div className="shrink-0" style={{ width: 0 }} />
       ) : (
         <div
           className="flex items-center justify-center shrink-0"
