@@ -22,8 +22,7 @@ So I vibe-coded this extension to bring that to Chrome.
 - Custom icons: Choose from Lucide icon library with search functionality
 - Custom colors: 9 preset colors + custom hex color support
 - Configurable icon size (12-48px)
-- Export/Import: Backup and restore pinned sites as JSON
-- Right-click menu: Edit (title, URL, icon, color), Reset favicon, Unpin
+- Right-click menu: Edit (title, URL, icon, color), Duplicate, Reset favicon, Unpin
 - Click: Open as Chrome pinned tab (activates existing tab or creates new one)
 - Shift+Click: Open in new window
 
@@ -34,9 +33,11 @@ So I vibe-coded this extension to bring that to Chrome.
   - New Folder
   - Sort by Name/Date
   - Edit
+  - Duplicate
   - Delete
   - Pin to pinned bar
 - Drag-and-drop to organize bookmarks
+- Drag tabs from Tabs section to create bookmarks
 - Click: Open in current tab (Cmd/Ctrl+Click: Open in new background tab, Shift+Click: Open in new window)
 
 ### Active Tabs
@@ -47,18 +48,42 @@ So I vibe-coded this extension to bring that to Chrome.
 - Reorder tabs via drag-and-drop
 - Click to switch to tab
 - Close tab via X button on hover
-- Sort options (via right-click menu):
+- "New Tab" row at the bottom for quick tab creation
+- Tab context menu (right-click):
+  - Pin to Sidebar
+  - Add to Group
+  - Add to Bookmark (or "Move to Bookmark" in Arc style mode)
+  - Duplicate
+  - Close
+- Sort options (via header menu):
   - Sort by domain then title (A-Z or Z-A)
   - Close all tabs
 - Tab Group support:
   - Display Chrome tab groups with their color and title
   - Collapse/expand groups by clicking the group header
+  - Group context menu:
+    - New Tab (in group)
+    - Sort by Domain (A-Z or Z-A)
+    - Save to Bookmarks (creates a bookmark folder with all tabs)
+    - Rename Group
+    - Change Color
+    - Close All Tabs in Group
   - Drag-and-drop support:
     - Reorder tabs within a group
     - Move tabs between groups
     - Move tabs in/out of groups
     - Reorder tab groups
-  - Close all tabs in a group via the X button on group header
+    - Drag tab groups to Bookmarks section to save as folder
+
+### Import & Export
+
+- Full backup and restore capability via JSON files
+- Export options:
+  - Select specific data to export: Pinned sites, Bookmarks, and/or Tabs & Groups
+- Import options:
+  - **Pinned Sites**: Replace existing or append to list
+  - **Bookmarks**: Replace all or import as a subfolder
+  - **Tabs & Groups**: Replace current session or append to current window
 
 ### Settings
 
@@ -66,8 +91,10 @@ Gear icon in the bottom-left corner:
 
 - **Font size**: 6-36px (default: 14px)
 - **Pinned icon size**: 12-48px (default: 22px)
-- **Hide "Other Bookmarks"**: Hide the Other Bookmarks folder from the sidebar
-- **Open bookmarks in new tab**: Toggle Cmd/Ctrl+click behavior for bookmarks
+- **Open bookmark**: Choose how bookmarks open
+  - Arc style: Bookmarks act as persistent tabs (hidden from Tabs section)
+  - In new tab: Opens bookmark in a new background tab
+  - In active tab: Replaces the current tab with the bookmark
 - **Sort tab groups first**: When sorting tabs, keep tab groups at the top
 
 ### General
@@ -87,7 +114,6 @@ Built with the usual modern web stack:
 - [Tailwind CSS](https://tailwindcss.com/) for styling
 - [Lucide React](https://lucide.dev/) for icons
 - [@dnd-kit/core](https://dndkit.com/) for drag & drop
-- [Radix UI](https://www.radix-ui.com/) for context menus
 - Chrome Manifest V3 APIs (`sidePanel`, `bookmarks`, `tabs`, `tabGroups`, `storage`, `favicon`)
 
 ## Project Structure
@@ -99,7 +125,7 @@ Built with the usual modern web stack:
 ├── src/
 │   ├── components/ # React UI components (tabs, bookmarks, pinned bar, dialogs)
 │   ├── hooks/      # Custom hooks wrapping Chrome APIs and shared state
-│   ├── contexts/   # React contexts for global state (font size)
+│   ├── contexts/   # React contexts for global state (font size, bookmark-tab associations)
 │   └── utils/      # Helper functions (drag-drop)
 ```
 
