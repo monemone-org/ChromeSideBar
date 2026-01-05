@@ -16,7 +16,6 @@ Read `READEME.md` for more details about the extension.
 ## Build & Test
 
 - Build: `npm run build`
-- Lint: `npm run lint`
 
 Do not run build after making changes. Notify the user to compile and verify.
 Do not run `git add` or `git commit`. Notify the user to add and commit.

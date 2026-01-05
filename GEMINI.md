@@ -1,2 +1,3 @@
-read `CLAUDE.md`
+read @CLAUDE.md
+
 
