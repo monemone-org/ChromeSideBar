@@ -19,12 +19,12 @@ So I vibe-coded this extension to bring that to Chrome.
 - Quick-access icon bar at top of panel
 - Pin bookmarks or tabs for one-click navigation
 - Drag-and-drop to reorder
-- Custom icons: Choose from Lucide icon library with search functionality
-- Custom colors: 9 preset colors + custom hex color support
+- Custom icons and colors
 - Configurable icon size (12-48px)
 - Right-click menu: Edit (title, URL, icon, color), Duplicate, Reset favicon, Unpin
-- Click: Open as Chrome pinned tab (activates existing tab or creates new one)
-- Shift+Click: Open in new window
+- Click: Open as Arc-style tab
+- Cmd/Ctrl+Click: Open in new background tab, Shift+Click: Open in new window
+- Open indicator: Circular dot for opened state, triangle for playing audio
 
 ### Bookmarks
 
@@ -38,7 +38,10 @@ So I vibe-coded this extension to bring that to Chrome.
   - Pin to pinned bar
 - Drag-and-drop to organize bookmarks
 - Drag tabs from Tabs section to create bookmarks
-- Click: Open in current tab (Cmd/Ctrl+Click: Open in new background tab, Shift+Click: Open in new window)
+- Click: Open as Arc-style tab
+- Cmd/Ctrl+Click: Open in new background tab, Shift+Click: Open in new window
+- Audio indicator (speaker icon) for playing audio
+- Close tab via X button on hover
 
 ### Active Tabs
 
@@ -153,4 +156,8 @@ Outputs production build to `dist/` folder.
 2. Turn on **Developer mode** (top-right toggle)
 3. Click **Load unpacked** and select the `dist/` folder
 4. Click the extension icon or hit `Cmd+Shift+E` to open the sidebar
+
+Or Install via Chrome Extension Store
+
+https://chromewebstore.google.com/detail/jmmgjadgeeicdbagekohgmaipoekgcbn?utm_source=item-share-cb
 
