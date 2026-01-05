@@ -75,7 +75,13 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
-- Changed to not use "SideBarForArc" tab group to manage persistent tabs for Arc style bookmarks and pinned sites.  When the extension losts the session data (e.g. when extension is reloaded), the previously persistent tabs will show up as normal tabs.
+## 1.0.116
+
+- Improved Arc-style persistent tab handling: tabs are no longer placed in a special tab group. If session data is lost (e.g. extension reload), persistent tabs now appear as normal tabs instead of being hidden.
+- Added "Add to Bookmarks" / "Move to Bookmarks" menu for tabs
+- Dragging a tab to bookmarks now auto-associates it as a persistent tab (Arc style)
+- Added delete button on bookmark rows
+- Fixed context menu dismiss not blocking clicks on underlying elements
 
 ## 1.0.111
 
