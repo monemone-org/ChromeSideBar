@@ -4,7 +4,7 @@ import { useTabGroups } from '../hooks/useTabGroups';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { SIDEBAR_TAB_GROUP_NAME, SPEAKER_ICON_SIZE } from '../constants';
+import { SPEAKER_ICON_SIZE } from '../constants';
 
 // External drop target type for tab → bookmark drops
 export interface ExternalDropTarget
@@ -882,26 +882,21 @@ interface TabListProps {
   resolveBookmarkDropTarget?: () => ResolveBookmarkDropTarget | null;
 }
 
-const SIDEBAR_GROUP_NAME = SIDEBAR_TAB_GROUP_NAME;
-
 export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
-  const { groupId: sidebarGroupId } = useBookmarkTabsContext();
+  const { getManagedTabIds } = useBookmarkTabsContext();
 
-  // Filter out tabs from the SideBarForArc group (managed by bookmark-tab associations)
+  // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
   const visibleTabs = useMemo(() =>
   {
-    if (sidebarGroupId === null) return tabs;
-    return tabs.filter(tab => (tab.groupId ?? -1) !== sidebarGroupId);
-  }, [tabs, sidebarGroupId]);
+    const managedTabIds = getManagedTabIds();
+    return tabs.filter(tab => !managedTabIds.has(tab.id!));
+  }, [tabs, getManagedTabIds]);
 
-  // Filter out the SideBarForArc group from display
-  const visibleTabGroups = useMemo(() =>
-  {
-    return tabGroups.filter(g => g.title !== SIDEBAR_GROUP_NAME);
-  }, [tabGroups]);
+  // All tab groups are visible (no longer filtering out SideBarForArc group)
+  const visibleTabGroups = tabGroups;
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Add to Group dialog state

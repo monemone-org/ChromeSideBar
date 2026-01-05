@@ -11,7 +11,6 @@ import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
-import { SIDEBAR_TAB_GROUP_NAME } from './constants';
 import { Settings, Info, Upload, Download } from 'lucide-react';
 
 function App() {
@@ -70,23 +69,6 @@ function App() {
   const { bookmarks } = useBookmarks();
 
   const handleApplySettings = (newSettings: SettingsValues) => {
-    // If switching from Arc-style to other mode, ungroup managed tabs
-    if (bookmarkOpenMode === 'arc' && newSettings.bookmarkOpenMode !== 'arc') {
-      chrome.windows.getCurrent((window) => {
-        chrome.tabGroups.query({ windowId: window.id, title: SIDEBAR_TAB_GROUP_NAME }, (groups) => {
-          if (groups.length > 0) {
-            const groupId = groups[0].id;
-            chrome.tabs.query({ windowId: window.id, groupId }, (tabs) => {
-              const tabIds = tabs.map(t => t.id).filter((id): id is number => id !== undefined);
-              if (tabIds.length > 0) {
-                chrome.tabs.ungroup(tabIds);
-              }
-            });
-          }
-        });
-      });
-    }
-
     setFontSize(newSettings.fontSize);
     setHideOtherBookmarks(newSettings.hideOtherBookmarks);
     setSortGroupsFirst(newSettings.sortGroupsFirst);

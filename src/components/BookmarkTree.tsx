@@ -480,14 +480,14 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           )}
           {!isSpecialFolder && (
             <>
-              <ContextMenu.Item onSelect={() => onEdit(node)}>
-                <Edit size={14} className="mr-2" /> Edit
-              </ContextMenu.Item>
               {!isFolder && (
                 <ContextMenu.Item onSelect={() => onDuplicate(node.id)}>
                   <Copy size={14} className="mr-2" /> Duplicate
                 </ContextMenu.Item>
               )}
+              <ContextMenu.Item onSelect={() => onEdit(node)}>
+                <Edit size={14} className="mr-2" /> Edit
+              </ContextMenu.Item>
               <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
                 <Trash size={14} className="mr-2" /> Delete
               </ContextMenu.Item>

@@ -2,9 +2,9 @@
 
 Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
 
-I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, bookmarks, and tabs all in one vertical list. So I built this extension to bring that experience to Chrome.
+I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, bookmarks, and tabs all in one vertical list and its pinned tab support. So I built this extension to bring that experience to Chrome.
 
-### Arc-Style Persistent Tabs
+### Arc-Style Persistent/Pinned Tabs
 
 In Arc, bookmarks aren't just links—they're live pages that stay in your sidebar even after you close them. Click to load, click again to jump back.
 
@@ -73,18 +73,18 @@ Permissions
 
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
-## Version 1.0.111
+## Changelog
 
-Change since version 1.0.103
+- Changed to not use "SideBarForArc" tab group to manage persistent tabs for Arc style bookmarks and pinned sites.  When the extension losts the session data (e.g. when extension is reloaded), the previously persistent tabs will show up as normal tabs.
+
+## 1.0.111
 
 - Moved "+ New Tab" row to the bottom of the Tabs section
 - Added duplicate option for bookmarks and pinned sites in context menu
 - Tab groups can now be saved to any bookmark folder, not just "Other Bookmarks"
 
 
-## Version 1.0.103
-
-Changes since version 1.0.52
+## 1.0.103
 
 - Arc Style Bookmarks: Bookmarks act as persistent tabs, similar to Arc
 - Tab Group Drag-Drop: Reorder groups, move tabs between groups
@@ -93,7 +93,5 @@ Changes since version 1.0.52
 - Drag Tabs to Bookmarks: Drop tabs into bookmark folders to create bookmarks
 - Full Import/Export: Backup everything as JSON
 - Duplicate Tab: Right-click to duplicate tabs
-
-
 
 

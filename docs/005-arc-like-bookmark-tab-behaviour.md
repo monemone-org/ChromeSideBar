@@ -30,14 +30,15 @@ This behavior is controlled by the **"Arc style bookmarks"** setting in Settings
 | Arc style bookmarks | ON | When enabled, bookmarks act as persistent tabs that can be reopened similar to Arc browser |
 
 **When ON (default):**
-- Bookmarks and pinned sites open as managed tabs in the SideBarForArc group
+- Bookmarks and pinned sites open as managed tabs (tracked by tabId)
+- Managed tabs are hidden from the Tabs section in sidebar
 - Close button (X) visible on loaded bookmark rows
 - Audio indicator visible when tab is playing sound
 - Active bookmark highlighted with blue background
 - Pinned sites show cyan background when loaded
 
 **When OFF:**
-- Bookmarks and pinned sites open as regular Chrome tabs (not grouped, not tracked)
+- Bookmarks and pinned sites open as regular Chrome tabs (not tracked)
 - No close button on bookmark rows
 - No audio indicator on bookmark rows
 - No active state highlighting
@@ -48,21 +49,22 @@ This behavior is controlled by the **"Arc style bookmarks"** setting in Settings
 - Cmd/Ctrl+Click: Opens as unmanaged new tab
 - Shift+Click: Opens in new window
 
-## Tab Group Management
+## Tab Visibility Management
 
-All bookmark/pinned-site tabs are managed in a dedicated Chrome tab group:
+Managed tabs (opened via bookmarks/pinned sites) are hidden from the sidebar's Tabs section:
 
-| Property | Value |
-|----------|-------|
-| Group name | SideBarForArc |
-| Color | Cyan |
-| Default state | Expanded (not collapsed) |
-| Visibility in sidebar | Hidden from Tabs section |
+| Aspect | Behavior |
+|--------|----------|
+| Managed tabs | Hidden from Tabs section, visible in Chrome's tab bar |
+| Regular tabs | Visible in Tabs section |
+| Filtering | Based on tabId tracking, not tab groups |
 
-### Why a Tab Group?
-- Keeps bookmark-tabs visually separate from regular tabs in Chrome's tab bar
-- Easy to filter out from the sidebar's Tabs section
-- Built-in collapse functionality reduces clutter
+### Session Loss Behavior
+When extension reloads or browser restarts:
+- Session storage (`chrome.storage.session`) is cleared
+- Associations between bookmarks and tabs are lost
+- Previously managed tabs appear as regular tabs in the sidebar
+- Clicking a bookmark creates a new association
 
 ## Per-Window Behavior
 
@@ -74,7 +76,7 @@ All bookmark/pinned-site tabs are managed in a dedicated Chrome tab group:
 
 ### Opening a Bookmark
 1. User clicks a bookmark row
-2. If no associated tab exists → create tab in "SideBarForArc" group, load URL
+2. If no associated tab exists → create new tab, store association, load URL
 3. If associated tab exists → activate that tab
 4. Bookmark row shows close button (X icon) - always visible when loaded
 
@@ -90,9 +92,8 @@ All bookmark/pinned-site tabs are managed in a dedicated Chrome tab group:
 2. Extension listens for `chrome.tabs.onRemoved` event
 3. Updates bookmark-tab association (mark as unloaded)
 
-### Pinned Sites (Updated Behavior)
-- Previously: opened as Chrome pinned tabs
-- Now: opened in the "SideBarForArc" tab group (same as bookmarks)
+### Pinned Sites
+- Opened as regular tabs with tracked association (same as bookmarks)
 - Same open/close behavior as bookmarks
 
 ## UI Changes
@@ -133,10 +134,9 @@ Folder (depth=2):
   unloaded         loaded
 ```
 - Subtle cyan background (`bg-cyan-500/20`) when pinned site has an open tab
-- Matches tab group color for visual consistency
 
 ### Tabs Section
-- Filter out tabs belonging to the "SideBarForArc" group
+- Filter out tabs that have bookmark/pinned associations (by tabId)
 - These tabs are managed via their bookmark/pinned-site rows instead
 
 ## Implementation
@@ -181,22 +181,6 @@ Map<tabId, itemKey>   // tab → bookmark/pinned (for event handling)
 Set<tabId>            // tabs currently playing audio
 ```
 
-### Tab Group Management
-
-**On first bookmark/pinned-site click (per window):**
-1. Check if "SideBarForArc" group exists in current window
-2. If not, create tab first, then group it (avoids empty group deletion)
-3. Update group properties
-
-**Group properties:**
-```typescript
-chrome.tabGroups.update(groupId, {
-  title: "SideBarForArc",
-  color: "cyan",
-  collapsed: false
-});
-```
-
 ### Event Listeners
 
 | Event | Action |
@@ -208,10 +192,9 @@ chrome.tabGroups.update(groupId, {
 ### Restoration Flow (on sidebar open)
 
 1. Get stored associations from `chrome.storage.session`
-2. Find "SideBarForArc" group in current window
-3. Get all tabs in that group
-4. Match tabs to stored associations
-5. Rebuild in-memory maps
+2. For each stored tabId, verify tab still exists
+3. Remove stale associations (tabs that no longer exist)
+4. Rebuild in-memory maps
 
 ### Key Functions
 
@@ -221,7 +204,7 @@ chrome.tabGroups.update(groupId, {
 ├─────────────────────────────────────────────────────────┤
 │ 1. Check if bookmarkId has associated tabId             │
 │ 2. If yes → chrome.tabs.update(tabId, {active: true})   │
-│ 3. If no  → create tab, add to group, store association │
+│ 3. If no  → create tab, store association               │
 └─────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
@@ -233,19 +216,17 @@ chrome.tabGroups.update(groupId, {
 └─────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
-│ isBookmarkAudible(bookmarkId)                           │
+│ getManagedTabIds()                                      │
 ├─────────────────────────────────────────────────────────┤
-│ 1. Get tabId from bookmarkId                            │
-│ 2. Check if tabId is in audibleTabs set                 │
+│ Returns Set of all tabIds with bookmark/pinned          │
+│ associations (used for filtering in TabList)            │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ### Chrome APIs Required
 
 - `chrome.tabs` - create, update, remove, query tabs
-- `chrome.tabGroups` - create and manage tab group
 - `chrome.storage.session` - persist associations within session
-- `chrome.windows` - get current window
 
 ### Drag-Drop Fix
 
@@ -266,6 +247,7 @@ const targetIndex = targetTab.index;  // Chrome's real index
 
 Verify `manifest.json` includes:
 ```json
-"permissions": ["tabs", "tabGroups", "storage"]
+"permissions": ["tabs", "storage"]
 ```
+Note: `tabGroups` permission is used by other features but not required for Arc-style bookmark-tab associations.
 
