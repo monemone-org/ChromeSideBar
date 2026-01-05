@@ -2,6 +2,10 @@
 
 A Chrome extension that puts pinned sites, bookmarks, and tabs in a side panel, similar to the Arc browser's experience.
 
+**Link to Chrome Web Store:**
+https://chromewebstore.google.com/detail/jmmgjadgeeicdbagekohgmaipoekgcbn?utm_source=item-share-cb
+
+
 ## Background
 
 I've been using Arc Browser for a while. When Arc paused development, I started looking at Chrome and other Chromium-based browsers. The one thing I really missed was Arc's sidebar—how it puts favorite sites, pinned pages, and tabs all in one vertical list.

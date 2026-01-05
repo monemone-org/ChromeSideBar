@@ -15,7 +15,7 @@ cd "$(dirname "$0")/.."
 echo "Updating version..."
 
 # Update version number
-./tools/update-version.sh
+# ./tools/update-version.sh
 
 # Re-read version after update
 VERSION=$(grep '"version"' public/manifest.json | sed 's/.*: "\([^"]*\)".*/\1/')
