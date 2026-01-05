@@ -6,6 +6,13 @@ A Chrome extension that puts pinned sites, bookmarks, and tabs in a side panel, 
 https://chromewebstore.google.com/detail/jmmgjadgeeicdbagekohgmaipoekgcbn?utm_source=item-share-cb
 
 
+**What it does:**
+- **Unified sidebar:** Pinned bookmarks, regular bookmarks, and active tabs all in one vertical panel
+- **"Live" bookmarks:** Bookmarks behave like tabs—open and close them on the fly
+- **Backup/Restore:** Export and import everything to JSON
+- **Tab groups:** Create and organize tabs within groups (a native Chrome feature)
+- **Drag & drop:** Reorganize bookmarks, folders, tabs, and groups easily
+
 ## Background
 
 I've been using Arc Browser for a while. When Arc paused development, I started looking at Chrome and other Chromium-based browsers. The one thing I really missed was Arc's sidebar—how it puts favorite sites, pinned pages, and tabs all in one vertical list.
