@@ -24,7 +24,7 @@ import { Dialog } from './Dialog';
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
 import { FolderPickerDialog } from './FolderPickerDialog';
-import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, MoreHorizontal, SquareStack } from 'lucide-react';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, MoreHorizontal, SquareStack, Bookmark } from 'lucide-react';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
@@ -479,6 +479,8 @@ interface DraggableTabProps {
   onDuplicate?: (id: number) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   onOpenAddToGroupDialog?: (tabId: number, currentGroupId?: number) => void;
+  onAddToBookmark?: (tab: chrome.tabs.Tab) => void;
+  arcStyleEnabled?: boolean;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -500,6 +502,8 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onDuplicate,
   onPin,
   onOpenAddToGroupDialog,
+  onAddToBookmark,
+  arcStyleEnabled,
   attributes,
   listeners
 }, ref) => {
@@ -614,6 +618,11 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           {onOpenAddToGroupDialog && (
             <ContextMenu.Item onSelect={() => onOpenAddToGroupDialog(tab.id!, tab.groupId)}>
               <FolderPlus size={14} className="mr-2" /> Add to Group
+            </ContextMenu.Item>
+          )}
+          {onAddToBookmark && tab.url && !tab.url.startsWith('chrome://') && (
+            <ContextMenu.Item onSelect={() => onAddToBookmark(tab)}>
+              <Bookmark size={14} className="mr-2" /> {arcStyleEnabled ? 'Move to Bookmark' : 'Add to Bookmark'}
             </ContextMenu.Item>
           )}
           {onDuplicate && tab.url && (
@@ -880,13 +889,14 @@ interface TabListProps {
   sortGroupsFirst?: boolean;
   onExternalDropTargetChange?: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget?: () => ResolveBookmarkDropTarget | null;
+  arcStyleEnabled?: boolean;
 }
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
-  const { getManagedTabIds } = useBookmarkTabsContext();
+  const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
 
   // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
   const visibleTabs = useMemo(() =>
@@ -948,8 +958,41 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setRenameGroupDialog({ isOpen: false, group: null });
   }, []);
 
+  // Add to Bookmark dialog state
+  const [addToBookmarkDialog, setAddToBookmarkDialog] = useState<{
+    isOpen: boolean;
+    tab: chrome.tabs.Tab | null;
+  }>({ isOpen: false, tab: null });
+
+  const openAddToBookmarkDialog = useCallback((tab: chrome.tabs.Tab) =>
+  {
+    setAddToBookmarkDialog({ isOpen: true, tab });
+  }, []);
+
+  const closeAddToBookmarkDialog = useCallback(() =>
+  {
+    setAddToBookmarkDialog({ isOpen: false, tab: null });
+  }, []);
+
   // Bookmarks functions for export and tab-to-bookmark drops
   const { findFolderInParent, createFolder, createBookmark, createBookmarksBatch, getBookmark, getChildren, clearFolder, getBookmarkPath } = useBookmarks();
+
+  const handleAddToBookmarkFolderSelect = useCallback(async (folderId: string) =>
+  {
+    const tab = addToBookmarkDialog.tab;
+    if (!tab || !tab.url || !tab.title) return;
+
+    // Create bookmark in the selected folder
+    const newBookmark = await createBookmark(folderId, tab.title, tab.url);
+
+    // If Arc style is enabled, associate the tab with the new bookmark
+    if (arcStyleEnabled && newBookmark && tab.id)
+    {
+      await associateExistingTab(tab.id, newBookmark.id);
+    }
+
+    closeAddToBookmarkDialog();
+  }, [addToBookmarkDialog.tab, createBookmark, arcStyleEnabled, associateExistingTab, closeAddToBookmarkDialog]);
 
   const [exportConflictDialog, setExportConflictDialog] = useState<{
     isOpen: boolean;
@@ -1483,8 +1526,15 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           }
         }
 
-        // Create bookmark at the calculated position (tab remains as regular tab)
-        await createBookmark(parentId, tab.title, tab.url, index);
+        // Create bookmark at the calculated position
+        const newBookmark = await createBookmark(parentId, tab.title, tab.url, index);
+
+        // If Arc style is enabled, associate the tab with the new bookmark
+        // This makes it a managed/persistent tab (hidden from Tabs section)
+        if (arcStyleEnabled && newBookmark && tab.id)
+        {
+          await associateExistingTab(tab.id, newBookmark.id);
+        }
       }
 
       // Clear all state
@@ -1845,7 +1895,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setDropPosition(null);
     setLocalExternalTarget(null);
     onExternalDropTargetChange?.(null);
-  }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren]);
+  }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
@@ -1975,6 +2025,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   onDuplicate={duplicateTab}
                   onPin={onPin}
                   onOpenAddToGroupDialog={openAddToGroupDialog}
+                  onAddToBookmark={openAddToBookmarkDialog}
+                  arcStyleEnabled={arcStyleEnabled}
                 />
               );
             }
@@ -2037,6 +2089,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         onDuplicate={duplicateTab}
                         onPin={onPin}
                         onOpenAddToGroupDialog={openAddToGroupDialog}
+                        onAddToBookmark={openAddToBookmarkDialog}
+                        arcStyleEnabled={arcStyleEnabled}
                       />
                     );
                   })}
@@ -2097,6 +2151,13 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         title="Select Destination Folder"
         onSelect={handleFolderSelected}
         onClose={closeFolderPickerDialog}
+      />
+
+      <FolderPickerDialog
+        isOpen={addToBookmarkDialog.isOpen}
+        title={arcStyleEnabled ? "Move Tab to Bookmark Folder" : "Add Tab to Bookmark Folder"}
+        onSelect={handleAddToBookmarkFolderSelect}
+        onClose={closeAddToBookmarkDialog}
       />
 
       <ExportConflictDialog

@@ -418,6 +418,18 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           <X size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       )}
+      {/* Delete button - visible on hover when tab is NOT loaded (or non-Arc style) */}
+      {!isFolder && !isSpecialFolder && (bookmarkOpenMode !== 'arc' || !isLoaded) && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onRemove(node.id); }}
+          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
+          title="Delete bookmark"
+          aria-label="Delete bookmark"
+        >
+          <Trash size={14} className="text-gray-700 dark:text-gray-200" />
+        </button>
+      )}
     </div>
   );
 
