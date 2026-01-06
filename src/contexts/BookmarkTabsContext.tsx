@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 
-const STORAGE_KEY = 'tabAssociations';
+// Helper to create window-scoped storage key
+const getStorageKey = (windowId: number) => `tabAssociations_${windowId}`;
 
 // Helper to create item keys
 const makeBookmarkKey = (bookmarkId: string) => `bookmark-${bookmarkId}`;
@@ -51,6 +52,9 @@ interface BookmarkTabsProviderProps
 
 export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 {
+  // Current window ID for window-scoped storage
+  const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
+
   // In-memory mappings for fast lookup (key is "bookmark-{id}" or "pinned-{id}")
   const [itemToTab, setItemToTab] = useState<Map<string, number>>(new Map());
   const [tabToItem, setTabToItem] = useState<Map<number, string>>(new Map());
@@ -60,6 +64,18 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   const [isInitialized, setIsInitialized] = useState(false);
 
   const isRebuilding = useRef(false);
+
+  // Get current window ID on mount
+  useEffect(() =>
+  {
+    chrome.windows.getCurrent((win) =>
+    {
+      if (win.id)
+      {
+        setCurrentWindowId(win.id);
+      }
+    });
+  }, []);
 
   const handleError = useCallback((operation: string) =>
   {
@@ -76,16 +92,18 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
   // Rebuild associations from storage on init
   // Just validates that stored tabIds still exist - no URL matching
-  const rebuildAssociations = useCallback(async () =>
+  const rebuildAssociations = useCallback(async (windowId: number) =>
   {
     if (isRebuilding.current) return;
     isRebuilding.current = true;
 
+    const storageKey = getStorageKey(windowId);
+
     try
     {
       // Get stored associations from session storage
-      const result = await chrome.storage.session.get(STORAGE_KEY);
-      const associations: Record<number, string> = result[STORAGE_KEY] || {};
+      const result = await chrome.storage.session.get(storageKey);
+      const associations: Record<number, string> = result[storageKey] || {};
 
       const newItemToTab = new Map<string, number>();
       const newTabToItem = new Map<number, string>();
@@ -132,7 +150,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
       }
 
       // Update storage with cleaned associations
-      await chrome.storage.session.set({ [STORAGE_KEY]: associations });
+      await chrome.storage.session.set({ [storageKey]: associations });
 
       setItemToTab(newItemToTab);
       setTabToItem(newTabToItem);
@@ -150,15 +168,22 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     }
   }, []);
 
-  // Initialize on mount
+  // Initialize when windowId is available
   useEffect(() =>
   {
-    rebuildAssociations();
-  }, [rebuildAssociations]);
+    if (currentWindowId !== null)
+    {
+      rebuildAssociations(currentWindowId);
+    }
+  }, [currentWindowId, rebuildAssociations]);
 
   // Listen for tab removal
   useEffect(() =>
   {
+    if (currentWindowId === null) return;
+
+    const storageKey = getStorageKey(currentWindowId);
+
     const handleTabRemoved = (tabId: number) =>
     {
       setTabToItem((prev) =>
@@ -174,11 +199,11 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           });
 
           // Clean up from session storage
-          chrome.storage.session.get(STORAGE_KEY, (result) =>
+          chrome.storage.session.get(storageKey, (result) =>
           {
-            const associations: Record<number, string> = result[STORAGE_KEY] || {};
+            const associations: Record<number, string> = result[storageKey] || {};
             delete associations[tabId];
-            chrome.storage.session.set({ [STORAGE_KEY]: associations });
+            chrome.storage.session.set({ [storageKey]: associations });
           });
 
           const newMap = new Map(prev);
@@ -195,7 +220,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     {
       chrome.tabs?.onRemoved?.removeListener(handleTabRemoved);
     };
-  }, []);
+  }, [currentWindowId]);
 
   // Listen for tab audible state changes
   useEffect(() =>
@@ -259,19 +284,26 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   // Store association in session storage
   const storeAssociation = useCallback((tabId: number, itemKey: string): Promise<void> =>
   {
+    if (currentWindowId === null)
+    {
+      return Promise.resolve();
+    }
+
+    const storageKey = getStorageKey(currentWindowId);
+
     return new Promise((resolve) =>
     {
-      chrome.storage.session.get(STORAGE_KEY, (result) =>
+      chrome.storage.session.get(storageKey, (result) =>
       {
-        const associations: Record<number, string> = result[STORAGE_KEY] || {};
+        const associations: Record<number, string> = result[storageKey] || {};
         associations[tabId] = itemKey;
-        chrome.storage.session.set({ [STORAGE_KEY]: associations }, () =>
+        chrome.storage.session.set({ [storageKey]: associations }, () =>
         {
           resolve();
         });
       });
     });
-  }, []);
+  }, [currentWindowId]);
 
   // Create a new tab for an item (no grouping)
   const createItemTab = useCallback(async (itemKey: string, url: string): Promise<void> =>
