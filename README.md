@@ -5,7 +5,6 @@ A Chrome extension that puts pinned sites, bookmarks, and tabs in a side panel, 
 **Link to Chrome Web Store:**
 https://chromewebstore.google.com/detail/jmmgjadgeeicdbagekohgmaipoekgcbn?utm_source=item-share-cb
 
-
 **What it does:**
 - **Unified sidebar:** Pinned bookmarks, regular bookmarks, and active tabs all in one vertical panel
 - **"Live" bookmarks:** Bookmarks behave like tabs—open and close them on the fly
