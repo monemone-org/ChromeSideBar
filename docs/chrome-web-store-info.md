@@ -84,6 +84,10 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
+## 1.0.123
+
+- Arc-style bookmarks now stay local to each window - opening a bookmark in one window won't affect another
+
 ## 1.0.116
 
 - Improved Arc-style persistent tab handling: tabs are no longer placed in a special tab group. If session data is lost (e.g. extension reload), persistent tabs now appear as normal tabs instead of being hidden.
