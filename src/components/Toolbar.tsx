@@ -135,7 +135,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   // Check if any filter is active
   const hasActiveFilters = filterLiveTabsActive || filterAudibleActive || inputValue.trim() !== '';
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside or pressing Escape
   useEffect(() =>
   {
     const handleClickOutside = (e: MouseEvent) =>
@@ -151,12 +151,23 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       }
     };
 
+    const handleEscape = (e: KeyboardEvent) =>
+    {
+      if (e.key === 'Escape' && showDropdown)
+      {
+        e.preventDefault();
+        setShowDropdown(false);
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
     return () =>
     {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
     };
-  }, []);
+  }, [showDropdown]);
 
   // Listen for Chrome extension commands directly
   useEffect(() =>

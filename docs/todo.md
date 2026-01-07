@@ -86,3 +86,7 @@ bugs:
 - [x] remove seperate line in filtering mode if there is no pinned site nor bookmarks after filtering
 - [ ] add filter toolbar button: filter by domain name, and save as a "Named filtered view" (please suggest a better name). show a drop down to let user choose and apply/unapply a "filtered named view".
 
+- saved filter
+      - [x] recent filter is not saved. there should be a debounce to start search. that search string is remembered in memory.  the string should be saved in recent. if user edit the search string without deleting all charactors, then edit that recent search string without adding another new one to the recent list.
+      - [x] add a [reset] filter button to toolbar that clear the search string , filter with open tab and filter with speaker.
+      - [ ] focus doesn't go to the input field
