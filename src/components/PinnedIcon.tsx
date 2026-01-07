@@ -306,6 +306,7 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onDuplica
             style={{ ...style, width: iconSize + 8, height: iconSize + 8 }}
             {...attributes}
             {...listeners}
+            title={site.title}
             className={clsx(
               "group/pin relative flex items-center justify-center rounded",
               isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700",
@@ -344,11 +345,6 @@ export const PinnedIcon = ({ site, onRemove, onUpdate, onResetFavicon, onDuplica
                 />
               )
             )}
-
-            {/* Fast tooltip */}
-            <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white rounded whitespace-nowrap opacity-0 invisible group-hover/pin:opacity-100 group-hover/pin:visible transition-opacity duration-100 delay-150 pointer-events-none z-50">
-              {site.title}
-            </div>
           </div>
         </ContextMenu.Trigger>
         <ContextMenu.Portal>

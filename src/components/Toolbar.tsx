@@ -11,32 +11,6 @@ interface ToolbarProps
   menuButtonRef: React.RefObject<HTMLButtonElement>;
 }
 
-interface TooltipButtonProps
-{
-  onClick: () => void;
-  tooltip: string;
-  className?: string;
-  children: React.ReactNode;
-  buttonRef?: React.RefObject<HTMLButtonElement>;
-}
-
-const TooltipButton = ({ onClick, tooltip, className, children, buttonRef }: TooltipButtonProps) =>
-{
-  return (
-    <div className="relative group">
-      <button
-        ref={buttonRef}
-        onClick={onClick}
-        className={className}
-      >
-        {children}
-      </button>
-      <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 px-2 py-1 text-xs text-white bg-gray-800 dark:bg-gray-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 delay-150 pointer-events-none z-50">
-        {tooltip}
-      </div>
-    </div>
-  );
-};
 
 export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   filterLiveTabsActive,
@@ -54,36 +28,36 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
     <div className="flex items-center justify-between px-2 py-1 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
       {/* Left side - Filter buttons */}
       <div className="flex items-center gap-1">
-        <TooltipButton
+        <button
           onClick={onFilterLiveTabsToggle}
-          tooltip={filterLiveTabsActive ? "Show all items" : "Show only items with live tabs"}
+          title={filterLiveTabsActive ? "Show all items" : "Show only items with open tabs"}
           className={`p-1.5 rounded transition-all duration-150 ${
             filterLiveTabsActive ? activeButtonClass : inactiveButtonClass
           }`}
         >
           <Filter size={16} />
-        </TooltipButton>
+        </button>
 
-        <TooltipButton
+        <button
           onClick={onFilterAudibleToggle}
-          tooltip={filterAudibleActive ? "Show all items" : "Show only items playing audio/video"}
+          title={filterAudibleActive ? "Show all items" : "Show only items playing audio/video"}
           className={`p-1.5 rounded transition-all duration-150 ${
             filterAudibleActive ? activeButtonClass : inactiveButtonClass
           }`}
         >
           <Volume2 size={16} />
-        </TooltipButton>
+        </button>
       </div>
 
       {/* Right side - Settings gear button */}
-      <TooltipButton
+      <button
+        ref={menuButtonRef}
         onClick={onMenuToggle}
-        tooltip="Menu"
-        buttonRef={menuButtonRef}
+        title="Menu"
         className={`p-1.5 rounded transition-all duration-150 ${inactiveButtonClass}`}
       >
         <Settings size={16} />
-      </TooltipButton>
+      </button>
     </div>
   );
 });
