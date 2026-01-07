@@ -913,6 +913,8 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setDropPosition(null);
   }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
+  const hasVisibleBookmarks = visibleBookmarks.length > 0;
+
   return (
     <>
       <DndContext
@@ -962,6 +964,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
           {activeNode ? <DragOverlayContent node={activeNode} depth={activeDepth} /> : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Separator - only show when there are visible bookmarks */}
+      {hasVisibleBookmarks && (
+        <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
+      )}
 
       <EditModal
         isOpen={editingNode !== null}
