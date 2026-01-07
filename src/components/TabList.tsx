@@ -588,6 +588,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           ref={ref}
           depth={indentLevel}
           title={tab.title}
+          tooltip={tab.url ? `${tab.title}\n${tab.url}` : undefined}
           icon={icon}
           hasChildren={false}
           isActive={false} // Disable default active style, we handle it via className

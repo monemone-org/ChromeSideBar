@@ -8,6 +8,7 @@ import { LAYOUT, getIndentStyle } from '../utils/indent';
 export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   depth: number;
   title: React.ReactNode;
+  tooltip?: string;             // Native HTML title attribute for hover tooltip
   icon?: React.ReactNode;
   isExpanded?: boolean;
   hasChildren?: boolean;
@@ -26,7 +27,7 @@ export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
   // DND props
   dndAttributes?: DraggableAttributes;
   dndListeners?: SyntheticListenerMap;
-  
+
   // Custom styles
   // className and style are in HTMLAttributes
 }
@@ -34,6 +35,7 @@ export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
 export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
   depth,
   title,
+  tooltip,
   icon,
   isExpanded,
   hasChildren,
@@ -59,6 +61,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       {...props} // Spread standard HTML attributes and injected props first
       {...dndAttributes}
       {...dndListeners}
+      title={tooltip}
       className={clsx(
         'group flex items-center h-7 rounded-md cursor-default select-none transition-colors relative pr-2',
         isActive ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100' : 'hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200',

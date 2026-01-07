@@ -83,3 +83,5 @@ bugs:
 
 - [x] tooltips are clipped
 - [ ] tab/bookmark rows have no tooltips
+- [ ] remove seperate line in filtering mode if there is no pinned site nor bookmarks after filtering
+- [ ] add filter toolbar button: filter by domain name, and save as a "Named filtered view" (please suggest a better name). show a drop down to let user choose and apply/unapply a "filtered named view".

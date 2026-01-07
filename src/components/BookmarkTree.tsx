@@ -445,6 +445,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           ref={ref}
           depth={depth}
           title={node.title}
+          tooltip={node.url ? `${node.title}\n${node.url}` : undefined}
           icon={combinedIcon}
           hasChildren={isFolder}
           isExpanded={expandedState[node.id]}
