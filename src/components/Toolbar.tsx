@@ -17,10 +17,13 @@ interface ToolbarProps
   onSaveFilter: (text: string) => void;
   onDeleteSavedFilter: (text: string) => void;
   onApplyFilter: (text: string) => void;
+  onUpdateRecent?: (text: string, existingEntry?: string) => void;
   onShowToast?: (message: string) => void;
   onResetFilters?: () => void;
 }
 
+
+const DEBOUNCE_MS = 300;
 
 export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   filterLiveTabsActive,
@@ -36,6 +39,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   onSaveFilter,
   onDeleteSavedFilter,
   onApplyFilter,
+  onUpdateRecent,
   onShowToast,
   onResetFilters,
 }, _ref) =>
@@ -48,8 +52,88 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   const dropdownButtonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Local input value for immediate display (debounced before filtering)
+  const [inputValue, setInputValue] = useState(filterText);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track current session's recent entry (for updating instead of adding new)
+  const [sessionRecentEntry, setSessionRecentEntry] = useState<string | null>(null);
+
+  // Sync inputValue when filterText changes externally (e.g., from selecting a filter)
+  useEffect(() =>
+  {
+    setInputValue(filterText);
+  }, [filterText]);
+
+  // Debounced filter change
+  const handleInputChange = useCallback((value: string) =>
+  {
+    const oldValue = inputValue.trim();
+    const newValue = value.trim();
+
+    // Detect "select all and clear/replace" pattern:
+    // If old value had meaningful content (3+ chars) and is being cleared or replaced
+    const hadMeaningfulContent = oldValue.length >= 3;
+    const isCleared = newValue.length === 0;
+    const isReplacement = newValue.length > 0 &&
+      newValue.length <= 2 &&
+      !oldValue.toLowerCase().startsWith(newValue.toLowerCase());
+
+    // If clearing or replacing meaningful content, save the old search first
+    if (hadMeaningfulContent && (isCleared || isReplacement) && onUpdateRecent)
+    {
+      onUpdateRecent(oldValue, sessionRecentEntry ?? undefined);
+      setSessionRecentEntry(null); // Start fresh session
+    }
+
+    setInputValue(value);
+
+    // Clear existing timer
+    if (debounceTimerRef.current)
+    {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // If cleared completely, reset session and apply immediately
+    if (newValue === '')
+    {
+      setSessionRecentEntry(null);
+      onFilterTextChange('');
+      return;
+    }
+
+    // Debounce the actual filter change
+    debounceTimerRef.current = setTimeout(() =>
+    {
+      onFilterTextChange(value);
+    }, DEBOUNCE_MS);
+  }, [onFilterTextChange, inputValue, sessionRecentEntry, onUpdateRecent]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() =>
+  {
+    return () =>
+    {
+      if (debounceTimerRef.current)
+      {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Commit current search to recent (on blur or Enter)
+  const commitToRecent = useCallback(() =>
+  {
+    const trimmed = inputValue.trim();
+    if (!trimmed || !onUpdateRecent) return;
+
+    // Update existing entry or add new
+    onUpdateRecent(trimmed, sessionRecentEntry ?? undefined);
+    setSessionRecentEntry(trimmed);
+  }, [inputValue, sessionRecentEntry, onUpdateRecent]);
+
   // Check if any filter is active
-  const hasActiveFilters = filterLiveTabsActive || filterAudibleActive || filterText.trim() !== '';
+  const hasActiveFilters = filterLiveTabsActive || filterAudibleActive || inputValue.trim() !== '';
 
   // Close dropdown when clicking outside
   useEffect(() =>
@@ -83,10 +167,9 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       if (input)
       {
         input.focus();
-        // Place cursor at the end of existing text
-        const val = input.value;
-        input.value = '';
-        input.value = val;
+        // Use setSelectionRange for controlled inputs to avoid fighting with React
+        const len = input.value.length;
+        input.setSelectionRange(len, len);
       }
     };
 
@@ -98,9 +181,14 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       }
       else if (command === 'open-saved-filters')
       {
+        // Focus immediately to catch the event
         focusInputWithCursorAtEnd();
+        
         // Toggle dropdown instead of just opening
         setShowDropdown(prev => !prev);
+        
+        // Re-focus after render to ensure it sticks
+        setTimeout(focusInputWithCursorAtEnd, 100);
       }
     };
 
@@ -108,7 +196,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
     return () => chrome.commands.onCommand.removeListener(handleCommand);
   }, []);
 
-  // Handle input keydown for ArrowDown to open dropdown
+  // Handle input keydown for ArrowDown to open dropdown, Enter to commit
   const handleInputKeydown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) =>
   {
     if (e.key === 'ArrowDown')
@@ -116,11 +204,22 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       e.preventDefault();
       setShowDropdown(true);
     }
-  }, []);
+    else if (e.key === 'Enter')
+    {
+      e.preventDefault();
+      commitToRecent();
+    }
+  }, [commitToRecent]);
+
+  // Handle input blur to commit to recent
+  const handleInputBlur = useCallback(() =>
+  {
+    commitToRecent();
+  }, [commitToRecent]);
 
   const handleSaveFilter = () =>
   {
-    const trimmed = filterText.trim();
+    const trimmed = inputValue.trim();
     if (trimmed && !savedFilters.includes(trimmed))
     {
       onSaveFilter(trimmed);
@@ -130,16 +229,28 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
 
   const handleSelectFilter = (text: string) =>
   {
+    // Commit current search to recent before switching (if any)
+    commitToRecent();
+
+    // Apply the selected filter and start a new session
     onApplyFilter(text);
+    setSessionRecentEntry(text);
     setShowDropdown(false);
   };
 
   const handleClearFilter = () =>
   {
+    // Clear debounce timer
+    if (debounceTimerRef.current)
+    {
+      clearTimeout(debounceTimerRef.current);
+    }
+    setInputValue('');
+    setSessionRecentEntry(null);
     onFilterTextChange('');
   };
 
-  const canSave = filterText.trim() && !savedFilters.includes(filterText.trim());
+  const canSave = inputValue.trim() && !savedFilters.includes(inputValue.trim());
 
   return (
     <div className="flex flex-col border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
@@ -201,15 +312,16 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
           <input
             ref={inputRef}
             type="text"
-            value={filterText}
-            onChange={(e) => onFilterTextChange(e.target.value)}
+            value={inputValue}
+            onChange={(e) => handleInputChange(e.target.value)}
             onKeyDown={handleInputKeydown}
+            onBlur={handleInputBlur}
             placeholder="Filter by title or URL..."
             className="w-full pl-2 pr-16 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
           />
 
           {/* Clear button - inside input on right */}
-          {filterText && (
+          {inputValue && (
             <button
               onClick={handleClearFilter}
               title="Clear filter"
@@ -307,7 +419,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
         <button
           onClick={handleSaveFilter}
           disabled={!canSave}
-          title={canSave ? "Save filter" : filterText.trim() ? "Already saved" : "Enter filter text first"}
+          title={canSave ? "Save filter" : inputValue.trim() ? "Already saved" : "Enter filter text first"}
           className={`p-1.5 rounded transition-all duration-150 ${
             canSave
               ? 'text-blue-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30'

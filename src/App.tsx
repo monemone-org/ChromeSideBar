@@ -120,6 +120,19 @@ function App() {
     }
   };
 
+  // Update recent filter (called on blur/Enter from toolbar)
+  // If existingEntry is provided, replace it; otherwise add new
+  const handleUpdateRecent = useCallback((text: string, existingEntry?: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    // Remove existing entry if provided (we're updating it)
+    // Also remove duplicates of the new text
+    const filtered = recentFilters.filter((f) => f !== trimmed && f !== existingEntry);
+    // Add new text at the top, max 5
+    setRecentFilters([trimmed, ...filtered].slice(0, 5));
+  }, [recentFilters]);
+
   // Toast helpers
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -227,6 +240,7 @@ function App() {
           onSaveFilter={handleSaveFilter}
           onDeleteSavedFilter={handleDeleteSavedFilter}
           onApplyFilter={handleApplyFilter}
+          onUpdateRecent={handleUpdateRecent}
           onShowToast={showToast}
           onResetFilters={handleResetFilters}
         />
