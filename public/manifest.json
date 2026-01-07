@@ -44,13 +44,6 @@
       },
       "description": "New Tab in Active Group"
     },
-    "focus-filter-input": {
-      "suggested_key": {
-        "default": "Alt+F",
-        "mac": "Alt+F"
-      },
-      "description": "Focus Filter Input"
-    },
     "open-saved-filters": {
       "suggested_key": {
         "default": "Alt+Shift+F",
