@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { BookmarkTree } from './components/BookmarkTree';
 import { TabList, ExternalDropTarget, ResolveBookmarkDropTarget } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
@@ -7,6 +7,7 @@ import { SettingsDialog, SettingsValues, BookmarkOpenMode } from './components/S
 import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
+import { Toast } from './components/Toast';
 import { usePinnedSites } from './hooks/usePinnedSites';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -54,6 +55,19 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
   const [filterAudible, setFilterAudible] = useState(false);
+  const [filterText, setFilterText] = useState('');
+  const [savedFilters, setSavedFilters] = useLocalStorage<string[]>(
+    'sidebar-saved-filters',
+    [],
+    { parse: (v) => JSON.parse(v), serialize: (v) => JSON.stringify(v) }
+  );
+  const [recentFilters, setRecentFilters] = useLocalStorage<string[]>(
+    'sidebar-recent-filters',
+    [],
+    { parse: (v) => JSON.parse(v), serialize: (v) => JSON.stringify(v) }
+  );
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastVisible, setToastVisible] = useState(false);
   const [externalDropTarget, setExternalDropTarget] = useState<ExternalDropTarget | null>(null);
   const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -80,6 +94,48 @@ function App() {
     setBookmarkOpenMode(newSettings.bookmarkOpenMode);
     setShowSettings(false);
   };
+
+  // Filter handlers
+  const handleFilterTextChange = (text: string) => {
+    setFilterText(text);
+  };
+
+  const handleSaveFilter = (text: string) => {
+    if (text.trim() && !savedFilters.includes(text.trim())) {
+      setSavedFilters([text.trim(), ...savedFilters]);
+    }
+  };
+
+  const handleDeleteSavedFilter = (text: string) => {
+    setSavedFilters(savedFilters.filter((f) => f !== text));
+  };
+
+  const handleApplyFilter = (text: string) => {
+    setFilterText(text);
+    // Add to recent filters (avoid duplicates, max 5)
+    const trimmed = text.trim();
+    if (trimmed) {
+      const newRecent = [trimmed, ...recentFilters.filter((f) => f !== trimmed)].slice(0, 5);
+      setRecentFilters(newRecent);
+    }
+  };
+
+  // Toast helpers
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+  }, []);
+
+  const hideToast = useCallback(() => {
+    setToastVisible(false);
+  }, []);
+
+  // Reset all filters
+  const handleResetFilters = useCallback(() => {
+    setFilterText('');
+    setFilterLiveTabs(false);
+    setFilterAudible(false);
+  }, []);
 
   // Close menu when clicking outside
   useEffect(() =>
@@ -164,13 +220,25 @@ function App() {
           onFilterAudibleToggle={() => setFilterAudible(!filterAudible)}
           onMenuToggle={() => setShowMenu(!showMenu)}
           menuButtonRef={buttonRef}
+          filterText={filterText}
+          onFilterTextChange={handleFilterTextChange}
+          savedFilters={savedFilters}
+          recentFilters={recentFilters}
+          onSaveFilter={handleSaveFilter}
+          onDeleteSavedFilter={handleDeleteSavedFilter}
+          onApplyFilter={handleApplyFilter}
+          onShowToast={showToast}
+          onResetFilters={handleResetFilters}
         />
 
-        {/* Popup menu - positioned below toolbar on the right */}
-        {showMenu && (
+        {/* Popup menu - positioned below settings button */}
+        {showMenu && buttonRef.current && (
           <div
             ref={menuRef}
-            className="absolute right-2 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32 z-50"
+            className="absolute right-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32 z-50"
+            style={{
+              top: buttonRef.current.offsetTop + buttonRef.current.offsetHeight + 4,
+            }}
           >
             <button
               onClick={() =>
@@ -236,13 +304,20 @@ function App() {
         bookmarkOpenMode={bookmarkOpenMode}
         filterLiveTabs={filterLiveTabs}
         filterAudible={filterAudible}
+        filterText={filterText}
       />
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} bookmarkOpenMode={bookmarkOpenMode} onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }} filterLiveTabs={filterLiveTabs} filterAudible={filterAudible} />
-        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current} arcStyleEnabled={bookmarkOpenMode === 'arc'} filterAudible={filterAudible} />
+        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} bookmarkOpenMode={bookmarkOpenMode} onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }} filterLiveTabs={filterLiveTabs} filterAudible={filterAudible} filterText={filterText} />
+        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current} arcStyleEnabled={bookmarkOpenMode === 'arc'} filterAudible={filterAudible} filterText={filterText} />
       </div>
+
+      <Toast
+        message={toastMessage}
+        isVisible={toastVisible}
+        onDismiss={hideToast}
+      />
       </div>
       </BookmarkTabsProvider>
     </FontSizeContext.Provider>

@@ -621,7 +621,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               <FolderPlus size={14} className="mr-2" /> Add to Group
             </ContextMenu.Item>
           )}
-          {onAddToBookmark && tab.url && !tab.url.startsWith('chrome://') && (
+          {onAddToBookmark && tab.url && (
             <ContextMenu.Item onSelect={() => onAddToBookmark(tab)}>
               <Bookmark size={14} className="mr-2" /> {arcStyleEnabled ? 'Move to Bookmark' : 'Add to Bookmark'}
             </ContextMenu.Item>
@@ -892,16 +892,17 @@ interface TabListProps {
   resolveBookmarkDropTarget?: () => ResolveBookmarkDropTarget | null;
   arcStyleEnabled?: boolean;
   filterAudible?: boolean;
+  filterText?: string;
 }
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false, filterText = '' }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
 
   // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
-  // Also apply audible filter if enabled
+  // Also apply audible filter and text filter if enabled
   const visibleTabs = useMemo(() =>
   {
     const managedTabIds = getManagedTabIds();
@@ -910,8 +911,16 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     {
       filtered = filtered.filter(tab => tab.audible);
     }
+    if (filterText.trim())
+    {
+      const searchTerm = filterText.trim().toLowerCase();
+      filtered = filtered.filter(tab =>
+        (tab.title?.toLowerCase().includes(searchTerm) ?? false) ||
+        (tab.url?.toLowerCase().includes(searchTerm) ?? false)
+      );
+    }
     return filtered;
-  }, [tabs, getManagedTabIds, filterAudible]);
+  }, [tabs, getManagedTabIds, filterAudible, filterText]);
 
   // All tab groups are visible (no longer filtering out SideBarForArc group)
   const visibleTabGroups = tabGroups;
@@ -1497,7 +1506,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     if (localExternalTarget && activeId && typeof activeId === 'number')
     {
       const tab = visibleTabs.find(t => t.id === activeId);
-      if (tab && tab.url && tab.title && !tab.url.startsWith('chrome://'))
+      if (tab && tab.url && tab.title)
       {
         const { bookmarkId: targetBookmarkId, position, isFolder } = localExternalTarget;
 

@@ -82,6 +82,7 @@ bugs:
 - [x] add a menu item to tab's popup menu: "Add/Move to Bookmark" (Add for non-arc style bookmark. Move for arc style bookmark) which then prompt select a folder dialog.  then create a bookmark.  If it's in arc style bookmark, turn the tab to the bookmark's arc style persistent tab 
 
 - [x] tooltips are clipped
-- [ ] tab/bookmark rows have no tooltips
-- [ ] remove seperate line in filtering mode if there is no pinned site nor bookmarks after filtering
+- [x] tab/bookmark rows have no tooltips
+- [x] remove seperate line in filtering mode if there is no pinned site nor bookmarks after filtering
 - [ ] add filter toolbar button: filter by domain name, and save as a "Named filtered view" (please suggest a better name). show a drop down to let user choose and apply/unapply a "filtered named view".
+

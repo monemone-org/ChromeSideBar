@@ -255,6 +255,7 @@ interface BookmarkRowProps {
   onCreateFolder: (parentId: string) => void;
   onSort: (folderId: string, sortBy: SortOption) => void;
   onDuplicate: (id: string) => void;
+  onExpandAll?: (folderId: string) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   isDragging?: boolean;
   activeId?: string | null;
@@ -288,6 +289,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onCreateFolder,
   onSort,
   onDuplicate,
+  onExpandAll,
   onPin,
   isDragging: _isDragging,
   activeId,
@@ -475,6 +477,11 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onCreateFolder(node.id)}>
                 <FolderPlus size={14} className="mr-2" /> New Folder
               </ContextMenu.Item>
+              {onExpandAll && (
+                <ContextMenu.Item onSelect={() => onExpandAll(node.id)}>
+                  <span className="w-[14px] mr-2" /> Expand All
+                </ContextMenu.Item>
+              )}
               <ContextMenu.Item onSelect={() => onSort(node.id, 'name')}>
                 <ArrowDownAZ size={14} className="mr-2" /> Sort by Name
               </ContextMenu.Item>
@@ -624,16 +631,17 @@ interface BookmarkTreeProps {
   onResolverReady?: (resolver: ResolveBookmarkDropTarget) => void;
   filterLiveTabs?: boolean;
   filterAudible?: boolean;
+  filterText?: string;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '' }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
 
   // Recursively filter bookmarks based on a predicate function
   const filterBookmarksRecursive = useCallback((
     nodes: chrome.bookmarks.BookmarkTreeNode[],
-    predicate: (id: string) => boolean
+    predicate: (node: chrome.bookmarks.BookmarkTreeNode) => boolean
   ): chrome.bookmarks.BookmarkTreeNode[] =>
   {
     return nodes.reduce<chrome.bookmarks.BookmarkTreeNode[]>((acc, node) =>
@@ -655,7 +663,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
       else
       {
         // For bookmarks, include only if predicate returns true
-        if (predicate(node.id))
+        if (predicate(node))
         {
           acc.push(node);
         }
@@ -672,13 +680,23 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   // Apply live tabs filter if enabled
   if (filterLiveTabs)
   {
-    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, isBookmarkLoaded);
+    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) => isBookmarkLoaded(node.id));
   }
 
   // Apply audible filter if enabled
   if (filterAudible)
   {
-    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, isBookmarkAudible);
+    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) => isBookmarkAudible(node.id));
+  }
+
+  // Apply text filter if provided
+  if (filterText.trim())
+  {
+    const searchTerm = filterText.trim().toLowerCase();
+    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) =>
+      node.title.toLowerCase().includes(searchTerm) ||
+      (node.url?.toLowerCase().includes(searchTerm) ?? false)
+    );
   }
 
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
@@ -812,6 +830,35 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setExpandedState(prev => ({ ...prev, [id]: expanded }));
   };
 
+  // Expand all descendant folders under a given folder
+  const handleExpandAll = useCallback((folderId: string) => {
+    const collectFolderIds = (node: chrome.bookmarks.BookmarkTreeNode): string[] => {
+      const ids: string[] = [];
+      if (!node.url) {
+        // It's a folder
+        ids.push(node.id);
+        if (node.children) {
+          for (const child of node.children) {
+            ids.push(...collectFolderIds(child));
+          }
+        }
+      }
+      return ids;
+    };
+
+    const folder = findNode(folderId);
+    if (folder) {
+      const folderIds = collectFolderIds(folder);
+      setExpandedState(prev => {
+        const newState = { ...prev };
+        for (const id of folderIds) {
+          newState[id] = true;
+        }
+        return newState;
+      });
+    }
+  }, [findNode]);
+
   const handleCreateFolder = (parentId: string) => {
     setCreatingFolderParentId(parentId);
   };
@@ -941,6 +988,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             onCreateFolder={handleCreateFolder}
             onSort={sortBookmarks}
             onDuplicate={duplicateBookmark}
+            onExpandAll={handleExpandAll}
             onPin={onPin}
             isDragging={!!activeId}
             activeId={activeId}

@@ -33,6 +33,7 @@ interface PinnedBarProps {
   bookmarkOpenMode?: BookmarkOpenMode;
   filterLiveTabs?: boolean;
   filterAudible?: boolean;
+  filterText?: string;
 }
 
 export const PinnedBar = ({
@@ -46,6 +47,7 @@ export const PinnedBar = ({
   bookmarkOpenMode = 'arc',
   filterLiveTabs = false,
   filterAudible = false,
+  filterText = '',
 }: PinnedBarProps) => {
   const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible } = useBookmarkTabsContext();
 
@@ -58,6 +60,14 @@ export const PinnedBar = ({
   if (filterAudible)
   {
     visiblePinnedSites = visiblePinnedSites.filter(site => isPinnedAudible(site.id));
+  }
+  if (filterText.trim())
+  {
+    const searchTerm = filterText.trim().toLowerCase();
+    visiblePinnedSites = visiblePinnedSites.filter(site =>
+      site.title.toLowerCase().includes(searchTerm) ||
+      site.url.toLowerCase().includes(searchTerm)
+    );
   }
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),

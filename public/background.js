@@ -49,4 +49,5 @@ chrome.commands.onCommand.addListener((command) =>
       });
     });
   }
+  // Note: focus-filter-input and open-saved-filters are handled directly in the side panel
 });
