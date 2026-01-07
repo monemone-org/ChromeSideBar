@@ -31,6 +31,8 @@ interface PinnedBarProps {
   duplicatePin: (id: string) => void;
   iconSize: number;
   bookmarkOpenMode?: BookmarkOpenMode;
+  filterLiveTabs?: boolean;
+  filterAudible?: boolean;
 }
 
 export const PinnedBar = ({
@@ -42,8 +44,21 @@ export const PinnedBar = ({
   duplicatePin,
   iconSize,
   bookmarkOpenMode = 'arc',
+  filterLiveTabs = false,
+  filterAudible = false,
 }: PinnedBarProps) => {
   const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible } = useBookmarkTabsContext();
+
+  // Filter pinned sites based on active filters
+  let visiblePinnedSites = pinnedSites;
+  if (filterLiveTabs)
+  {
+    visiblePinnedSites = visiblePinnedSites.filter(site => isPinnedLoaded(site.id));
+  }
+  if (filterAudible)
+  {
+    visiblePinnedSites = visiblePinnedSites.filter(site => isPinnedAudible(site.id));
+  }
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {
@@ -58,7 +73,7 @@ export const PinnedBar = ({
     }
   };
 
-  if (pinnedSites.length === 0) {
+  if (visiblePinnedSites.length === 0) {
     return null;
   }
 
@@ -75,10 +90,10 @@ export const PinnedBar = ({
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={pinnedSites.map(s => s.id)}
+          items={visiblePinnedSites.map(s => s.id)}
           strategy={rectSortingStrategy}
         >
-          {pinnedSites.map((site) => (
+          {visiblePinnedSites.map((site) => (
             <PinnedIcon
               key={site.id}
               site={site}

@@ -890,20 +890,27 @@ interface TabListProps {
   onExternalDropTargetChange?: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget?: () => ResolveBookmarkDropTarget | null;
   arcStyleEnabled?: boolean;
+  filterAudible?: boolean;
 }
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
 
   // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
+  // Also apply audible filter if enabled
   const visibleTabs = useMemo(() =>
   {
     const managedTabIds = getManagedTabIds();
-    return tabs.filter(tab => !managedTabIds.has(tab.id!));
-  }, [tabs, getManagedTabIds]);
+    let filtered = tabs.filter(tab => !managedTabIds.has(tab.id!));
+    if (filterAudible)
+    {
+      filtered = filtered.filter(tab => tab.audible);
+    }
+    return filtered;
+  }, [tabs, getManagedTabIds, filterAudible]);
 
   // All tab groups are visible (no longer filtering out SideBarForArc group)
   const visibleTabGroups = tabGroups;

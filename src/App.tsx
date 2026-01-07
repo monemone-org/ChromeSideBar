@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { BookmarkTree } from './components/BookmarkTree';
 import { TabList, ExternalDropTarget, ResolveBookmarkDropTarget } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
+import { Toolbar } from './components/Toolbar';
 import { SettingsDialog, SettingsValues, BookmarkOpenMode } from './components/SettingsDialog';
 import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
@@ -51,10 +52,13 @@ function App() {
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [filterLiveTabs, setFilterLiveTabs] = useState(false);
+  const [filterAudible, setFilterAudible] = useState(false);
   const [externalDropTarget, setExternalDropTarget] = useState<ExternalDropTarget | null>(null);
   const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null!);
+  const toolbarRef = useRef<HTMLDivElement>(null);
   const {
     pinnedSites,
     addPin,
@@ -151,34 +155,22 @@ function App() {
         appendPinnedSites={appendPinnedSites}
       />
 
-      {/* Pinned Sites */}
-      <PinnedBar
-        pinnedSites={pinnedSites}
-        removePin={removePin}
-        updatePin={updatePin}
-        resetFavicon={resetFavicon}
-        movePin={movePin}
-        duplicatePin={duplicatePin}
-        iconSize={pinnedIconSize}
-        bookmarkOpenMode={bookmarkOpenMode}
-      />
+      {/* Toolbar */}
+      <div ref={toolbarRef} className="relative">
+        <Toolbar
+          filterLiveTabsActive={filterLiveTabs}
+          onFilterLiveTabsToggle={() => setFilterLiveTabs(!filterLiveTabs)}
+          filterAudibleActive={filterAudible}
+          onFilterAudibleToggle={() => setFilterAudible(!filterAudible)}
+          onMenuToggle={() => setShowMenu(!showMenu)}
+          menuButtonRef={buttonRef}
+        />
 
-      {/* Settings button with popup menu - bottom-left corner of panel */}
-      <div className="absolute left-2 bottom-2 z-20">
-        <button
-          ref={buttonRef}
-          onClick={() => setShowMenu(!showMenu)}
-          title="Menu"
-          className="p-1.5 rounded bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 hover:scale-110 transition-all duration-150"
-        >
-          <Settings size={16} />
-        </button>
-
-        {/* Popup menu */}
+        {/* Popup menu - positioned below toolbar on the right */}
         {showMenu && (
           <div
             ref={menuRef}
-            className="absolute left-0 bottom-full mb-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32"
+            className="absolute right-2 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32 z-50"
           >
             <button
               onClick={() =>
@@ -232,11 +224,25 @@ function App() {
         )}
       </div>
 
+      {/* Pinned Sites */}
+      <PinnedBar
+        pinnedSites={pinnedSites}
+        removePin={removePin}
+        updatePin={updatePin}
+        resetFavicon={resetFavicon}
+        movePin={movePin}
+        duplicatePin={duplicatePin}
+        iconSize={pinnedIconSize}
+        bookmarkOpenMode={bookmarkOpenMode}
+        filterLiveTabs={filterLiveTabs}
+        filterAudible={filterAudible}
+      />
+
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} bookmarkOpenMode={bookmarkOpenMode} onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }} />
+        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} bookmarkOpenMode={bookmarkOpenMode} onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }} filterLiveTabs={filterLiveTabs} filterAudible={filterAudible} />
         <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
-        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current} arcStyleEnabled={bookmarkOpenMode === 'arc'} />
+        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current} arcStyleEnabled={bookmarkOpenMode === 'arc'} filterAudible={filterAudible} />
       </div>
       </div>
       </BookmarkTabsProvider>

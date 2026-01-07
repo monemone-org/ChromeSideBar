@@ -621,16 +621,64 @@ interface BookmarkTreeProps {
   externalDropTarget?: ExternalDropTarget | null;
   bookmarkOpenMode?: BookmarkOpenMode;
   onResolverReady?: (resolver: ResolveBookmarkDropTarget) => void;
+  filterLiveTabs?: boolean;
+  filterAudible?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
 
+  // Recursively filter bookmarks based on a predicate function
+  const filterBookmarksRecursive = useCallback((
+    nodes: chrome.bookmarks.BookmarkTreeNode[],
+    predicate: (id: string) => boolean
+  ): chrome.bookmarks.BookmarkTreeNode[] =>
+  {
+    return nodes.reduce<chrome.bookmarks.BookmarkTreeNode[]>((acc, node) =>
+    {
+      const isFolder = !node.url;
+
+      if (isFolder)
+      {
+        // For folders, recursively filter children
+        const filteredChildren = node.children
+          ? filterBookmarksRecursive(node.children, predicate)
+          : [];
+        // Only include folder if it has filtered children
+        if (filteredChildren.length > 0)
+        {
+          acc.push({ ...node, children: filteredChildren });
+        }
+      }
+      else
+      {
+        // For bookmarks, include only if predicate returns true
+        if (predicate(node.id))
+        {
+          acc.push(node);
+        }
+      }
+      return acc;
+    }, []);
+  }, []);
+
   // Filter out "Other Bookmarks" (id "2") if hidden
-  const visibleBookmarks = hideOtherBookmarks
+  let visibleBookmarks = hideOtherBookmarks
     ? bookmarks.filter(node => node.id !== '2')
     : bookmarks;
+
+  // Apply live tabs filter if enabled
+  if (filterLiveTabs)
+  {
+    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, isBookmarkLoaded);
+  }
+
+  // Apply audible filter if enabled
+  if (filterAudible)
+  {
+    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, isBookmarkAudible);
+  }
 
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
