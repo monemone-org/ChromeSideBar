@@ -23,7 +23,8 @@ import {
   Pin,
   X,
   Volume2,
-  Copy
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -271,6 +272,7 @@ interface BookmarkRowProps {
   checkIsActive?: (bookmarkId: string) => boolean;
   onOpenBookmark?: (bookmarkId: string, url: string) => void;
   onCloseBookmark?: (bookmarkId: string) => void;
+  onMoveToNewWindow?: (bookmarkId: string) => void;
   // External drop target (from tab drag)
   externalDropTarget?: ExternalDropTarget | null;
   // Drag-drop attributes
@@ -301,6 +303,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   isActive,
   onOpenBookmark,
   onCloseBookmark,
+  onMoveToNewWindow,
   externalDropTarget,
   attributes,
   listeners
@@ -498,6 +501,11 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               </ContextMenu.Item>
             </>
           )}
+          {!isFolder && isLoaded && onMoveToNewWindow && (
+            <ContextMenu.Item onSelect={() => onMoveToNewWindow(node.id)}>
+              <ExternalLink size={14} className="mr-2" /> Move to New Window
+            </ContextMenu.Item>
+          )}
           {!isSpecialFolder && (
             <>
               {!isFolder && (
@@ -636,7 +644,17 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '' }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey } = useBookmarkTabsContext();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark } = useBookmarkTabsContext();
+
+  // Move bookmark's tab to a new window
+  const moveBookmarkToNewWindow = useCallback((bookmarkId: string) =>
+  {
+    const tabId = getTabIdForBookmark(bookmarkId);
+    if (tabId)
+    {
+      chrome.windows.create({ tabId });
+    }
+  }, [getTabIdForBookmark]);
 
   // Recursively filter bookmarks based on a predicate function
   const filterBookmarksRecursive = useCallback((
@@ -1003,6 +1021,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             checkIsActive={isBookmarkActive}
             onOpenBookmark={openBookmarkTab}
             onCloseBookmark={closeBookmarkTab}
+            onMoveToNewWindow={moveBookmarkToNewWindow}
             externalDropTarget={externalDropTarget}
           />
         ))}

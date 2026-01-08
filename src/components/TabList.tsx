@@ -24,7 +24,7 @@ import { Dialog } from './Dialog';
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
 import { FolderPickerDialog } from './FolderPickerDialog';
-import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, MoreHorizontal, SquareStack, Bookmark } from 'lucide-react';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, MoreHorizontal, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { DropIndicators } from './DropIndicators';
@@ -480,6 +480,10 @@ interface DraggableTabProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   onOpenAddToGroupDialog?: (tabId: number, currentGroupId?: number) => void;
   onAddToBookmark?: (tab: chrome.tabs.Tab) => void;
+  onMoveToNewWindow?: (tabId: number) => void;
+  onCloseTabsBefore?: (tabId: number) => void;
+  onCloseTabsAfter?: (tabId: number) => void;
+  onCloseOthers?: (tabId: number) => void;
   arcStyleEnabled?: boolean;
   // Drag attributes
   attributes?: DraggableAttributes;
@@ -503,6 +507,10 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onPin,
   onOpenAddToGroupDialog,
   onAddToBookmark,
+  onMoveToNewWindow,
+  onCloseTabsBefore,
+  onCloseTabsAfter,
+  onCloseOthers,
   arcStyleEnabled,
   attributes,
   listeners
@@ -631,6 +639,28 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               <Copy size={14} className="mr-2" /> Duplicate
             </ContextMenu.Item>
           )}
+          {onMoveToNewWindow && (
+            <ContextMenu.Item onSelect={() => onMoveToNewWindow(tab.id!)}>
+              <ExternalLink size={14} className="mr-2" /> Move to New Window
+            </ContextMenu.Item>
+          )}
+          <ContextMenu.Separator />
+          {onCloseTabsBefore && (
+            <ContextMenu.Item onSelect={() => onCloseTabsBefore(tab.id!)}>
+              <span className="w-[14px] mr-2" /> Close Tabs Before
+            </ContextMenu.Item>
+          )}
+          {onCloseTabsAfter && (
+            <ContextMenu.Item onSelect={() => onCloseTabsAfter(tab.id!)}>
+              <span className="w-[14px] mr-2" /> Close Tabs After
+            </ContextMenu.Item>
+          )}
+          {onCloseOthers && (
+            <ContextMenu.Item onSelect={() => onCloseOthers(tab.id!)}>
+              <span className="w-[14px] mr-2" /> Close Other Tabs
+            </ContextMenu.Item>
+          )}
+          <ContextMenu.Separator />
           <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
             <X size={14} className="mr-2" /> Close
           </ContextMenu.Item>
@@ -1941,6 +1971,42 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     closeTabs(tabIds);
   };
 
+  // Move tab to a new window
+  const moveToNewWindow = useCallback((tabId: number) =>
+  {
+    chrome.windows.create({ tabId });
+  }, []);
+
+  // Close tabs before/after/others (based on visibleTabs order)
+  const closeTabsBefore = useCallback((tabId: number) =>
+  {
+    const index = visibleTabs.findIndex(t => t.id === tabId);
+    if (index <= 0) return;
+    const tabIds = visibleTabs.slice(0, index)
+      .map(t => t.id)
+      .filter((id): id is number => id !== undefined);
+    closeTabs(tabIds);
+  }, [visibleTabs, closeTabs]);
+
+  const closeTabsAfter = useCallback((tabId: number) =>
+  {
+    const index = visibleTabs.findIndex(t => t.id === tabId);
+    if (index < 0 || index >= visibleTabs.length - 1) return;
+    const tabIds = visibleTabs.slice(index + 1)
+      .map(t => t.id)
+      .filter((id): id is number => id !== undefined);
+    closeTabs(tabIds);
+  }, [visibleTabs, closeTabs]);
+
+  const closeOthers = useCallback((tabId: number) =>
+  {
+    const tabIds = visibleTabs
+      .filter(t => t.id !== tabId)
+      .map(t => t.id)
+      .filter((id): id is number => id !== undefined);
+    closeTabs(tabIds);
+  }, [visibleTabs, closeTabs]);
+
   // Track if menu was just closed to prevent immediate reopen
   const menuJustClosedRef = useRef(false);
 
@@ -2043,6 +2109,10 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   onPin={onPin}
                   onOpenAddToGroupDialog={openAddToGroupDialog}
                   onAddToBookmark={openAddToBookmarkDialog}
+                  onMoveToNewWindow={moveToNewWindow}
+                  onCloseTabsBefore={closeTabsBefore}
+                  onCloseTabsAfter={closeTabsAfter}
+                  onCloseOthers={closeOthers}
                   arcStyleEnabled={arcStyleEnabled}
                 />
               );
@@ -2107,6 +2177,10 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         onPin={onPin}
                         onOpenAddToGroupDialog={openAddToGroupDialog}
                         onAddToBookmark={openAddToBookmarkDialog}
+                        onMoveToNewWindow={moveToNewWindow}
+                        onCloseTabsBefore={closeTabsBefore}
+                        onCloseTabsAfter={closeTabsAfter}
+                        onCloseOthers={closeOthers}
                         arcStyleEnabled={arcStyleEnabled}
                       />
                     );

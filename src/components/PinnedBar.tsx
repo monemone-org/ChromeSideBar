@@ -49,7 +49,17 @@ export const PinnedBar = ({
   filterAudible = false,
   filterText = '',
 }: PinnedBarProps) => {
-  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible } = useBookmarkTabsContext();
+  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned } = useBookmarkTabsContext();
+
+  // Move pinned tab to a new window
+  const movePinnedToNewWindow = (pinnedId: string) =>
+  {
+    const tabId = getTabIdForPinned(pinnedId);
+    if (tabId)
+    {
+      chrome.windows.create({ tabId });
+    }
+  };
 
   // Filter pinned sites based on active filters
   let visiblePinnedSites = pinnedSites;
@@ -119,6 +129,7 @@ export const PinnedBar = ({
                     : (s) => chrome.tabs.create({ url: s.url, active: true })
               }
               onClose={bookmarkOpenMode === 'arc' ? closePinnedTab : undefined}
+              onMoveToNewWindow={bookmarkOpenMode === 'arc' ? movePinnedToNewWindow : undefined}
               isLoaded={bookmarkOpenMode === 'arc' ? isPinnedLoaded(site.id) : false}
               isActive={bookmarkOpenMode === 'arc' ? isPinnedActive(site.id) : false}
               isAudible={bookmarkOpenMode === 'arc' ? isPinnedAudible(site.id) : false}
