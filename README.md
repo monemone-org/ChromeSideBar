@@ -7,10 +7,12 @@ https://chromewebstore.google.com/detail/jmmgjadgeeicdbagekohgmaipoekgcbn?utm_so
 
 **What it does:**
 - **Unified sidebar:** Pinned bookmarks, regular bookmarks, and active tabs all in one vertical panel
+- **Tab history:** Navigate back/forward through recently used tabs
 - **"Live" bookmarks:** Bookmarks behave like tabs—open and close them on the fly
 - **Backup/Restore:** Export and import everything to JSON
 - **Tab groups:** Create and organize tabs within groups (a native Chrome feature)
 - **Drag & drop:** Reorganize bookmarks, folders, tabs, and groups easily
+- **Filter & search:** Find items by text, filter by live tabs or playing audio
 
 ## Background
 
@@ -20,6 +22,15 @@ So I vibe-coded this extension to bring that to Chrome.
 
 ## Features
 
+### Tab History Navigation
+
+Navigate back and forward through your recently used tabs—like undo/redo for tab switching.
+
+- `Cmd+Shift+<` (Mac) / `Ctrl+Shift+<` (Windows/Linux): Go back to previous tab
+- `Cmd+Shift+>` (Mac) / `Ctrl+Shift+>` (Windows/Linux): Go forward
+- Each window maintains its own history stack
+- Closed tabs are automatically removed from history
+
 ### Pinned Sites
 
 - Quick-access icon bar at top of panel
@@ -27,7 +38,7 @@ So I vibe-coded this extension to bring that to Chrome.
 - Drag-and-drop to reorder
 - Custom icons and colors
 - Configurable icon size (12-48px)
-- Right-click menu: Edit (title, URL, icon, color), Duplicate, Reset favicon, Unpin
+- Right-click menu: Edit (title, URL, icon, color), Duplicate, Reset favicon, Unpin, Move to New Window (when loaded)
 - Click: Open as Arc-style tab
 - Cmd/Ctrl+Click: Open in new background tab, Shift+Click: Open in new window
 - Open indicator: Circular dot for opened state, triangle for playing audio
@@ -42,6 +53,8 @@ So I vibe-coded this extension to bring that to Chrome.
   - Duplicate
   - Delete
   - Pin to pinned bar
+  - Move to New Window (when loaded)
+  - Expand All (folders only, recursively expands all subfolders)
 - Drag-and-drop to organize bookmarks
 - Drag tabs from Tabs section to create bookmarks
 - Click: Open as Arc-style tab
@@ -62,8 +75,10 @@ So I vibe-coded this extension to bring that to Chrome.
   - Pin to Sidebar
   - Add to Group
   - Add to Bookmark (or "Move to Bookmark" in Arc style mode)
+  - Move to New Window
   - Duplicate
   - Close
+  - Close Tabs Before / After / Other Tabs
 - Sort options (via header menu):
   - Sort by domain then title (A-Z or Z-A)
   - Close all tabs
@@ -94,6 +109,17 @@ So I vibe-coded this extension to bring that to Chrome.
   - **Bookmarks**: Replace all or import as a subfolder
   - **Tabs & Groups**: Replace current session or append to current window
 
+### Filter & Search
+
+Toolbar at the top with filter options:
+
+- **Text filter**: Search by title or URL across pinned sites, bookmarks, and tabs
+  - Dropdown shows saved and recent filters (last 5 used)
+  - Save button to persist current filter
+  - Reset button clears all active filters
+- **Live tabs filter**: Show only bookmarks/pins that have an open tab
+- **Audible filter**: Show only items playing audio/video
+
 ### Settings
 
 Gear icon in the bottom-left corner:
@@ -109,9 +135,11 @@ Gear icon in the bottom-left corner:
 ### General
 
 - Dark/light mode (follows your system preference)
-- Open the sidebar with:
-  - Click the extension icon in the toolbar
-  - Keyboard shortcut: `Cmd+Shift+E` (Mac) / `Ctrl+Shift+E` (Windows/Linux)
+- Keyboard shortcuts:
+  - `Cmd+Shift+E` (Mac) / `Ctrl+Shift+E` (Windows/Linux): Open the sidebar
+  - `Cmd+Shift+<` / `Cmd+Shift+>`: Navigate tab history
+  - `Alt+Shift+F`: Toggle saved filters dropdown
+  - Customize shortcuts via `chrome://extensions/shortcuts`
 
 
 ## Tech Stack

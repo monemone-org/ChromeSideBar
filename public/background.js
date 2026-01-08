@@ -18,6 +18,38 @@ function getOrCreateHistory(windowId)
   return windowTabHistory.get(windowId);
 }
 
+// Debug: dump complete history with tab details
+async function dumpHistory(windowId, action)
+{
+  const history = windowTabHistory.get(windowId);
+  if (!history)
+  {
+    console.log(`[TabHistory] ${action} - windowId=${windowId}: NO HISTORY`);
+    return;
+  }
+
+  console.log(`\n[TabHistory] --- begin ---`);
+  console.log(`[TabHistory] ${action} - windowId=${windowId}, index=${history.index}, size=${history.stack.length}`);
+
+  for (let i = 0; i < history.stack.length; i++)
+  {
+    const tabId = history.stack[i];
+    const marker = i === history.index ? ">>>" : "   ";
+    try
+    {
+      const tab = await chrome.tabs.get(tabId);
+      const title = tab.title || "(no title)";
+      const url = tab.url || tab.pendingUrl || "(no url)";
+      console.log(`${marker} [${i}] tabId=${tabId}, title="${title}", url="${url}"`);
+    }
+    catch (e)
+    {
+      console.log(`${marker} [${i}] tabId=${tabId}, (tab not found - closed?)`);
+    }
+  }
+  console.log(`[TabHistory] --- end ---`);
+}
+
 function pushToHistory(windowId, tabId)
 {
   const history = getOrCreateHistory(windowId);
@@ -49,6 +81,8 @@ function pushToHistory(windowId, tabId)
     const trimCount = afterCount - MAX_HISTORY_SIZE;
     history.stack.splice(history.stack.length - trimCount, trimCount);
   }
+
+  dumpHistory(windowId, `PUSH tabId=${tabId}`);
 }
 
 function removeFromHistory(windowId, tabId)
@@ -72,6 +106,8 @@ function removeFromHistory(windowId, tabId)
   {
     history.index = -1;
   }
+
+  dumpHistory(windowId, `REMOVE tabId=${tabId}`);
 }
 
 function navigateHistory(windowId, direction)
@@ -86,6 +122,9 @@ function navigateHistory(windowId, direction)
 
   history.index = newIndex;
   const tabId = history.stack[newIndex];
+
+  const dirLabel = direction === -1 ? "BACK" : "FORWARD";
+  dumpHistory(windowId, `NAVIGATE ${dirLabel} to tabId=${tabId}`);
 
   isNavigating = true;
   chrome.tabs.update(tabId, { active: true }, () =>
