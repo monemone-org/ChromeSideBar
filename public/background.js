@@ -82,7 +82,7 @@ function pushToHistory(windowId, tabId)
     history.stack.splice(history.stack.length - trimCount, trimCount);
   }
 
-  dumpHistory(windowId, `PUSH tabId=${tabId}`);
+  // dumpHistory(windowId, `PUSH tabId=${tabId}`);
 }
 
 function removeFromHistory(windowId, tabId)
@@ -107,7 +107,7 @@ function removeFromHistory(windowId, tabId)
     history.index = -1;
   }
 
-  dumpHistory(windowId, `REMOVE tabId=${tabId}`);
+  // dumpHistory(windowId, `REMOVE tabId=${tabId}`);
 }
 
 function navigateHistory(windowId, direction)
@@ -123,8 +123,8 @@ function navigateHistory(windowId, direction)
   history.index = newIndex;
   const tabId = history.stack[newIndex];
 
-  const dirLabel = direction === -1 ? "BACK" : "FORWARD";
-  dumpHistory(windowId, `NAVIGATE ${dirLabel} to tabId=${tabId}`);
+  // const dirLabel = direction === -1 ? "BACK" : "FORWARD";
+  // dumpHistory(windowId, `NAVIGATE ${dirLabel} to tabId=${tabId}`);
 
   isNavigating = true;
   chrome.tabs.update(tabId, { active: true }, () =>
@@ -165,6 +165,104 @@ chrome.tabs.onCreated.addListener((tab) =>
   if (groupId && groupId !== -1)
   {
     chrome.tabs.group({ tabIds: [tab.id], groupId });
+  }
+});
+
+// Handle messages from side panel
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
+{
+  if (message.action === 'prev-used-tab' || message.action === 'next-used-tab')
+  {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
+    {
+      if (tabs.length === 0) return;
+      const direction = message.action === 'prev-used-tab' ? -1 : 1;
+      navigateHistory(tabs[0].windowId, direction);
+    });
+  }
+  else if (message.action === 'get-tab-history')
+  {
+    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) =>
+    {
+      if (tabs.length === 0)
+      {
+        sendResponse({ before: [], after: [], currentIndex: -1 });
+        return;
+      }
+
+      const windowId = tabs[0].windowId;
+      const history = windowTabHistory.get(windowId);
+
+      if (!history || history.stack.length === 0)
+      {
+        sendResponse({ before: [], after: [], currentIndex: -1 });
+        return;
+      }
+
+      // Build before and after lists with tab details
+      const before = [];
+      const after = [];
+
+      for (let i = 0; i < history.stack.length; i++)
+      {
+        const tabId = history.stack[i];
+        try
+        {
+          const tab = await chrome.tabs.get(tabId);
+          const item = {
+            tabId,
+            index: i,
+            title: tab.title || '(no title)',
+            url: tab.url || tab.pendingUrl || '',
+            favIconUrl: tab.favIconUrl || ''
+          };
+
+          if (i < history.index)
+          {
+            before.push(item);
+          }
+          else if (i > history.index)
+          {
+            after.push(item);
+          }
+        }
+        catch (e)
+        {
+          // Tab no longer exists, skip it
+        }
+      }
+
+      // Reverse before list so most recent is first
+      before.reverse();
+
+      sendResponse({ before, after, currentIndex: history.index });
+    });
+
+    // Return true to indicate async response
+    return true;
+  }
+  else if (message.action === 'navigate-to-history-index')
+  {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
+    {
+      if (tabs.length === 0) return;
+
+      const windowId = tabs[0].windowId;
+      const history = windowTabHistory.get(windowId);
+
+      if (!history || message.index < 0 || message.index >= history.stack.length) return;
+
+      history.index = message.index;
+      const tabId = history.stack[message.index];
+
+      // dumpHistory(windowId, `NAVIGATE to index=${message.index}, tabId=${tabId}`);
+
+      isNavigating = true;
+      chrome.tabs.update(tabId, { active: true }, () =>
+      {
+        isNavigating = false;
+      });
+    });
   }
 });
 

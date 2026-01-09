@@ -48,6 +48,11 @@ function App() {
       serialize: (v) => v
     }
   );
+  const [showFilterArea, setShowFilterArea] = useLocalStorage(
+    'sidebar-show-filter-area',
+    false,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  );
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
   const [showExport, setShowExport] = useState(false);
@@ -92,6 +97,7 @@ function App() {
     setSortGroupsFirst(newSettings.sortGroupsFirst);
     setPinnedIconSize(newSettings.pinnedIconSize);
     setBookmarkOpenMode(newSettings.bookmarkOpenMode);
+    setShowFilterArea(newSettings.showFilterArea);
     setShowSettings(false);
   };
 
@@ -201,6 +207,7 @@ function App() {
           sortGroupsFirst,
           pinnedIconSize,
           bookmarkOpenMode,
+          showFilterArea,
         }}
         onApply={handleApplySettings}
       />
@@ -243,6 +250,7 @@ function App() {
           onUpdateRecent={handleUpdateRecent}
           onShowToast={showToast}
           onResetFilters={handleResetFilters}
+          showFilterArea={showFilterArea}
         />
 
         {/* Popup menu - positioned below settings button */}
