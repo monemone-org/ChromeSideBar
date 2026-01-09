@@ -6,7 +6,7 @@ I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, book
 
 **What it does:**
 - **Unified sidebar:** Pinned bookmarks, regular bookmarks, and active tabs all in one vertical panel
-- **Tab history:** Navigate back/forward through recently used tabs
+- **Recent tab history:** Navigate back/forward through recently used tabs
 - **"Live" bookmarks:** Bookmarks behave like tabs—open and close them on the fly
 - **Backup/Restore:** Export and import everything to JSON
 - **Tab groups:** Create and organize tabs within groups (a native Chrome feature)
@@ -87,13 +87,17 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
-## 1.0.136
+## 1.0.140
 
-- Tab history navigation: Go back/forward through recently used tabs with `Cmd+Shift+<` and `Cmd+Shift+>`
+- Used Tab history navigation:
+  - Keyboard shortcuts: `Cmd+Shift+<` and `Cmd+Shift+>` to go back/forward
+  - Toolbar buttons: Click to navigate, hold to show history dropdown with favicon and title
 - Toolbar with filter options:
-  - Text filter: Search by title or URL with saved and recent filters
   - Live tabs filter: Show only bookmarks/pins with open tabs
   - Audible filter: Show only items playing audio
+- Tab Search bar: 
+  - Search by title or URL with saved and recent filters
+  - "Show tab search bar" setting to hide/show the search bar (hidden by default)
 - New context menu actions:
   - Move to New Window (tabs, pinned sites, bookmarks)
   - Close Tabs Before/After/Other Tabs (tabs only)
