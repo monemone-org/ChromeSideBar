@@ -115,6 +115,14 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   // Handle click-and-hold for history dropdown
   const handleHistoryMouseDown = useCallback((direction: 'prev' | 'next') =>
   {
+    // If dropdown is already showing, dismiss it and don't start timer
+    // (similar to Chrome's back/forward buttons behavior)
+    if (historyDropdown !== null)
+    {
+      setHistoryDropdown(null);
+      return;
+    }
+
     // Clear any existing timer
     if (holdTimerRef.current)
     {
@@ -128,7 +136,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       setHistoryDropdown(direction);
       holdTimerRef.current = null;
     }, 300);
-  }, [fetchTabHistory]);
+  }, [fetchTabHistory, historyDropdown]);
 
   const handleHistoryMouseUp = useCallback((direction: 'prev' | 'next') =>
   {
@@ -146,7 +154,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
         handleNextUsedTab();
       }
     }
-    // If timer already fired, dropdown is shown - don't navigate
+    // If timer already fired or dropdown was just dismissed - don't navigate
   }, [handlePrevUsedTab, handleNextUsedTab]);
 
   const handleHistoryMouseLeave = useCallback(() =>
@@ -434,7 +442,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
               onMouseUp={() => handleHistoryMouseUp('prev')}
               onMouseLeave={handleHistoryMouseLeave}
               title={`Previous used tab${prevTabShortcut ? ` (${prevTabShortcut})` : ''}\nHold for history`}
-              className={`p-1.5 rounded transition-all duration-150 ${inactiveButtonClass}`}
+              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
             >
               <RotateCcwSquare size={16} className="-rotate-90" />
             </button>
@@ -482,7 +490,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
               onMouseUp={() => handleHistoryMouseUp('next')}
               onMouseLeave={handleHistoryMouseLeave}
               title={`Next used tab${nextTabShortcut ? ` (${nextTabShortcut})` : ''}\nHold for history`}
-              className={`p-1.5 rounded transition-all duration-150 ${inactiveButtonClass}`}
+              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
             >
               <RotateCwSquare size={16} className="rotate-90" />
             </button>
@@ -530,7 +538,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
           <button
             onClick={onFilterLiveTabsToggle}
             title={filterLiveTabsActive ? "Show all items" : "Show only items with open tabs"}
-            className={`p-1.5 rounded transition-all duration-150 ${
+            className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
               filterLiveTabsActive ? activeButtonClass : inactiveButtonClass
             }`}
           >
@@ -540,7 +548,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
           <button
             onClick={onFilterAudibleToggle}
             title={filterAudibleActive ? "Show all items" : "Show only items playing audio/video"}
-            className={`p-1.5 rounded transition-all duration-150 ${
+            className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
               filterAudibleActive ? activeButtonClass : inactiveButtonClass
             }`}
           >
@@ -553,7 +561,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
               onClick={onResetFilters}
               disabled={!hasActiveFilters}
               title="Reset all filters"
-              className={`p-1.5 rounded transition-all duration-150 ${
+              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
                 hasActiveFilters
                   ? inactiveButtonClass
                   : 'text-gray-300 dark:text-gray-600'
