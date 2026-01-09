@@ -27,6 +27,7 @@ import { FolderPickerDialog } from './FolderPickerDialog';
 import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, MoreHorizontal, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
+import { matchesFilter } from '../utils/searchParser';
 import { DropIndicators } from './DropIndicators';
 import * as ContextMenu from './ContextMenu';
 import { useInView } from '../hooks/useInView';
@@ -943,10 +944,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     }
     if (filterText.trim())
     {
-      const searchTerm = filterText.trim().toLowerCase();
       filtered = filtered.filter(tab =>
-        (tab.title?.toLowerCase().includes(searchTerm) ?? false) ||
-        (tab.url?.toLowerCase().includes(searchTerm) ?? false)
+        matchesFilter(tab.title ?? '', tab.url ?? '', filterText)
       );
     }
     return filtered;

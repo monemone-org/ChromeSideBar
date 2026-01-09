@@ -1,4 +1,4 @@
-import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcw, RotateCcwSquare, RotateCwSquare } from 'lucide-react';
+import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcw, RotateCcwSquare, RotateCwSquare, HelpCircle } from 'lucide-react';
 import { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
 
 interface ToolbarProps
@@ -217,6 +217,11 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   const dropdownButtonRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Syntax help popover state
+  const [showSyntaxHelp, setShowSyntaxHelp] = useState(false);
+  const syntaxHelpRef = useRef<HTMLDivElement>(null);
+  const syntaxHelpButtonRef = useRef<HTMLButtonElement>(null);
+
   // Local input value for immediate display (debounced before filtering)
   const [inputValue, setInputValue] = useState(filterText);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -333,6 +338,42 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       document.removeEventListener('keydown', handleEscape);
     };
   }, [showDropdown]);
+
+  // Close syntax help popover when clicking outside or pressing Escape
+  useEffect(() =>
+  {
+    if (!showSyntaxHelp) return;
+
+    const handleClickOutside = (e: MouseEvent) =>
+    {
+      if (
+        syntaxHelpRef.current &&
+        !syntaxHelpRef.current.contains(e.target as Node) &&
+        syntaxHelpButtonRef.current &&
+        !syntaxHelpButtonRef.current.contains(e.target as Node)
+      )
+      {
+        setShowSyntaxHelp(false);
+      }
+    };
+
+    const handleEscape = (e: KeyboardEvent) =>
+    {
+      if (e.key === 'Escape')
+      {
+        e.preventDefault();
+        setShowSyntaxHelp(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () =>
+    {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showSyntaxHelp]);
 
   // Listen for Chrome extension commands directly
   useEffect(() =>
@@ -706,6 +747,45 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
           >
             <Save size={16} />
           </button>
+
+          {/* Syntax help button */}
+          <div className="relative">
+            <button
+              ref={syntaxHelpButtonRef}
+              onClick={() => setShowSyntaxHelp(!showSyntaxHelp)}
+              title="Search syntax help"
+              className="p-1.5 rounded transition-all duration-150 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <HelpCircle size={16} />
+            </button>
+
+            {/* Syntax help popover */}
+            {showSyntaxHelp && (
+              <div
+                ref={syntaxHelpRef}
+                className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 px-3 z-50 w-56 text-sm"
+              >
+                <div className="font-medium text-gray-700 dark:text-gray-200 mb-2">Search Syntax</div>
+                <div className="space-y-1 text-gray-600 dark:text-gray-400 text-xs">
+                  <div className="flex justify-between"><span>space</span><span className="text-gray-500">implicit AND</span></div>
+                  <div className="flex justify-between"><span>&&</span><span className="text-gray-500">AND</span></div>
+                  <div className="flex justify-between"><span>||</span><span className="text-gray-500">OR</span></div>
+                  <div className="flex justify-between"><span>!</span><span className="text-gray-500">NOT</span></div>
+                  <div className="flex justify-between"><span>( )</span><span className="text-gray-500">grouping</span></div>
+                  <div className="flex justify-between"><span>"..." '...'</span><span className="text-gray-500">exact phrase</span></div>
+                </div>
+                <div className="border-t border-gray-200 dark:border-gray-700 mt-2 pt-2">
+                  <div className="text-gray-500 dark:text-gray-500 text-xs mb-1">Examples:</div>
+                  <div className="space-y-0.5 text-gray-600 dark:text-gray-400 text-xs">
+                    <div>youtube canada</div>
+                    <div>youtube || instagram</div>
+                    <div>react !tutorial</div>
+                    <div>(a || b) && c</div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

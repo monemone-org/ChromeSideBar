@@ -16,6 +16,7 @@ import { PinnedIcon } from './PinnedIcon';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { BookmarkOpenMode } from './SettingsDialog';
+import { matchesFilter } from '../utils/searchParser';
 
 interface PinnedBarProps {
   pinnedSites: PinnedSite[];
@@ -73,10 +74,8 @@ export const PinnedBar = ({
   }
   if (filterText.trim())
   {
-    const searchTerm = filterText.trim().toLowerCase();
     visiblePinnedSites = visiblePinnedSites.filter(site =>
-      site.title.toLowerCase().includes(searchTerm) ||
-      site.url.toLowerCase().includes(searchTerm)
+      matchesFilter(site.title, site.url, filterText)
     );
   }
   const sensors = useSensors(

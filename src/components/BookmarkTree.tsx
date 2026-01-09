@@ -4,6 +4,7 @@ import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
+import { matchesFilter } from '../utils/searchParser';
 import { DropIndicators } from './DropIndicators';
 import { ExternalDropTarget, ResolveBookmarkDropTarget } from './TabList';
 import { BookmarkOpenMode } from './SettingsDialog';
@@ -710,10 +711,8 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   // Apply text filter if provided
   if (filterText.trim())
   {
-    const searchTerm = filterText.trim().toLowerCase();
     visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) =>
-      node.title.toLowerCase().includes(searchTerm) ||
-      (node.url?.toLowerCase().includes(searchTerm) ?? false)
+      matchesFilter(node.title, node.url ?? '', filterText)
     );
   }
 
