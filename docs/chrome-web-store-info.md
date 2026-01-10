@@ -95,9 +95,9 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 - Toolbar with filter options:
   - Live tabs filter: Show only bookmarks/pins with open tabs
   - Audible filter: Show only items playing audio
-- Tab Search bar: 
+- Tab Search bar:
   - Search by title or URL with saved and recent filters
-  - "Show tab search bar" setting to hide/show the search bar (hidden by default)
+  - Toggle button in toolbar to show/hide the search bar (hidden by default)
 - New context menu actions:
   - Move to New Window (tabs, pinned sites, bookmarks)
   - Close Tabs Before/After/Other Tabs (tabs only)

@@ -1,4 +1,4 @@
-import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcw, RotateCcwSquare, RotateCwSquare, HelpCircle } from 'lucide-react';
+import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcw, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
 import { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
 
 interface ToolbarProps
@@ -21,6 +21,7 @@ interface ToolbarProps
   onShowToast?: (message: string) => void;
   onResetFilters?: () => void;
   showFilterArea?: boolean;
+  onToggleFilterArea?: () => void;
 }
 
 
@@ -44,6 +45,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   onShowToast,
   onResetFilters,
   showFilterArea = false,
+  onToggleFilterArea,
 }, _ref) =>
 {
   const activeButtonClass = 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400';
@@ -609,6 +611,19 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
               }`}
             >
               <RotateCcw size={16} />
+            </button>
+          )}
+
+          {/* Toggle search bar button */}
+          {onToggleFilterArea && (
+            <button
+              onClick={onToggleFilterArea}
+              title={showFilterArea ? "Hide search bar" : "Show search bar"}
+              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
+                showFilterArea ? activeButtonClass : inactiveButtonClass
+              }`}
+            >
+              <Search size={16} />
             </button>
           )}
         </div>

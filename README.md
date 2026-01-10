@@ -113,12 +113,13 @@ Navigate back and forward through your recently used tabs—like undo/redo for t
 
 Toolbar at the top with filter options:
 
-- **Text filter**: Search by title or URL across pinned sites, bookmarks, and tabs
+- **Text search bar**: Search by title or URL across pinned sites, bookmarks, and tabs
   - Dropdown shows saved and recent filters (last 5 used)
   - Save button to persist current filter
-  - Reset button clears all active filters
+- **Search bar toggle**: Show/hide the text search bar (hidden by default)
 - **Live tabs filter**: Show only bookmarks/pins that have an open tab
 - **Audible filter**: Show only items playing audio/video
+- **Reset button**: Clears all active filters
 
 ### Settings
 

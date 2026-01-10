@@ -97,7 +97,6 @@ function App() {
     setSortGroupsFirst(newSettings.sortGroupsFirst);
     setPinnedIconSize(newSettings.pinnedIconSize);
     setBookmarkOpenMode(newSettings.bookmarkOpenMode);
-    setShowFilterArea(newSettings.showFilterArea);
     setShowSettings(false);
   };
 
@@ -207,7 +206,6 @@ function App() {
           sortGroupsFirst,
           pinnedIconSize,
           bookmarkOpenMode,
-          showFilterArea,
         }}
         onApply={handleApplySettings}
       />
@@ -251,6 +249,7 @@ function App() {
           onShowToast={showToast}
           onResetFilters={handleResetFilters}
           showFilterArea={showFilterArea}
+          onToggleFilterArea={() => setShowFilterArea(!showFilterArea)}
         />
 
         {/* Popup menu - positioned below settings button */}

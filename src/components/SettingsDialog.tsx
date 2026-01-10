@@ -10,7 +10,6 @@ export interface SettingsValues {
   sortGroupsFirst: boolean;
   pinnedIconSize: number;
   bookmarkOpenMode: BookmarkOpenMode;
-  showFilterArea: boolean;
 }
 
 interface SettingsDialogProps {
@@ -32,7 +31,6 @@ export function SettingsDialog({
   const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(settings.sortGroupsFirst);
   const [tempPinnedIconSize, setTempPinnedIconSize] = useState(settings.pinnedIconSize);
   const [tempBookmarkOpenMode, setTempBookmarkOpenMode] = useState(settings.bookmarkOpenMode);
-  const [tempShowFilterArea, setTempShowFilterArea] = useState(settings.showFilterArea);
 
   // Test results state (dev mode only)
   const [testResults, setTestResults] = useState<{ passed: number; failed: number; results: Array<{ name: string; passed: boolean; error?: string }> } | null>(null);
@@ -45,7 +43,6 @@ export function SettingsDialog({
       setTempSortGroupsFirst(settings.sortGroupsFirst);
       setTempPinnedIconSize(settings.pinnedIconSize);
       setTempBookmarkOpenMode(settings.bookmarkOpenMode);
-      setTempShowFilterArea(settings.showFilterArea);
     }
   }, [isOpen, settings]);
 
@@ -68,7 +65,6 @@ export function SettingsDialog({
       sortGroupsFirst: tempSortGroupsFirst,
       pinnedIconSize: tempPinnedIconSize,
       bookmarkOpenMode: tempBookmarkOpenMode,
-      showFilterArea: tempShowFilterArea,
     });
   };
 
@@ -173,20 +169,6 @@ export function SettingsDialog({
                 />
                 Sort tab groups first
               </label>
-              <div>
-                <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={tempShowFilterArea}
-                    onChange={(e) => setTempShowFilterArea(e.target.checked)}
-                    className="rounded border-gray-300 dark:border-gray-600"
-                  />
-                  Show tab search bar
-                </label>
-                <p className="ml-6 text-gray-500 dark:text-gray-400">
-                  Filter pinned sites, bookmarks, and tabs by title or URL
-                </p>
-              </div>
             </div>
           </div>
 
