@@ -1,5 +1,6 @@
 import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcw, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
 import { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
+import { useFontSize } from '../contexts/FontSizeContext';
 
 interface ToolbarProps
 {
@@ -50,6 +51,8 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
 {
   const activeButtonClass = 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400';
   const inactiveButtonClass = 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700';
+
+  const fontSize = useFontSize();
 
   // Tab history navigation shortcuts
   const [prevTabShortcut, setPrevTabShortcut] = useState<string>('');
@@ -494,7 +497,8 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             {historyDropdown === 'prev' && historyBefore.length > 0 && (
               <div
                 ref={historyDropdownRef}
-                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-48 max-w-72 max-h-64 overflow-y-auto"
+                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-48 max-w-72 max-h-64 overflow-y-auto font-sans"
+                style={{ fontSize: `${fontSize}px` }}
               >
                 {historyBefore.map((item) => (
                   <div
@@ -507,7 +511,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
                     ) : (
                       <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded" />
                     )}
-                    <span className="text-gray-700 dark:text-gray-200 truncate text-sm">
+                    <span className="text-gray-700 dark:text-gray-200 truncate">
                       {item.title}
                     </span>
                   </div>
@@ -519,9 +523,10 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             {historyDropdown === 'prev' && historyBefore.length === 0 && (
               <div
                 ref={historyDropdownRef}
-                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 px-3 z-50 min-w-32"
+                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 px-3 z-50 min-w-32 font-sans"
+                style={{ fontSize: `${fontSize}px` }}
               >
-                <span className="text-gray-500 dark:text-gray-400 text-sm">No previous tabs</span>
+                <span className="text-gray-500 dark:text-gray-400">No previous tabs</span>
               </div>
             )}
           </div>
@@ -542,7 +547,8 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             {historyDropdown === 'next' && historyAfter.length > 0 && (
               <div
                 ref={historyDropdownRef}
-                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-48 max-w-72 max-h-64 overflow-y-auto"
+                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-48 max-w-72 max-h-64 overflow-y-auto font-sans"
+                style={{ fontSize: `${fontSize}px` }}
               >
                 {historyAfter.map((item) => (
                   <div
@@ -555,7 +561,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
                     ) : (
                       <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded" />
                     )}
-                    <span className="text-gray-700 dark:text-gray-200 truncate text-sm">
+                    <span className="text-gray-700 dark:text-gray-200 truncate">
                       {item.title}
                     </span>
                   </div>
@@ -567,9 +573,10 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             {historyDropdown === 'next' && historyAfter.length === 0 && (
               <div
                 ref={historyDropdownRef}
-                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 px-3 z-50 min-w-32"
+                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 px-3 z-50 min-w-32 font-sans"
+                style={{ fontSize: `${fontSize}px` }}
               >
-                <span className="text-gray-500 dark:text-gray-400 text-sm">No next tabs</span>
+                <span className="text-gray-500 dark:text-gray-400">No next tabs</span>
               </div>
             )}
           </div>
@@ -598,6 +605,19 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             <Volume2 size={16} />
           </button>
 
+          {/* Toggle search bar button */}
+          {onToggleFilterArea && (
+            <button
+              onClick={onToggleFilterArea}
+              title={showFilterArea ? "Hide search bar" : "Show search bar"}
+              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
+                showFilterArea ? activeButtonClass : inactiveButtonClass
+              }`}
+            >
+              <Search size={16} />
+            </button>
+          )}
+
           {/* Reset filters button - always visible, disabled when no filters active */}
           {onResetFilters && (
             <button
@@ -611,19 +631,6 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
               }`}
             >
               <RotateCcw size={16} />
-            </button>
-          )}
-
-          {/* Toggle search bar button */}
-          {onToggleFilterArea && (
-            <button
-              onClick={onToggleFilterArea}
-              title={showFilterArea ? "Hide search bar" : "Show search bar"}
-              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
-                showFilterArea ? activeButtonClass : inactiveButtonClass
-              }`}
-            >
-              <Search size={16} />
             </button>
           )}
         </div>
