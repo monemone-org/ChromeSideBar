@@ -635,14 +635,14 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               <Bookmark size={14} className="mr-2" /> {arcStyleEnabled ? 'Move to Bookmark' : 'Add to Bookmark'}
             </ContextMenu.Item>
           )}
-          {onDuplicate && tab.url && (
-            <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
-              <Copy size={14} className="mr-2" /> Duplicate
-            </ContextMenu.Item>
-          )}
           {onMoveToNewWindow && (
             <ContextMenu.Item onSelect={() => onMoveToNewWindow(tab.id!)}>
               <ExternalLink size={14} className="mr-2" /> Move to New Window
+            </ContextMenu.Item>
+          )}
+          {onDuplicate && tab.url && (
+            <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
+              <Copy size={14} className="mr-2" /> Duplicate
             </ContextMenu.Item>
           )}
           <ContextMenu.Separator />

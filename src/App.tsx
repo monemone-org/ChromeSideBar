@@ -102,6 +102,12 @@ function App() {
 
   // Filter handlers
   const handleFilterTextChange = (text: string) => {
+    // Reset audible filter only when starting a new search (empty → non-empty)
+    // This shows all matched tabs, not just audible ones
+    // If user manually re-enables audible filter after, that choice is respected
+    if (filterText.trim() === '' && text.trim() !== '') {
+      setFilterAudible(false);
+    }
     setFilterText(text);
   };
 
@@ -116,6 +122,10 @@ function App() {
   };
 
   const handleApplyFilter = (text: string) => {
+    // Reset audible filter when applying a filter from empty state
+    if (filterText.trim() === '' && text.trim() !== '') {
+      setFilterAudible(false);
+    }
     setFilterText(text);
     // Add to recent filters (avoid duplicates, max 5)
     const trimmed = text.trim();

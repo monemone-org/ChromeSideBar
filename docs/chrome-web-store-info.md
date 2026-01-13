@@ -55,6 +55,7 @@ Active Tabs
 
 Tab Groups
 - Works with Chrome's tab groups
+- Add tabs to existing groups or create new groups
 - Drag tabs between groups or ungroup
 - Drag to reorder groups
 - Rename groups and change group color
@@ -73,9 +74,19 @@ Settings
   - In new tab: Opens in a new background tab
   - In active tab: Replaces the current tab
 
+Tab Search & Filter
+- Search by title or URL
+- Filter to show only live tabs (bookmarks/pins with open tabs)
+- Filter to show only tabs playing audio
+- Save frequently used searches for quick access
+
+Tab History Navigation
+- Keyboard shortcuts: Cmd+Shift+< / Cmd+Shift+> to go back/forward
+- Toolbar buttons with history dropdown
+- Inspired by IDE navigation (like VS Code) - great for jumping between tabs while researching
+
 Others
 - Toggle sidebar: Cmd+Shift+E (Mac) / Ctrl+Shift+E (Windows)
-- Tab history: Cmd+Shift+< / Cmd+Shift+> to go back/forward
 - Dark mode follows system
 
 Permissions
@@ -89,7 +100,7 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## 1.0.140
 
-- Used Tab history navigation:
+- Tab history navigation:
   - Keyboard shortcuts: `Cmd+Shift+<` and `Cmd+Shift+>` to go back/forward
   - Toolbar buttons: Click to navigate, hold to show history dropdown with favicon and title
 - Toolbar with filter options:
