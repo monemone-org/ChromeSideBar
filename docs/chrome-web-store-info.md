@@ -1,7 +1,8 @@
-## Description
 
+## Summary from package
 Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
 
+## Description
 I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, bookmarks, and tabs all in one vertical list and its pinned tab support. So I built this extension to bring that experience to Chrome.
 
 ## Key Features
@@ -96,6 +97,11 @@ Search and filter by text, live tabs, or tabs playing audio. Save your frequentl
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
+
+## 1.0.146
+
+- Advanced search syntax: support for `&&` (AND), `||` (OR), `!` (NOT), parentheses for grouping, and quoted strings for exact phrases
+- Search bar toggle button in toolbar (search bar hidden by default)
 
 ## 1.0.140
 
