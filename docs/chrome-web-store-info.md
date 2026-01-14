@@ -98,6 +98,10 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
+## 1.0.149
+
+- Fixed duplicate entries in tab history navigation dropdown
+
 ## 1.0.146
 
 - Advanced search syntax: support for `&&` (AND), `||` (OR), `!` (NOT), parentheses for grouping, and quoted strings for exact phrases
