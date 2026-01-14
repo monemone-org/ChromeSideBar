@@ -20,6 +20,7 @@ import {
   Trash,
   Edit,
   FolderPlus,
+  FolderOpen,
   ArrowDownAZ,
   Calendar,
   Pin,
@@ -28,6 +29,7 @@ import {
   Copy,
   ExternalLink
 } from 'lucide-react';
+import { getRandomGroupColor } from '../utils/groupColors';
 import clsx from 'clsx';
 import {
   DndContext,
@@ -277,6 +279,7 @@ interface BookmarkRowProps {
   onOpenBookmark?: (bookmarkId: string, url: string) => void;
   onCloseBookmark?: (bookmarkId: string) => void;
   onMoveToNewWindow?: (bookmarkId: string) => void;
+  onOpenAsTabGroup?: (folderId: string, folderName: string) => void;
   // External drop target (from tab drag)
   externalDropTarget?: ExternalDropTarget | null;
   // Drag-drop attributes
@@ -309,6 +312,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onOpenBookmark,
   onCloseBookmark,
   onMoveToNewWindow,
+  onOpenAsTabGroup,
   externalDropTarget,
   attributes,
   listeners
@@ -496,6 +500,11 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onSort(node.id, 'dateAdded')}>
                 <Calendar size={14} className="mr-2" /> Sort by Date
               </ContextMenu.Item>
+              {onOpenAsTabGroup && (
+                <ContextMenu.Item onSelect={() => onOpenAsTabGroup(node.id, node.title)}>
+                  <FolderOpen size={14} className="mr-2" /> Open as Tab Group
+                </ContextMenu.Item>
+              )}
               {!isSpecialFolder && <ContextMenu.Separator />}
             </>
           )}
@@ -647,10 +656,11 @@ interface BookmarkTreeProps {
   filterAudible?: boolean;
   filterText?: string;
   activeSpace?: Space | null;
+  onShowToast?: (message: string) => void;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace }: BookmarkTreeProps) => {
-  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath } = useBookmarks();
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace, onShowToast }: BookmarkTreeProps) => {
+  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark, getBookmarkLiveTitle } = useBookmarkTabsContext();
 
   // Move bookmark's tab to a new window
@@ -662,6 +672,40 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
       chrome.windows.create({ tabId });
     }
   }, [getTabIdForBookmark]);
+
+  // Open all bookmarks in folder as a tab group
+  const handleOpenAsTabGroup = useCallback(async (
+    folderId: string,
+    folderName: string
+  ) =>
+  {
+    const bookmarksList = await getAllBookmarksInFolder(folderId);
+
+    if (bookmarksList.length === 0)
+    {
+      onShowToast?.('No bookmarks found in folder');
+      return;
+    }
+
+    const createdTabIds: number[] = [];
+    for (const bookmark of bookmarksList)
+    {
+      const tab = await chrome.tabs.create({ url: bookmark.url, active: false });
+      if (tab.id) createdTabIds.push(tab.id);
+    }
+
+    if (createdTabIds.length > 0)
+    {
+      const groupId = await chrome.tabs.group({ tabIds: createdTabIds });
+      await chrome.tabGroups.update(groupId, {
+        title: folderName,
+        color: getRandomGroupColor()
+      });
+      // Activate the first tab in the group
+      await chrome.tabs.update(createdTabIds[0], { active: true });
+      onShowToast?.(`Opened ${createdTabIds.length} tabs as "${folderName}"`);
+    }
+  }, [getAllBookmarksInFolder, onShowToast]);
 
   // Recursively filter bookmarks based on a predicate function
   const filterBookmarksRecursive = useCallback((
@@ -1069,6 +1113,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             onOpenBookmark={openBookmarkTab}
             onCloseBookmark={closeBookmarkTab}
             onMoveToNewWindow={moveBookmarkToNewWindow}
+            onOpenAsTabGroup={handleOpenAsTabGroup}
             externalDropTarget={externalDropTarget}
           />
         ))}
