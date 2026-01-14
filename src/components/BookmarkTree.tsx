@@ -269,9 +269,11 @@ interface BookmarkRowProps {
   isLoaded?: boolean;
   isAudible?: boolean;
   isActive?: boolean;
+  liveTitle?: string;
   checkIsLoaded?: (bookmarkId: string) => boolean;
   checkIsAudible?: (bookmarkId: string) => boolean;
   checkIsActive?: (bookmarkId: string) => boolean;
+  getLiveTitle?: (bookmarkId: string) => string | undefined;
   onOpenBookmark?: (bookmarkId: string, url: string) => void;
   onCloseBookmark?: (bookmarkId: string) => void;
   onMoveToNewWindow?: (bookmarkId: string) => void;
@@ -303,6 +305,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   isLoaded,
   isAudible,
   isActive,
+  liveTitle,
   onOpenBookmark,
   onCloseBookmark,
   onMoveToNewWindow,
@@ -451,7 +454,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
         <TreeRow
           ref={ref}
           depth={depth}
-          title={node.title}
+          title={bookmarkOpenMode === 'arc' && isLoaded && liveTitle ? liveTitle : node.title}
           tooltip={node.url ? `${node.title}\n${node.url}` : undefined}
           icon={combinedIcon}
           hasChildren={isFolder}
@@ -570,7 +573,7 @@ StaticBookmarkRow.displayName = 'StaticBookmarkRow';
 
 // --- Recursive Item ---
 const BookmarkItem = (props: BookmarkRowProps) => {
-  const { node, expandedState, depth = 0, checkIsLoaded, checkIsAudible, checkIsActive } = props;
+  const { node, expandedState, depth = 0, checkIsLoaded, checkIsAudible, checkIsActive, getLiveTitle } = props;
   const isFolder = !node.url;
   const { ref, isInView } = useInView<HTMLDivElement>();
 
@@ -593,6 +596,7 @@ const BookmarkItem = (props: BookmarkRowProps) => {
               isLoaded={checkIsLoaded ? checkIsLoaded(child.id) : false}
               isAudible={checkIsAudible ? checkIsAudible(child.id) : false}
               isActive={checkIsActive ? checkIsActive(child.id) : false}
+              liveTitle={getLiveTitle ? getLiveTitle(child.id) : undefined}
             />
           ))}
         </div>
@@ -647,7 +651,7 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark } = useBookmarkTabsContext();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark, getBookmarkLiveTitle } = useBookmarkTabsContext();
 
   // Move bookmark's tab to a new window
   const moveBookmarkToNewWindow = useCallback((bookmarkId: string) =>
@@ -1057,9 +1061,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             isLoaded={isBookmarkLoaded(node.id)}
             isAudible={isBookmarkAudible(node.id)}
             isActive={isBookmarkActive(node.id)}
+            liveTitle={getBookmarkLiveTitle(node.id)}
             checkIsLoaded={isBookmarkLoaded}
             checkIsAudible={isBookmarkAudible}
             checkIsActive={isBookmarkActive}
+            getLiveTitle={getBookmarkLiveTitle}
             onOpenBookmark={openBookmarkTab}
             onCloseBookmark={closeBookmarkTab}
             onMoveToNewWindow={moveBookmarkToNewWindow}

@@ -22,6 +22,7 @@ interface BookmarkTabsContextValue
   isBookmarkAudible: (bookmarkId: string) => boolean;
   isBookmarkActive: (bookmarkId: string) => boolean;
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
+  getBookmarkLiveTitle: (bookmarkId: string) => string | undefined;
   associateExistingTab: (tabId: number, bookmarkId: string) => Promise<void>;
   // Pinned site functions
   openPinnedTab: (pinnedId: string, url: string) => Promise<number | undefined>;
@@ -30,6 +31,7 @@ interface BookmarkTabsContextValue
   isPinnedAudible: (pinnedId: string) => boolean;
   isPinnedActive: (pinnedId: string) => boolean;
   getTabIdForPinned: (pinnedId: string) => number | undefined;
+  getPinnedLiveTitle: (pinnedId: string) => string | undefined;
   // Active item tracking
   getActiveItemKey: () => string | null;
   // Tab filtering for sidebar
@@ -65,6 +67,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   const [itemToTab, setItemToTab] = useState<Map<string, number>>(new Map());
   const [tabToItem, setTabToItem] = useState<Map<number, string>>(new Map());
   const [audibleTabs, setAudibleTabs] = useState<Set<number>>(new Set());
+  const [tabTitles, setTabTitles] = useState<Map<number, string>>(new Map());
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -204,6 +207,14 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
             return newMap;
           });
 
+          // Clean up title
+          setTabTitles((prevTitles) =>
+          {
+            const newMap = new Map(prevTitles);
+            newMap.delete(tabId);
+            return newMap;
+          });
+
           // Clean up from session storage
           chrome.storage.session.get(storageKey, (result) =>
           {
@@ -228,7 +239,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     };
   }, [currentWindowId]);
 
-  // Listen for tab audible state changes
+  // Listen for tab audible and title changes
   useEffect(() =>
   {
     const handleTabUpdated = (
@@ -236,6 +247,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
       changeInfo: chrome.tabs.TabChangeInfo
     ) =>
     {
+      // Track audible state
       if (changeInfo.audible !== undefined)
       {
         setAudibleTabs((prev) =>
@@ -250,6 +262,25 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
             newSet.delete(tabId);
           }
           return newSet;
+        });
+      }
+
+      // Track title changes for managed tabs only
+      if (changeInfo.title !== undefined)
+      {
+        setTabToItem((prev) =>
+        {
+          // Only track title if this is a managed tab
+          if (prev.has(tabId))
+          {
+            setTabTitles((prevTitles) =>
+            {
+              const newMap = new Map(prevTitles);
+              newMap.set(tabId, changeInfo.title!);
+              return newMap;
+            });
+          }
+          return prev;
         });
       }
     };
@@ -457,6 +488,12 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return itemToTab.get(makeBookmarkKey(bookmarkId));
   }, [itemToTab]);
 
+  const getBookmarkLiveTitle = useCallback((bookmarkId: string): string | undefined =>
+  {
+    const tabId = itemToTab.get(makeBookmarkKey(bookmarkId));
+    return tabId !== undefined ? tabTitles.get(tabId) : undefined;
+  }, [itemToTab, tabTitles]);
+
   // Associate an existing tab with a bookmark (for drag-drop from tabs to bookmarks)
   const associateExistingTab = useCallback(async (tabId: number, bookmarkId: string): Promise<void> =>
   {
@@ -506,6 +543,12 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return itemToTab.get(makePinnedKey(pinnedId));
   }, [itemToTab]);
 
+  const getPinnedLiveTitle = useCallback((pinnedId: string): string | undefined =>
+  {
+    const tabId = itemToTab.get(makePinnedKey(pinnedId));
+    return tabId !== undefined ? tabTitles.get(tabId) : undefined;
+  }, [itemToTab, tabTitles]);
+
   // --- Active state functions ---
   const isBookmarkActive = useCallback((bookmarkId: string): boolean =>
   {
@@ -540,6 +583,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     isBookmarkAudible,
     isBookmarkActive,
     getTabIdForBookmark,
+    getBookmarkLiveTitle,
     associateExistingTab,
     openPinnedTab,
     closePinnedTab,
@@ -547,6 +591,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     isPinnedAudible,
     isPinnedActive,
     getTabIdForPinned,
+    getPinnedLiveTitle,
     getActiveItemKey,
     getManagedTabIds,
     isInitialized,
