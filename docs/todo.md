@@ -91,7 +91,10 @@ bugs:
       - [x] add a [reset] filter button to toolbar that clear the search string , filter with open tab and filter with speaker.
       - [ ] focus doesn't go to the input field
 
-- [ ] bookmark row title should be updated to match the live bookmark tab 's. when live bookmark tab is closed, restore the row title back to the name of the bookmark.
+- [-] arc style "live" bookmark row title should be updated to match the live bookmark tab's current page
+  title. When live bookmark tab is closed, restore the row title back to the name of the bookmark.
+- [-]  in pinned site edit dialog, reset site icon should fetch and display the site icon in the selected icon in the dialog.
+
 
 - [ ] remove duplicated code. simplify code.
 
@@ -102,8 +105,6 @@ bugs:
       only show the 1st time the extension is run.
 
       
-- [ ]  in pinned site edit dialog, reset site icon should fetch and display the site icon in the selected icon in the dialog.
-
 
 4. Add feature popup menu "Open as group" for bookmark folder to open the selected bookmark folder as a tab group:
    - Create a tab group with the same name as the selected folder

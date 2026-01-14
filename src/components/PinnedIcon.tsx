@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Globe, Edit, Trash, X, RotateCcw, Play, Copy, ExternalLink } from 'lucide-react';
-import { PinnedSite } from '../hooks/usePinnedSites';
+import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePinnedSites';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
@@ -35,7 +35,7 @@ export const PinnedIcon = ({
   site,
   onRemove,
   onUpdate,
-  onResetFavicon,
+  onResetFavicon: _onResetFavicon,
   onDuplicate,
   onOpen,
   onClose,
@@ -188,14 +188,15 @@ export const PinnedIcon = ({
     }
   }, [customHexInput, handleColorChange]);
 
-  const handleResetIcon = () =>
+  const handleResetIcon = useCallback(async () =>
   {
-    onResetFavicon(site.id);
-    // Clear local edit state to reflect the reset
-    setEditFavicon(undefined);
+    // Fetch site favicon and update local edit state
+    const chromeFaviconUrl = getFaviconUrl(editUrl || site.url);
+    const favicon = await fetchFaviconAsBase64(chromeFaviconUrl);
+    setEditFavicon(favicon);
     setEditCustomIconName(undefined);
     setEditIconColor(DEFAULT_ICON_COLOR);
-  };
+  }, [editUrl, site.url]);
 
   const handleUnpin = () =>
   {

@@ -17,12 +17,12 @@ const generateId = (): string => {
 };
 
 // Get favicon URL using Chrome's internal favicon cache
-const getFaviconUrl = (pageUrl: string): string => {
+export const getFaviconUrl = (pageUrl: string): string => {
   return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(pageUrl)}&size=32`;
 };
 
 // Fetch favicon and convert to base64 for storage
-const fetchFaviconAsBase64 = async (url: string): Promise<string | undefined> => {
+export const fetchFaviconAsBase64 = async (url: string): Promise<string | undefined> => {
   try {
     const response = await fetch(url);
     if (!response.ok) return undefined;
