@@ -16,7 +16,7 @@ import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
 import { SpaceDialogs } from './components/SpaceDialogs';
-import { Settings, Info, Upload, Download } from 'lucide-react';
+import { Settings, Info, Upload, Download, RefreshCw } from 'lucide-react';
 
 // Inner component that uses SpacesContext (must be inside SpacesProvider)
 interface SidebarContentProps
@@ -410,6 +410,18 @@ function App() {
               <Info size={14} />
               About
             </button>
+            {import.meta.env.DEV && (
+              <>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                <button
+                  onClick={() => chrome.runtime.reload()}
+                  className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
+                >
+                  <RefreshCw size={14} />
+                  Reload Extension
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>

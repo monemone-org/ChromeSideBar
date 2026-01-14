@@ -171,9 +171,9 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
           {iconHeaderAction}
         </div>
 
-        {/* Current icon preview */}
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-8 h-8 flex items-center justify-center border rounded-md dark:border-gray-600">
+        {/* Icon preview + Search in one row */}
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center border rounded-md dark:border-gray-600">
             {currentIconPreview ? (
               currentIconPreview
             ) : selectedIcon ? (
@@ -182,22 +182,21 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
               <Globe className="w-5 h-5 text-gray-400" />
             )}
           </div>
-          <span className="text-[0.85em] text-gray-500 dark:text-gray-400">
-            {selectedIcon || 'No icon selected'}
-          </span>
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={iconSearch}
+              onChange={(e) => setIconSearch(e.target.value)}
+              placeholder="Search icons..."
+              className="w-full pl-7 pr-2 py-1 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none text-[0.85em]"
+            />
+          </div>
         </div>
-
-        {/* Search input */}
-        <div className="relative mb-2">
-          <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={iconSearch}
-            onChange={(e) => setIconSearch(e.target.value)}
-            placeholder="Search icons..."
-            className="w-full pl-7 pr-2 py-1 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none text-[0.85em]"
-          />
-        </div>
+        {/* Icon name */}
+        <p className="text-[0.85em] text-gray-500 dark:text-gray-400 mb-2">
+          {selectedIcon || 'No icon selected'}
+        </p>
 
         {/* Icon grid - virtualized */}
         <div
