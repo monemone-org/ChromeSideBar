@@ -8,6 +8,7 @@ const windowActiveGroups = new Map();
 const MAX_HISTORY_SIZE = 25;
 const windowTabHistory = new Map(); // Map<windowId, { stack: tabId[], index: number }>
 let isNavigating = false; // flag to skip history tracking during navigation
+let debugTabHistory = false; // enable via 'set-debug-tab-history' message from sidebar
 
 function getOrCreateHistory(windowId)
 {
@@ -60,6 +61,18 @@ function pushToHistory(windowId, tabId)
     return;
   }
 
+  // remove any existing occurrence of this tabId to prevent duplicates
+  const existingIdx = history.stack.indexOf(tabId);
+  if (existingIdx !== -1)
+  {
+    history.stack.splice(existingIdx, 1);
+    // adjust index if the removed entry was before or at current position
+    if (existingIdx <= history.index)
+    {
+      history.index--;
+    }
+  }
+
   // insert new entry after current position (preserve forward history)
   history.stack.splice(history.index + 1, 0, tabId);
   history.index++;
@@ -82,7 +95,7 @@ function pushToHistory(windowId, tabId)
     history.stack.splice(history.stack.length - trimCount, trimCount);
   }
 
-  // dumpHistory(windowId, `PUSH tabId=${tabId}`);
+  if (debugTabHistory) dumpHistory(windowId, `PUSH tabId=${tabId}`);
 }
 
 function removeFromHistory(windowId, tabId)
@@ -107,7 +120,7 @@ function removeFromHistory(windowId, tabId)
     history.index = -1;
   }
 
-  // dumpHistory(windowId, `REMOVE tabId=${tabId}`);
+  if (debugTabHistory) dumpHistory(windowId, `REMOVE tabId=${tabId}`);
 }
 
 function navigateHistory(windowId, direction)
@@ -123,8 +136,11 @@ function navigateHistory(windowId, direction)
   history.index = newIndex;
   const tabId = history.stack[newIndex];
 
-  // const dirLabel = direction === -1 ? "BACK" : "FORWARD";
-  // dumpHistory(windowId, `NAVIGATE ${dirLabel} to tabId=${tabId}`);
+  if (debugTabHistory)
+  {
+    const dirLabel = direction === -1 ? "BACK" : "FORWARD";
+    dumpHistory(windowId, `NAVIGATE ${dirLabel} to tabId=${tabId}`);
+  }
 
   isNavigating = true;
   chrome.tabs.update(tabId, { active: true }, () =>
@@ -171,6 +187,13 @@ chrome.tabs.onCreated.addListener((tab) =>
 // Handle messages from side panel
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
 {
+  if (message.action === 'set-debug-tab-history')
+  {
+    debugTabHistory = message.enabled;
+    console.log(`[TabHistory] Debug mode ${debugTabHistory ? 'ENABLED' : 'DISABLED'}`);
+    return;
+  }
+
   if (message.action === 'prev-used-tab' || message.action === 'next-used-tab')
   {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
@@ -255,7 +278,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
       history.index = message.index;
       const tabId = history.stack[message.index];
 
-      // dumpHistory(windowId, `NAVIGATE to index=${message.index}, tabId=${tabId}`);
+      if (debugTabHistory) dumpHistory(windowId, `NAVIGATE to index=${message.index}, tabId=${tabId}`);
 
       isNavigating = true;
       chrome.tabs.update(tabId, { active: true }, () =>

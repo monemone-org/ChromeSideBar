@@ -200,6 +200,15 @@ function App() {
     };
   }, [showMenu]);
 
+  // Enable tab history debug logging in DEV builds
+  useEffect(() =>
+  {
+    if (import.meta.env.DEV)
+    {
+      chrome.runtime.sendMessage({ action: 'set-debug-tab-history', enabled: true });
+    }
+  }, []);
+
   return (
     <FontSizeContext.Provider value={fontSize}>
       <BookmarkTabsProvider>
