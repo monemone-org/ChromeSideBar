@@ -1,7 +1,23 @@
-import React, { useRef } from 'react';
+import React, { useState } from 'react';
 import clsx from 'clsx';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { Plus } from 'lucide-react';
-import { SpaceIcon } from './SpaceIcon';
+import { SpaceIcon, SpaceIconOverlay } from './SpaceIcon';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
 
 interface SpaceBarProps
@@ -17,8 +33,16 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   onDeleteSpace,
 }) =>
 {
-  const { allSpaces, activeSpaceId, setActiveSpaceId } = useSpacesContext();
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const { allSpaces, activeSpaceId, setActiveSpaceId, moveSpace, getSpaceById } = useSpacesContext();
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  // Drag-drop sensors with activation distance to allow clicks
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const handleSpaceClick = (spaceId: string) =>
   {
@@ -31,6 +55,23 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   {
     onDeleteSpace(space);
   };
+
+  const handleDragStart = (event: DragStartEvent) =>
+  {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) =>
+  {
+    const { active, over } = event;
+    if (over && active.id !== over.id)
+    {
+      moveSpace(active.id as string, over.id as string);
+    }
+    setActiveId(null);
+  };
+
+  const activeSpace = activeId ? getSpaceById(activeId) : null;
 
   return (
     <div className="flex items-stretch border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -49,23 +90,44 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 
       {/* Horizontal scrollable space icons */}
       <div
-        ref={scrollContainerRef}
         className="flex-1 flex items-center gap-1 px-1 py-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600"
         style={{
           scrollbarWidth: 'thin',
         }}
       >
-        {allSpaces.map((space) => (
-          <SpaceIcon
-            key={space.id}
-            space={space}
-            isActive={space.id === activeSpaceId}
-            onClick={() => handleSpaceClick(space.id)}
-            onEdit={() => onEditSpace(space)}
-            onDelete={() => handleDelete(space)}
-            isAllSpace={space.id === 'all'}
-          />
-        ))}
+        {/* All spaces in SortableContext for proper position calculation */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={allSpaces.map(s => s.id)}
+            strategy={horizontalListSortingStrategy}
+          >
+            {allSpaces.map((space) => (
+              <SpaceIcon
+                key={space.id}
+                space={space}
+                isActive={space.id === activeSpaceId}
+                onClick={() => handleSpaceClick(space.id)}
+                onEdit={() => onEditSpace(space)}
+                onDelete={() => handleDelete(space)}
+                isAllSpace={space.id === 'all'}
+                isDraggable={space.id !== 'all'}
+              />
+            ))}
+          </SortableContext>
+          <DragOverlay>
+            {activeSpace && (
+              <SpaceIconOverlay
+                space={activeSpace}
+                isActive={activeSpace.id === activeSpaceId}
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       {/* Fixed "+" button */}

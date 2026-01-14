@@ -1,5 +1,7 @@
 import React from 'react';
 import clsx from 'clsx';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import * as ContextMenu from './ContextMenu';
 import { LayoutGrid } from 'lucide-react';
 import { Space } from '../hooks/useSpaces';
@@ -14,6 +16,7 @@ interface SpaceIconProps
   onEdit?: () => void;
   onDelete?: () => void;
   isAllSpace?: boolean;
+  isDraggable?: boolean;
 }
 
 // Get icon element by name - uses Iconify CDN for dynamic icons
@@ -55,12 +58,36 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
   onEdit,
   onDelete,
   isAllSpace = false,
+  isDraggable = false,
 }) =>
 {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: space.id,
+    disabled: !isDraggable,
+  });
+
+  // When using DragOverlay, hide the original item while dragging
+  const style = isDraggable
+    ? {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0 : 1,
+      }
+    : undefined;
+
   const colorStyle = GROUP_COLORS[space.color] || GROUP_COLORS.grey;
 
   const iconButton = (
     <button
+      ref={setNodeRef}
+      style={style}
       onClick={onClick}
       title={space.name}
       className={clsx(
@@ -68,6 +95,7 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         "hover:scale-105",
         isActive ? colorStyle.badge : [colorStyle.bg, "hover:opacity-80"]
       )}
+      {...(isDraggable ? { ...attributes, ...listeners } : {})}
     >
       <span
         className={clsx(
@@ -106,5 +134,38 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>
+  );
+};
+
+// Static overlay component for DragOverlay - no sortable hooks
+interface SpaceIconOverlayProps
+{
+  space: Space;
+  isActive: boolean;
+}
+
+export const SpaceIconOverlay: React.FC<SpaceIconOverlayProps> = ({
+  space,
+  isActive,
+}) =>
+{
+  const colorStyle = GROUP_COLORS[space.color] || GROUP_COLORS.grey;
+
+  return (
+    <div
+      className={clsx(
+        "w-7 h-7 rounded flex items-center justify-center flex-shrink-0 cursor-grabbing",
+        isActive ? colorStyle.badge : colorStyle.bg
+      )}
+    >
+      <span
+        className={clsx(
+          "flex items-center justify-center",
+          isActive ? "text-white dark:text-black" : colorStyle.text
+        )}
+      >
+        {getIcon(space.icon, 14, isActive)}
+      </span>
+    </div>
   );
 };
