@@ -49,7 +49,7 @@ Detailed breakdown of implementation phases for the Spaces feature.
 **Details:**
 
 ### SpaceIcon.tsx
-- Renders icon using Lucide icons or emoji fallback
+- Renders icon using Lucide icons via Iconify CDN
 - Color background/ring from `GROUP_COLORS`
 - Active state: stronger background + ring highlight
 - Context menu (right-click): Edit, Delete
@@ -134,34 +134,82 @@ Detailed breakdown of implementation phases for the Spaces feature.
 - Tab group mapping restored by name match after extension reload
 
 
-## Phase 5: SpaceEditDialog
+## Phase 5: SpaceEditDialog ✅ DONE
 
 **Goal:** Create dialog for creating/editing spaces.
 
-**Files to Create:**
-- `src/components/SpaceEditDialog.tsx`
-- `src/components/IconPicker.tsx` (optional - can be inline)
+**Files Created:**
+- `src/components/SpaceEditDialog.tsx` - Create/edit space dialog
+- `src/components/SpaceDeleteDialog.tsx` - Delete confirmation dialog
+- `src/components/SpaceDialogs.tsx` - Container component for dialogs
+- `src/components/IconColorPicker.tsx` - Shared icon/color picker component
+- `src/utils/iconify.ts` - Iconify API utilities for dynamic icon loading
+
+**Files Modified:**
+- `src/App.tsx` - Added SpaceDialogs, wired up handlers
+- `src/components/SpaceIcon.tsx` - Uses Iconify CDN for dynamic icons
+- `src/components/PinnedIcon.tsx` - Refactored to use shared IconColorPicker
+- `src/components/Dialog.tsx` - Made scrollable for small windows
+- `src/components/SettingsDialog.tsx` - Made scrollable
+- `src/components/ImportDialog.tsx` - Made scrollable
 
 **Details:**
 
-### SpaceEditDialog.tsx
-- Props: `isOpen`, `onClose`, `space` (null for create mode), `onSave`
-- Form fields:
-  - **Name**: text input
-  - **Icon**: icon picker (grid of common Lucide icons)
-  - **Color**: 9 color circles (reuse `GROUP_COLOR_OPTIONS`)
-  - **Bookmark Folder**:
-    - Create mode default: "Will create: Other Bookmarks/{name}"
-    - Button to open `FolderPickerDialog` to select existing folder
-- On Save:
-  - If creating with new folder: create folder first via `chrome.bookmarks.create`
-  - Then call `createSpace` or `updateSpace`
-- Validation: name required, folder path required
+### IconColorPicker.tsx (Shared Component)
+- Shared between SpaceEditDialog and PinnedIcon edit modal
+- **Icon section:**
+  - Current icon preview with icon name
+  - Search input to filter icons
+  - Virtualized icon grid (7 columns) with configurable height via `iconGridHeight` prop
+  - Icons loaded dynamically from Iconify CDN (Lucide icon set)
+- **Color section:**
+  - Color circles with selection ring
+  - Optional custom hex input (`showCustomHex` prop)
+  - Configurable circle size via `colorCircleSize` prop
+- **Props:** `selectedIcon`, `selectedColor`, `onIconSelect`, `onColorSelect`, `colorOptions`, `iconGridHeight`, `colorCircleSize`, `showCustomHex`, etc.
 
-### Delete Confirmation
-- Simple confirm dialog or inline in context menu
-- On confirm: call `deleteSpace(id)`
-- Does NOT delete bookmark folder or close tabs
+### iconify.ts
+- `getIconUrl(name)` - Returns Iconify CDN URL for Lucide icons
+- `iconToDataUrl(name, color)` - Fetches SVG and converts to data URL with custom color
+- `getIconNames()` - Fetches and caches list of all Lucide icon names
+- `toKebabCase(name)` - Converts PascalCase to kebab-case for API
+
+### SpaceEditDialog.tsx
+- Uses shared `Dialog` component for consistent styling
+- Uses `IconColorPicker` with `iconGridHeight={90}` (2.5 rows)
+- Form fields:
+  - **Name**: text input with validation
+  - **Icon**: IconColorPicker grid
+  - **Color**: 9 color circles using `GROUP_COLOR_OPTIONS`
+  - **Bookmark Folder**:
+    - Create mode default: shows "Other Bookmarks/{name}" with italic styling
+    - Message: "This folder will be created when saved"
+    - "Pick existing folder" button opens `FolderPickerDialog`
+- On Save:
+  - If creating with new folder: creates folder first via `chrome.bookmarks.create`
+  - Calls `createSpace` or `updateSpace` via SpacesContext
+  - Switches to newly created space automatically
+
+### SpaceDeleteDialog.tsx
+- Confirmation dialog with warning icon
+- Shows space name being deleted
+- Clarifies that bookmarks and tabs are not deleted
+- On confirm: calls `deleteSpace(id)` and switches to "All" space
+
+### SpaceDialogs.tsx
+- Container component that lives inside SpacesProvider
+- Uses useSpacesContext to access createSpace, updateSpace, deleteSpace
+- Handles the save/delete logic that requires context access
+
+### SpaceIcon.tsx Updates
+- Uses Iconify CDN for dynamic icon loading instead of hardcoded icon map
+- `getIcon()` function handles icon rendering with proper color inversion for active state
+- CSS filter classes: `dark:invert` for normal, `invert dark:invert-0` for active
+
+### Dialog Scrolling
+- All dialogs made scrollable for small windows
+- Structure: fixed header, scrollable content (`overflow-y-auto flex-1`), fixed footer
+- `max-h-[calc(100vh-2rem)]` prevents dialog from exceeding viewport
 
 
 ## Phase 6: Export/Import Support
@@ -250,16 +298,24 @@ Detailed breakdown of implementation phases for the Spaces feature.
 | `src/components/SpaceIcon.tsx` | 2 | Space icon |
 | `src/components/SpaceBar.tsx` | 2 | Bottom bar |
 | `src/components/SpaceEditDialog.tsx` | 5 | Create/Edit dialog |
+| `src/components/SpaceDeleteDialog.tsx` | 5 | Delete confirmation |
+| `src/components/SpaceDialogs.tsx` | 5 | Dialog container |
+| `src/components/IconColorPicker.tsx` | 5 | Shared icon/color picker |
+| `src/utils/iconify.ts` | 5 | Iconify API utilities |
 
 ### Modified Files
 | File | Phase | Changes |
 |------|-------|---------|
-| `src/App.tsx` | 2 | Add SpacesProvider, SpaceBar |
+| `src/App.tsx` | 2, 5 | Add SpacesProvider, SpaceBar, SpaceDialogs |
 | `src/components/BookmarkTree.tsx` | 3 | Filter by space folder |
 | `src/components/TabList.tsx` | 3, 4 | Filter by space tab group |
 | `src/contexts/BookmarkTabsContext.tsx` | 4 | Add tabs to space group |
+| `src/components/SpaceIcon.tsx` | 5 | Use Iconify CDN for icons |
+| `src/components/PinnedIcon.tsx` | 5 | Use shared IconColorPicker |
+| `src/components/Dialog.tsx` | 5 | Made scrollable |
+| `src/components/SettingsDialog.tsx` | 5 | Made scrollable |
+| `src/components/ImportDialog.tsx` | 5, 6 | Made scrollable, import spaces |
 | `src/components/ExportDialog.tsx` | 6 | Export spaces |
-| `src/components/ImportDialog.tsx` | 6 | Import spaces |
 
 
 ## Current Progress
@@ -268,6 +324,6 @@ Detailed breakdown of implementation phases for the Spaces feature.
 - [x] Phase 2: SpaceBar UI
 - [x] Phase 3: Filtering
 - [x] Phase 4: Tab Group Integration
-- [ ] Phase 5: SpaceEditDialog
+- [x] Phase 5: SpaceEditDialog
 - [ ] Phase 6: Export/Import
 - [ ] Phase 7: Polish

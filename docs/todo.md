@@ -93,3 +93,24 @@ bugs:
 
 - [ ] bookmark row title should be updated to match the live bookmark tab 's. when live bookmark tab is closed, restore the row title back to the name of the bookmark.
 
+- [ ] remove duplicated code. simplify code.
+
+- [ ] a welcome dialog that explains the following features. Briefly explain what they are and their purposes
+      - pinned sites
+      - arc-style live bookmarks
+      - arc-style space
+      only show the 1st time the extension is run.
+
+      
+- [ ]  in pinned site edit dialog, reset site icon should fetch and display the site icon in the selected icon in the dialog.
+
+
+4. Add feature popup menu "Open as group" for bookmark folder to open the selected bookmark folder as a tab group:
+   - Create a tab group with the same name as the selected folder
+   - Open all the tabs (recursively) under that folder and place them in the group.
+   - Reverse action of "Save to Bookmarks"
+
+1. Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
+
+2. Review code for O(n²) or less efficient logic.
+

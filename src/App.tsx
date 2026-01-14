@@ -15,6 +15,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
+import { SpaceDialogs } from './components/SpaceDialogs';
 import { Settings, Info, Upload, Download } from 'lucide-react';
 
 // Inner component that uses SpacesContext (must be inside SpacesProvider)
@@ -134,9 +135,10 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [externalDropTarget, setExternalDropTarget] = useState<ExternalDropTarget | null>(null);
-  const [_spaceToEdit, setSpaceToEdit] = useState<Space | null>(null);
-  const [_showSpaceEditDialog, setShowSpaceEditDialog] = useState(false);
-  const [_spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
+  const [spaceToEdit, setSpaceToEdit] = useState<Space | null>(null);
+  const [showSpaceEditDialog, setShowSpaceEditDialog] = useState(false);
+  const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
+  const [showSpaceDeleteDialog, setShowSpaceDeleteDialog] = useState(false);
   const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null!);
@@ -241,8 +243,7 @@ function App() {
 
   const handleDeleteSpace = useCallback((space: Space) => {
     setSpaceToDelete(space);
-    // TODO: Show confirmation dialog
-    // For now, we'll implement this when we create the SpaceEditDialog
+    setShowSpaceDeleteDialog(true);
   }, []);
 
   // Close menu when clicking outside
@@ -444,6 +445,16 @@ function App() {
           resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current}
         />
       </div>
+
+      {/* Space Dialogs */}
+      <SpaceDialogs
+        showEditDialog={showSpaceEditDialog}
+        spaceToEdit={spaceToEdit}
+        onCloseEditDialog={() => setShowSpaceEditDialog(false)}
+        showDeleteDialog={showSpaceDeleteDialog}
+        spaceToDelete={spaceToDelete}
+        onCloseDeleteDialog={() => setShowSpaceDeleteDialog(false)}
+      />
 
       {/* Space Bar */}
       <SpaceBar

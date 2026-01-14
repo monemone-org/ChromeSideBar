@@ -200,9 +200,9 @@ export function ImportDialog({
 
       {/* Dialog - shown after file is selected */}
       {dialogState !== 'selecting' && (
-        <div className="absolute inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 w-64 border border-gray-200 dark:border-gray-700">
-            <div className="flex justify-between items-center mb-3">
+        <div className="absolute inset-0 z-[60] bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-64 border border-gray-200 dark:border-gray-700 max-h-[calc(100vh-2rem)] flex flex-col my-auto">
+            <div className="flex justify-between items-center p-3 pb-0 flex-shrink-0">
               <h2 className="font-bold">
                 {dialogState === 'success' ? 'Import Complete' : 'Import Backup'}
               </h2>
@@ -214,7 +214,7 @@ export function ImportDialog({
               </button>
             </div>
 
-            <div className="space-y-3">
+            <div className="overflow-y-auto flex-1 p-3 space-y-3">
               {/* Error state */}
               {error && (
                 <>

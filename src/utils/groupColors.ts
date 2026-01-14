@@ -18,6 +18,9 @@ export const GROUP_COLORS: Record<string, {
   orange: { bg: 'bg-[#FEF1E8] dark:bg-[#FCAD70]/20', bgStrong: 'bg-[#FCE3D1] dark:bg-[#FCAD70]/40', badge: 'bg-[#FA903E] dark:bg-[#FCAD70]', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]', border: 'border-[#FA903E] dark:border-[#FCAD70]', text: 'text-[#FA903E] dark:text-[#FCAD70]' },
 };
 
+// Shared size for color picker circles (used in dialogs)
+export const COLOR_CIRCLE_SIZE = 'w-5 h-5';
+
 // Chrome tab group color options for pickers
 export const GROUP_COLOR_OPTIONS: { value: chrome.tabGroups.ColorEnum; dot: string }[] = [
   { value: 'grey', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]' },

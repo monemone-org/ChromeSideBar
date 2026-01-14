@@ -1,57 +1,10 @@
 import React from 'react';
 import clsx from 'clsx';
 import * as ContextMenu from './ContextMenu';
-import {
-  LayoutGrid,
-  Briefcase,
-  Home,
-  Rocket,
-  Star,
-  Heart,
-  Folder,
-  Code,
-  Music,
-  Book,
-  Camera,
-  Coffee,
-  Globe,
-  Lightbulb,
-  Mail,
-  MessageCircle,
-  Settings,
-  ShoppingCart,
-  Users,
-  Zap,
-  Circle,
-  LucideIcon,
-} from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 import { Space } from '../hooks/useSpaces';
 import { GROUP_COLORS } from '../utils/groupColors';
-
-// Map of supported icon names to components
-const ICON_MAP: Record<string, LucideIcon> = {
-  LayoutGrid,
-  Briefcase,
-  Home,
-  Rocket,
-  Star,
-  Heart,
-  Folder,
-  Code,
-  Music,
-  Book,
-  Camera,
-  Coffee,
-  Globe,
-  Lightbulb,
-  Mail,
-  MessageCircle,
-  Settings,
-  ShoppingCart,
-  Users,
-  Zap,
-  Circle,
-};
+import { getIconUrl } from '../utils/iconify';
 
 interface SpaceIconProps
 {
@@ -63,21 +16,36 @@ interface SpaceIconProps
   isAllSpace?: boolean;
 }
 
-// Get icon component by name
-const getIcon = (iconName: string, size: number = 18): React.ReactNode =>
+// Get icon element by name - uses Iconify CDN for dynamic icons
+// isActive: when true, icon needs to be white (light) or black (dark) for contrast on badge
+const getIcon = (iconName: string, size: number = 14, isActive: boolean = false): React.ReactNode =>
 {
-  const IconComponent = ICON_MAP[iconName];
-  if (IconComponent)
+  // Special case: LayoutGrid is used for the "All" space
+  if (iconName === 'LayoutGrid')
   {
-    return <IconComponent size={size} />;
+    return <LayoutGrid size={size} />;
   }
-  // Fallback: treat as emoji
-  if (iconName.length <= 2)
-  {
-    return <span className="text-sm">{iconName}</span>;
-  }
-  // Default fallback
-  return <Circle size={size} />;
+
+  // Icon filter classes:
+  // - Normal: dark:invert (black in light mode, white in dark mode)
+  // - Active: invert dark:invert-0 (white in light mode, black in dark mode)
+  const filterClass = isActive ? "invert dark:invert-0" : "dark:invert";
+
+  // Use Iconify CDN for Lucide icons
+  return (
+    <img
+      src={getIconUrl(iconName)}
+      alt={iconName}
+      width={size}
+      height={size}
+      className={filterClass}
+      onError={(e) =>
+      {
+        // Fallback to Circle icon on error
+        e.currentTarget.style.display = 'none';
+      }}
+    />
+  );
 };
 
 export const SpaceIcon: React.FC<SpaceIconProps> = ({
@@ -101,11 +69,13 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         isActive ? colorStyle.badge : [colorStyle.bg, "hover:opacity-80"]
       )}
     >
-      <span className={clsx(
-        "flex items-center justify-center",
-        isActive ? "text-white dark:text-black" : colorStyle.text
-      )}>
-        {getIcon(space.icon, 14)}
+      <span
+        className={clsx(
+          "flex items-center justify-center",
+          isActive ? "text-white dark:text-black" : colorStyle.text
+        )}
+      >
+        {getIcon(space.icon, 14, isActive)}
       </span>
     </button>
   );
@@ -138,6 +108,3 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
     </ContextMenu.Root>
   );
 };
-
-// Export the icon map for use in icon picker
-export { ICON_MAP };

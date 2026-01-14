@@ -1,4 +1,4 @@
-# Arc-Style Spaces Test Plan (Phases 1-4)
+# Arc-Style Spaces Test Plan (Phases 1-5)
 
 Manual test plan for the Spaces feature. A Space links a bookmark folder to a Chrome tab group, creating isolated workspaces.
 
@@ -13,7 +13,8 @@ Manual test plan for the Spaces feature. A Space links a bookmark folder to a Ch
 
 ### 1.1 Space Creation
 - [ ] Click "+" button in SpaceBar
-- [ ] Space is created with default name, icon, and color
+- [ ] SpaceEditDialog opens in create mode
+- [ ] Enter name, pick icon, pick color
 - [ ] New space appears in SpaceBar after "All"
 
 ### 1.2 Space Persistence
@@ -148,6 +149,70 @@ Manual test plan for the Spaces feature. A Space links a bookmark folder to a Ch
 
 ---
 
+## Phase 5: SpaceEditDialog
+
+### 5.1 Create Space Dialog
+- [ ] Click "+" button in SpaceBar
+- [ ] Dialog opens with title "Create Space"
+- [ ] Name field is empty and focused
+- [ ] Icon picker shows current icon preview and searchable grid
+- [ ] Icon search filters icons as you type
+- [ ] Color picker shows 9 color circles (grey, blue, red, yellow, green, pink, purple, cyan, orange)
+- [ ] Folder shows "Other Bookmarks/{name}" in italic with message "This folder will be created when saved"
+
+### 5.2 Create Space with Default Folder
+- [ ] Enter name "MySpace"
+- [ ] Folder preview updates to "Other Bookmarks/MySpace"
+- [ ] Click Create
+- [ ] New folder "MySpace" is created under "Other Bookmarks"
+- [ ] Space is created and becomes active
+
+### 5.3 Create Space with Existing Folder
+- [ ] Click "+" button
+- [ ] Enter name
+- [ ] Click "Pick existing folder" button
+- [ ] FolderPickerDialog opens
+- [ ] Select existing folder
+- [ ] Dialog shows selected folder path (no longer italic)
+- [ ] Create space - uses existing folder (no new folder created)
+
+### 5.4 Edit Space Dialog
+- [ ] Right-click space icon → Edit...
+- [ ] Dialog opens with title "Edit Space"
+- [ ] Fields are populated with space's current values
+- [ ] Save button says "Save" (not "Create")
+
+### 5.5 Edit Space Properties
+- [ ] Change name → space name updates
+- [ ] Change icon → space icon updates in SpaceBar
+- [ ] Change color → space color updates in SpaceBar
+- [ ] Change folder → space shows new folder's bookmarks
+
+### 5.6 Delete Space
+- [ ] Right-click space icon → Delete
+- [ ] Confirmation dialog appears
+- [ ] Shows space name being deleted
+- [ ] Click Cancel → dialog closes, space remains
+- [ ] Click Delete → space removed, switches to "All"
+
+### 5.7 Delete Preserves Data
+- [ ] Delete a space that has tabs and bookmarks
+- [ ] Tabs remain open (not closed)
+- [ ] Bookmark folder remains (not deleted)
+
+### 5.8 Validation
+- [ ] Create with empty name → shows error, cannot save
+- [ ] Edit existing space folder to one that doesn't exist → shows error
+
+### 5.9 Dialog Scrolling
+- [ ] Shrink Chrome window vertically
+- [ ] SpaceEditDialog content scrolls, header and footer buttons remain visible
+- [ ] SettingsDialog content scrolls, Apply/Cancel buttons remain visible
+- [ ] ImportDialog content scrolls when importing large backup
+- [ ] PinnedIcon edit modal scrolls, Save/Cancel buttons remain visible
+
+---
+
 ## Edge Cases
 
 ### Tab Group Manually Closed
@@ -162,7 +227,7 @@ Manual test plan for the Spaces feature. A Space links a bookmark folder to a Ch
 
 ### Space Color Matches Tab Group
 - [ ] Space color should match its tab group color in Chrome
-- [ ] (Note: Color editing is Phase 5)
+- [ ] Edit space color → tab group color updates when new tabs are added
 
 ---
 

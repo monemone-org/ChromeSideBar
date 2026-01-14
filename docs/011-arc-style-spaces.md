@@ -34,7 +34,7 @@ When a space is active, the sidebar shows only:
 interface Space {
   id: string;                         // "space_{timestamp}_{random}"
   name: string;
-  icon: string;                       // Lucide icon name or emoji
+  icon: string;                       // Lucide icon name
   color: chrome.tabGroups.ColorEnum;  // grey, blue, red, yellow, green, pink, purple, cyan, orange
   bookmarkFolderPath: string;         // e.g. "Bookmarks Bar/Work" or "Other Bookmarks/Projects"
 }
@@ -151,13 +151,13 @@ Right-click space icon:
 - Delete (with confirmation)
 
 **SpaceEditDialog** - single dialog for both creating and editing spaces:
-- Name input
-- Icon picker
-- Color picker (9 Chrome tab group colors)
+- Name input (with validation)
+- Icon picker (shared `IconColorPicker` component with searchable Lucide icons via Iconify CDN)
+- Color picker (9 Chrome tab group colors as circles)
 - Bookmark folder selection:
-  - **Default (create mode):** Create new folder under "Other Bookmarks" with space name
-  - Show indicator like "Will create: Other Bookmarks/{name}" (folder created on OK, not before)
-  - User can click to pick existing folder via FolderPickerDialog instead
+  - **Default (create mode):** Shows "Other Bookmarks/{name}" with message "This folder will be created when saved"
+  - "Pick existing folder" button opens `FolderPickerDialog` to select existing folder
+  - Folder created on save, not before
 
 ### Export/Import
 - Spaces included in full backup export
@@ -231,15 +231,11 @@ When switching spaces, the space handles activating the correct tab independentl
 
 ## TODO
 
-1. Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
-
-2. Review code for O(n²) or less efficient logic.
-
 3. ~~Close all tabs in tabList should only close tabs on the tablist, but not the live tabs for bookmarks and pinned sites.~~ ✅ DONE - `handleCloseAllTabs` now uses `visibleTabs` which excludes managed tabs.
 
-4. Add feature popup menu "Open as group" for bookmark folder to open the selected bookmark folder as a tab group:
-   - Create a tab group with the same name as the selected folder
-   - Open all the tabs (recursively) under that folder and place them in the group.
-   - Reverse action of "Save to Bookmarks"
-
 5. ~~Write a test plan to test all major functionalities.~~ ✅ DONE - See `docs/011-arc-style-spaces-test-plan.md`
+
+6. ~~Pick new folder - should launch "Pick existing folder..." dialog, as in "Space edit dialog"~~ ✅ DONE - BookmarkTree uses FolderPickerDialog
+
+7. ~~remove "..." from "Pick existing folder..." button label~~ ✅ DONE - Button now says "Pick existing folder"
+

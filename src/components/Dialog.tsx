@@ -40,11 +40,11 @@ export const Dialog = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto"
       style={{ fontSize: `${fontSize}px` }}
     >
-      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full ${maxWidth} border border-gray-200 dark:border-gray-700`}>
-        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
+      <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full ${maxWidth} border border-gray-200 dark:border-gray-700 max-h-[calc(100vh-2rem)] flex flex-col my-auto`}>
+        <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
           <h3 className="font-medium text-gray-900 dark:text-gray-100">
             {title}
           </h3>
@@ -56,7 +56,9 @@ export const Dialog = ({
             <X size={16} />
           </button>
         </div>
-        {children}
+        <div className="overflow-y-auto flex-1">
+          {children}
+        </div>
       </div>
     </div>,
     document.body

@@ -46,7 +46,7 @@ import {
 } from '@dnd-kit/core';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import clsx from 'clsx';
-import { GROUP_COLORS, GROUP_COLOR_OPTIONS } from '../utils/groupColors';
+import { GROUP_COLORS, GROUP_COLOR_OPTIONS, COLOR_CIRCLE_SIZE } from '../utils/groupColors';
 
 // --- Add to Group Dialog ---
 interface AddToGroupDialogProps {
@@ -142,7 +142,8 @@ const AddToGroupDialog = ({
                   key={opt.value}
                   onClick={() => setNewGroupColor(opt.value)}
                   className={clsx(
-                    "w-6 h-6 rounded-full border-2 transition-transform hover:scale-110",
+                    COLOR_CIRCLE_SIZE,
+                    "rounded-full border-2 transition-transform hover:scale-110",
                     opt.dot,
                     newGroupColor === opt.value
                       ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
@@ -243,13 +244,14 @@ const ChangeGroupColorDialog = ({
           <label className="block font-medium mb-2 text-gray-700 dark:text-gray-300">
             Select Color
           </label>
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-1.5 flex-wrap">
             {GROUP_COLOR_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setSelectedColor(opt.value)}
                 className={clsx(
-                  "w-8 h-8 rounded-full border-2 transition-transform hover:scale-110",
+                  COLOR_CIRCLE_SIZE,
+                  "rounded-full border-2 transition-transform hover:scale-110",
                   opt.dot,
                   selectedColor === opt.value
                     ? "border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800"
