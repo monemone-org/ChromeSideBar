@@ -3,9 +3,9 @@
 
 ## Goal 
 
-To migrate the storage of pinned sites to a folder "SideBar For Arc Pinned Sites" under "Other Bookmarks" by default. . and let user choose to store those in a different folder if they prefer
+To migrate the storage of pinned sites to a folder "SideBar For Arc Pinned Sites" under "Other Bookmarks" by default. Let the user choose to store those in a different folder if they prefer.
 
-This allows the pinned site to be sync and backup online.  Also preserve links even if the extension is uninstalled.
+This allows pinned sites to be synced and backed up online. Also preserves links even if the extension is uninstalled.
 
 
 ## Migration Workflow
@@ -48,18 +48,28 @@ Store URL/title in bookmarks, metadata in `chrome.storage.sync`.
 
 ```
 Bookmark: { url: "https://gmail.com", title: "Gmail" }
-chrome.storage.sync: { "https://gmail.com": { customIconName: "home", iconColor: "#ef4444" } }
+chrome.storage.sync: {
+  "https://gmail.com": {
+    customIconName: "home",      // Lucide icon name
+    iconColor: "#ef4444",        // Hex color
+    favicon: "data:image/svg+xml,..." // Base64 data URL of rendered icon
+  }
+}
 ```
+
+Note: The current implementation stores `favicon` as a base64 data URL (the rendered icon with color applied). This caches the icon so we don't need to re-fetch from Iconify CDN on every load. The `customIconName` and `iconColor` are kept for the icon picker UI.
 
 Pros:
 - Bookmarks stay clean and human-readable
 - `chrome.storage.sync` also syncs via Chrome account
 - Simple implementation
 - Order determined by folder position
+- No repeated fetches for custom icons
 
 Cons:
 - Metadata lost if extension uninstalled (unless user reinstalls while signed in)
 - Need to handle orphaned metadata when bookmark deleted externally
+- `chrome.storage.sync` has size limits (100KB total) - may need to fall back to `chrome.storage.local` for users with many pinned sites
 
 ---
 
@@ -68,6 +78,18 @@ Cons:
 Store `chrome-extension://<ext-id>/redirect?url=gmail.com&icon=home&color=ef4444`
 
 Extension intercepts clicks and opens the real URL.
+
+Two options for icon storage:
+
+1. **Icon name + color only** (e.g., `&icon=home&color=ef4444`)
+   - Compact URL (~30 extra chars)
+   - Must re-fetch icon from CDN on every load
+
+2. **Base64 encoded favicon** (e.g., `&icon=home&color=ef4444&favicon=PHN2ZyB4bWxucz0i...`)
+   - Self-contained, no fetch needed
+   - Still stores icon name + color for the icon picker UI
+   - But URLs become 400-2000+ chars longer
+   - Harder to debug/inspect
 
 Pros:
 - All metadata encoded in URL
