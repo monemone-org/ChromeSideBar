@@ -98,14 +98,12 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       className={clsx(
         "w-7 h-7 rounded flex items-center justify-center transition-all flex-shrink-0",
         "hover:scale-105",
-        isActive
-          ? [colorStyle.bgStrong, "ring-2 ring-offset-1 ring-offset-white dark:ring-offset-gray-900", colorStyle.border.replace('border-', 'ring-')]
-          : [colorStyle.bg, "hover:opacity-80"]
+        isActive ? colorStyle.badge : [colorStyle.bg, "hover:opacity-80"]
       )}
     >
       <span className={clsx(
         "flex items-center justify-center",
-        isActive ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-300"
+        isActive ? "text-white dark:text-black" : colorStyle.text
       )}>
         {getIcon(space.icon, 14)}
       </span>

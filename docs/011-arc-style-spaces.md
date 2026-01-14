@@ -116,26 +116,34 @@ User has 3 spaces and 2 browser windows open.
 
 ### Opening Bookmarks in a Space
 Follows existing bookmark open mode settings:
-- **Arc mode (live bookmark)** - tab associated with bookmark, added to space's tab group
-- **Replace active tab** - replaces current tab (stays in space's tab group if already there)
-- **New tab** - opens new tab in space's tab group
+- **Arc mode (live bookmark)** - tab associated with bookmark, stays **ungrouped** (shown in Bookmarks section)
+- **Replace active tab** - replaces current tab
+- **New tab** - opens new tab, stays **ungrouped**
 
-**Tab group association (lazy):**
+**Design decision:** Live bookmark/pinned tabs stay ungrouped. They're already shown in the Bookmarks/Pinned section with loaded indicators, so grouping them provides no additional benefit and adds complexity.
+
+**Tab group creation (lazy):**
 1. Check `spaceTabGroupMap` for existing mapping
 2. If no mapping, search for existing tab group with matching name
 3. If found, use that group and store mapping
-4. If not found, create new tab group when first tab is opened (not on space switch)
+4. If not found, create new tab group when first **new tab** is opened (via Cmd+T or "+ New Tab" button)
 
 ### Switching Spaces
 **Triggers:**
 - Click space icon in SpaceBar
-- 2-finger swipe left/right on side panel
+- 2-finger swipe left/right on side panel (Phase 7)
 
 **Behavior:**
 1. Filter sidebar to show only that space's bookmarks and tabs
-2. Activate the space's "active tab" if it exists
-3. If no active tab, activate the most recently used tab in that space
-4. If no tabs exist in the space, show empty tab section (no tab created)
+2. Bookmarks section shows space's folder as collapsible item (auto-expanded)
+3. Tabs section shows space's tabs **flat without group header**
+4. If no tabs exist in the space, show empty tab section
+5. Tab group mapping restored by name match if needed (handles extension reload)
+
+**Tab operations in space:**
+- "Close All Tabs" only closes visible tabs (space's tabs)
+- Sort by Domain sorts only space's tabs (preserves group)
+- Close Tabs Before/After/Others respect space filtering
 
 ### Managing Spaces (Context Menu)
 Right-click space icon:
@@ -178,21 +186,23 @@ Located at bottom of side panel:
 
 **Space Icon:**
 - Shows icon only (no label)
-- Color background/ring matching space color
-- Active space has highlight ring
+- Uses same colors as tab group headers in TabList:
+  - **Active:** solid badge color background, white/black text (like group badge)
+  - **Inactive:** light background, colored text
 - Tooltip shows space name on hover
-- Drag-drop to reorder
+- Drag-drop to reorder (Phase 7)
 
 
 ## Edge Cases
 
 | Case | Handling |
 |------|----------|
-| Space's bookmark folder deleted | Show inline message: "Folder 'X' not found. [Pick new folder]" - link opens FolderPickerDialog |
-| Tab group closed manually | Clear mapping from `spaceTabGroupMap` |
+| Space's bookmark folder deleted | Show inline message: "Folder 'X' not found. Pick new folder" (same font as extension) |
+| Tab group closed manually | Clear mapping from `spaceTabGroupMap`; recreate on next tab open |
 | Tab moved to another window | Treat as if tab was closed in original window |
-| Extension reloaded | Session storage lost; on next tab open, find tab group by matching name |
-| No tab group exists yet | Show empty tab section; create group on first bookmark/tab open |
+| Extension reloaded | Session storage lost; `findTabGroupForSpace` restores mapping by name match on space switch |
+| No tab group exists yet | Show empty tab section; create group on first Cmd+T or "+ New Tab" |
+| Live bookmark/pinned tab opened | Tab stays ungrouped (tracked separately in Bookmarks section) |
 
 
 ## Tab History
@@ -217,3 +227,19 @@ When switching spaces, the space handles activating the correct tab independentl
 6. **Export/Import** - Include spaces in backup, Replace/Add options
 7. **Polish** - Drag-drop reorder, swipe gestures, edge case handling
 
+
+
+## TODO
+
+1. Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
+
+2. Review code for O(n²) or less efficient logic.
+
+3. ~~Close all tabs in tabList should only close tabs on the tablist, but not the live tabs for bookmarks and pinned sites.~~ ✅ DONE - `handleCloseAllTabs` now uses `visibleTabs` which excludes managed tabs.
+
+4. Add feature popup menu "Open as group" for bookmark folder to open the selected bookmark folder as a tab group:
+   - Create a tab group with the same name as the selected folder
+   - Open all the tabs (recursively) under that folder and place them in the group.
+   - Reverse action of "Save to Bookmarks"
+
+5. ~~Write a test plan to test all major functionalities.~~ ✅ DONE - See `docs/011-arc-style-spaces-test-plan.md`

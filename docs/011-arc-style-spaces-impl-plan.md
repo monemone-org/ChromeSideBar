@@ -68,76 +68,70 @@ Detailed breakdown of implementation phases for the Spaces feature.
 - Add handlers: `handleCreateSpace`, `handleEditSpace`, `handleDeleteSpace`
 
 
-## Phase 3: Filtering
+## Phase 3: Filtering ✅ DONE
 
 **Goal:** Filter BookmarkTree and TabList by active space.
 
-**Files to Modify:**
+**Files Modified:**
 - `src/components/BookmarkTree.tsx`
 - `src/components/TabList.tsx`
 
 **Details:**
 
 ### BookmarkTree.tsx
-- Add prop: `activeSpace: Space | null` (from context)
+- Add prop: `activeSpace: Space | null` (passed from App.tsx via SidebarContent)
 - When `activeSpace.id !== 'all'`:
-  - Resolve `bookmarkFolderPath` to folder ID using `getBookmarkPath` helper
-  - Only render contents of that folder (not the folder itself)
-  - If folder not found, show: "Folder '{path}' not found. [Pick new folder]"
+  - Use `findFolderByPath` from useBookmarks to resolve path to folder
+  - Show the folder itself as a collapsible item (not just contents)
+  - Auto-expand the space folder when switching to space
+  - If folder not found, show: "Folder '{path}' not found. Pick new folder" (inline, same font as extension)
 - When `activeSpace.id === 'all'`: current behavior (show all)
 
-**New helper function:**
-```typescript
-// Find bookmark folder ID by path like "Bookmarks Bar/Work"
-async function findFolderByPath(path: string): Promise<string | null>
-```
-
 ### TabList.tsx
-- Add prop: `activeSpaceTabGroupId: number | null` (from context)
-- When `activeSpaceTabGroupId !== null`:
+- Get `activeSpaceTabGroupId` from SpacesContext via `getTabGroupForSpace`
+- When in a space (`activeSpace.id !== 'all'`):
   - Filter `visibleTabs` to only show tabs where `tab.groupId === activeSpaceTabGroupId`
-  - Hide other tab groups from display
-- When `activeSpaceTabGroupId === null` (All space): current behavior
+  - Filter `visibleTabGroups` to only show the space's group
+  - If no tab group exists yet, show empty list
+  - Display tabs **flat without group header** (no indentation, no group row)
+- When in "All" space: current behavior (show all tabs with group headers)
 
 
-## Phase 4: Tab Group Integration
+## Phase 4: Tab Group Integration ✅ DONE
 
 **Goal:** Ensure tabs opened in a space go to that space's tab group.
 
-**Files to Modify:**
+**Files Modified:**
 - `src/contexts/BookmarkTabsContext.tsx`
 - `src/contexts/SpacesContext.tsx`
-- `src/hooks/useTabGroups.ts`
 - `src/components/TabList.tsx`
 
 **Details:**
 
 ### SpacesContext.tsx
-- Update `ensureTabGroupForSpace` to:
-  1. Check `spaceTabGroupMap` for existing mapping
-  2. If no mapping, search for existing tab group with matching name
-  3. If found by name, store mapping and return group ID
-  4. If not found, return null (don't create group yet)
-- Add `createTabGroupForSpace(spaceId, firstTabId)` - creates group with provided tab
+- `findTabGroupForSpace(spaceId)` - searches for existing tab group by name, stores mapping if found
+- `createTabGroupForSpace(spaceId, firstTabId)` - creates group with provided tab, sets name/color from space
 
 ### BookmarkTabsContext.tsx
-- Modify `createItemTab` to accept optional `spaceId` parameter
-- When `spaceId` provided and not 'all':
-  - Get existing tab group via `ensureTabGroupForSpace`
-  - If no group exists, create tab first, then create group with that tab
-  - If group exists, add tab to group after creation
-- Pass active space context to bookmark click handlers
-
-### useTabGroups.ts
-- Add `findTabGroupByName(name)` - searches current window for group with matching title
-- Add `addTabToGroup(tabId, groupId)` - adds existing tab to group
+- Live bookmark/pinned tabs **stay ungrouped** (simpler design)
+- Added `pendingManagedTabs` Set to track tabs being created for bookmarks/pinned
+- Added `isPendingManagedTab(tabId)` export for TabList to check
+- `createItemTab` marks tab as pending, then ungroups after 200ms as fallback
 
 ### TabList.tsx
-- When creating new tab in a space:
-  - Call `chrome.tabs.group()` to add to space's tab group
-- Update "New Tab" button behavior when space is active
+- `handleNewTab` - space-aware new tab creation:
+  - In space: creates tab in space's group (or creates group if none exists)
+  - In "All": creates ungrouped tab
+- `chrome.tabs.onCreated` listener auto-groups Cmd+T tabs when in a space
+  - Skips tabs marked as `isPendingManagedTab` (bookmark/pinned tabs)
+- `handleCloseAllTabs` - closes only `visibleTabs` (respects space filtering)
+- Sort menu uses `sortGroupTabs` when in space to preserve group
+- `findTabGroupForSpace` called on space switch to restore mapping after reload
 
-**Key change:** Tab groups are NOT created on space switch. They are only created when first tab/bookmark is opened in that space.
+**Key decisions:**
+- Tab groups are NOT created on space switch, only when first tab is opened
+- Live bookmark/pinned tabs stay ungrouped (shown in Bookmarks section anyway)
+- Tab group mapping restored by name match after extension reload
 
 
 ## Phase 5: SpaceEditDialog
@@ -272,8 +266,8 @@ async function findFolderByPath(path: string): Promise<string | null>
 
 - [x] Phase 1: Core Infrastructure
 - [x] Phase 2: SpaceBar UI
-- [ ] Phase 3: Filtering
-- [ ] Phase 4: Tab Group Integration
+- [x] Phase 3: Filtering
+- [x] Phase 4: Tab Group Integration
 - [ ] Phase 5: SpaceEditDialog
 - [ ] Phase 6: Export/Import
 - [ ] Phase 7: Polish

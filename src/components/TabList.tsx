@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback, forwardRef } from 'react';
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
-import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
+import { useBookmarkTabsContext, isPendingManagedTab } from '../contexts/BookmarkTabsContext';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
@@ -902,7 +902,7 @@ interface TabListProps {
 
 export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false, filterText = '' }: TabListProps) =>
 {
-  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
+  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
   const { activeSpace, getTabGroupForSpace, createTabGroupForSpace, findTabGroupForSpace } = useSpacesContext();
@@ -932,6 +932,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
     const handleTabCreated = async (tab: chrome.tabs.Tab) =>
     {
+      // Skip tabs created for bookmarks/pinned sites (they should stay ungrouped)
+      if (tab.id && isPendingManagedTab(tab.id)) return;
+
       // Only handle tabs in current window and not already in a group
       if (tab.windowId !== chrome.windows.WINDOW_ID_CURRENT && tab.groupId !== -1) return;
 
@@ -1049,27 +1052,17 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     }
   }, [isInSpace, activeSpace, activeSpaceTabGroupId, createTabInGroup, createTabGroupForSpace, createTab]);
 
-  // Space-aware close all tabs
+  // Space-aware close all tabs - closes only visible tabs
   const handleCloseAllTabs = useCallback(() =>
   {
-    if (isInSpace && activeSpaceTabGroupId !== undefined)
+    const tabIds = visibleTabs
+      .map(tab => tab.id!)
+      .filter(id => id !== undefined);
+    if (tabIds.length > 0)
     {
-      // Close only tabs in the active space's group
-      const spaceTabIds = tabs
-        .filter(tab => tab.groupId === activeSpaceTabGroupId)
-        .map(tab => tab.id!)
-        .filter(id => id !== undefined);
-      if (spaceTabIds.length > 0)
-      {
-        closeTabs(spaceTabIds);
-      }
+      closeTabs(tabIds);
     }
-    else
-    {
-      // "All" space - close all tabs
-      closeAllTabs();
-    }
-  }, [isInSpace, activeSpaceTabGroupId, tabs, closeTabs, closeAllTabs]);
+  }, [visibleTabs, closeTabs]);
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 

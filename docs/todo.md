@@ -90,3 +90,6 @@ bugs:
       - [x] recent filter is not saved. there should be a debounce to start search. that search string is remembered in memory.  the string should be saved in recent. if user edit the search string without deleting all charactors, then edit that recent search string without adding another new one to the recent list.
       - [x] add a [reset] filter button to toolbar that clear the search string , filter with open tab and filter with speaker.
       - [ ] focus doesn't go to the input field
+
+- [ ] bookmark row title should be updated to match the live bookmark tab 's. when live bookmark tab is closed, restore the row title back to the name of the bookmark.
+

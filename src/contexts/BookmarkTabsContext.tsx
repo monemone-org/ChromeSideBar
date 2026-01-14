@@ -7,6 +7,12 @@ const getStorageKey = (windowId: number) => `tabAssociations_${windowId}`;
 const makeBookmarkKey = (bookmarkId: string) => `bookmark-${bookmarkId}`;
 const makePinnedKey = (pinnedId: string) => `pinned-${pinnedId}`;
 
+// Global set to track tabs being created for bookmarks/pinned sites
+// Used to prevent auto-grouping by spaces
+const pendingManagedTabs = new Set<number>();
+
+export const isPendingManagedTab = (tabId: number): boolean => pendingManagedTabs.has(tabId);
+
 interface BookmarkTabsContextValue
 {
   // Bookmark functions
@@ -322,6 +328,28 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           }
 
           const tabId = tab.id;
+
+          // Mark as pending managed tab to prevent auto-grouping by spaces
+          pendingManagedTabs.add(tabId);
+
+          // Clean up after a delay (onCreated listener should have checked by then)
+          // Also ungroup the tab in case it somehow got grouped
+          setTimeout(async () =>
+          {
+            pendingManagedTabs.delete(tabId);
+            try
+            {
+              const currentTab = await chrome.tabs.get(tabId);
+              if (currentTab.groupId && currentTab.groupId !== -1)
+              {
+                await chrome.tabs.ungroup(tabId);
+              }
+            }
+            catch
+            {
+              // Tab might be closed, ignore
+            }
+          }, 200);
 
           // Store association
           await storeAssociation(tabId, itemKey);
