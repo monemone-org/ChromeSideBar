@@ -10,7 +10,7 @@ const makePinnedKey = (pinnedId: string) => `pinned-${pinnedId}`;
 interface BookmarkTabsContextValue
 {
   // Bookmark functions
-  openBookmarkTab: (bookmarkId: string, url: string) => Promise<void>;
+  openBookmarkTab: (bookmarkId: string, url: string) => Promise<number | undefined>;
   closeBookmarkTab: (bookmarkId: string) => void;
   isBookmarkLoaded: (bookmarkId: string) => boolean;
   isBookmarkAudible: (bookmarkId: string) => boolean;
@@ -18,7 +18,7 @@ interface BookmarkTabsContextValue
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
   associateExistingTab: (tabId: number, bookmarkId: string) => Promise<void>;
   // Pinned site functions
-  openPinnedTab: (pinnedId: string, url: string) => Promise<void>;
+  openPinnedTab: (pinnedId: string, url: string) => Promise<number | undefined>;
   closePinnedTab: (pinnedId: string) => void;
   isPinnedLoaded: (pinnedId: string) => boolean;
   isPinnedAudible: (pinnedId: string) => boolean;
@@ -306,7 +306,8 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   }, [currentWindowId]);
 
   // Create a new tab for an item (no grouping)
-  const createItemTab = useCallback(async (itemKey: string, url: string): Promise<void> =>
+  // Returns the created tab ID, or undefined if creation failed
+  const createItemTab = useCallback(async (itemKey: string, url: string): Promise<number | undefined> =>
   {
     return new Promise(async (resolve) =>
     {
@@ -316,7 +317,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         {
           if (handleError('create') || !tab.id)
           {
-            resolve();
+            resolve(undefined);
             return;
           }
 
@@ -338,19 +339,20 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
             return newMap;
           });
 
-          resolve();
+          resolve(tabId);
         });
       }
       catch (err)
       {
         console.error('Failed to create item tab:', err);
-        resolve();
+        resolve(undefined);
       }
     });
   }, [handleError, storeAssociation]);
 
   // Open a tab for an item (bookmark or pinned site)
-  const openItemTab = useCallback(async (itemKey: string, url: string): Promise<void> =>
+  // Returns the tab ID (existing or newly created), or undefined if failed
+  const openItemTab = useCallback(async (itemKey: string, url: string): Promise<number | undefined> =>
   {
     const existingTabId = itemToTab.get(itemKey);
 
@@ -369,7 +371,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
             chrome.tabs.update(existingTabId, { active: true }, () =>
             {
               handleError('activate');
-              resolve();
+              resolve(existingTabId);
             });
           }
         });
@@ -401,7 +403,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   }, [itemToTab]);
 
   // --- Bookmark-specific wrappers ---
-  const openBookmarkTab = useCallback(async (bookmarkId: string, url: string): Promise<void> =>
+  const openBookmarkTab = useCallback(async (bookmarkId: string, url: string): Promise<number | undefined> =>
   {
     return openItemTab(makeBookmarkKey(bookmarkId), url);
   }, [openItemTab]);
@@ -450,7 +452,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   }, [storeAssociation]);
 
   // --- Pinned site-specific wrappers ---
-  const openPinnedTab = useCallback(async (pinnedId: string, url: string): Promise<void> =>
+  const openPinnedTab = useCallback(async (pinnedId: string, url: string): Promise<number | undefined> =>
   {
     return openItemTab(makePinnedKey(pinnedId), url);
   }, [openItemTab]);

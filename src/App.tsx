@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BookmarkTree } from './components/BookmarkTree';
 import { TabList, ExternalDropTarget, ResolveBookmarkDropTarget } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
 import { Toolbar } from './components/Toolbar';
+import { SpaceBar } from './components/SpaceBar';
 import { SettingsDialog, SettingsValues, BookmarkOpenMode } from './components/SettingsDialog';
 import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
@@ -13,7 +14,66 @@ import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
+import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
 import { Settings, Info, Upload, Download } from 'lucide-react';
+
+// Inner component that uses SpacesContext (must be inside SpacesProvider)
+interface SidebarContentProps
+{
+  onPin: (url: string, title: string, faviconUrl?: string) => void;
+  hideOtherBookmarks: boolean;
+  externalDropTarget: ExternalDropTarget | null;
+  bookmarkOpenMode: BookmarkOpenMode;
+  onResolverReady: (fn: ResolveBookmarkDropTarget) => void;
+  filterLiveTabs: boolean;
+  filterAudible: boolean;
+  filterText: string;
+  sortGroupsFirst: boolean;
+  onExternalDropTargetChange: (target: ExternalDropTarget | null) => void;
+  resolveBookmarkDropTarget: () => ResolveBookmarkDropTarget | null;
+}
+
+const SidebarContent: React.FC<SidebarContentProps> = ({
+  onPin,
+  hideOtherBookmarks,
+  externalDropTarget,
+  bookmarkOpenMode,
+  onResolverReady,
+  filterLiveTabs,
+  filterAudible,
+  filterText,
+  sortGroupsFirst,
+  onExternalDropTargetChange,
+  resolveBookmarkDropTarget,
+}) =>
+{
+  const { activeSpace } = useSpacesContext();
+
+  return (
+    <>
+      <BookmarkTree
+        onPin={onPin}
+        hideOtherBookmarks={hideOtherBookmarks}
+        externalDropTarget={externalDropTarget}
+        bookmarkOpenMode={bookmarkOpenMode}
+        onResolverReady={onResolverReady}
+        filterLiveTabs={filterLiveTabs}
+        filterAudible={filterAudible}
+        filterText={filterText}
+        activeSpace={activeSpace}
+      />
+      <TabList
+        onPin={onPin}
+        sortGroupsFirst={sortGroupsFirst}
+        onExternalDropTargetChange={onExternalDropTargetChange}
+        resolveBookmarkDropTarget={resolveBookmarkDropTarget}
+        arcStyleEnabled={bookmarkOpenMode === 'arc'}
+        filterAudible={filterAudible}
+        filterText={filterText}
+      />
+    </>
+  );
+};
 
 function App() {
   const [fontSize, setFontSize] = useLocalStorage('sidebar-font-size-px', 14, {
@@ -74,6 +134,9 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [externalDropTarget, setExternalDropTarget] = useState<ExternalDropTarget | null>(null);
+  const [_spaceToEdit, setSpaceToEdit] = useState<Space | null>(null);
+  const [_showSpaceEditDialog, setShowSpaceEditDialog] = useState(false);
+  const [_spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
   const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null!);
@@ -165,6 +228,23 @@ function App() {
     setFilterAudible(false);
   }, []);
 
+  // Space handlers
+  const handleCreateSpace = useCallback(() => {
+    setSpaceToEdit(null);
+    setShowSpaceEditDialog(true);
+  }, []);
+
+  const handleEditSpace = useCallback((space: Space) => {
+    setSpaceToEdit(space);
+    setShowSpaceEditDialog(true);
+  }, []);
+
+  const handleDeleteSpace = useCallback((space: Space) => {
+    setSpaceToDelete(space);
+    // TODO: Show confirmation dialog
+    // For now, we'll implement this when we create the SpaceEditDialog
+  }, []);
+
   // Close menu when clicking outside
   useEffect(() =>
   {
@@ -212,6 +292,7 @@ function App() {
   return (
     <FontSizeContext.Provider value={fontSize}>
       <BookmarkTabsProvider>
+      <SpacesProvider>
       <div
         className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
         style={{ fontSize: `${fontSize}px` }}
@@ -349,9 +430,27 @@ function App() {
 
       {/* Single scrollable content */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <BookmarkTree onPin={addPin} hideOtherBookmarks={hideOtherBookmarks} externalDropTarget={externalDropTarget} bookmarkOpenMode={bookmarkOpenMode} onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }} filterLiveTabs={filterLiveTabs} filterAudible={filterAudible} filterText={filterText} />
-        <TabList onPin={addPin} sortGroupsFirst={sortGroupsFirst} onExternalDropTargetChange={setExternalDropTarget} resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current} arcStyleEnabled={bookmarkOpenMode === 'arc'} filterAudible={filterAudible} filterText={filterText} />
+        <SidebarContent
+          onPin={addPin}
+          hideOtherBookmarks={hideOtherBookmarks}
+          externalDropTarget={externalDropTarget}
+          bookmarkOpenMode={bookmarkOpenMode}
+          onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }}
+          filterLiveTabs={filterLiveTabs}
+          filterAudible={filterAudible}
+          filterText={filterText}
+          sortGroupsFirst={sortGroupsFirst}
+          onExternalDropTargetChange={setExternalDropTarget}
+          resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current}
+        />
       </div>
+
+      {/* Space Bar */}
+      <SpaceBar
+        onCreateSpace={handleCreateSpace}
+        onEditSpace={handleEditSpace}
+        onDeleteSpace={handleDeleteSpace}
+      />
 
       <Toast
         message={toastMessage}
@@ -359,6 +458,7 @@ function App() {
         onDismiss={hideToast}
       />
       </div>
+      </SpacesProvider>
       </BookmarkTabsProvider>
     </FontSizeContext.Provider>
   );

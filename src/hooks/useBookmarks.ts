@@ -358,6 +358,29 @@ export const useBookmarks = () => {
     await createBookmark(node.parentId, node.title, node.url, node.index + 1);
   }, [getBookmark, createBookmark]);
 
+  // Find a folder by its path (e.g., "Bookmarks Bar/Home")
+  // Returns the folder node if found, null otherwise
+  const findFolderByPath = useCallback((path: string): chrome.bookmarks.BookmarkTreeNode | null =>
+  {
+    if (!path) return null;
+
+    const pathParts = path.split('/');
+    let currentNodes = bookmarks;
+
+    for (const part of pathParts)
+    {
+      const found = currentNodes.find(node => node.title === part && !node.url);
+      if (!found) return null;
+      currentNodes = found.children || [];
+      if (pathParts.indexOf(part) === pathParts.length - 1)
+      {
+        return found;
+      }
+    }
+
+    return null;
+  }, [bookmarks]);
+
   return {
     bookmarks,
     removeBookmark,
@@ -366,6 +389,7 @@ export const useBookmarks = () => {
     sortBookmarks,
     moveBookmark,
     findFolderInParent,
+    findFolderByPath,
     createBookmark,
     createBookmarksBatch,
     getBookmark,

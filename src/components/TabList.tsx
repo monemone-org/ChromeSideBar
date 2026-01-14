@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback, forwardRef } from 'r
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
+import { useSpacesContext } from '../contexts/SpacesContext';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SPEAKER_ICON_SIZE } from '../constants';
@@ -45,34 +46,7 @@ import {
 } from '@dnd-kit/core';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import clsx from 'clsx';
-
-// Chrome tab group color mapping (exact Chrome hex codes)
-// Light theme: badge uses darker colors, Dark theme: badge uses lighter/pastel colors
-// bg: subtle background for grouped tabs, bgStrong: stronger background when group has active tab
-const GROUP_COLORS: Record<string, { bg: string; bgStrong: string; badge: string; dot: string; border: string }> = {
-  grey:   { bg: 'bg-[#F1F3F4] dark:bg-[#5F6368]/30', bgStrong: 'bg-[#E8EAED] dark:bg-[#5F6368]/50', badge: 'bg-[#5F6368] dark:bg-[#BDC1C6]', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]', border: 'border-[#5F6368] dark:border-[#BDC1C6]' },
-  blue:   { bg: 'bg-[#E8F0FE] dark:bg-[#8AB4F8]/20', bgStrong: 'bg-[#D2E3FC] dark:bg-[#8AB4F8]/40', badge: 'bg-[#1A73E8] dark:bg-[#8AB4F8]', dot: 'bg-[#1A73E8] dark:bg-[#8AB4F8]', border: 'border-[#1A73E8] dark:border-[#8AB4F8]' },
-  red:    { bg: 'bg-[#FCE8E6] dark:bg-[#F28B82]/20', bgStrong: 'bg-[#F9D0CC] dark:bg-[#F28B82]/40', badge: 'bg-[#D93025] dark:bg-[#F28B82]', dot: 'bg-[#D93025] dark:bg-[#F28B82]', border: 'border-[#D93025] dark:border-[#F28B82]' },
-  yellow: { bg: 'bg-[#FEF7E0] dark:bg-[#FDD663]/20', bgStrong: 'bg-[#FCEFC7] dark:bg-[#FDD663]/40', badge: 'bg-[#E37400] dark:bg-[#FDD663]', dot: 'bg-[#E37400] dark:bg-[#FDD663]', border: 'border-[#E37400] dark:border-[#FDD663]' },
-  green:  { bg: 'bg-[#E6F4EA] dark:bg-[#81C995]/20', bgStrong: 'bg-[#CEEAD6] dark:bg-[#81C995]/40', badge: 'bg-[#188038] dark:bg-[#81C995]', dot: 'bg-[#188038] dark:bg-[#81C995]', border: 'border-[#188038] dark:border-[#81C995]' },
-  pink:   { bg: 'bg-[#FEE7F5] dark:bg-[#FF8BCB]/20', bgStrong: 'bg-[#FCCFEB] dark:bg-[#FF8BCB]/40', badge: 'bg-[#D01884] dark:bg-[#FF8BCB]', dot: 'bg-[#D01884] dark:bg-[#FF8BCB]', border: 'border-[#D01884] dark:border-[#FF8BCB]' },
-  purple: { bg: 'bg-[#F3E8FD] dark:bg-[#D7AEFB]/20', bgStrong: 'bg-[#E8D0FB] dark:bg-[#D7AEFB]/40', badge: 'bg-[#9333EA] dark:bg-[#D7AEFB]', dot: 'bg-[#9333EA] dark:bg-[#D7AEFB]', border: 'border-[#9333EA] dark:border-[#D7AEFB]' },
-  cyan:   { bg: 'bg-[#E4F7FB] dark:bg-[#78D9EC]/20', bgStrong: 'bg-[#CBEFF7] dark:bg-[#78D9EC]/40', badge: 'bg-[#11858E] dark:bg-[#78D9EC]', dot: 'bg-[#11858E] dark:bg-[#78D9EC]', border: 'border-[#11858E] dark:border-[#78D9EC]' },
-  orange: { bg: 'bg-[#FEF1E8] dark:bg-[#FCAD70]/20', bgStrong: 'bg-[#FCE3D1] dark:bg-[#FCAD70]/40', badge: 'bg-[#FA903E] dark:bg-[#FCAD70]', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]', border: 'border-[#FA903E] dark:border-[#FCAD70]' },
-};
-
-// Chrome tab group color options for new group creation
-const GROUP_COLOR_OPTIONS: { value: chrome.tabGroups.ColorEnum; dot: string }[] = [
-  { value: 'grey', dot: 'bg-[#5F6368] dark:bg-[#BDC1C6]' },
-  { value: 'blue', dot: 'bg-[#1A73E8] dark:bg-[#8AB4F8]' },
-  { value: 'red', dot: 'bg-[#D93025] dark:bg-[#F28B82]' },
-  { value: 'yellow', dot: 'bg-[#E37400] dark:bg-[#FDD663]' },
-  { value: 'green', dot: 'bg-[#188038] dark:bg-[#81C995]' },
-  { value: 'pink', dot: 'bg-[#D01884] dark:bg-[#FF8BCB]' },
-  { value: 'purple', dot: 'bg-[#9333EA] dark:bg-[#D7AEFB]' },
-  { value: 'cyan', dot: 'bg-[#11858E] dark:bg-[#78D9EC]' },
-  { value: 'orange', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]' },
-];
+import { GROUP_COLORS, GROUP_COLOR_OPTIONS } from '../utils/groupColors';
 
 // --- Add to Group Dialog ---
 interface AddToGroupDialogProps {
@@ -931,13 +905,92 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, closeAllTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
+  const { activeSpace, getTabGroupForSpace, createTabGroupForSpace, findTabGroupForSpace } = useSpacesContext();
+
+  // Get active space's tab group ID (if not "all" space)
+  const activeSpaceTabGroupId = activeSpace?.id !== 'all'
+    ? getTabGroupForSpace(activeSpace.id)
+    : undefined;
+
+  // Check if we're in a non-"all" space
+  const isInSpace = activeSpace && activeSpace.id !== 'all';
+
+  // Restore tab group mapping when switching to a space (e.g., after extension reload)
+  // This finds the group by name if the mapping doesn't exist
+  useEffect(() =>
+  {
+    if (isInSpace && activeSpace && activeSpaceTabGroupId === undefined)
+    {
+      findTabGroupForSpace(activeSpace.id);
+    }
+  }, [isInSpace, activeSpace?.id, activeSpaceTabGroupId, findTabGroupForSpace]);
+
+  // Auto-add new tabs (e.g., Cmd+T) to the active space's group
+  useEffect(() =>
+  {
+    if (!isInSpace || !activeSpace) return;
+
+    const handleTabCreated = async (tab: chrome.tabs.Tab) =>
+    {
+      // Only handle tabs in current window and not already in a group
+      if (tab.windowId !== chrome.windows.WINDOW_ID_CURRENT && tab.groupId !== -1) return;
+
+      // Check if this tab is in our window
+      const currentWindow = await chrome.windows.getCurrent();
+      if (tab.windowId !== currentWindow.id) return;
+
+      // Skip if tab is already in a group
+      if (tab.groupId && tab.groupId !== -1) return;
+
+      // Add to active space's group
+      if (activeSpaceTabGroupId !== undefined && tab.id)
+      {
+        try
+        {
+          await chrome.tabs.group({ tabIds: [tab.id], groupId: activeSpaceTabGroupId });
+        }
+        catch (error)
+        {
+          console.error('Failed to add new tab to space group:', error);
+        }
+      }
+      else if (tab.id)
+      {
+        // No group exists yet - create one with this tab
+        await createTabGroupForSpace(activeSpace.id, tab.id);
+      }
+    };
+
+    chrome.tabs.onCreated.addListener(handleTabCreated);
+
+    return () =>
+    {
+      chrome.tabs.onCreated.removeListener(handleTabCreated);
+    };
+  }, [isInSpace, activeSpace, activeSpaceTabGroupId, createTabGroupForSpace]);
 
   // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
-  // Also apply audible filter and text filter if enabled
+  // Also apply audible filter, text filter, and space filter if enabled
   const visibleTabs = useMemo(() =>
   {
     const managedTabIds = getManagedTabIds();
     let filtered = tabs.filter(tab => !managedTabIds.has(tab.id!));
+
+    // Space filter: when in a space, only show tabs in that space's tab group
+    // If the space has no tab group yet, show empty list
+    if (isInSpace)
+    {
+      if (activeSpaceTabGroupId !== undefined)
+      {
+        filtered = filtered.filter(tab => tab.groupId === activeSpaceTabGroupId);
+      }
+      else
+      {
+        // Space has no tab group yet - show empty list
+        filtered = [];
+      }
+    }
+
     if (filterAudible)
     {
       filtered = filtered.filter(tab => tab.audible);
@@ -949,10 +1002,75 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       );
     }
     return filtered;
-  }, [tabs, getManagedTabIds, filterAudible, filterText]);
+  }, [tabs, getManagedTabIds, filterAudible, filterText, isInSpace, activeSpaceTabGroupId]);
 
-  // All tab groups are visible (no longer filtering out SideBarForArc group)
-  const visibleTabGroups = tabGroups;
+  // Filter tab groups - when a space is active, only show that space's tab group
+  // If the space has no tab group yet, show empty list
+  const visibleTabGroups = useMemo(() =>
+  {
+    if (isInSpace)
+    {
+      if (activeSpaceTabGroupId !== undefined)
+      {
+        return tabGroups.filter(g => g.id === activeSpaceTabGroupId);
+      }
+      // Space has no tab group yet - show empty list
+      return [];
+    }
+    return tabGroups;
+  }, [tabGroups, isInSpace, activeSpaceTabGroupId]);
+
+  // Space-aware new tab creation
+  const handleNewTab = useCallback(async () =>
+  {
+    if (isInSpace && activeSpace)
+    {
+      if (activeSpaceTabGroupId !== undefined)
+      {
+        // Space has an existing tab group - create tab in that group
+        createTabInGroup(activeSpaceTabGroupId);
+      }
+      else
+      {
+        // Space has no tab group yet - create tab then create group
+        chrome.tabs.create({ active: true }, async (tab) =>
+        {
+          if (tab?.id)
+          {
+            await createTabGroupForSpace(activeSpace.id, tab.id);
+          }
+        });
+      }
+    }
+    else
+    {
+      // "All" space - create normal ungrouped tab
+      createTab();
+    }
+  }, [isInSpace, activeSpace, activeSpaceTabGroupId, createTabInGroup, createTabGroupForSpace, createTab]);
+
+  // Space-aware close all tabs
+  const handleCloseAllTabs = useCallback(() =>
+  {
+    if (isInSpace && activeSpaceTabGroupId !== undefined)
+    {
+      // Close only tabs in the active space's group
+      const spaceTabIds = tabs
+        .filter(tab => tab.groupId === activeSpaceTabGroupId)
+        .map(tab => tab.id!)
+        .filter(id => id !== undefined);
+      if (spaceTabIds.length > 0)
+      {
+        closeTabs(spaceTabIds);
+      }
+    }
+    else
+    {
+      // "All" space - close all tabs
+      closeAllTabs();
+    }
+  }, [isInSpace, activeSpaceTabGroupId, tabs, closeTabs, closeAllTabs]);
+
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Add to Group dialog state
@@ -2059,14 +2177,27 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
             </div>
             <ContextMenu.Portal>
               <ContextMenu.Content>
-                <ContextMenu.Item onSelect={() => sortTabs('asc', visibleTabGroups, sortGroupsFirst)}>
+                <ContextMenu.Item onSelect={() => {
+                  // When in a space, use sortGroupTabs to avoid destroying the group
+                  if (isInSpace && activeSpaceTabGroupId !== undefined) {
+                    sortGroupTabs(activeSpaceTabGroupId, 'asc');
+                  } else {
+                    sortTabs('asc', visibleTabGroups, sortGroupsFirst);
+                  }
+                }}>
                   <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
                 </ContextMenu.Item>
-                <ContextMenu.Item onSelect={() => sortTabs('desc', visibleTabGroups, sortGroupsFirst)}>
+                <ContextMenu.Item onSelect={() => {
+                  if (isInSpace && activeSpaceTabGroupId !== undefined) {
+                    sortGroupTabs(activeSpaceTabGroupId, 'desc');
+                  } else {
+                    sortTabs('desc', visibleTabGroups, sortGroupsFirst);
+                  }
+                }}>
                   <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
                 </ContextMenu.Item>
                 <ContextMenu.Separator />
-                <ContextMenu.Item danger onSelect={closeAllTabs}>
+                <ContextMenu.Item danger onSelect={handleCloseAllTabs}>
                   <Trash size={14} className="mr-2" /> Close All Tabs
                 </ContextMenu.Item>
               </ContextMenu.Content>
@@ -2118,6 +2249,42 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
             }
             else
             {
+              // When in a space, show tabs without group header (flat list)
+              if (isInSpace)
+              {
+                return (
+                  <div key={`group-${item.group.id}`}>
+                    {item.tabs.map((tab) =>
+                    {
+                      const tabId = String(tab.id);
+                      const isTabTarget = dropTargetId === tabId;
+                      return (
+                        <DraggableTab
+                          key={tab.id}
+                          tab={tab}
+                          indentLevel={0}
+                          isBeingDragged={activeId === tab.id}
+                          showDropBefore={isTabTarget && dropPosition === 'before'}
+                          showDropAfter={isTabTarget && dropPosition === 'after'}
+                          onClose={closeTab}
+                          onActivate={activateTab}
+                          onDuplicate={duplicateTab}
+                          onPin={onPin}
+                          onOpenAddToGroupDialog={openAddToGroupDialog}
+                          onAddToBookmark={openAddToBookmarkDialog}
+                          onMoveToNewWindow={moveToNewWindow}
+                          onCloseTabsBefore={closeTabsBefore}
+                          onCloseTabsAfter={closeTabsAfter}
+                          onCloseOthers={closeOthers}
+                          arcStyleEnabled={arcStyleEnabled}
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              }
+
+              // Normal view: show group header and indented tabs
               const isGroupExpanded = expandedGroups[item.group.id];
               const groupTargetId = `group-${item.group.id}`;
               const isTarget = dropTargetId === groupTargetId;
@@ -2196,7 +2363,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
             icon={<Plus size={14} />}
             title="New Tab"
             hasChildren={false}
-            onClick={createTab}
+            onClick={handleNewTab}
             className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
           >
             {dropTargetId === 'end-of-list' && (

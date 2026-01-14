@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, forwardRef } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
+import { Space } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
@@ -641,10 +642,11 @@ interface BookmarkTreeProps {
   filterLiveTabs?: boolean;
   filterAudible?: boolean;
   filterText?: string;
+  activeSpace?: Space | null;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '' }: BookmarkTreeProps) => {
-  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark } = useBookmarks();
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace }: BookmarkTreeProps) => {
+  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark } = useBookmarkTabsContext();
 
   // Move bookmark's tab to a new window
@@ -696,6 +698,18 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     ? bookmarks.filter(node => node.id !== '2')
     : bookmarks;
 
+  // Space folder info - track if folder is found or missing
+  const spaceFolderPath = activeSpace?.id !== 'all' ? activeSpace?.bookmarkFolderPath : null;
+  const spaceFolder = spaceFolderPath ? findFolderByPath(spaceFolderPath) : null;
+  const isSpaceFolderMissing = spaceFolderPath && !spaceFolder;
+
+  // Apply space filter if a space (not "all") is active
+  // Show the space's folder as a collapsible item
+  if (spaceFolder)
+  {
+    visibleBookmarks = [spaceFolder];
+  }
+
   // Apply live tabs filter if enabled
   if (filterLiveTabs)
   {
@@ -719,6 +733,15 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
+
+  // Auto-expand space folder when viewing a space
+  useEffect(() =>
+  {
+    if (spaceFolder && !expandedState[spaceFolder.id])
+    {
+      setExpandedState(prev => ({ ...prev, [spaceFolder.id]: true }));
+    }
+  }, [spaceFolder?.id]);
 
   // Auto-scroll to active bookmark when it changes
   const prevActiveItemKeyRef = useRef<string | null>(null);
@@ -978,6 +1001,25 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
 
   const hasVisibleBookmarks = visibleBookmarks.length > 0;
+
+  // Show message if space folder is missing
+  if (isSpaceFolderMissing)
+  {
+    return (
+      <div className="p-4 text-gray-500 dark:text-gray-400">
+        <span>Folder "{spaceFolderPath}" not found. </span>
+        <button
+          className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline"
+          onClick={() => {
+            // TODO: Open folder picker dialog to select new folder
+            console.log('Pick new folder for space');
+          }}
+        >
+          Pick new folder
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
