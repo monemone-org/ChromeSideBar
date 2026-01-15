@@ -134,6 +134,6 @@ SpaceBar
 
 - [x] import tabs/groups with replace options - will create a blank page to prevent the windows from being closed.  that blank page needs to be closed after import completes if the import contains no tabs.
 
-- [ ] when creating/editing space, check if the name already used. if so , show error and don't commit changes and keep dialog open till a valid unique space name is entered.
+- [x] when creating/editing space, check if the name already used. if so , show error and don't commit changes and keep dialog open till a valid unique space name is entered.
 
 - [ ] WelcomeDialog , add a welcome /product overview page as the 1st page.

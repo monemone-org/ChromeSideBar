@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import clsx from 'clsx';
 import { Dialog } from './Dialog';
 import { FolderPickerDialog } from './FolderPickerDialog';
@@ -13,6 +13,7 @@ interface SpaceEditDialogProps
 {
   isOpen: boolean;
   space: Space | null; // null = create mode, Space = edit mode
+  existingSpaces: Space[]; // all spaces for duplicate name validation
   onClose: () => void;
   onSave: (spaceData: {
     name: string;
@@ -32,6 +33,7 @@ const SPACE_COLOR_OPTIONS: ColorOption[] = GROUP_COLOR_OPTIONS.map((opt) => ({
 export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
   isOpen,
   space,
+  existingSpaces,
   onClose,
   onSave,
 }) =>
@@ -51,6 +53,7 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
 
   // Validation state
   const [nameError, setNameError] = useState('');
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset form when dialog opens
   useEffect(() =>
@@ -82,14 +85,59 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
   // Validate name
   const validateName = useCallback((value: string): boolean =>
   {
-    if (!value.trim())
+    const trimmedValue = value.trim();
+    if (!trimmedValue)
     {
       setNameError('Name is required');
       return false;
     }
+
+    // Check for duplicate name (case-insensitive)
+    const isDuplicate = existingSpaces.some(s =>
+      s.name.trim().toLowerCase() === trimmedValue.toLowerCase() &&
+      s.id !== space?.id  // Exclude current space in edit mode
+    );
+    if (isDuplicate)
+    {
+      setNameError('A space with this name already exists');
+      return false;
+    }
+
     setNameError('');
     return true;
-  }, []);
+  }, [existingSpaces, space]);
+
+  // Debounced validation as user types
+  useEffect(() =>
+  {
+    // Clear any existing timer
+    if (debounceTimerRef.current)
+    {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Only validate if there's input (don't show error for empty field while typing)
+    if (name.trim())
+    {
+      debounceTimerRef.current = setTimeout(() =>
+      {
+        validateName(name);
+      }, 300);
+    }
+    else
+    {
+      // Clear error when field is emptied (will show on blur/save)
+      setNameError('');
+    }
+
+    return () =>
+    {
+      if (debounceTimerRef.current)
+      {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, [name, validateName]);
 
   // Handle folder selection from picker
   const handleFolderSelect = useCallback(async (folderId: string) =>
@@ -218,11 +266,7 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
               <input
                 type="text"
                 value={name}
-                onChange={(e) =>
-                {
-                  setName(e.target.value);
-                  if (nameError) validateName(e.target.value);
-                }}
+                onChange={(e) => setName(e.target.value)}
                 onBlur={() => validateName(name)}
                 placeholder="Enter space name"
                 className={clsx(

@@ -23,7 +23,7 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
   onCloseDeleteDialog,
 }) =>
 {
-  const { createSpace, updateSpace, deleteSpace, setActiveSpaceId, getTabGroupForSpace } = useSpacesContext();
+  const { spaces, createSpace, updateSpace, deleteSpace, setActiveSpaceId, getTabGroupForSpace } = useSpacesContext();
 
   const handleSaveSpace = async (spaceData: {
     name: string;
@@ -84,6 +84,7 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
       <SpaceEditDialog
         isOpen={showEditDialog}
         space={spaceToEdit}
+        existingSpaces={spaces}
         onClose={onCloseEditDialog}
         onSave={handleSaveSpace}
       />
