@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Dialog } from './Dialog';
-import { Pin, BookOpen, LayoutGrid } from 'lucide-react';
+import { Pin, BookOpen, LayoutGrid, Sparkles } from 'lucide-react';
 
 interface WelcomeDialogProps
 {
@@ -12,11 +12,36 @@ interface PageContent
 {
   title: string;
   description: string;
-  image: string;
+  image?: string;
   icon: React.ReactNode;
+  isOverview?: boolean;
 }
 
+const featurePreview = [
+  {
+    title: 'Pinned Sites',
+    description: 'Quick-access icon bar',
+    icon: <Pin size={18} />,
+  },
+  {
+    title: 'Live Bookmarks',
+    description: 'Bookmarks that act as tabs',
+    icon: <BookOpen size={18} />,
+  },
+  {
+    title: 'Spaces',
+    description: 'Organize by context',
+    icon: <LayoutGrid size={18} />,
+  },
+];
+
 const pages: PageContent[] = [
+  {
+    title: 'Welcome',
+    description: "Arc browser's sidebar experience for Chrome",
+    icon: <Sparkles size={20} />,
+    isOverview: true,
+  },
   {
     title: 'Pinned Sites',
     description: 'Quick-access icons at the top. Pin your favorite sites for one-click access.',
@@ -79,27 +104,69 @@ export function WelcomeDialog({ isOpen, onClose }: WelcomeDialogProps)
       maxWidth="max-w-sm"
     >
       <div className="p-4">
-        {/* Screenshot */}
-        <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-4">
-          <img
-            src={page.image}
-            alt={page.title}
-            className="w-full h-auto"
-          />
-        </div>
+        {page.isOverview ? (
+          <>
+            {/* Overview page content */}
+            <div className="flex flex-col items-center mb-4">
+              <img
+                src="/icon.png"
+                alt="SideBar icon"
+                className="w-16 h-16 mb-3"
+              />
+              <p className="text-gray-600 dark:text-gray-400 text-center">
+                {page.description}
+              </p>
+            </div>
 
-        {/* Title with icon */}
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-blue-500">{page.icon}</span>
-          <h4 className="font-medium text-gray-900 dark:text-gray-100">
-            {page.title}
-          </h4>
-        </div>
+            {/* Feature preview list */}
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden mb-4">
+              {featurePreview.map((feature, index) => (
+                <div
+                  key={feature.title}
+                  className={`flex items-center gap-3 px-3 py-2.5 ${
+                    index < featurePreview.length - 1
+                      ? 'border-b border-gray-200 dark:border-gray-700'
+                      : ''
+                  }`}
+                >
+                  <span className="text-blue-500 flex-shrink-0">{feature.icon}</span>
+                  <div>
+                    <div className="font-medium text-gray-900 dark:text-gray-100">
+                      {feature.title}
+                    </div>
+                    <div className="text-gray-500 dark:text-gray-400">
+                      {feature.description}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Title with icon */}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-blue-500">{page.icon}</span>
+              <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                {page.title}
+              </h4>
+            </div>
 
-        {/* Description */}
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
-          {page.description}
-        </p>
+            {/* Description */}
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              {page.description}
+            </p>
+
+            {/* Screenshot */}
+            <div className="rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-4">
+              <img
+                src={page.image}
+                alt={page.title}
+                className="w-full h-auto"
+              />
+            </div>
+          </>
+        )}
 
         {/* Page indicator dots */}
         <div className="flex justify-center gap-2 mb-4">

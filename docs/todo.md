@@ -132,9 +132,9 @@ SpaceBar
 
 - [x] when creating/editing space, check if the name already used. if so , show error and don't commit changes and keep dialog open till a valid unique space name is entered.
 
-- [ ] WelcomeDialog , add a welcome /product overview page as the 1st page.
+- [x] WelcomeDialog , add a welcome /product overview page as the 1st page.
 
-- [ ] when activate to a different space, activate the last activated tab in the Space.  If there is no history of which tab is the last activated one, activate the 1st tab.  if there is no tab, create a about:blank tab for that space.
+- [-] when activate to a different space, activate the last activated tab in the Space.  If there is no history of which tab is the last activated one, activate the 1st tab.  if there is no tab, create a about:blank tab for that space.
 
 - Review Code:
       - [ ] Review code for O(n²) or less efficient logic.
