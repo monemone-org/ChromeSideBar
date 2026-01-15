@@ -13,13 +13,16 @@ import { Toast } from './components/Toast';
 import { usePinnedSites } from './hooks/usePinnedSites';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
 import { SpaceDialogs } from './components/SpaceDialogs';
-import { Settings, Info, Upload, Download, RefreshCw } from 'lucide-react';
+import { useFontSize } from './contexts/FontSizeContext';
+import { getIconUrl } from './utils/iconify';
+import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid } from 'lucide-react';
 
-// Inner component that uses SpacesContext (must be inside SpacesProvider)
+// Inner component that renders content for a single space
 interface SidebarContentProps
 {
   onPin: (url: string, title: string, faviconUrl?: string) => void;
@@ -33,6 +36,7 @@ interface SidebarContentProps
   sortGroupsFirst: boolean;
   onExternalDropTargetChange: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget: () => ResolveBookmarkDropTarget | null;
+  onShowToast?: (message: string) => void;
 }
 
 const SidebarContent: React.FC<SidebarContentProps> = ({
@@ -47,12 +51,13 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   sortGroupsFirst,
   onExternalDropTargetChange,
   resolveBookmarkDropTarget,
+  onShowToast,
 }) =>
 {
   const { activeSpace } = useSpacesContext();
 
   return (
-    <>
+    <div className="h-full overflow-y-auto overflow-x-hidden p-2">
       <BookmarkTree
         onPin={onPin}
         hideOtherBookmarks={hideOtherBookmarks}
@@ -63,6 +68,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         filterAudible={filterAudible}
         filterText={filterText}
         activeSpace={activeSpace}
+        onShowToast={onShowToast}
       />
       <TabList
         onPin={onPin}
@@ -72,8 +78,106 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         arcStyleEnabled={bookmarkOpenMode === 'arc'}
         filterAudible={filterAudible}
         filterText={filterText}
+        activeSpace={activeSpace}
       />
-    </>
+    </div>
+  );
+};
+
+// Fixed space title bar - shows current space icon and name
+const SpaceTitle: React.FC = () =>
+{
+  const { activeSpace } = useSpacesContext();
+  const fontSize = useFontSize();
+
+  const titleFontSize = fontSize - 1;
+  const iconSize = titleFontSize;
+
+  return (
+    <div
+      className="flex items-center gap-1.5 px-3 py-1 text-gray-400 dark:text-gray-500 flex-shrink-0"
+      style={{ fontSize: `${titleFontSize}px` }}
+    >
+      {activeSpace.icon === 'LayoutGrid' ? (
+        <LayoutGrid size={iconSize} className="flex-shrink-0" />
+      ) : (
+        <img
+          src={getIconUrl(activeSpace.icon)}
+          alt=""
+          width={iconSize}
+          height={iconSize}
+          className="flex-shrink-0 opacity-60 dark:invert dark:opacity-50"
+        />
+      )}
+      <span>{activeSpace.name}</span>
+    </div>
+  );
+};
+
+// Container with swipe navigation and slide animation
+interface SwipeableContainerProps extends SidebarContentProps
+{
+}
+
+const SwipeableContainer: React.FC<SwipeableContainerProps> = (props) =>
+{
+  const { allSpaces, activeSpaceId, setActiveSpaceId } = useSpacesContext();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const prevSpaceIdRef = useRef(activeSpaceId);
+
+  const currentIndex = allSpaces.findIndex(s => s.id === activeSpaceId);
+  const canSwipeLeft = currentIndex < allSpaces.length - 1;
+  const canSwipeRight = currentIndex > 0;
+
+  // Detect space change and set slide direction
+  useEffect(() =>
+  {
+    if (activeSpaceId !== prevSpaceIdRef.current)
+    {
+      const prevIndex = allSpaces.findIndex(s => s.id === prevSpaceIdRef.current);
+      const newIndex = allSpaces.findIndex(s => s.id === activeSpaceId);
+      setSlideDirection(newIndex > prevIndex ? 'left' : 'right');
+      prevSpaceIdRef.current = activeSpaceId;
+    }
+  }, [activeSpaceId, allSpaces]);
+
+  // Clear animation after it completes
+  useEffect(() =>
+  {
+    if (slideDirection)
+    {
+      const timer = setTimeout(() => setSlideDirection(null), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [slideDirection]);
+
+  const handleSwipe = useCallback((direction: 'left' | 'right') =>
+  {
+    if (direction === 'left' && canSwipeLeft)
+    {
+      setActiveSpaceId(allSpaces[currentIndex + 1].id);
+    }
+    else if (direction === 'right' && canSwipeRight)
+    {
+      setActiveSpaceId(allSpaces[currentIndex - 1].id);
+    }
+  }, [allSpaces, currentIndex, canSwipeLeft, canSwipeRight, setActiveSpaceId]);
+
+  useSwipeNavigation(containerRef, { onSwipe: handleSwipe });
+
+  const animationClass = slideDirection === 'left'
+    ? 'animate-slide-left'
+    : slideDirection === 'right'
+      ? 'animate-slide-right'
+      : '';
+
+  return (
+    <div ref={containerRef} className="flex-1 overflow-hidden">
+      <div className={`h-full ${animationClass}`}>
+        <SidebarContent {...props} />
+      </div>
+    </div>
   );
 };
 
@@ -457,22 +561,24 @@ function App() {
         filterText={filterText}
       />
 
-      {/* Single scrollable content */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2">
-        <SidebarContent
-          onPin={addPin}
-          hideOtherBookmarks={hideOtherBookmarks}
-          externalDropTarget={externalDropTarget}
-          bookmarkOpenMode={bookmarkOpenMode}
-          onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }}
-          filterLiveTabs={filterLiveTabs}
-          filterAudible={filterAudible}
-          filterText={filterText}
-          sortGroupsFirst={sortGroupsFirst}
-          onExternalDropTargetChange={setExternalDropTarget}
-          resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current}
-        />
-      </div>
+      {/* Space Title */}
+      <SpaceTitle />
+
+      {/* Content with 2-finger swipe navigation */}
+      <SwipeableContainer
+        onPin={addPin}
+        hideOtherBookmarks={hideOtherBookmarks}
+        externalDropTarget={externalDropTarget}
+        bookmarkOpenMode={bookmarkOpenMode}
+        onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }}
+        filterLiveTabs={filterLiveTabs}
+        filterAudible={filterAudible}
+        filterText={filterText}
+        sortGroupsFirst={sortGroupsFirst}
+        onExternalDropTargetChange={setExternalDropTarget}
+        resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current}
+        onShowToast={showToast}
+      />
 
       {/* Space Dialogs */}
       <SpaceDialogs

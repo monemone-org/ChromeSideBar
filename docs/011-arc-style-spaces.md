@@ -147,7 +147,7 @@ Follows existing bookmark open mode settings:
 
 ### Managing Spaces (Context Menu)
 Right-click space icon:
-- Edit... (opens SpaceEditDialog - edit name, icon, color, bookmark folder)
+- Edit (opens SpaceEditDialog - edit name, icon, color, bookmark folder)
 - Delete (with confirmation)
 
 **SpaceEditDialog** - single dialog for both creating and editing spaces:

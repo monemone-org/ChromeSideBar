@@ -90,6 +90,7 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       style={style}
       onClick={onClick}
       title={space.name}
+      data-space-id={space.id}
       className={clsx(
         "w-7 h-7 rounded flex items-center justify-center transition-all flex-shrink-0",
         "hover:scale-105",
@@ -123,7 +124,7 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       <ContextMenu.Portal>
         <ContextMenu.Content>
           <ContextMenu.Item onSelect={onEdit}>
-            Edit...
+            Edit
           </ContextMenu.Item>
 
           <ContextMenu.Separator />

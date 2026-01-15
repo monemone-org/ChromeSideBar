@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback, forwardRef } from 'r
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useBookmarkTabsContext, isPendingManagedTab } from '../contexts/BookmarkTabsContext';
-import { useSpacesContext } from '../contexts/SpacesContext';
+import { useSpacesContext, Space } from '../contexts/SpacesContext';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SPEAKER_ICON_SIZE } from '../constants';
@@ -900,14 +900,18 @@ interface TabListProps {
   arcStyleEnabled?: boolean;
   filterAudible?: boolean;
   filterText?: string;
+  activeSpace?: Space;  // If provided, use this instead of context
 }
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false, filterText = '' }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false, filterText = '', activeSpace: activeSpaceProp }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
-  const { activeSpace, getTabGroupForSpace, createTabGroupForSpace, findTabGroupForSpace } = useSpacesContext();
+  const { activeSpace: activeSpaceFromContext, getTabGroupForSpace, createTabGroupForSpace, findTabGroupForSpace } = useSpacesContext();
+
+  // Use prop if provided, otherwise use context
+  const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
 
   // Get active space's tab group ID (if not "all" space)
   const activeSpaceTabGroupId = activeSpace?.id !== 'all'

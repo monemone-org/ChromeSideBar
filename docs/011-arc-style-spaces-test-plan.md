@@ -54,7 +54,7 @@ Manual test plan for the Spaces feature. A Space links a bookmark folder to a Ch
 
 ### 2.5 Context Menu
 - [ ] Right-click space icon shows menu
-- [ ] "Edit..." option present
+- [ ] "Edit" option present
 - [ ] "Delete" option present (with danger styling)
 
 ---
@@ -177,7 +177,7 @@ Manual test plan for the Spaces feature. A Space links a bookmark folder to a Ch
 - [ ] Create space - uses existing folder (no new folder created)
 
 ### 5.4 Edit Space Dialog
-- [ ] Right-click space icon → Edit...
+- [ ] Right-click space icon → Edit
 - [ ] Dialog opens with title "Edit Space"
 - [ ] Fields are populated with space's current values
 - [ ] Save button says "Save" (not "Create")

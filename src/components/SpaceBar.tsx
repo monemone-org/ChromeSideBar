@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import {
   DndContext,
@@ -35,6 +35,20 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 {
   const { allSpaces, activeSpaceId, setActiveSpaceId, moveSpace, getSpaceById } = useSpacesContext();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to make active space visible
+  useEffect(() =>
+  {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const activeButton = container.querySelector(`[data-space-id="${activeSpaceId}"]`);
+    if (activeButton)
+    {
+      activeButton.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+    }
+  }, [activeSpaceId]);
 
   // Drag-drop sensors with activation distance to allow clicks
   const sensors = useSensors(
@@ -90,10 +104,9 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 
       {/* Horizontal scrollable space icons */}
       <div
-        className="flex-1 flex items-center gap-1 px-1 py-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600"
-        style={{
-          scrollbarWidth: 'thin',
-        }}
+        ref={scrollContainerRef}
+        className="flex-1 flex items-center gap-1 px-1 py-1 overflow-x-auto"
+        style={{ scrollbarWidth: 'none' }}
       >
         {/* All spaces in SortableContext for proper position calculation */}
         <DndContext

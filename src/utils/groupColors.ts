@@ -33,3 +33,10 @@ export const GROUP_COLOR_OPTIONS: { value: chrome.tabGroups.ColorEnum; dot: stri
   { value: 'cyan', dot: 'bg-[#11858E] dark:bg-[#78D9EC]' },
   { value: 'orange', dot: 'bg-[#FA903E] dark:bg-[#FCAD70]' },
 ];
+
+// Get a random tab group color
+export const getRandomGroupColor = (): chrome.tabGroups.ColorEnum =>
+{
+  const colors = GROUP_COLOR_OPTIONS.map(opt => opt.value);
+  return colors[Math.floor(Math.random() * colors.length)];
+};
