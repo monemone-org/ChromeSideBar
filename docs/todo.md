@@ -141,5 +141,6 @@ SpaceBar
       - [ ] Remove duplicated code. simplify code.
       - [ ] Refactor reusable or  self-contained code into separate components
       - [ ] Security review
+      - [ ] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
 
 

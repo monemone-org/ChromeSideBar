@@ -23,7 +23,7 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
   onCloseDeleteDialog,
 }) =>
 {
-  const { spaces, createSpace, updateSpace, deleteSpace, setActiveSpaceId, getTabGroupForSpace } = useSpacesContext();
+  const { spaces, createSpace, updateSpace, deleteSpace, setActiveSpaceId, getTabGroupForSpace, clearStateForSpace } = useSpacesContext();
 
   const handleSaveSpace = async (spaceData: {
     name: string;
@@ -73,6 +73,8 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
   {
     if (spaceToDelete)
     {
+      // Cleanup per-window state before deleting the space
+      clearStateForSpace(spaceToDelete.id);
       deleteSpace(spaceToDelete.id);
       // Switch to "All" space after deletion
       setActiveSpaceId('all');

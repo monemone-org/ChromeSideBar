@@ -4,6 +4,7 @@ export interface SpaceWindowState
 {
   activeSpaceId: string;
   spaceTabGroupMap: Record<string, number>;  // space ID → Chrome tab group ID
+  spaceLastActiveTabMap: Record<string, number>;  // space ID → last active tab ID
 }
 
 const getStorageKey = (windowId: number): string =>
@@ -14,6 +15,7 @@ const getStorageKey = (windowId: number): string =>
 const DEFAULT_STATE: SpaceWindowState = {
   activeSpaceId: 'all',
   spaceTabGroupMap: {},
+  spaceLastActiveTabMap: {},
 };
 
 export const useSpaceWindowState = () =>
@@ -142,6 +144,28 @@ export const useSpaceWindowState = () =>
     return state.spaceTabGroupMap[spaceId];
   }, [state.spaceTabGroupMap]);
 
+  const getLastActiveTabForSpace = useCallback((spaceId: string): number | undefined =>
+  {
+    return state.spaceLastActiveTabMap[spaceId];
+  }, [state.spaceLastActiveTabMap]);
+
+  // Clear all state for a space (used when deleting a space)
+  const clearStateForSpace = useCallback((spaceId: string) =>
+  {
+    setState(prev =>
+    {
+      const { [spaceId]: _tabGroup, ...restTabGroupMap } = prev.spaceTabGroupMap;
+      const { [spaceId]: _lastTab, ...restLastActiveMap } = prev.spaceLastActiveTabMap;
+      const newState = {
+        ...prev,
+        spaceTabGroupMap: restTabGroupMap,
+        spaceLastActiveTabMap: restLastActiveMap,
+      };
+      saveState(newState);
+      return newState;
+    });
+  }, [saveState]);
+
   // Clear mapping when tab group is removed
   const handleTabGroupRemoved = useCallback((tabGroupId: number) =>
   {
@@ -173,6 +197,10 @@ export const useSpaceWindowState = () =>
     };
   }, [isInitialized, handleTabGroupRemoved]);
 
+  // Extract values to avoid depending on entire map objects (prevents race conditions)
+  const activeSpaceTabGroupId = state.spaceTabGroupMap[state.activeSpaceId];
+  const activeSpaceLastTabId = state.spaceLastActiveTabMap[state.activeSpaceId];
+
   // Send active space to background whenever it changes
   useEffect(() =>
   {
@@ -181,9 +209,11 @@ export const useSpaceWindowState = () =>
     chrome.runtime.sendMessage({
       action: 'set-active-space',
       windowId,
-      spaceId: state.activeSpaceId
+      spaceId: state.activeSpaceId,
+      spaceTabGroupId: activeSpaceTabGroupId,
+      lastActiveTabId: activeSpaceLastTabId
     });
-  }, [windowId, isInitialized, state.activeSpaceId]);
+  }, [windowId, isInitialized, state.activeSpaceId, activeSpaceTabGroupId, activeSpaceLastTabId]);
 
   // Listen for history tab activation to switch spaces
   useEffect(() =>
@@ -213,5 +243,7 @@ export const useSpaceWindowState = () =>
     setTabGroupForSpace,
     clearTabGroupForSpace,
     getTabGroupForSpace,
+    getLastActiveTabForSpace,
+    clearStateForSpace,
   };
 };

@@ -132,6 +132,89 @@ function removeFromHistory(windowId, tabId)
   if (debugTabHistory) dumpHistory(windowId, `REMOVE tabId=${tabId}`);
 }
 
+// Update last active tab for a space in session storage
+async function updateSpaceLastActiveTab(windowId, spaceId, tabId)
+{
+  if (!spaceId || spaceId === 'all') return;
+
+  const storageKey = `spaceWindowState_${windowId}`;
+  const result = await chrome.storage.session.get([storageKey]);
+  const state = result[storageKey] || {
+    activeSpaceId: 'all',
+    spaceTabGroupMap: {},
+    spaceLastActiveTabMap: {}
+  };
+
+  state.spaceLastActiveTabMap = state.spaceLastActiveTabMap || {};
+  state.spaceLastActiveTabMap[spaceId] = tabId;
+
+  await chrome.storage.session.set({ [storageKey]: state });
+}
+
+// Remove tab from all space last-active mappings when closed
+async function removeTabFromSpaceLastActive(windowId, tabId)
+{
+  const storageKey = `spaceWindowState_${windowId}`;
+  const result = await chrome.storage.session.get([storageKey]);
+  const state = result[storageKey];
+  if (!state?.spaceLastActiveTabMap) return;
+
+  let changed = false;
+  for (const spaceId of Object.keys(state.spaceLastActiveTabMap))
+  {
+    if (state.spaceLastActiveTabMap[spaceId] === tabId)
+    {
+      delete state.spaceLastActiveTabMap[spaceId];
+      changed = true;
+    }
+  }
+
+  if (changed)
+  {
+    await chrome.storage.session.set({ [storageKey]: state });
+  }
+}
+
+// Activate last tab for a space when switching spaces
+async function activateLastTabForSpace(windowId, spaceId, spaceTabGroupId, lastActiveTabId)
+{
+  if (spaceId === 'all') return { success: true, action: 'none' };
+
+  // Try stored last active tab
+  if (lastActiveTabId)
+  {
+    try
+    {
+      const tab = await chrome.tabs.get(lastActiveTabId);
+      // Tab exists - activate it (don't check groupId as pinned/live bookmark tabs have groupId=-1)
+      if (tab)
+      {
+        await chrome.tabs.update(lastActiveTabId, { active: true });
+        return { success: true, action: 'activated-last', tabId: lastActiveTabId };
+      }
+    }
+    catch (e) { /* tab doesn't exist */ }
+  }
+
+  // Fallback: first tab in group
+  if (spaceTabGroupId !== undefined && spaceTabGroupId !== -1)
+  {
+    try
+    {
+      const tabs = await chrome.tabs.query({ windowId, groupId: spaceTabGroupId });
+      if (tabs.length > 0)
+      {
+        await chrome.tabs.update(tabs[0].id, { active: true });
+        return { success: true, action: 'activated-first', tabId: tabs[0].id };
+      }
+    }
+    catch (e) { /* failed to query */ }
+  }
+
+  // No tabs in space - do nothing (don't create blank page)
+  return { success: true, action: 'none' };
+}
+
 function navigateHistory(windowId, direction)
 {
   const history = windowTabHistory.get(windowId);
@@ -178,6 +261,13 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
     pushToHistory(activeInfo.windowId, activeInfo.tabId);
   }
 
+  // Track last active tab for current space
+  const spaceId = windowActiveSpaces.get(activeInfo.windowId);
+  if (spaceId && spaceId !== 'all')
+  {
+    updateSpaceLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId);
+  }
+
   chrome.tabs.get(activeInfo.tabId, (tab) =>
   {
     if (tab && tab.groupId !== undefined)
@@ -191,6 +281,7 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
 {
   removeFromHistory(removeInfo.windowId, tabId);
+  removeTabFromSpaceLastActive(removeInfo.windowId, tabId);
 });
 
 // Auto-group all new tabs when active tab is in a group
@@ -214,7 +305,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
     return;
   }
 
-  // Track active space from sidebar
+  // Track active space from sidebar and activate last tab for that space
   if (message.action === 'set-active-space')
   {
     if (message.windowId && message.spaceId)
@@ -224,6 +315,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
       {
         console.log(`[TabHistory] Active space set: windowId=${message.windowId}, spaceId=${message.spaceId}`);
       }
+
+      // Activate last tab for the new space
+      activateLastTabForSpace(
+        message.windowId,
+        message.spaceId,
+        message.spaceTabGroupId,
+        message.lastActiveTabId
+      ).then(sendResponse);
+
+      return true;  // async response
     }
     return;
   }

@@ -32,6 +32,8 @@ interface SpacesContextValue
   getTabGroupForSpace: (spaceId: string) => number | undefined;
   setTabGroupForSpace: (spaceId: string, tabGroupId: number) => void;
   clearTabGroupForSpace: (spaceId: string) => void;
+  getLastActiveTabForSpace: (spaceId: string) => number | undefined;
+  clearStateForSpace: (spaceId: string) => void;
 
   // Tab group helpers
   findTabGroupForSpace: (spaceId: string) => Promise<number | null>;
@@ -60,6 +62,8 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     getTabGroupForSpace,
     setTabGroupForSpace,
     clearTabGroupForSpace,
+    getLastActiveTabForSpace,
+    clearStateForSpace,
   } = useSpaceWindowState();
 
   // All spaces including the "All" space at the beginning
@@ -168,6 +172,8 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     getTabGroupForSpace,
     setTabGroupForSpace,
     clearTabGroupForSpace,
+    getLastActiveTabForSpace,
+    clearStateForSpace,
     findTabGroupForSpace,
     createTabGroupForSpace,
   };
