@@ -132,6 +132,6 @@ SpaceBar
 - [x] Close icon on all popup menu should be consistent . use x , not trash can
 - [x] add icons to Space popup menus.
 
-- [ ] import tabs/groups with replace options - will create a blank page to prevent the windows from being closed.  that blank page needs to be closed after import completes if the import contains no tabs.
+- [x] import tabs/groups with replace options - will create a blank page to prevent the windows from being closed.  that blank page needs to be closed after import completes if the import contains no tabs.
 
 

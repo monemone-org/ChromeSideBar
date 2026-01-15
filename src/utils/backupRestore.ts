@@ -152,9 +152,10 @@ export interface ImportOptions {
 }
 
 // Close all tabs in current window except one (Chrome requires at least one tab)
-async function closeAllTabs(): Promise<void> {
+// Returns the ID of the blank tab created to keep the window open
+async function closeAllTabs(): Promise<number | undefined> {
   const tabs = await chrome.tabs.query({ currentWindow: true });
-  if (tabs.length === 0) return;
+  if (tabs.length === 0) return undefined;
 
   // Create a new blank tab first (Chrome won't allow closing all tabs)
   const newTab = await chrome.tabs.create({ url: 'about:blank' });
@@ -167,6 +168,8 @@ async function closeAllTabs(): Promise<void> {
   if (tabIdsToClose.length > 0) {
     await chrome.tabs.remove(tabIdsToClose);
   }
+
+  return newTab.id;
 }
 
 // Import full backup
@@ -231,11 +234,20 @@ export async function importFullBackup(
 
   // Import tab groups
   if (options.importTabGroups && backup.tabGroups && backup.tabGroups.length > 0) {
+    let blankTabId: number | undefined;
     if (options.tabGroupsMode === 'replace') {
-      await closeAllTabs();
+      blankTabId = await closeAllTabs();
     }
     await importTabGroups(backup.tabGroups);
     result.tabGroupsCount = backup.tabGroups.length;
+
+    // Close the blank tab if other tabs exist
+    if (blankTabId) {
+      const tabs = await chrome.tabs.query({ currentWindow: true });
+      if (tabs.length > 1) {
+        await chrome.tabs.remove(blankTabId);
+      }
+    }
   }
 
   return result;
