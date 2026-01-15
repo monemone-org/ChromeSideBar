@@ -1,4 +1,5 @@
 import { PinnedSite } from '../hooks/usePinnedSites';
+import { Space } from '../hooks/useSpaces';
 
 export interface TabGroupBackup {
   title: string;
@@ -16,6 +17,7 @@ export interface FullBackup {
   pinnedSites?: PinnedSite[];
   bookmarks?: chrome.bookmarks.BookmarkTreeNode[];
   tabGroups?: TabGroupBackup[];
+  spaces?: Space[];
 }
 
 // Type guard to check if a file is a backup (has version field)
@@ -71,6 +73,7 @@ export async function exportFullBackup(
 export type BookmarkImportMode = 'replace' | 'folder';
 export type PinnedSitesImportMode = 'replace' | 'append';
 export type TabGroupsImportMode = 'replace' | 'append';
+export type SpacesImportMode = 'replace' | 'append';
 
 // Import bookmarks recursively, returns count of bookmarks created
 async function importBookmarkNode(
@@ -140,6 +143,7 @@ export interface ImportResult {
   pinnedSitesCount: number;
   bookmarksCount: number;
   tabGroupsCount: number;
+  spacesCount: number;
 }
 
 export interface ImportOptions {
@@ -149,6 +153,8 @@ export interface ImportOptions {
   bookmarkMode: BookmarkImportMode;
   importTabGroups: boolean;
   tabGroupsMode: TabGroupsImportMode;
+  importSpaces: boolean;
+  spacesMode: SpacesImportMode;
 }
 
 // Close all tabs in current window except one (Chrome requires at least one tab)
@@ -172,17 +178,37 @@ async function closeAllTabs(): Promise<number | undefined> {
   return newTab.id;
 }
 
+// Generate unique space name by adding suffix if needed
+function generateUniqueSpaceName(name: string, existingNames: Set<string>): string
+{
+  if (!existingNames.has(name))
+  {
+    return name;
+  }
+
+  let suffix = 2;
+  while (existingNames.has(`${name} (${suffix})`))
+  {
+    suffix++;
+  }
+  return `${name} (${suffix})`;
+}
+
 // Import full backup
 export async function importFullBackup(
   backup: FullBackup,
   options: ImportOptions,
   replacePinnedSites: (sites: PinnedSite[]) => void,
-  appendPinnedSites: (sites: PinnedSite[]) => void
+  appendPinnedSites: (sites: PinnedSite[]) => void,
+  replaceSpaces: (spaces: Space[]) => void,
+  appendSpaces: (spaces: Space[]) => void,
+  existingSpaceNames: string[]
 ): Promise<ImportResult> {
   const result: ImportResult = {
     pinnedSitesCount: 0,
     bookmarksCount: 0,
     tabGroupsCount: 0,
+    spacesCount: 0,
   };
 
   // Import pinned sites
@@ -248,6 +274,25 @@ export async function importFullBackup(
         await chrome.tabs.remove(blankTabId);
       }
     }
+  }
+
+  // Import spaces
+  if (options.importSpaces && backup.spaces && backup.spaces.length > 0) {
+    if (options.spacesMode === 'replace') {
+      replaceSpaces(backup.spaces);
+    } else {
+      // For append mode, rename spaces with duplicate names
+      const existingNamesSet = new Set(existingSpaceNames);
+      const renamedSpaces = backup.spaces.map(space =>
+      {
+        const uniqueName = generateUniqueSpaceName(space.name, existingNamesSet);
+        // Add this name to the set so subsequent spaces don't conflict
+        existingNamesSet.add(uniqueName);
+        return { ...space, name: uniqueName };
+      });
+      appendSpaces(renamedSpaces);
+    }
+    result.spacesCount = backup.spaces.length;
   }
 
   return result;

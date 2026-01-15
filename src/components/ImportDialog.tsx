@@ -6,17 +6,22 @@ import {
   BookmarkImportMode,
   PinnedSitesImportMode,
   TabGroupsImportMode,
+  SpacesImportMode,
   FullBackup,
   ImportOptions,
   ImportResult,
 } from '../utils/backupRestore';
 import { PinnedSite } from '../hooks/usePinnedSites';
+import { Space } from '../hooks/useSpaces';
 
 interface ImportDialogProps {
   isOpen: boolean;
   onClose: () => void;
   replacePinnedSites: (sites: PinnedSite[]) => void;
   appendPinnedSites: (sites: PinnedSite[]) => void;
+  replaceSpaces: (spaces: Space[]) => void;
+  appendSpaces: (spaces: Space[]) => void;
+  existingSpaces: Space[];
 }
 
 type DialogState = 'selecting' | 'preview' | 'importing' | 'success';
@@ -26,6 +31,7 @@ interface ParsedData {
   hasPinnedSites: boolean;
   hasBookmarks: boolean;
   hasTabGroups: boolean;
+  hasSpaces: boolean;
   dataTypeCount: number;
 }
 
@@ -34,6 +40,9 @@ export function ImportDialog({
   onClose,
   replacePinnedSites,
   appendPinnedSites,
+  replaceSpaces,
+  appendSpaces,
+  existingSpaces,
 }: ImportDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isMountedRef = useRef(true);
@@ -45,6 +54,8 @@ export function ImportDialog({
   const [bookmarkMode, setBookmarkMode] = useState<BookmarkImportMode>('folder');
   const [importTabGroups, setImportTabGroups] = useState(true);
   const [tabGroupsMode, setTabGroupsMode] = useState<TabGroupsImportMode>('append');
+  const [importSpacesFlag, setImportSpacesFlag] = useState(true);
+  const [spacesMode, setSpacesMode] = useState<SpacesImportMode>('append');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,7 +124,8 @@ export function ImportDialog({
         const hasPinnedSites = (backup.pinnedSites?.length || 0) > 0;
         const hasBookmarks = (backup.bookmarks?.length || 0) > 0;
         const hasTabGroups = (backup.tabGroups?.length || 0) > 0;
-        const dataTypeCount = [hasPinnedSites, hasBookmarks, hasTabGroups].filter(Boolean).length;
+        const hasSpaces = (backup.spaces?.length || 0) > 0;
+        const dataTypeCount = [hasPinnedSites, hasBookmarks, hasTabGroups, hasSpaces].filter(Boolean).length;
 
         if (dataTypeCount === 0) {
           setError('Backup file contains no data');
@@ -126,6 +138,7 @@ export function ImportDialog({
           hasPinnedSites,
           hasBookmarks,
           hasTabGroups,
+          hasSpaces,
           dataTypeCount,
         });
 
@@ -136,6 +149,8 @@ export function ImportDialog({
         setBookmarkMode('folder');
         setImportTabGroups(hasTabGroups);
         setTabGroupsMode('append');
+        setImportSpacesFlag(hasSpaces);
+        setSpacesMode('append');
         setDialogState('preview');
       } catch {
         setError('Failed to parse backup file');
@@ -157,12 +172,17 @@ export function ImportDialog({
         bookmarkMode,
         importTabGroups,
         tabGroupsMode,
+        importSpaces: importSpacesFlag,
+        spacesMode,
       };
       const result = await importFullBackup(
         parsedData.backup,
         options,
         replacePinnedSites,
-        appendPinnedSites
+        appendPinnedSites,
+        replaceSpaces,
+        appendSpaces,
+        existingSpaces.map(s => s.name)
       );
       setImportResult(result);
       setDialogState('success');
@@ -173,7 +193,7 @@ export function ImportDialog({
     }
   };
 
-  const nothingSelected = !importPinnedSitesFlag && !importBookmarksFlag && !importTabGroups;
+  const nothingSelected = !importPinnedSitesFlag && !importBookmarksFlag && !importTabGroups && !importSpacesFlag;
 
   if (!isOpen) {
     return null;
@@ -246,6 +266,9 @@ export function ImportDialog({
                     )}
                     {importResult.tabGroupsCount > 0 && (
                       <li>{importResult.tabGroupsCount} tabs and groups</li>
+                    )}
+                    {importResult.spacesCount > 0 && (
+                      <li>{importResult.spacesCount} spaces</li>
                     )}
                   </ul>
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end">
@@ -358,6 +381,37 @@ export function ImportDialog({
                             disabled={dialogState === 'importing'}
                           />
                           Replace all bookmarks
+                        </label>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Single data type - Spaces only */}
+                  {parsedData.dataTypeCount === 1 && parsedData.hasSpaces && (
+                    <div className="space-y-2">
+                      <p className="text-gray-700 dark:text-gray-300">
+                        {parsedData.backup.spaces?.length} spaces
+                      </p>
+                      <div className="ml-2 space-y-1">
+                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="spacesModeSingle"
+                            checked={spacesMode === 'replace'}
+                            onChange={() => setSpacesMode('replace')}
+                            disabled={dialogState === 'importing'}
+                          />
+                          Replace all spaces
+                        </label>
+                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="spacesModeSingle"
+                            checked={spacesMode === 'append'}
+                            onChange={() => setSpacesMode('append')}
+                            disabled={dialogState === 'importing'}
+                          />
+                          Append to existing
                         </label>
                       </div>
                     </div>
@@ -486,6 +540,46 @@ export function ImportDialog({
                                   name="tabGroupsMode"
                                   checked={tabGroupsMode === 'append'}
                                   onChange={() => setTabGroupsMode('append')}
+                                  disabled={dialogState === 'importing'}
+                                />
+                                Append to existing
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Spaces import */}
+                      {parsedData.hasSpaces && (
+                        <div>
+                          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={importSpacesFlag}
+                              onChange={(e) => setImportSpacesFlag(e.target.checked)}
+                              className="rounded border-gray-300 dark:border-gray-600"
+                              disabled={dialogState === 'importing'}
+                            />
+                            Spaces ({parsedData.backup.spaces?.length})
+                          </label>
+                          {importSpacesFlag && (
+                            <div className="ml-5 mt-1 space-y-1">
+                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="spacesMode"
+                                  checked={spacesMode === 'replace'}
+                                  onChange={() => setSpacesMode('replace')}
+                                  disabled={dialogState === 'importing'}
+                                />
+                                Replace all spaces
+                              </label>
+                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="spacesMode"
+                                  checked={spacesMode === 'append'}
+                                  onChange={() => setSpacesMode('append')}
                                   disabled={dialogState === 'importing'}
                                 />
                                 Append to existing

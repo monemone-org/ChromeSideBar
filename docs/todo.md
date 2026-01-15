@@ -125,7 +125,7 @@ SpaceBar
 - Spaces:
       - [x] popup menu action: Close All Tabs In Space
       - [ ] popup menu edit spaces: a new dialog that lists all the spacs with name and icon.  users can add, edit , delete and reorder spaces in the dialog
-      - [ ] import/export, phase 6 in the plan
+      - [x] import/export, phase 6 in the plan
 
 - [x] live bookmark tab and live pinned site tab, after moving to new window, it should be considered closed in this window. so no [x] button or speaker button should be presented
 
@@ -134,4 +134,6 @@ SpaceBar
 
 - [x] import tabs/groups with replace options - will create a blank page to prevent the windows from being closed.  that blank page needs to be closed after import completes if the import contains no tabs.
 
+- [ ] when creating/editing space, check if the name already used. if so , show error and don't commit changes and keep dialog open till a valid unique space name is entered.
 
+- [ ] WelcomeDialog , add a welcome /product overview page as the 1st page.

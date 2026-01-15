@@ -18,6 +18,7 @@ import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
 import { useCloseAllTabsInSpace } from './hooks/useCloseAllTabsInSpace';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
+import { useSpaces } from './hooks/useSpaces';
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
@@ -327,6 +328,11 @@ function App() {
     appendPinnedSites,
   } = usePinnedSites();
   const { bookmarks } = useBookmarks();
+  const {
+    spaces,
+    replaceSpaces,
+    appendSpaces,
+  } = useSpaces();
 
   const handleApplySettings = (newSettings: SettingsValues) => {
     setFontSize(newSettings.fontSize);
@@ -494,6 +500,7 @@ function App() {
         onClose={() => setShowExport(false)}
         pinnedSites={pinnedSites}
         bookmarks={bookmarks}
+        spaces={spaces}
       />
 
       <ImportDialog
@@ -501,6 +508,9 @@ function App() {
         onClose={() => setShowImport(false)}
         replacePinnedSites={replacePinnedSites}
         appendPinnedSites={appendPinnedSites}
+        replaceSpaces={replaceSpaces}
+        appendSpaces={appendSpaces}
+        existingSpaces={spaces}
       />
 
       <WelcomeDialog

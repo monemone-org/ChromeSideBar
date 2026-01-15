@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { PinnedSite } from '../hooks/usePinnedSites';
+import { Space } from '../hooks/useSpaces';
 
 export interface ExportOptions {
   exportPinnedSites: boolean;
   exportBookmarks: boolean;
   exportTabGroups: boolean;
+  exportSpaces: boolean;
 }
 
 interface ExportDialogProps {
@@ -13,6 +15,7 @@ interface ExportDialogProps {
   onClose: () => void;
   pinnedSites: PinnedSite[];
   bookmarks: chrome.bookmarks.BookmarkTreeNode[];
+  spaces: Space[];
 }
 
 interface TabGroupBackup {
@@ -31,6 +34,7 @@ interface FullBackup {
   pinnedSites?: PinnedSite[];
   bookmarks?: chrome.bookmarks.BookmarkTreeNode[];
   tabGroups?: TabGroupBackup[];
+  spaces?: Space[];
 }
 
 export function ExportDialog({
@@ -38,10 +42,12 @@ export function ExportDialog({
   onClose,
   pinnedSites,
   bookmarks,
+  spaces,
 }: ExportDialogProps) {
   const [exportPinnedSites, setExportPinnedSites] = useState(true);
   const [exportBookmarks, setExportBookmarks] = useState(true);
   const [exportTabGroups, setExportTabGroups] = useState(true);
+  const [exportSpaces, setExportSpaces] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
   // Reset options when dialog opens
@@ -50,6 +56,7 @@ export function ExportDialog({
       setExportPinnedSites(true);
       setExportBookmarks(true);
       setExportTabGroups(true);
+      setExportSpaces(true);
     }
   }, [isOpen]);
 
@@ -66,7 +73,7 @@ export function ExportDialog({
   }, [isOpen, onClose]);
 
   const handleExport = async () => {
-    if (!exportPinnedSites && !exportBookmarks && !exportTabGroups) {
+    if (!exportPinnedSites && !exportBookmarks && !exportTabGroups && !exportSpaces) {
       return; // Nothing to export
     }
 
@@ -109,6 +116,11 @@ export function ExportDialog({
         }
       }
 
+      // Add spaces if selected
+      if (exportSpaces && spaces.length > 0) {
+        backup.spaces = spaces;
+      }
+
       // Download the file
       const data = JSON.stringify(backup, null, 2);
       const blob = new Blob([data], { type: 'application/json' });
@@ -127,7 +139,7 @@ export function ExportDialog({
     }
   };
 
-  const nothingSelected = !exportPinnedSites && !exportBookmarks && !exportTabGroups;
+  const nothingSelected = !exportPinnedSites && !exportBookmarks && !exportTabGroups && !exportSpaces;
 
   if (!isOpen) {
     return null;
@@ -178,6 +190,17 @@ export function ExportDialog({
               className="rounded border-gray-300 dark:border-gray-600"
             />
             Tabs and groups
+          </label>
+
+          {/* Spaces export */}
+          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={exportSpaces}
+              onChange={(e) => setExportSpaces(e.target.checked)}
+              className="rounded border-gray-300 dark:border-gray-600"
+            />
+            Spaces ({spaces.length})
           </label>
 
           {/* Export / Cancel buttons */}
