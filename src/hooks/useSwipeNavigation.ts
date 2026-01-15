@@ -23,6 +23,9 @@ export const useSwipeNavigation = <T extends HTMLElement>(
 
   const accumulatedRef = useRef(0);
   const lastTimeRef = useRef(0);
+  // Use ref for callback to avoid re-attaching listener when callback changes
+  const onSwipeRef = useRef(onSwipe);
+  onSwipeRef.current = onSwipe;
 
   useEffect(() =>
   {
@@ -55,18 +58,18 @@ export const useSwipeNavigation = <T extends HTMLElement>(
       if (accumulatedRef.current > threshold)
       {
         accumulatedRef.current = 0;
-        globalCooldownUntil = now + 400;  // 400ms cooldown
-        onSwipe('left');
+        globalCooldownUntil = now + 500;  // 500ms cooldown
+        onSwipeRef.current('left');
       }
       else if (accumulatedRef.current < -threshold)
       {
         accumulatedRef.current = 0;
-        globalCooldownUntil = now + 400;  // 400ms cooldown
-        onSwipe('right');
+        globalCooldownUntil = now + 500;  // 500ms cooldown
+        onSwipeRef.current('right');
       }
     };
 
     element.addEventListener('wheel', handleWheel, { passive: true });
     return () => element.removeEventListener('wheel', handleWheel);
-  }, [ref, enabled, threshold, onSwipe]);
+  }, [ref, enabled, threshold]);  // Removed onSwipe from deps - using ref instead
 };

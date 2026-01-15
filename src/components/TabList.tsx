@@ -25,7 +25,8 @@ import { Dialog } from './Dialog';
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
 import { FolderPickerDialog } from './FolderPickerDialog';
-import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, MoreHorizontal, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
+import { SectionHeader } from './SectionHeader';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
@@ -2123,87 +2124,43 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     closeTabs(tabIds);
   }, [visibleTabs, closeTabs]);
 
-  // Track if menu was just closed to prevent immediate reopen
-  const menuJustClosedRef = useRef(false);
-
-  // Handler for the [...] menu button mousedown - detect if menu is open before it closes
-  const handleMenuButtonMouseDown = (_e: React.MouseEvent<HTMLButtonElement>, isOpen: boolean) =>
-  {
-    // Don't stop propagation - let the outside click handler close the menu.
-    // Just record that the menu was open so the click handler knows not to reopen.
-    if (isOpen)
-    {
-      menuJustClosedRef.current = true;
-    }
-  };
-
-  // Handler for the [...] menu button click
-  const handleMenuButtonClick = (e: React.MouseEvent<HTMLButtonElement>, openMenu: (x: number, y: number) => void) =>
-  {
-    e.stopPropagation();
-    // If menu was just closed by mousedown, don't reopen
-    if (menuJustClosedRef.current)
-    {
-      menuJustClosedRef.current = false;
-      return;
-    }
-    const rect = e.currentTarget.getBoundingClientRect();
-    openMenu(rect.right, rect.bottom);
-  };
+  // Build menu content for Tabs section header
+  const tabsMenuContent = (
+    <>
+      <ContextMenu.Item onSelect={() => {
+        // When in a space, use sortGroupTabs to avoid destroying the group
+        if (isInSpace && activeSpaceTabGroupId !== undefined) {
+          sortGroupTabs(activeSpaceTabGroupId, 'asc');
+        } else {
+          sortTabs('asc', visibleTabGroups, sortGroupsFirst);
+        }
+      }}>
+        <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => {
+        if (isInSpace && activeSpaceTabGroupId !== undefined) {
+          sortGroupTabs(activeSpaceTabGroupId, 'desc');
+        } else {
+          sortTabs('desc', visibleTabGroups, sortGroupsFirst);
+        }
+      }}>
+        <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
+      </ContextMenu.Item>
+      <ContextMenu.Separator />
+      <ContextMenu.Item onSelect={handleCloseAllTabs}>
+        <Trash size={14} className="mr-2" /> Close Tabs
+      </ContextMenu.Item>
+    </>
+  );
 
   return (
     <>
       {/* Tabs Label Row */}
-      <ContextMenu.Root>
-        {({ open: openMenu, isOpen: isMenuOpen }) => (
-          <>
-            <div
-              className="group relative flex items-center py-1 rounded select-none outline-none border-2 border-transparent"
-              style={{ paddingLeft: `${getIndentPadding(0)}px`, paddingRight: '8px' }}
-            >
-              <span className="flex-1 text-gray-500 dark:text-gray-400">
-                Tabs
-              </span>
-              <button
-                onMouseDown={(e) => handleMenuButtonMouseDown(e, isMenuOpen)}
-                onClick={(e) => handleMenuButtonClick(e, openMenu)}
-                className="p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
-                title="Tab options"
-                aria-label="Tab options"
-              >
-                <MoreHorizontal size={14} />
-              </button>
-            </div>
-            <ContextMenu.Portal>
-              <ContextMenu.Content>
-                <ContextMenu.Item onSelect={() => {
-                  // When in a space, use sortGroupTabs to avoid destroying the group
-                  if (isInSpace && activeSpaceTabGroupId !== undefined) {
-                    sortGroupTabs(activeSpaceTabGroupId, 'asc');
-                  } else {
-                    sortTabs('asc', visibleTabGroups, sortGroupsFirst);
-                  }
-                }}>
-                  <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
-                </ContextMenu.Item>
-                <ContextMenu.Item onSelect={() => {
-                  if (isInSpace && activeSpaceTabGroupId !== undefined) {
-                    sortGroupTabs(activeSpaceTabGroupId, 'desc');
-                  } else {
-                    sortTabs('desc', visibleTabGroups, sortGroupsFirst);
-                  }
-                }}>
-                  <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
-                </ContextMenu.Item>
-                <ContextMenu.Separator />
-                <ContextMenu.Item danger onSelect={handleCloseAllTabs}>
-                  <Trash size={14} className="mr-2" /> Close All Tabs
-                </ContextMenu.Item>
-              </ContextMenu.Content>
-            </ContextMenu.Portal>
-          </>
-        )}
-      </ContextMenu.Root>
+      <SectionHeader
+        label="Tabs"
+        menuContent={tabsMenuContent}
+        menuTitle="Tab options"
+      />
 
       {/* Tabs list */}
       <DndContext

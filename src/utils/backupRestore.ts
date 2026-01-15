@@ -157,7 +157,7 @@ async function closeAllTabs(): Promise<void> {
   if (tabs.length === 0) return;
 
   // Create a new blank tab first (Chrome won't allow closing all tabs)
-  const newTab = await chrome.tabs.create({ url: 'chrome://newtab', active: false });
+  const newTab = await chrome.tabs.create({ url: 'about:blank' });
 
   // Close all other tabs
   const tabIdsToClose = tabs

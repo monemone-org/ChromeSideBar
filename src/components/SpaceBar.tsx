@@ -19,6 +19,7 @@ import {
 import { Plus } from 'lucide-react';
 import { SpaceIcon, SpaceIconOverlay } from './SpaceIcon';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
+import { useCloseAllTabsInSpace } from '../hooks/useCloseAllTabsInSpace';
 
 interface SpaceBarProps
 {
@@ -34,6 +35,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 }) =>
 {
   const { allSpaces, activeSpaceId, setActiveSpaceId, moveSpace, getSpaceById } = useSpacesContext();
+  const closeAllTabsInSpace = useCloseAllTabsInSpace();
   const [activeId, setActiveId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -127,6 +129,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
                 onClick={() => handleSpaceClick(space.id)}
                 onEdit={() => onEditSpace(space)}
                 onDelete={() => handleDelete(space)}
+                onCloseAllTabs={() => closeAllTabsInSpace(space)}
                 isAllSpace={space.id === 'all'}
                 isDraggable={space.id !== 'all'}
               />

@@ -15,6 +15,7 @@ interface SpaceIconProps
   onClick: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onCloseAllTabs?: () => void;
   isAllSpace?: boolean;
   isDraggable?: boolean;
 }
@@ -57,6 +58,7 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
   onClick,
   onEdit,
   onDelete,
+  onCloseAllTabs,
   isAllSpace = false,
   isDraggable = false,
 }) =>
@@ -109,10 +111,24 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
     </button>
   );
 
-  // "All" space has no context menu
+  // "All" space has a simpler context menu
   if (isAllSpace)
   {
-    return iconButton;
+    return (
+      <ContextMenu.Root>
+        <ContextMenu.Trigger asChild>
+          {iconButton}
+        </ContextMenu.Trigger>
+
+        <ContextMenu.Portal>
+          <ContextMenu.Content>
+            <ContextMenu.Item onSelect={onCloseAllTabs}>
+              Close All Tabs
+            </ContextMenu.Item>
+          </ContextMenu.Content>
+        </ContextMenu.Portal>
+      </ContextMenu.Root>
+    );
   }
 
   return (
@@ -121,10 +137,18 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         {iconButton}
       </ContextMenu.Trigger>
 
+      {/* NOTE: This menu is duplicated in SpaceTitle (App.tsx).
+          Any changes here must also be updated there. */}
       <ContextMenu.Portal>
         <ContextMenu.Content>
           <ContextMenu.Item onSelect={onEdit}>
             Edit
+          </ContextMenu.Item>
+
+          <ContextMenu.Separator />
+
+          <ContextMenu.Item onSelect={onCloseAllTabs}>
+            Close All Tabs In Space
           </ContextMenu.Item>
 
           <ContextMenu.Separator />

@@ -384,9 +384,9 @@ export const useBookmarks = () => {
   // Get all bookmarks recursively from a folder (including nested subfolders)
   const getAllBookmarksInFolder = useCallback(async (
     folderId: string
-  ): Promise<Array<{ title: string; url: string }>> =>
+  ): Promise<Array<{ id: string; title: string; url: string }>> =>
   {
-    const results: Array<{ title: string; url: string }> = [];
+    const results: Array<{ id: string; title: string; url: string }> = [];
 
     const collectRecursive = async (id: string): Promise<void> =>
     {
@@ -395,7 +395,7 @@ export const useBookmarks = () => {
       {
         if (child.url)
         {
-          results.push({ title: child.title, url: child.url });
+          results.push({ id: child.id, title: child.title, url: child.url });
         }
         else
         {

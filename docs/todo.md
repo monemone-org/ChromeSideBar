@@ -116,10 +116,17 @@ bugs:
 
 - [ ] add right click action on tab "Move to Space". It's similar to add to group but it's for moving a tab to space.
 
-- [-] spaces:
-      - popup menu action: Close all tabs in spaces
-      - popup menu edit spaces: a new dialog that lists all the spacs with name and icon.  users can add, edit , delete and reorder spaces in the dialog
+- Spaces:
+      - [x] popup menu action: Close All Tabs In Space
+      - [ ] popup menu edit spaces: a new dialog that lists all the spacs with name and icon.  users can add, edit , delete and reorder spaces in the dialog
+      - [ ] import/export, phase 6 in the plan
 
-- [-] live bookmark tab and live pinned site tab, after moving to new window, it should be considered closed in this window. so no [x] button or speaker button should be presented
+- [x] live bookmark tab and live pinned site tab, after moving to new window, it should be considered closed in this window. so no [x] button or speaker button should be presented
 
+- [ ] import tabs/groups with replace options - will create a blank page to prevent the windows from being closed.  that blank page needs to be closed after import completes if the import contains no tabs.
+
+- [ ] clean up icon on popup menu.  add icons to Space popup menus.
+close should all use [x] icon
+
+- [x] 2 finger swipe left/right on side panel to change space changes 2 spaces forward/backward each time            
 

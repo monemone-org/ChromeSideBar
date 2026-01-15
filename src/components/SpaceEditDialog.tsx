@@ -256,6 +256,9 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
               <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Bookmark Folder
               </label>
+              <p className="text-[0.85em] text-gray-500 dark:text-gray-400 mb-2">
+                Bookmarks saved in this space will be stored in this folder.
+              </p>
               <div className="flex items-center gap-2 px-2 py-1.5 border rounded bg-gray-50 dark:bg-gray-900 dark:border-gray-600">
                 {useExistingFolder ? (
                   <FolderOpen size={14} className="text-yellow-500 flex-shrink-0" />

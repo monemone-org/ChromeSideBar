@@ -16,11 +16,14 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
+import { useCloseAllTabsInSpace } from './hooks/useCloseAllTabsInSpace';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
 import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid } from 'lucide-react';
+import { SectionHeader } from './components/SectionHeader';
+import * as ContextMenu from './components/ContextMenu';
 
 // Inner component that renders content for a single space
 interface SidebarContentProps
@@ -85,32 +88,90 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
 };
 
 // Fixed space title bar - shows current space icon and name
-const SpaceTitle: React.FC = () =>
+interface SpaceTitleProps
+{
+  onEditSpace: (space: Space) => void;
+  onDeleteSpace: (space: Space) => void;
+  onCloseAllTabs: (space: Space) => void;
+}
+
+const SpaceTitle: React.FC<SpaceTitleProps> = ({ onEditSpace, onDeleteSpace, onCloseAllTabs }) =>
 {
   const { activeSpace } = useSpacesContext();
   const fontSize = useFontSize();
-
   const titleFontSize = fontSize - 1;
   const iconSize = titleFontSize;
+  const isAllSpace = activeSpace.id === 'all';
+
+  // Build icon element
+  const iconElement = activeSpace.icon === 'LayoutGrid' ? (
+    <LayoutGrid size={iconSize} />
+  ) : (
+    <img
+      src={getIconUrl(activeSpace.icon)}
+      alt=""
+      width={iconSize}
+      height={iconSize}
+      className="opacity-60 dark:invert dark:opacity-50"
+    />
+  );
+
+  // Build menu content
+  // NOTE: This menu is duplicated in SpaceIcon.tsx.
+  // Any changes here must also be updated there.
+  const menuContent = isAllSpace ? (
+    <ContextMenu.Item onSelect={() => onCloseAllTabs(activeSpace)}>
+      Close All Tabs
+    </ContextMenu.Item>
+  ) : (
+    <>
+      <ContextMenu.Item onSelect={() => onEditSpace(activeSpace)}>
+        Edit
+      </ContextMenu.Item>
+
+      <ContextMenu.Separator />
+
+      <ContextMenu.Item onSelect={() => onCloseAllTabs(activeSpace)}>
+        Close All Tabs In Space
+      </ContextMenu.Item>
+
+      <ContextMenu.Separator />
+
+      <ContextMenu.Item danger onSelect={() => onDeleteSpace(activeSpace)}>
+        Delete
+      </ContextMenu.Item>
+    </>
+  );
 
   return (
-    <div
-      className="flex items-center gap-1.5 px-3 py-1 text-gray-400 dark:text-gray-500 flex-shrink-0"
-      style={{ fontSize: `${titleFontSize}px` }}
-    >
-      {activeSpace.icon === 'LayoutGrid' ? (
-        <LayoutGrid size={iconSize} className="flex-shrink-0" />
-      ) : (
-        <img
-          src={getIconUrl(activeSpace.icon)}
-          alt=""
-          width={iconSize}
-          height={iconSize}
-          className="flex-shrink-0 opacity-60 dark:invert dark:opacity-50"
-        />
-      )}
-      <span>{activeSpace.name}</span>
-    </div>
+    <SectionHeader
+      label={activeSpace.name}
+      icon={iconElement}
+      menuContent={menuContent}
+      menuTitle="Space options"
+      fontSize={titleFontSize}
+      showMenuButton={false}
+    />
+  );
+};
+
+// Wrapper that provides close tabs handler using hooks (must be inside providers)
+interface SpaceTitleWrapperProps
+{
+  onEditSpace: (space: Space) => void;
+  onDeleteSpace: (space: Space) => void;
+}
+
+const SpaceTitleWrapper: React.FC<SpaceTitleWrapperProps> = ({ onEditSpace, onDeleteSpace }) =>
+{
+  const closeAllTabsInSpace = useCloseAllTabsInSpace();
+
+  return (
+    <SpaceTitle
+      onEditSpace={onEditSpace}
+      onDeleteSpace={onDeleteSpace}
+      onCloseAllTabs={closeAllTabsInSpace}
+    />
   );
 };
 
@@ -562,7 +623,10 @@ function App() {
       />
 
       {/* Space Title */}
-      <SpaceTitle />
+      <SpaceTitleWrapper
+        onEditSpace={handleEditSpace}
+        onDeleteSpace={handleDeleteSpace}
+      />
 
       {/* Content with 2-finger swipe navigation */}
       <SwipeableContainer
