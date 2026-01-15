@@ -93,7 +93,7 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       data-space-id={space.id}
       className={clsx(
         "w-7 h-7 rounded flex items-center justify-center transition-all flex-shrink-0",
-        "hover:scale-105",
+        "hover:scale-105 focus:outline-none",
         isActive ? colorStyle.badge : [colorStyle.bg, "hover:opacity-80"]
       )}
       {...(isDraggable ? { ...attributes, ...listeners } : {})}
