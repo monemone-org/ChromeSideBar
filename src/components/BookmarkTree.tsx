@@ -754,10 +754,10 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const isSpaceFolderMissing = spaceFolderPath && !spaceFolder;
 
   // Apply space filter if a space (not "all") is active
-  // Show the folder's contents directly (hide the root folder itself)
+  // Show the space folder itself (not just children) so it's always a drop target
   if (spaceFolder)
   {
-    visibleBookmarks = spaceFolder.children || [];
+    visibleBookmarks = [spaceFolder];
   }
 
   // Apply live tabs filter if enabled
@@ -784,6 +784,19 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
   const [showSpaceFolderPicker, setShowSpaceFolderPicker] = useState(false);
+
+  // Auto-expand space folder when it changes
+  useEffect(() =>
+  {
+    if (spaceFolder)
+    {
+      setExpandedState(prev =>
+      {
+        if (prev[spaceFolder.id]) return prev;  // Already expanded
+        return { ...prev, [spaceFolder.id]: true };
+      });
+    }
+  }, [spaceFolder?.id]);
 
   // Auto-scroll to active bookmark when it changes
   const prevActiveItemKeyRef = useRef<string | null>(null);

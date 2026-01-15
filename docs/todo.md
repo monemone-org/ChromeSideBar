@@ -84,7 +84,7 @@ bugs:
 - [x] tooltips are clipped
 - [x] tab/bookmark rows have no tooltips
 - [x] remove seperate line in filtering mode if there is no pinned site nor bookmarks after filtering
-- [ ] add filter toolbar button: filter by domain name, and save as a "Named filtered view" (please suggest a better name). show a drop down to let user choose and apply/unapply a "filtered named view".
+- [x] add filter toolbar button: filter by domain name, and save as quick access.
 
 - saved filter
       - [x] recent filter is not saved. there should be a debounce to start search. that search string is remembered in memory.  the string should be saved in recent. if user edit the search string without deleting all charactors, then edit that recent search string without adding another new one to the recent list.
@@ -134,7 +134,11 @@ SpaceBar
 
 - [x] WelcomeDialog , add a welcome /product overview page as the 1st page.
 
-- [-] when activate to a different space, activate the last activated tab in the Space.  If there is no history of which tab is the last activated one, activate the 1st tab.  if there is no tab, create a about:blank tab for that space.
+- [x] when activate to a different space, activate the last activated tab in the Space.  If there is no history of which tab is the last activated one, activate the 1st tab.  if there is no tab, no-op
+
+- [x] when space has no bookmark (i.e. the bookmark folder has no bookmarks), i can't drop tab to bookmark section to create bookmarks.
+
+- [ ] tab popup menu "move to bookmark" , if in a space, use the space bookmark folder as the default selection in the select folder dialog.
 
 - Review Code:
       - [ ] Review code for O(n²) or less efficient logic.
