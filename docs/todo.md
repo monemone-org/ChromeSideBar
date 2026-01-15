@@ -116,11 +116,7 @@ SpaceBar
 
 - [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
 
-- [ ] Review code for O(n²) or less efficient logic.
-
-- [ ] Remove duplicated code. simplify code.
-
-- [ ] add right click action on tab "Move to Space". It's similar to add to group but it's for moving a tab to space.
+- [x] add right click action on tab "Move to Space". It's similar to add to group but it's for moving a tab to space.
 
 - Spaces:
       - [x] popup menu action: Close All Tabs In Space
@@ -137,3 +133,13 @@ SpaceBar
 - [x] when creating/editing space, check if the name already used. if so , show error and don't commit changes and keep dialog open till a valid unique space name is entered.
 
 - [ ] WelcomeDialog , add a welcome /product overview page as the 1st page.
+
+- [ ] when activate to a different space, activate the last activated tab in the Space.  If there is no history of which tab is the last activated one, activate the 1st tab.  if there is no tab, create a about:blank tab for that space.
+
+- Review Code:
+      - [ ] Review code for O(n²) or less efficient logic.
+      - [ ] Remove duplicated code. simplify code.
+      - [ ] Refactor reusable or  self-contained code into separate components
+      - [ ] Security review
+
+

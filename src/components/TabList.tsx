@@ -25,6 +25,7 @@ import { Dialog } from './Dialog';
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
 import { FolderPickerDialog } from './FolderPickerDialog';
+import { MoveToSpaceDialog } from './MoveToSpaceDialog';
 import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
 import { getIndentPadding } from '../utils/indent';
@@ -457,6 +458,7 @@ interface DraggableTabProps {
   onDuplicate?: (id: number) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   onOpenAddToGroupDialog?: (tabId: number, currentGroupId?: number) => void;
+  onOpenMoveToSpaceDialog?: (tabId: number, currentSpaceId?: string) => void;
   onAddToBookmark?: (tab: chrome.tabs.Tab) => void;
   onMoveToNewWindow?: (tabId: number) => void;
   onCloseTabsBefore?: (tabId: number) => void;
@@ -484,6 +486,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onDuplicate,
   onPin,
   onOpenAddToGroupDialog,
+  onOpenMoveToSpaceDialog,
   onAddToBookmark,
   onMoveToNewWindow,
   onCloseTabsBefore,
@@ -602,9 +605,20 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               </ContextMenu.Item>
              </>
           )}
+          {onDuplicate && tab.url && (
+            <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
+              <Copy size={14} className="mr-2" /> Duplicate
+            </ContextMenu.Item>
+          )}
+          <ContextMenu.Separator />
           {onOpenAddToGroupDialog && (
             <ContextMenu.Item onSelect={() => onOpenAddToGroupDialog(tab.id!, tab.groupId)}>
               <FolderPlus size={14} className="mr-2" /> Add to Group
+            </ContextMenu.Item>
+          )}
+          {onOpenMoveToSpaceDialog && (
+            <ContextMenu.Item onSelect={() => onOpenMoveToSpaceDialog(tab.id!)}>
+              <SquareStack size={14} className="mr-2" /> Move to Space
             </ContextMenu.Item>
           )}
           {onAddToBookmark && tab.url && (
@@ -615,11 +629,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           {onMoveToNewWindow && (
             <ContextMenu.Item onSelect={() => onMoveToNewWindow(tab.id!)}>
               <ExternalLink size={14} className="mr-2" /> Move to New Window
-            </ContextMenu.Item>
-          )}
-          {onDuplicate && tab.url && (
-            <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
-              <Copy size={14} className="mr-2" /> Duplicate
             </ContextMenu.Item>
           )}
           <ContextMenu.Separator />
@@ -909,7 +918,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
-  const { activeSpace: activeSpaceFromContext, getTabGroupForSpace, createTabGroupForSpace, findTabGroupForSpace } = useSpacesContext();
+  const { spaces, activeSpace: activeSpaceFromContext, getTabGroupForSpace, createTabGroupForSpace, findTabGroupForSpace } = useSpacesContext();
 
   // Use prop if provided, otherwise use context
   const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
@@ -1089,6 +1098,41 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   {
     setAddToGroupDialog({ isOpen: false, tabId: null });
   }, []);
+
+  // Move to Space dialog state
+  const [moveToSpaceDialog, setMoveToSpaceDialog] = useState<{
+    isOpen: boolean;
+    tabId: number | null;
+    currentSpaceId?: string;
+  }>({ isOpen: false, tabId: null });
+
+  const openMoveToSpaceDialog = useCallback((tabId: number, currentSpaceId?: string) =>
+  {
+    setMoveToSpaceDialog({ isOpen: true, tabId, currentSpaceId });
+  }, []);
+
+  const closeMoveToSpaceDialog = useCallback(() =>
+  {
+    setMoveToSpaceDialog({ isOpen: false, tabId: null });
+  }, []);
+
+  // Handler to move tab to a space's tab group
+  const handleMoveToSpace = useCallback(async (tabId: number, spaceId: string) =>
+  {
+    // Find existing tab group for space, or create new one
+    let groupId = await findTabGroupForSpace(spaceId);
+
+    if (groupId === null)
+    {
+      // Create new group with this tab as the first tab
+      groupId = await createTabGroupForSpace(spaceId, tabId);
+    }
+    else
+    {
+      // Move tab to existing group
+      await chrome.tabs.group({ tabIds: [tabId], groupId });
+    }
+  }, [findTabGroupForSpace, createTabGroupForSpace]);
 
   // Change Group Color dialog state
   const [changeColorDialog, setChangeColorDialog] = useState<{
@@ -2194,6 +2238,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   onDuplicate={duplicateTab}
                   onPin={onPin}
                   onOpenAddToGroupDialog={openAddToGroupDialog}
+                  onOpenMoveToSpaceDialog={spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                   onAddToBookmark={openAddToBookmarkDialog}
                   onMoveToNewWindow={moveToNewWindow}
                   onCloseTabsBefore={closeTabsBefore}
@@ -2227,6 +2272,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           onDuplicate={duplicateTab}
                           onPin={onPin}
                           onOpenAddToGroupDialog={openAddToGroupDialog}
+                          onOpenMoveToSpaceDialog={spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                           onAddToBookmark={openAddToBookmarkDialog}
                           onMoveToNewWindow={moveToNewWindow}
                           onCloseTabsBefore={closeTabsBefore}
@@ -2298,6 +2344,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         onDuplicate={duplicateTab}
                         onPin={onPin}
                         onOpenAddToGroupDialog={openAddToGroupDialog}
+                        onOpenMoveToSpaceDialog={spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                         onAddToBookmark={openAddToBookmarkDialog}
                         onMoveToNewWindow={moveToNewWindow}
                         onCloseTabsBefore={closeTabsBefore}
@@ -2343,6 +2390,15 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         onAddToGroup={groupTab}
         onCreateGroup={createGroupWithTab}
         onClose={closeAddToGroupDialog}
+      />
+
+      <MoveToSpaceDialog
+        isOpen={moveToSpaceDialog.isOpen}
+        tabId={moveToSpaceDialog.tabId}
+        spaces={spaces}
+        currentSpaceId={activeSpace?.id}
+        onMoveToSpace={handleMoveToSpace}
+        onClose={closeMoveToSpaceDialog}
       />
 
       <ChangeGroupColorDialog
