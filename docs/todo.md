@@ -95,19 +95,18 @@ bugs:
   title. When live bookmark tab is closed, restore the row title back to the name of the bookmark.
 
 
-- [-]  in pinned site edit dialog, reset site icon should fetch and display the site icon in the selected icon in the dialog.
+- [x]  in pinned site edit dialog, reset site icon should fetch and display the site icon in the selected icon in the dialog.
 
+- [x] New feature: add a popup menu "Open as tab group" for bookmark folder to open the selected bookmark folder as a tab group:
+   - Create a tab group with the same name as the selected folder, randomly pick a colour for the group
+   - Open all the tabs (recursively) under that folder and place them in the group.
+   - This would be a reverse action of the existing feature: "Save to Bookmarks"
 
-- [ ] a welcome dialog that explains the following features. Briefly explain what they are and their purposes
+- [-] new feature: A welcome dialog that explains the following features. Briefly explain what they are and their purposes
       - pinned sites
       - arc-style live bookmarks
       - arc-style space
       only show the 1st time the extension is run.    
-
-- [ ] Add feature popup menu "Open as group" for bookmark folder to open the selected bookmark folder as a tab group:
-   - Create a tab group with the same name as the selected folder
-   - Open all the tabs (recursively) under that folder and place them in the group.
-   - Reverse action of "Save to Bookmarks"
 
 - [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
 
@@ -115,3 +114,4 @@ bugs:
 
 - [ ] Remove duplicated code. simplify code.
 
+- [ ] add right click action on tab "Add to Space". It's similar to add to group but it's for adding to space.

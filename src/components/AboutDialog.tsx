@@ -10,9 +10,10 @@ const ABOUT = {
 interface AboutDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onShowWelcome?: () => void;
 }
 
-export function AboutDialog({ isOpen, onClose }: AboutDialogProps)
+export function AboutDialog({ isOpen, onClose, onShowWelcome }: AboutDialogProps)
 {
   const [version, setVersion] = useState('');
 
@@ -70,6 +71,18 @@ export function AboutDialog({ isOpen, onClose }: AboutDialogProps)
           </div>
 
           <div className="border-t border-gray-200 dark:border-gray-700 pt-3 space-y-2">
+            {onShowWelcome && (
+              <button
+                onClick={() =>
+                {
+                  onClose();
+                  onShowWelcome();
+                }}
+                className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                Show Welcome
+              </button>
+            )}
             <a
               href={ABOUT.github}
               target="_blank"

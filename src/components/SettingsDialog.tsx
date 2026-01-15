@@ -204,6 +204,21 @@ export function SettingsDialog({
                   )}
                 </div>
               )}
+              <div className="flex items-center justify-between mt-3">
+                <label className="text-gray-700 dark:text-gray-300">
+                  Reset Welcome
+                </label>
+                <button
+                  onClick={() =>
+                  {
+                    localStorage.removeItem('sidebar-has-seen-welcome');
+                    alert('Welcome dialog reset. Reload extension to see it.');
+                  }}
+                  className="px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded hover:bg-purple-200 dark:hover:bg-purple-800"
+                >
+                  Reset
+                </button>
+              </div>
             </div>
           )}
 

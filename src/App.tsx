@@ -8,6 +8,7 @@ import { SettingsDialog, SettingsValues, BookmarkOpenMode } from './components/S
 import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
+import { WelcomeDialog } from './components/WelcomeDialog';
 import { Toast } from './components/Toast';
 import { usePinnedSites } from './hooks/usePinnedSites';
 import { useBookmarks } from './hooks/useBookmarks';
@@ -118,6 +119,12 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage(
+    'sidebar-has-seen-welcome',
+    false,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  );
+  const [showWelcome, setShowWelcome] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
   const [filterAudible, setFilterAudible] = useState(false);
@@ -314,6 +321,7 @@ function App() {
       <AboutDialog
         isOpen={showAbout}
         onClose={() => setShowAbout(false)}
+        onShowWelcome={() => setShowWelcome(true)}
       />
 
       <ExportDialog
@@ -328,6 +336,14 @@ function App() {
         onClose={() => setShowImport(false)}
         replacePinnedSites={replacePinnedSites}
         appendPinnedSites={appendPinnedSites}
+      />
+
+      <WelcomeDialog
+        isOpen={!hasSeenWelcome || showWelcome}
+        onClose={() => {
+          setHasSeenWelcome(true);
+          setShowWelcome(false);
+        }}
       />
 
       {/* Toolbar */}
