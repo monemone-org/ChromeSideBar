@@ -25,7 +25,7 @@ import { Dialog } from './Dialog';
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
 import { FolderPickerDialog } from './FolderPickerDialog';
-import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, Trash, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
@@ -2148,7 +2148,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       </ContextMenu.Item>
       <ContextMenu.Separator />
       <ContextMenu.Item onSelect={handleCloseAllTabs}>
-        <Trash size={14} className="mr-2" /> Close Tabs
+        <X size={14} className="mr-2" /> Close Tabs
       </ContextMenu.Item>
     </>
   );

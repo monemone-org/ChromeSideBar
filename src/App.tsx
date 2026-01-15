@@ -21,7 +21,7 @@ import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContex
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
-import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid } from 'lucide-react';
+import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Pencil, X, Trash2 } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
 import * as ContextMenu from './components/ContextMenu';
 
@@ -121,24 +121,24 @@ const SpaceTitle: React.FC<SpaceTitleProps> = ({ onEditSpace, onDeleteSpace, onC
   // Any changes here must also be updated there.
   const menuContent = isAllSpace ? (
     <ContextMenu.Item onSelect={() => onCloseAllTabs(activeSpace)}>
-      Close All Tabs
+      <X size={14} className="mr-2 flex-shrink-0" /> Close All Tabs
     </ContextMenu.Item>
   ) : (
     <>
       <ContextMenu.Item onSelect={() => onEditSpace(activeSpace)}>
-        Edit
+        <Pencil size={14} className="mr-2 flex-shrink-0" /> Edit
       </ContextMenu.Item>
 
       <ContextMenu.Separator />
 
       <ContextMenu.Item onSelect={() => onCloseAllTabs(activeSpace)}>
-        Close All Tabs In Space
+        <X size={14} className="mr-2 flex-shrink-0" /> Close All Tabs In Space
       </ContextMenu.Item>
 
       <ContextMenu.Separator />
 
       <ContextMenu.Item danger onSelect={() => onDeleteSpace(activeSpace)}>
-        Delete
+        <Trash2 size={14} className="mr-2 flex-shrink-0" /> Delete
       </ContextMenu.Item>
     </>
   );

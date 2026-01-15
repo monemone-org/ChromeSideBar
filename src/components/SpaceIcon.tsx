@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import * as ContextMenu from './ContextMenu';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, Pencil, X, Trash2 } from 'lucide-react';
 import { Space } from '../hooks/useSpaces';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getIconUrl } from '../utils/iconify';
@@ -123,7 +123,7 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         <ContextMenu.Portal>
           <ContextMenu.Content>
             <ContextMenu.Item onSelect={onCloseAllTabs}>
-              Close All Tabs
+              <X size={14} className="mr-2 flex-shrink-0" /> Close All Tabs
             </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Portal>
@@ -142,19 +142,19 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       <ContextMenu.Portal>
         <ContextMenu.Content>
           <ContextMenu.Item onSelect={onEdit}>
-            Edit
+            <Pencil size={14} className="mr-2 flex-shrink-0" /> Edit
           </ContextMenu.Item>
 
           <ContextMenu.Separator />
 
           <ContextMenu.Item onSelect={onCloseAllTabs}>
-            Close All Tabs In Space
+            <X size={14} className="mr-2 flex-shrink-0" /> Close All Tabs In Space
           </ContextMenu.Item>
 
           <ContextMenu.Separator />
 
           <ContextMenu.Item danger onSelect={onDelete}>
-            Delete
+            <Trash2 size={14} className="mr-2 flex-shrink-0" /> Delete
           </ContextMenu.Item>
         </ContextMenu.Content>
       </ContextMenu.Portal>

@@ -102,11 +102,17 @@ bugs:
    - Open all the tabs (recursively) under that folder and place them in the group.
    - This would be a reverse action of the existing feature: "Save to Bookmarks"
 
-- [-] new feature: A welcome dialog that explains the following features. Briefly explain what they are and their purposes
+- [x] new feature: A welcome dialog that explains the following features. Briefly explain what they are and their purposes
       - pinned sites
       - arc-style live bookmarks
       - arc-style space
       only show the 1st time the extension is run.    
+
+- [x] 2 finger swipe left/right on side panel to change space changes 2 spaces forward/backward each time            
+
+SpaceBar
+- [x] add button + at the end of the space bar , need to clean up its style
+- [x] remove the vertical seperator lines before and after the space for Space buttons.
 
 - [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
 
@@ -123,13 +129,9 @@ bugs:
 
 - [x] live bookmark tab and live pinned site tab, after moving to new window, it should be considered closed in this window. so no [x] button or speaker button should be presented
 
+- [x] Close icon on all popup menu should be consistent . use x , not trash can
+- [x] add icons to Space popup menus.
+
 - [ ] import tabs/groups with replace options - will create a blank page to prevent the windows from being closed.  that blank page needs to be closed after import completes if the import contains no tabs.
 
-- [ ] clean up icon on popup menu.  add icons to Space popup menus.
-close should all use [x] icon
 
-- [x] 2 finger swipe left/right on side panel to change space changes 2 spaces forward/backward each time            
-
-SpaceBar
-- [x] add button + at the end of the space bar , need to clean up its style
-- [x] remove the vertical seperator lines before and after the space for Space buttons.
