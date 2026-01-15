@@ -186,6 +186,45 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     }
   }, [currentWindowId, rebuildAssociations]);
 
+  // Helper to remove association for a tab
+  const removeTabAssociation = useCallback((tabId: number, storageKey: string) =>
+  {
+    setTabToItem((prev) =>
+    {
+      const itemKey = prev.get(tabId);
+      if (itemKey)
+      {
+        setItemToTab((prevIT) =>
+        {
+          const newMap = new Map(prevIT);
+          newMap.delete(itemKey);
+          return newMap;
+        });
+
+        // Clean up title
+        setTabTitles((prevTitles) =>
+        {
+          const newMap = new Map(prevTitles);
+          newMap.delete(tabId);
+          return newMap;
+        });
+
+        // Clean up from session storage
+        chrome.storage.session.get(storageKey, (result) =>
+        {
+          const associations: Record<number, string> = result[storageKey] || {};
+          delete associations[tabId];
+          chrome.storage.session.set({ [storageKey]: associations });
+        });
+
+        const newMap = new Map(prev);
+        newMap.delete(tabId);
+        return newMap;
+      }
+      return prev;
+    });
+  }, []);
+
   // Listen for tab removal
   useEffect(() =>
   {
@@ -195,40 +234,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
     const handleTabRemoved = (tabId: number) =>
     {
-      setTabToItem((prev) =>
-      {
-        const itemKey = prev.get(tabId);
-        if (itemKey)
-        {
-          setItemToTab((prevIT) =>
-          {
-            const newMap = new Map(prevIT);
-            newMap.delete(itemKey);
-            return newMap;
-          });
-
-          // Clean up title
-          setTabTitles((prevTitles) =>
-          {
-            const newMap = new Map(prevTitles);
-            newMap.delete(tabId);
-            return newMap;
-          });
-
-          // Clean up from session storage
-          chrome.storage.session.get(storageKey, (result) =>
-          {
-            const associations: Record<number, string> = result[storageKey] || {};
-            delete associations[tabId];
-            chrome.storage.session.set({ [storageKey]: associations });
-          });
-
-          const newMap = new Map(prev);
-          newMap.delete(tabId);
-          return newMap;
-        }
-        return prev;
-      });
+      removeTabAssociation(tabId, storageKey);
     };
 
     chrome.tabs?.onRemoved?.addListener(handleTabRemoved);
@@ -237,7 +243,32 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     {
       chrome.tabs?.onRemoved?.removeListener(handleTabRemoved);
     };
-  }, [currentWindowId]);
+  }, [currentWindowId, removeTabAssociation]);
+
+  // Listen for tab detached (moved to another window)
+  // When a tab is detached from this window, treat it as closed in this window
+  useEffect(() =>
+  {
+    if (currentWindowId === null) return;
+
+    const storageKey = getStorageKey(currentWindowId);
+
+    const handleTabDetached = (tabId: number, detachInfo: chrome.tabs.TabDetachInfo) =>
+    {
+      // Only remove if detached from our window
+      if (detachInfo.oldWindowId === currentWindowId)
+      {
+        removeTabAssociation(tabId, storageKey);
+      }
+    };
+
+    chrome.tabs?.onDetached?.addListener(handleTabDetached);
+
+    return () =>
+    {
+      chrome.tabs?.onDetached?.removeListener(handleTabDetached);
+    };
+  }, [currentWindowId, removeTabAssociation]);
 
   // Listen for tab audible and title changes
   useEffect(() =>

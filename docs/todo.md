@@ -114,12 +114,12 @@ bugs:
 
 - [ ] Remove duplicated code. simplify code.
 
-- [ ] add right click action on tab "Add to Space". It's similar to add to group but it's for adding to space.
+- [ ] add right click action on tab "Move to Space". It's similar to add to group but it's for moving a tab to space.
 
-- [ ] spaces:
+- [-] spaces:
       - popup menu action: Close all tabs in spaces
       - popup menu edit spaces: a new dialog that lists all the spacs with name and icon.  users can add, edit , delete and reorder spaces in the dialog
 
-- [ ] live bookmark tab and live pinned site tab, after moving to new window, it should be considered closed in this window.
+- [-] live bookmark tab and live pinned site tab, after moving to new window, it should be considered closed in this window. so no [x] button or speaker button should be presented
 
 
