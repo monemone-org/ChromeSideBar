@@ -138,9 +138,9 @@ SpaceBar
 
 - [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
 
-- [ ] tab popup menu "move to bookmark" , if in a space, use the space bookmark folder as the default selection in the select folder dialog.
+- [x] tab popup menu "move to bookmark" , if in a space, use the space bookmark folder as the default selection in the select folder dialog.
 
-- [-]  when switching to a new space A from space B, right now the extension will record the current
+- [x]  when switching to a new space A from space B, right now the extension will record the current
   active tab T1 (even though the tab is from antoher space B) as its active
   tab.  When switch away to antoher space C another tab T2, then switch back
   to that space A, it will bring up the active tab T1 again.  This is
@@ -148,6 +148,17 @@ SpaceBar
   tab opened.  I think we should only record active tab for space A if the
   tab doesn't belong to any group (i.e. live bookmark or live pinned site) or
   belong to group A.
+
+- [ ] add support to drop bookmark to tab list to create new tab with the bookmark :
+   - if bookmark has a live tab, move that tab to tab list i.e. un-associate the tab with the bookmark
+   - if bookmark is not live, open a new tab with the bookmarked URL (same behaviour as CMD+click on the bookmark)
+- [ ] bookmark popup menu: open in new tab (same behaviour as CMD+click on the bookmark)
+
+- [ ] during drag drop, when hover over a folder node, it can expand and collapse the node if the cursor hovers over the node for some period of time. change that behaviour to only expand but not collapse.
+
+- [ ] update live bookmark title - right now it shows the loaded tab's title if it has a live tab.  add the bookmark name as prefix to the title "{bookmark title} - {url title}"
+
+- [ ] "move to space" after moving tab to space, should active that space and bring that tab in that space visible in the side panel
 
 
 - Review Code:

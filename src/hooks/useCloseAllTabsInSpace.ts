@@ -61,11 +61,14 @@ export const useCloseAllTabsInSpace = () =>
     if (spaceFolder)
     {
       const bookmarksInFolder = await getAllBookmarksInFolder(spaceFolder.id);
+      // Use Set for O(1) lookup instead of Array.includes() which is O(n)
+      const tabIdsSet = new Set(tabIdsToClose);
       bookmarksInFolder.forEach(bookmark =>
       {
         const tabId = getTabIdForBookmark(bookmark.id);
-        if (tabId !== undefined && !tabIdsToClose.includes(tabId))
+        if (tabId !== undefined && !tabIdsSet.has(tabId))
         {
+          tabIdsSet.add(tabId);
           tabIdsToClose.push(tabId);
         }
       });

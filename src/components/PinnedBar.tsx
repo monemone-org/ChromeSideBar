@@ -62,22 +62,17 @@ export const PinnedBar = ({
     }
   };
 
-  // Filter pinned sites based on active filters
-  let visiblePinnedSites = pinnedSites;
-  if (filterLiveTabs)
-  {
-    visiblePinnedSites = visiblePinnedSites.filter(site => isPinnedLoaded(site.id));
-  }
-  if (filterAudible)
-  {
-    visiblePinnedSites = visiblePinnedSites.filter(site => isPinnedAudible(site.id));
-  }
-  if (filterText.trim())
-  {
-    visiblePinnedSites = visiblePinnedSites.filter(site =>
-      matchesFilter(site.title, site.url, filterText)
-    );
-  }
+  // Filter pinned sites based on active filters (single pass instead of O(3n))
+  const hasFilters = filterLiveTabs || filterAudible || filterText.trim();
+  const visiblePinnedSites = hasFilters
+    ? pinnedSites.filter(site =>
+      {
+        if (filterLiveTabs && !isPinnedLoaded(site.id)) return false;
+        if (filterAudible && !isPinnedAudible(site.id)) return false;
+        if (filterText.trim() && !matchesFilter(site.title, site.url, filterText)) return false;
+        return true;
+      })
+    : pinnedSites;
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, {

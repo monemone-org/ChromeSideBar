@@ -760,24 +760,17 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     visibleBookmarks = [spaceFolder];
   }
 
-  // Apply live tabs filter if enabled
-  if (filterLiveTabs)
-  {
-    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) => isBookmarkLoaded(node.id));
-  }
-
-  // Apply audible filter if enabled
-  if (filterAudible)
-  {
-    visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) => isBookmarkAudible(node.id));
-  }
-
-  // Apply text filter if provided
-  if (filterText.trim())
+  // Apply all filters in a single pass instead of O(3n)
+  const hasFilters = filterLiveTabs || filterAudible || filterText.trim();
+  if (hasFilters)
   {
     visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) =>
-      matchesFilter(node.title, node.url ?? '', filterText)
-    );
+    {
+      if (filterLiveTabs && !isBookmarkLoaded(node.id)) return false;
+      if (filterAudible && !isBookmarkAudible(node.id)) return false;
+      if (filterText.trim() && !matchesFilter(node.title, node.url ?? '', filterText)) return false;
+      return true;
+    });
   }
 
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
@@ -1010,8 +1003,8 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     }
 
     // Can't move special folders (Bookmarks Bar, Other Bookmarks)
-    const sourceNode = findNode(sourceId);
-    if (sourceNode && SPECIAL_FOLDER_IDS.includes(sourceNode.id))
+    // Note: sourceId is already the bookmark ID, no need to call findNode
+    if (SPECIAL_FOLDER_IDS.includes(sourceId))
     {
       setDropTargetId(null);
       setDropPosition(null);
@@ -1021,7 +1014,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
 
     setDropTargetId(target.bookmarkId);
     setDropPosition(target.position);
-  }, [bookmarks, findNode, resolveBookmarkDropTarget, clearAutoExpandTimer, setDropTargetId, setDropPosition]);
+  }, [bookmarks, resolveBookmarkDropTarget, clearAutoExpandTimer, setDropTargetId, setDropPosition]);
 
   // Drag end handler
   const handleDragEnd = useCallback((event: DragEndEvent) => {

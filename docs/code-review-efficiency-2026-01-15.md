@@ -1,81 +1,29 @@
 # Code Review: O(n²) and Inefficient Patterns
 
 **Date:** 2026-01-15
-**Updated:** 2026-01-15 (second review pass)
+**Updated:** 2026-01-15 (fixes applied)
 
-Found **15 issues** ranging from true O(n²) to O(2n) patterns.
+Found **15 issues** ranging from true O(n²) to O(2n) patterns. **4 fixed.**
 
 ---
 
 ## High Priority
 
-### 1. `useCloseAllTabsInSpace.ts:66-70` - True O(n²)
-
-```typescript
-bookmarksInFolder.forEach(bookmark =>
-{
-  const tabId = getTabIdForBookmark(bookmark.id);
-  if (tabId !== undefined && !tabIdsToClose.includes(tabId))
-  {
-    tabIdsToClose.push(tabId);
-  }
-});
-```
+### 1. ~~`useCloseAllTabsInSpace.ts:66-70` - True O(n²)~~ ✓ FIXED
 
 **Problem:** `Array.includes()` is O(n) for each iteration, making the loop O(n²).
 
-**Fix:** Use a Set for O(1) lookups:
-```typescript
-const tabIdsSet = new Set(tabIdsToClose);
-bookmarksInFolder.forEach(bookmark =>
-{
-  const tabId = getTabIdForBookmark(bookmark.id);
-  if (tabId !== undefined && !tabIdsSet.has(tabId))
-  {
-    tabIdsSet.add(tabId);
-    tabIdsToClose.push(tabId);
-  }
-});
-```
+**Fix:** Used a Set for O(1) lookups.
 
 ---
 
 ## Medium Priority
 
-### 2. `BookmarkTree.tsx:746-780` - O(3n) tree traversals
-
-```typescript
-if (filterLiveTabs)
-{
-  visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) => isBookmarkLoaded(node.id));
-}
-if (filterAudible)
-{
-  visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) => isBookmarkAudible(node.id));
-}
-if (filterText.trim())
-{
-  visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) =>
-    matchesFilter(node.title, node.url ?? '', filterText)
-  );
-}
-```
+### 2. ~~`BookmarkTree.tsx:746-780` - O(3n) tree traversals~~ ✓ FIXED
 
 **Problem:** Multiple sequential `filterBookmarksRecursive` calls, each traversing the entire tree.
 
-**Fix:** Combine all predicates into a single pass:
-```typescript
-const combinedPredicate = (node: chrome.bookmarks.BookmarkTreeNode): boolean => {
-  if (filterLiveTabs && !isBookmarkLoaded(node.id)) return false;
-  if (filterAudible && !isBookmarkAudible(node.id)) return false;
-  if (filterText.trim() && !matchesFilter(node.title, node.url ?? '', filterText)) return false;
-  return true;
-};
-
-if (filterLiveTabs || filterAudible || filterText.trim()) {
-  visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, combinedPredicate);
-}
-```
+**Fix:** Combined all predicates into a single `filterBookmarksRecursive` pass.
 
 ---
 
@@ -236,37 +184,11 @@ for (const [spaceId, groupId] of Object.entries(state.spaceTabGroupMap))
 
 ## Additional Findings (Second Review Pass)
 
-### 9. `PinnedBar.tsx:66-80` - Chained `.filter()` calls
+### 9. ~~`PinnedBar.tsx:66-80` - Chained `.filter()` calls~~ ✓ FIXED
 
-```typescript
-let visiblePinnedSites = pinnedSites;
-if (filterLiveTabs)
-{
-  visiblePinnedSites = visiblePinnedSites.filter(site => isPinnedLoaded(site.id));
-}
-if (filterAudible)
-{
-  visiblePinnedSites = visiblePinnedSites.filter(site => isPinnedAudible(site.id));
-}
-if (filterText.trim())
-{
-  visiblePinnedSites = visiblePinnedSites.filter(site =>
-    matchesFilter(site.title, site.url, filterText)
-  );
-}
-```
+**Problem:** Three separate `.filter()` iterations when all filters are active.
 
-**Problem:** Same pattern as BookmarkTree - three separate iterations when all filters are active.
-
-**Fix:** Combine into a single `.filter()`:
-```typescript
-const visiblePinnedSites = pinnedSites.filter(site => {
-  if (filterLiveTabs && !isPinnedLoaded(site.id)) return false;
-  if (filterAudible && !isPinnedAudible(site.id)) return false;
-  if (filterText.trim() && !matchesFilter(site.title, site.url, filterText)) return false;
-  return true;
-});
-```
+**Fix:** Combined into a single `.filter()` with all predicates.
 
 ---
 
@@ -327,34 +249,11 @@ const nodeMap = useMemo(() => {
 
 ---
 
-### 11. `BookmarkTree.tsx:1000-1001` - Unnecessary `findNode` call during drag
+### 11. ~~`BookmarkTree.tsx:1000-1001` - Unnecessary `findNode` call during drag~~ ✓ FIXED
 
-```typescript
-// Line 1000-1001
-const sourceNode = findNode(sourceId);
-if (sourceNode && SPECIAL_FOLDER_IDS.includes(sourceNode.id))
-{
-  setDropTargetId(null);
-  setDropPosition(null);
-  clearAutoExpandTimer();
-  return;
-}
-```
+**Problem:** Code traversed the entire bookmark tree O(n) just to check if the dragged item is a special folder, but `sourceId` already IS the bookmark ID.
 
-**Problem:** This code traverses the entire bookmark tree O(n) just to check if the dragged item is a special folder. But `sourceId` already IS the bookmark ID, so `sourceNode.id === sourceId`. The `findNode` call is completely unnecessary.
-
-**Fix:** Remove the `findNode` call entirely:
-```typescript
-if (SPECIAL_FOLDER_IDS.includes(sourceId))
-{
-  setDropTargetId(null);
-  setDropPosition(null);
-  clearAutoExpandTimer();
-  return;
-}
-```
-
-This changes O(n) per drag move to O(1).
+**Fix:** Removed the `findNode` call, now checks `SPECIAL_FOLDER_IDS.includes(sourceId)` directly. O(n) → O(1).
 
 ---
 
@@ -479,28 +378,28 @@ async function importBookmarkNode(
 
 ## Summary
 
-| Priority | Location | Issue | Complexity |
-|----------|----------|-------|------------|
-| **High** | `useCloseAllTabsInSpace.ts:66-70` | Array.includes() in loop | O(n²) |
-| **High** | `BookmarkTree.tsx:991` | isDescendant called per drag move | O(n+m) per event |
-| **High** | `BookmarkTree.tsx:1000-1001` | Unnecessary findNode (just remove it) | O(n) per event |
-| Medium | `BookmarkTree.tsx:746-780` | Multiple filter passes | O(3n) |
-| Medium | `PinnedBar.tsx:66-80` | Chained .filter() calls | O(3n) |
-| Medium | `TabList.tsx:1692-2030` | Multiple .find()/.filter() in handleDragEnd | O(kn) |
-| Medium | `TabList.tsx:1611-1617` | DOM queries + reflow per drag move | DOM thrash |
-| Low | `useTabs.ts:180-190` | Sequential await in loop | O(n) serial |
-| Low | `useBookmarks.ts:130-145` | Sequential await in loop | O(n) serial |
-| Low | `TabList.tsx:1433-1477` | Two iterations over tabs | O(2n) |
-| Low | `useSpaces.ts` / `usePinnedSites.ts` | Two findIndex calls | O(2n) |
-| Low | `useSpaceWindowState.ts:146-156` | Object.entries + find | O(n) |
-| Low | `useBookmarks.ts:330-350` | getBookmarkPath sequential API | O(depth) |
-| Low | `backupRestore.ts:78-103` | Sequential bookmark creation | Sequential |
+| Priority | Location | Issue | Complexity | Status |
+|----------|----------|-------|------------|--------|
+| **High** | `useCloseAllTabsInSpace.ts:66-70` | Array.includes() in loop | O(n²) | ✓ Fixed |
+| **High** | `BookmarkTree.tsx:991` | isDescendant called per drag move | O(n+m) per event | |
+| **High** | `BookmarkTree.tsx:1000-1001` | Unnecessary findNode (just remove it) | O(n) per event | ✓ Fixed |
+| Medium | `BookmarkTree.tsx:746-780` | Multiple filter passes | O(3n) | ✓ Fixed |
+| Medium | `PinnedBar.tsx:66-80` | Chained .filter() calls | O(3n) | ✓ Fixed |
+| Medium | `TabList.tsx:1692-2030` | Multiple .find()/.filter() in handleDragEnd | O(kn) | |
+| Medium | `TabList.tsx:1611-1617` | DOM queries + reflow per drag move | DOM thrash | |
+| Low | `useTabs.ts:180-190` | Sequential await in loop | O(n) serial | |
+| Low | `useBookmarks.ts:130-145` | Sequential await in loop | O(n) serial | |
+| Low | `TabList.tsx:1433-1477` | Two iterations over tabs | O(2n) | |
+| Low | `useSpaces.ts` / `usePinnedSites.ts` | Two findIndex calls | O(2n) | |
+| Low | `useSpaceWindowState.ts:146-156` | Object.entries + find | O(n) | |
+| Low | `useBookmarks.ts:330-350` | getBookmarkPath sequential API | O(depth) | |
+| Low | `backupRestore.ts:78-103` | Sequential bookmark creation | Sequential | |
 
 ## Recommendations
 
-1. **Fix immediately:**
-   - `useCloseAllTabsInSpace.ts` - true O(n²), easy fix with Set
-   - `BookmarkTree.tsx:1000-1001` - just remove the unnecessary `findNode` call
+1. ~~**Fix immediately:**~~ ✓ Done
+   - ~~`useCloseAllTabsInSpace.ts` - true O(n²), easy fix with Set~~ ✓
+   - ~~`BookmarkTree.tsx:1000-1001` - just remove the unnecessary `findNode` call~~ ✓
 
 2. **Fix soon (drag performance):**
    - `BookmarkTree.tsx:991` - change `isDescendant` to walk up via parentId
@@ -509,6 +408,6 @@ async function importBookmarkNode(
 3. **Nice to have:**
    - Build `nodeMap` in BookmarkTree for O(1) lookups
    - Build `tabsById` / `tabsByGroupId` Maps in TabList
-   - Combine filter passes in `BookmarkTree.tsx` and `PinnedBar.tsx`
+   - ~~Combine filter passes in `BookmarkTree.tsx` and `PinnedBar.tsx`~~ ✓
 
 4. **Acceptable:** The rest are minor or run infrequently
