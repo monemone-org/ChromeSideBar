@@ -23,9 +23,9 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
   onCloseDeleteDialog,
 }) =>
 {
-  const { createSpace, updateSpace, deleteSpace, setActiveSpaceId } = useSpacesContext();
+  const { createSpace, updateSpace, deleteSpace, setActiveSpaceId, getTabGroupForSpace } = useSpacesContext();
 
-  const handleSaveSpace = (spaceData: {
+  const handleSaveSpace = async (spaceData: {
     name: string;
     icon: string;
     color: chrome.tabGroups.ColorEnum;
@@ -36,6 +36,24 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
     {
       // Edit mode
       updateSpace(spaceToEdit.id, spaceData);
+
+      // Also update the corresponding tab group if it exists
+      const groupId = getTabGroupForSpace(spaceToEdit.id);
+      if (groupId !== undefined)
+      {
+        try
+        {
+          await chrome.tabGroups.update(groupId, {
+            title: spaceData.name,
+            color: spaceData.color,
+          });
+        }
+        catch (error)
+        {
+          // Tab group might no longer exist, ignore the error
+          console.warn('Failed to update tab group:', error);
+        }
+      }
     }
     else
     {
