@@ -130,3 +130,6 @@ close should all use [x] icon
 
 - [x] 2 finger swipe left/right on side panel to change space changes 2 spaces forward/backward each time            
 
+SpaceBar
+- [x] add button + at the end of the space bar , need to clean up its style
+- [x] remove the vertical seperator lines before and after the space for Space buttons.

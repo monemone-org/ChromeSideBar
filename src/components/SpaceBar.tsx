@@ -92,7 +92,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   return (
     <div className="flex items-stretch border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
       {/* Vertical "SPACE" label */}
-      <div className="flex items-center justify-center px-0.5 border-r border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-center px-0.5">
         <span
           className="text-[8px] font-medium text-gray-400 dark:text-gray-500 tracking-wide"
           style={{
@@ -147,16 +147,17 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
       </div>
 
       {/* Fixed "+" button */}
-      <div className="flex items-center px-1 border-l border-gray-200 dark:border-gray-700">
+      <div className="flex items-center px-1">
         <button
           onClick={onCreateSpace}
           title="Create new space"
           className={clsx(
-            "w-7 h-7 rounded flex items-center justify-center",
-            "bg-gray-100 dark:bg-gray-700",
-            "hover:bg-gray-200 dark:hover:bg-gray-600",
-            "text-gray-600 dark:text-gray-300",
-            "transition-colors"
+            "p-1.5 rounded",
+            "text-gray-500 dark:text-gray-400",
+            "hover:text-gray-900 dark:hover:text-gray-100",
+            "hover:bg-gray-200 dark:hover:bg-gray-700",
+            "transition-all duration-150",
+            "focus:outline-none"
           )}
         >
           <Plus size={16} />
