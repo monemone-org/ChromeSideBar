@@ -133,7 +133,7 @@ function removeFromHistory(windowId, tabId)
 }
 
 // Update last active tab for a space in session storage
-async function updateSpaceLastActiveTab(windowId, spaceId, tabId)
+async function updateSpaceLastActiveTab(windowId, spaceId, tabId, tabGroupId)
 {
   if (!spaceId || spaceId === 'all') return;
 
@@ -144,6 +144,13 @@ async function updateSpaceLastActiveTab(windowId, spaceId, tabId)
     spaceTabGroupMap: {},
     spaceLastActiveTabMap: {}
   };
+
+  // Only record if tab belongs to this space or is ungrouped (pinned/live bookmark)
+  const spaceGroupId = state.spaceTabGroupMap[spaceId];
+  if (tabGroupId !== -1 && tabGroupId !== spaceGroupId)
+  {
+    return;  // Tab belongs to a different space, skip
+  }
 
   state.spaceLastActiveTabMap = state.spaceLastActiveTabMap || {};
   state.spaceLastActiveTabMap[spaceId] = tabId;
@@ -261,18 +268,21 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
     pushToHistory(activeInfo.windowId, activeInfo.tabId);
   }
 
-  // Track last active tab for current space
-  const spaceId = windowActiveSpaces.get(activeInfo.windowId);
-  if (spaceId && spaceId !== 'all')
-  {
-    updateSpaceLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId);
-  }
-
   chrome.tabs.get(activeInfo.tabId, (tab) =>
   {
-    if (tab && tab.groupId !== undefined)
+    if (tab)
     {
-      windowActiveGroups.set(activeInfo.windowId, tab.groupId);
+      if (tab.groupId !== undefined)
+      {
+        windowActiveGroups.set(activeInfo.windowId, tab.groupId);
+      }
+
+      // Track last active tab for current space
+      const spaceId = windowActiveSpaces.get(activeInfo.windowId);
+      if (spaceId && spaceId !== 'all')
+      {
+        updateSpaceLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId, tab.groupId);
+      }
     }
   });
 });

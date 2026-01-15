@@ -114,8 +114,6 @@ SpaceBar
 - [x] add button + at the end of the space bar , need to clean up its style
 - [x] remove the vertical seperator lines before and after the space for Space buttons.
 
-- [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
-
 - [x] add right click action on tab "Move to Space". It's similar to add to group but it's for moving a tab to space.
 
 - Spaces:
@@ -138,13 +136,25 @@ SpaceBar
 
 - [x] when space has no bookmark (i.e. the bookmark folder has no bookmarks), i can't drop tab to bookmark section to create bookmarks.
 
+- [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
+
 - [ ] tab popup menu "move to bookmark" , if in a space, use the space bookmark folder as the default selection in the select folder dialog.
+
+- [-]  when switching to a new space A from space B, right now the extension will record the current
+  active tab T1 (even though the tab is from antoher space B) as its active
+  tab.  When switch away to antoher space C another tab T2, then switch back
+  to that space A, it will bring up the active tab T1 again.  This is
+  confusing. T1 belongs to space B. Technically space A still doesn't have any
+  tab opened.  I think we should only record active tab for space A if the
+  tab doesn't belong to any group (i.e. live bookmark or live pinned site) or
+  belong to group A.
+
 
 - Review Code:
       - [ ] Review code for O(n²) or less efficient logic.
-      - [ ] Remove duplicated code. simplify code.
-      - [ ] Refactor reusable or  self-contained code into separate components
+      - [ ] Refactor reusable or self-contained code into separate components. Remove duplicated code. 
       - [ ] Security review
       - [ ] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
+      - [ ] Simplify code.
 
 
