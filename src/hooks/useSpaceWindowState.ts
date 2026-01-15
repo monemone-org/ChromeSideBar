@@ -173,6 +173,37 @@ export const useSpaceWindowState = () =>
     };
   }, [isInitialized, handleTabGroupRemoved]);
 
+  // Send active space to background whenever it changes
+  useEffect(() =>
+  {
+    if (!windowId || !isInitialized) return;
+
+    chrome.runtime.sendMessage({
+      action: 'set-active-space',
+      windowId,
+      spaceId: state.activeSpaceId
+    });
+  }, [windowId, isInitialized, state.activeSpaceId]);
+
+  // Listen for history tab activation to switch spaces
+  useEffect(() =>
+  {
+    const handleMessage = (
+      message: { action: string; spaceId?: string },
+      _sender: chrome.runtime.MessageSender,
+      _sendResponse: (response?: unknown) => void
+    ) =>
+    {
+      if (message.action === 'history-tab-activated' && message.spaceId)
+      {
+        setActiveSpaceId(message.spaceId);
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+    return () => chrome.runtime.onMessage.removeListener(handleMessage);
+  }, [setActiveSpaceId]);
+
   return {
     windowId,
     activeSpaceId: state.activeSpaceId,

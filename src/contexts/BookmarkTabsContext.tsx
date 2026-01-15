@@ -576,6 +576,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return new Set(tabToItem.keys());
   }, [tabToItem]);
 
+
   const value: BookmarkTabsContextValue = {
     openBookmarkTab,
     closeBookmarkTab,

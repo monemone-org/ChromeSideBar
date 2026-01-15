@@ -4,9 +4,13 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 // Track last active tab's groupId per window
 const windowActiveGroups = new Map();
 
+// Track active space per window (sent from sidebar)
+const windowActiveSpaces = new Map(); // Map<windowId, spaceId>
+
 // Tab history navigation (undo/redo style)
+// Each entry is { tabId, spaceId } to restore both tab and space
 const MAX_HISTORY_SIZE = 25;
-const windowTabHistory = new Map(); // Map<windowId, { stack: tabId[], index: number }>
+const windowTabHistory = new Map(); // Map<windowId, { stack: {tabId, spaceId}[], index: number }>
 let isNavigating = false; // flag to skip history tracking during navigation
 let debugTabHistory = false; // enable via 'set-debug-tab-history' message from sidebar
 
@@ -34,18 +38,18 @@ async function dumpHistory(windowId, action)
 
   for (let i = 0; i < history.stack.length; i++)
   {
-    const tabId = history.stack[i];
+    const entry = history.stack[i];
     const marker = i === history.index ? ">>>" : "   ";
     try
     {
-      const tab = await chrome.tabs.get(tabId);
+      const tab = await chrome.tabs.get(entry.tabId);
       const title = tab.title || "(no title)";
       const url = tab.url || tab.pendingUrl || "(no url)";
-      console.log(`${marker} [${i}] tabId=${tabId}, title="${title}", url="${url}"`);
+      console.log(`${marker} [${i}] tabId=${entry.tabId}, spaceId="${entry.spaceId}", title="${title}", url="${url}"`);
     }
     catch (e)
     {
-      console.log(`${marker} [${i}] tabId=${tabId}, (tab not found - closed?)`);
+      console.log(`${marker} [${i}] tabId=${entry.tabId}, spaceId="${entry.spaceId}", (tab not found - closed?)`);
     }
   }
   console.log(`[TabHistory] --- end ---`);
@@ -54,15 +58,20 @@ async function dumpHistory(windowId, action)
 function pushToHistory(windowId, tabId)
 {
   const history = getOrCreateHistory(windowId);
+  const spaceId = windowActiveSpaces.get(windowId) || 'all';
 
-  // skip if same as current entry
-  if (history.index >= 0 && history.stack[history.index] === tabId)
+  // skip if same as current entry (same tab AND same space)
+  if (history.index >= 0)
   {
-    return;
+    const current = history.stack[history.index];
+    if (current.tabId === tabId && current.spaceId === spaceId)
+    {
+      return;
+    }
   }
 
   // remove any existing occurrence of this tabId to prevent duplicates
-  const existingIdx = history.stack.indexOf(tabId);
+  const existingIdx = history.stack.findIndex(e => e.tabId === tabId);
   if (existingIdx !== -1)
   {
     history.stack.splice(existingIdx, 1);
@@ -74,7 +83,7 @@ function pushToHistory(windowId, tabId)
   }
 
   // insert new entry after current position (preserve forward history)
-  history.stack.splice(history.index + 1, 0, tabId);
+  history.stack.splice(history.index + 1, 0, { tabId, spaceId });
   history.index++;
 
   // trim to keep ±MAX_HISTORY_SIZE around current index
@@ -95,7 +104,7 @@ function pushToHistory(windowId, tabId)
     history.stack.splice(history.stack.length - trimCount, trimCount);
   }
 
-  if (debugTabHistory) dumpHistory(windowId, `PUSH tabId=${tabId}`);
+  if (debugTabHistory) dumpHistory(windowId, `PUSH tabId=${tabId}, spaceId=${spaceId}`);
 }
 
 function removeFromHistory(windowId, tabId)
@@ -103,7 +112,7 @@ function removeFromHistory(windowId, tabId)
   const history = windowTabHistory.get(windowId);
   if (!history) return;
 
-  const idx = history.stack.indexOf(tabId);
+  const idx = history.stack.findIndex(e => e.tabId === tabId);
   if (idx === -1) return;
 
   history.stack.splice(idx, 1);
@@ -134,18 +143,29 @@ function navigateHistory(windowId, direction)
   if (newIndex < 0 || newIndex >= history.stack.length) return;
 
   history.index = newIndex;
-  const tabId = history.stack[newIndex];
+  const entry = history.stack[newIndex];
 
   if (debugTabHistory)
   {
     const dirLabel = direction === -1 ? "BACK" : "FORWARD";
-    dumpHistory(windowId, `NAVIGATE ${dirLabel} to tabId=${tabId}`);
+    dumpHistory(windowId, `NAVIGATE ${dirLabel} to tabId=${entry.tabId}, spaceId=${entry.spaceId}`);
   }
 
   isNavigating = true;
-  chrome.tabs.update(tabId, { active: true }, () =>
+  chrome.tabs.update(entry.tabId, { active: true }, () =>
   {
     isNavigating = false;
+
+    // Notify sidebar of the stored spaceId for space switching
+    // Skip if spaceId is empty (pinned sites)
+    if (entry.spaceId)
+    {
+      chrome.runtime.sendMessage({
+        action: 'history-tab-activated',
+        tabId: entry.tabId,
+        spaceId: entry.spaceId
+      });
+    }
   });
 }
 
@@ -194,6 +214,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
     return;
   }
 
+  // Track active space from sidebar
+  if (message.action === 'set-active-space')
+  {
+    if (message.windowId && message.spaceId)
+    {
+      windowActiveSpaces.set(message.windowId, message.spaceId);
+      if (debugTabHistory)
+      {
+        console.log(`[TabHistory] Active space set: windowId=${message.windowId}, spaceId=${message.spaceId}`);
+      }
+    }
+    return;
+  }
+
   if (message.action === 'prev-used-tab' || message.action === 'next-used-tab')
   {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
@@ -228,12 +262,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
 
       for (let i = 0; i < history.stack.length; i++)
       {
-        const tabId = history.stack[i];
+        const entry = history.stack[i];
         try
         {
-          const tab = await chrome.tabs.get(tabId);
+          const tab = await chrome.tabs.get(entry.tabId);
           const item = {
-            tabId,
+            tabId: entry.tabId,
+            spaceId: entry.spaceId,
             index: i,
             title: tab.title || '(no title)',
             url: tab.url || tab.pendingUrl || '',
@@ -276,14 +311,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
       if (!history || message.index < 0 || message.index >= history.stack.length) return;
 
       history.index = message.index;
-      const tabId = history.stack[message.index];
+      const entry = history.stack[message.index];
 
-      if (debugTabHistory) dumpHistory(windowId, `NAVIGATE to index=${message.index}, tabId=${tabId}`);
+      if (debugTabHistory) dumpHistory(windowId, `NAVIGATE to index=${message.index}, tabId=${entry.tabId}, spaceId=${entry.spaceId}`);
 
       isNavigating = true;
-      chrome.tabs.update(tabId, { active: true }, () =>
+      chrome.tabs.update(entry.tabId, { active: true }, () =>
       {
         isNavigating = false;
+
+        // Notify sidebar of the stored spaceId for space switching
+        // Skip if spaceId is empty (pinned sites)
+        if (entry.spaceId)
+        {
+          chrome.runtime.sendMessage({
+            action: 'history-tab-activated',
+            tabId: entry.tabId,
+            spaceId: entry.spaceId
+          });
+        }
       });
     });
   }
