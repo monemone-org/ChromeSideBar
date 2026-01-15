@@ -525,9 +525,19 @@ function App() {
       <div ref={toolbarRef} className="relative">
         <Toolbar
           filterLiveTabsActive={filterLiveTabs}
-          onFilterLiveTabsToggle={() => setFilterLiveTabs(!filterLiveTabs)}
+          onFilterLiveTabsToggle={() =>
+          {
+            const newValue = !filterLiveTabs;
+            setFilterLiveTabs(newValue);
+            if (newValue) setFilterAudible(false);
+          }}
           filterAudibleActive={filterAudible}
-          onFilterAudibleToggle={() => setFilterAudible(!filterAudible)}
+          onFilterAudibleToggle={() =>
+          {
+            const newValue = !filterAudible;
+            setFilterAudible(newValue);
+            if (newValue) setFilterLiveTabs(false);
+          }}
           onMenuToggle={() => setShowMenu(!showMenu)}
           menuButtonRef={buttonRef}
           filterText={filterText}
