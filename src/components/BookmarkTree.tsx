@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect, forwardRef } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
-import { Space } from '../contexts/SpacesContext';
+import { Space, useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
+import { FolderPickerDialog } from './FolderPickerDialog';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
@@ -660,8 +661,9 @@ interface BookmarkTreeProps {
 }
 
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace, onShowToast }: BookmarkTreeProps) => {
-  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder } = useBookmarks();
+  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark, getBookmarkLiveTitle } = useBookmarkTabsContext();
+  const { updateSpace } = useSpacesContext();
 
   // Move bookmark's tab to a new window
   const moveBookmarkToNewWindow = useCallback((bookmarkId: string) =>
@@ -781,6 +783,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
+  const [showSpaceFolderPicker, setShowSpaceFolderPicker] = useState(false);
 
   // Auto-scroll to active bookmark when it changes
   const prevActiveItemKeyRef = useRef<string | null>(null);
@@ -942,6 +945,16 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setCreatingFolderParentId(parentId);
   };
 
+  // Handle folder selection for updating space's bookmark folder
+  const handleSpaceFolderSelected = useCallback(async (folderId: string) =>
+  {
+    setShowSpaceFolderPicker(false);
+    if (!activeSpace || activeSpace.id === 'all') return;
+
+    const path = await getBookmarkPath(folderId);
+    updateSpace(activeSpace.id, { bookmarkFolderPath: path });
+  }, [activeSpace, getBookmarkPath, updateSpace]);
+
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
@@ -1045,18 +1058,23 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   if (isSpaceFolderMissing)
   {
     return (
-      <div className="p-4 text-gray-500 dark:text-gray-400">
-        <span>Folder "{spaceFolderPath}" not found. </span>
-        <button
-          className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline"
-          onClick={() => {
-            // TODO: Open folder picker dialog to select new folder
-            console.log('Pick new folder for space');
-          }}
-        >
-          Pick new folder
-        </button>
-      </div>
+      <>
+        <div className="p-4 text-gray-500 dark:text-gray-400">
+          <span>Folder "{spaceFolderPath}" not found. </span>
+          <button
+            className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline"
+            onClick={() => setShowSpaceFolderPicker(true)}
+          >
+            Pick new folder
+          </button>
+        </div>
+        <FolderPickerDialog
+          isOpen={showSpaceFolderPicker}
+          title="Select Bookmark Folder"
+          onSelect={handleSpaceFolderSelected}
+          onClose={() => setShowSpaceFolderPicker(false)}
+        />
+      </>
     );
   }
 
