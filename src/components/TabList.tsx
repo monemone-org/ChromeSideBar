@@ -1183,7 +1183,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   }, []);
 
   // Bookmarks functions for export and tab-to-bookmark drops
-  const { findFolderInParent, createFolder, createBookmark, createBookmarksBatch, getBookmark, getChildren, clearFolder, getBookmarkPath } = useBookmarks();
+  const { findFolderInParent, findFolderByPath, createFolder, createBookmark, createBookmarksBatch, getBookmark, getChildren, clearFolder, getBookmarkPath } = useBookmarks();
 
   const handleAddToBookmarkFolderSelect = useCallback(async (folderId: string) =>
   {
@@ -2427,6 +2427,11 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         title={arcStyleEnabled ? "Move Tab to Bookmark Folder" : "Add Tab to Bookmark Folder"}
         onSelect={handleAddToBookmarkFolderSelect}
         onClose={closeAddToBookmarkDialog}
+        defaultFolderId={
+          activeSpace?.bookmarkFolderPath
+            ? findFolderByPath(activeSpace.bookmarkFolderPath)?.id
+            : undefined
+        }
       />
 
       <ExportConflictDialog

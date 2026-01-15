@@ -15,6 +15,7 @@ interface FolderPickerDialogProps
   title: string;
   onSelect: (folderId: string) => void;
   onClose: () => void;
+  defaultFolderId?: string;  // If provided, pre-select this folder when dialog opens
 }
 
 interface FolderItemProps
@@ -68,16 +69,18 @@ const FolderItem = ({
 
   return (
     <>
-      <TreeRow
-        depth={depth}
-        title={node.title || 'Untitled'}
-        icon={<Folder size={16} className="text-yellow-500" />}
-        hasChildren={hasChildren || isCreatingHere}
-        isExpanded={isExpanded || isCreatingHere}
-        isActive={isSelected}
-        onClick={() => onSelect(node.id)}
-        onToggle={() => onToggle(node.id)}
-      />
+      <div data-folder-id={node.id}>
+        <TreeRow
+          depth={depth}
+          title={node.title || 'Untitled'}
+          icon={<Folder size={16} className="text-yellow-500" />}
+          hasChildren={hasChildren || isCreatingHere}
+          isExpanded={isExpanded || isCreatingHere}
+          isActive={isSelected}
+          onClick={() => onSelect(node.id)}
+          onToggle={() => onToggle(node.id)}
+        />
+      </div>
       {(isExpanded || isCreatingHere) && (
         <>
           {folderChildren.map(child => (
@@ -145,10 +148,12 @@ export const FolderPickerDialog = ({
   isOpen,
   title,
   onSelect,
-  onClose
+  onClose,
+  defaultFolderId
 }: FolderPickerDialogProps) =>
 {
-  const { bookmarks, createFolder } = useBookmarks();
+  const { bookmarks, createFolder, getBookmark } = useBookmarks();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Default expand Bookmarks Bar and Other Bookmarks, select Other Bookmarks by default
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({
@@ -157,6 +162,9 @@ export const FolderPickerDialog = ({
     [MOBILE_BOOKMARKS_ID]: false
   });
   const [selectedFolderId, setSelectedFolderId] = useState<string>(OTHER_BOOKMARKS_ID);
+
+  // Track folder to scroll to after tree expands
+  const [pendingScrollFolderId, setPendingScrollFolderId] = useState<string | null>(null);
 
   // New folder creation state
   const [creatingInFolderId, setCreatingInFolderId] = useState<string | null>(null);
@@ -167,16 +175,72 @@ export const FolderPickerDialog = ({
   {
     if (isOpen)
     {
-      setExpandedState({
-        [BOOKMARKS_BAR_ID]: true,
-        [OTHER_BOOKMARKS_ID]: true,
-        [MOBILE_BOOKMARKS_ID]: false
-      });
-      setSelectedFolderId(OTHER_BOOKMARKS_ID);
       setCreatingInFolderId(null);
       setNewFolderName('');
+
+      // If defaultFolderId is provided, use it and expand parent folders
+      if (defaultFolderId)
+      {
+        setSelectedFolderId(defaultFolderId);
+
+        // Expand parent folders so the default folder is visible
+        const expandParents = async () =>
+        {
+          const newExpanded: Record<string, boolean> = {
+            [BOOKMARKS_BAR_ID]: true,
+            [OTHER_BOOKMARKS_ID]: true,
+            [MOBILE_BOOKMARKS_ID]: false
+          };
+
+          // Walk up the tree to find all parent folders
+          let currentId: string | undefined = defaultFolderId;
+          while (currentId)
+          {
+            const node = await getBookmark(currentId);
+            if (!node || !node.parentId || node.parentId === '0') break;
+            newExpanded[node.parentId] = true;
+            currentId = node.parentId;
+          }
+
+          setExpandedState(newExpanded);
+          // Schedule scroll after tree re-renders with expanded parents
+          setPendingScrollFolderId(defaultFolderId);
+        };
+
+        expandParents();
+      }
+      else
+      {
+        // Default behavior: expand standard folders, select Other Bookmarks
+        setExpandedState({
+          [BOOKMARKS_BAR_ID]: true,
+          [OTHER_BOOKMARKS_ID]: true,
+          [MOBILE_BOOKMARKS_ID]: false
+        });
+        setSelectedFolderId(OTHER_BOOKMARKS_ID);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, defaultFolderId, getBookmark]);
+
+  // Scroll to the pending folder after tree has re-rendered
+  useEffect(() =>
+  {
+    if (pendingScrollFolderId && scrollContainerRef.current)
+    {
+      // Use requestAnimationFrame to ensure DOM has updated
+      requestAnimationFrame(() =>
+      {
+        const element = scrollContainerRef.current?.querySelector(
+          `[data-folder-id="${pendingScrollFolderId}"]`
+        );
+        if (element)
+        {
+          element.scrollIntoView({ block: 'center', behavior: 'instant' });
+        }
+        setPendingScrollFolderId(null);
+      });
+    }
+  }, [pendingScrollFolderId, expandedState]);
 
   const handleToggle = useCallback((id: string) =>
   {
@@ -234,7 +298,7 @@ export const FolderPickerDialog = ({
     <Dialog isOpen={isOpen} onClose={onClose} title={title} maxWidth="max-w-sm">
       <div className="flex flex-col">
         {/* Folder tree */}
-        <div className="p-2 max-h-64 overflow-y-auto">
+        <div ref={scrollContainerRef} className="p-2 max-h-64 overflow-y-auto">
           {rootFolders.map(folder => (
             <FolderItem
               key={folder.id}
