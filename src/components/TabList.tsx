@@ -560,44 +560,44 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
         : "hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200"
   );
 
-  // Border overlay for grouped tabs (rounded corners independent of background)
-  // Shows on hover for both active and inactive tabs, using the group color
-  const borderOverlay = groupColor ? (
-    <div className={clsx(
-      "absolute inset-0 rounded-md border-2 pointer-events-none",
-      GROUP_COLORS[groupColor]?.border,
-      "opacity-0 group-hover:opacity-100"
-    )} />
-  ) : null;
-
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>
-        <TreeRow
-          ref={ref}
-          depth={indentLevel}
-          title={tab.title}
-          tooltip={tab.url ? `${tab.title}\n${tab.url}` : undefined}
-          icon={icon}
-          hasChildren={false}
-          isActive={false} // Disable default active style, we handle it via className
-          isDragging={isBeingDragged}
-          dndAttributes={attributes}
-          dndListeners={listeners}
-          className={rowClassName}
-          onClick={() => onActivate(tab.id!)}
-          leadingIndicator={leadingIndicator}
-          actions={actions}
-          badges={badges}
-          data-tab-id={tab.id}
-          data-group-id={tab.groupId ?? -1}
-        >
-          {borderOverlay}
-          <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
-        </TreeRow>
-      </ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content>
+      {({ isOpen }) => (
+        <>
+          <ContextMenu.Trigger asChild>
+            <TreeRow
+              ref={ref}
+              depth={indentLevel}
+              title={tab.title}
+              tooltip={tab.url ? `${tab.title}\n${tab.url}` : undefined}
+              icon={icon}
+              hasChildren={false}
+              isActive={false} // Disable default active style, we handle it via className
+              isHighlighted={!groupColor && isOpen}
+              isDragging={isBeingDragged}
+              dndAttributes={attributes}
+              dndListeners={listeners}
+              className={rowClassName}
+              onClick={() => onActivate(tab.id!)}
+              leadingIndicator={leadingIndicator}
+              actions={actions}
+              badges={badges}
+              data-tab-id={tab.id}
+              data-group-id={tab.groupId ?? -1}
+            >
+              {/* Border overlay for grouped tabs - shows on hover or context menu */}
+              {groupColor && (
+                <div className={clsx(
+                  "absolute inset-0 rounded-md border-2 pointer-events-none",
+                  GROUP_COLORS[groupColor]?.border,
+                  isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                )} />
+              )}
+              <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
+            </TreeRow>
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content>
           {onPin && tab.url && !tab.pinned && (
             <>
               <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
@@ -651,8 +651,10 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
             <X size={14} className="mr-2" /> Close
           </ContextMenu.Item>
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </>
+      )}
     </ContextMenu.Root>
   );
 });
@@ -752,49 +754,49 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
     </span>
   );
 
-  // Hover border overlay for group header (rounded corners independent of background)
-  const hoverBorderOverlay = !showDropInto ? (
-    <div className={clsx(
-      "absolute inset-0 rounded-md border-2 pointer-events-none",
-      colorStyle.border,
-      "opacity-0 group-hover:opacity-100"
-    )} />
-  ) : null;
-
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>
-        <TreeRow
-          ref={ref}
-          depth={0}
-          title={titleComponent}
-          hideIcon
-          hasChildren={true} // It's a group
-          isExpanded={isExpanded}
-          onToggle={(e) => { e.stopPropagation(); onToggle(); }}
-          onClick={onToggle}
-          isActive={false}
-          isDragging={isDragging}
-          dndAttributes={attributes}
-          dndListeners={listeners}
-          className={clsx(
-            "rounded-t-lg rounded-b-none", // Original rounding for background
-            showDropInto
-              ? "bg-blue-100 dark:bg-blue-900/50"
-              : colorStyle.bg
-          )}
-          data-group-header-id={group.id}
-          data-is-group-header="true"
-        >
-          {hoverBorderOverlay}
-          {showDropInto && (
-            <div className="absolute inset-0 rounded-lg ring-2 ring-blue-500 pointer-events-none" />
-          )}
-          <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} afterIndentPx={afterDropIndentPx} />
-        </TreeRow>
-      </ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content>
+      {({ isOpen }) => (
+        <>
+          <ContextMenu.Trigger asChild>
+            <TreeRow
+              ref={ref}
+              depth={0}
+              title={titleComponent}
+              hideIcon
+              hasChildren={true} // It's a group
+              isExpanded={isExpanded}
+              onToggle={(e) => { e.stopPropagation(); onToggle(); }}
+              onClick={onToggle}
+              isActive={false}
+              isDragging={isDragging}
+              dndAttributes={attributes}
+              dndListeners={listeners}
+              className={clsx(
+                "rounded-t-lg rounded-b-none", // Original rounding for background
+                showDropInto
+                  ? "bg-blue-100 dark:bg-blue-900/50"
+                  : colorStyle.bg
+              )}
+              data-group-header-id={group.id}
+              data-is-group-header="true"
+            >
+              {/* Hover border overlay - shows on hover or context menu */}
+              {!showDropInto && (
+                <div className={clsx(
+                  "absolute inset-0 rounded-md border-2 pointer-events-none",
+                  colorStyle.border,
+                  isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                )} />
+              )}
+              {showDropInto && (
+                <div className="absolute inset-0 rounded-lg ring-2 ring-blue-500 pointer-events-none" />
+              )}
+              <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} afterIndentPx={afterDropIndentPx} />
+            </TreeRow>
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content>
           <ContextMenu.Item onSelect={onNewTab}>
             <Plus size={14} className="mr-2" /> New Tab
           </ContextMenu.Item>
@@ -820,8 +822,10 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           <ContextMenu.Item danger onSelect={onCloseGroup}>
             <X size={14} className="mr-2" /> Close All Tabs in Group
           </ContextMenu.Item>
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </>
+      )}
     </ContextMenu.Root>
   );
 });

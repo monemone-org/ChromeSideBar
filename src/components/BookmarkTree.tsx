@@ -455,36 +455,39 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
 
   return (
     <ContextMenu.Root>
-      <ContextMenu.Trigger asChild>
-        <TreeRow
-          ref={ref}
-          depth={depth}
-          title={bookmarkOpenMode === 'arc' && isLoaded && liveTitle ? liveTitle : node.title}
-          tooltip={node.url ? `${node.title}\n${node.url}` : undefined}
-          icon={combinedIcon}
-          hasChildren={isFolder}
-          isExpanded={expandedState[node.id]}
-          onToggle={() => toggleFolder(node.id, !expandedState[node.id])}
-          onClick={handleRowClick}
-          isActive={bookmarkOpenMode === 'arc' && isActive}
-          isDragging={isBeingDragged}
-          dndAttributes={attributes}
-          dndListeners={listeners}
-          data-bookmark-id={node.id}
-          data-is-folder={isFolder}
-          data-depth={depth}
-          className={clsx(
-            showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
-            !isSpecialFolder && "touch-none"
-          )}
-          actions={actions}
-          leadingIndicator={leadingIndicator}
-        >
-          <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
-        </TreeRow>
-      </ContextMenu.Trigger>
-      <ContextMenu.Portal>
-        <ContextMenu.Content>
+      {({ isOpen }) => (
+        <>
+          <ContextMenu.Trigger asChild>
+            <TreeRow
+              ref={ref}
+              depth={depth}
+              title={bookmarkOpenMode === 'arc' && isLoaded && liveTitle ? liveTitle : node.title}
+              tooltip={node.url ? `${node.title}\n${node.url}` : undefined}
+              icon={combinedIcon}
+              hasChildren={isFolder}
+              isExpanded={expandedState[node.id]}
+              onToggle={() => toggleFolder(node.id, !expandedState[node.id])}
+              onClick={handleRowClick}
+              isActive={bookmarkOpenMode === 'arc' && isActive}
+              isHighlighted={isOpen}
+              isDragging={isBeingDragged}
+              dndAttributes={attributes}
+              dndListeners={listeners}
+              data-bookmark-id={node.id}
+              data-is-folder={isFolder}
+              data-depth={depth}
+              className={clsx(
+                showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
+                !isSpecialFolder && "touch-none"
+              )}
+              actions={actions}
+              leadingIndicator={leadingIndicator}
+            >
+              <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
+            </TreeRow>
+          </ContextMenu.Trigger>
+          <ContextMenu.Portal>
+            <ContextMenu.Content>
           {isFolder && (
             <>
               <ContextMenu.Item onSelect={() => onCreateFolder(node.id)}>
@@ -536,8 +539,10 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               </ContextMenu.Item>
             </>
           )}
-        </ContextMenu.Content>
-      </ContextMenu.Portal>
+            </ContextMenu.Content>
+          </ContextMenu.Portal>
+        </>
+      )}
     </ContextMenu.Root>
   );
 });
