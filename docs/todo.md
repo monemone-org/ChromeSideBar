@@ -149,11 +149,6 @@ SpaceBar
   tab doesn't belong to any group (i.e. live bookmark or live pinned site) or
   belong to group A.
 
-- [ ] add support to drop bookmark to tab list to create new tab with the bookmark :
-   - if bookmark has a live tab, move that tab to tab list i.e. un-associate the tab with the bookmark
-   - if bookmark is not live, open a new tab with the bookmarked URL (same behaviour as CMD+click on the bookmark)
-
-
 - [x] bookmark popup menu: add "open in new tab" (same behaviour as CMD+click on the bookmark)
 
 - [x]  bookmark popup menu: add a "move to space" menu item. it moves
@@ -174,9 +169,9 @@ SpaceBar
 - [x] change audio filter so it shows audio playing tab regardless of the active Space.
 
 - Review Code:
-      - [ ] Review code for O(n²) or less efficient logic.
-      - [ ] Refactor reusable or self-contained code into separate components. Remove duplicated code. 
-      - [ ] Security review
+      - [x] Review code for O(n²) or less efficient logic.
+      - [-] Refactor reusable or self-contained code into separate components. Remove duplicated code. 
+      - [-] Security review
       - [ ] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
       - [ ] Simplify code.
 
