@@ -1,7 +1,7 @@
 ---
 created: 2026-01-15
 after-version: 1.0.149
-status: in-progress
+status: completed
 ---
 
 # Code Review: O(n²) and Inefficient Patterns
@@ -417,3 +417,14 @@ async function importBookmarkNode(
    - ~~Combine filter passes in `BookmarkTree.tsx` and `PinnedBar.tsx`~~ ✓
 
 4. **Acceptable:** The rest are minor or run infrequently
+
+
+2026-01-15 Mone:
+
+- not going to fix Medium, low priority issues.
+
+- `| **High** | `BookmarkTree.tsx:991` | isDescendant called per drag move | O(n+m) per event | |`
+
+  I don't like the suggested fix for this issue. Claude suggested us to build a id->BookmarkTreeNode map
+  for lookup.  Building map is even more costly than looking up the BookmarkTreeNode tree.
+

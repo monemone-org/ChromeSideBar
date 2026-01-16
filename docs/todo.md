@@ -169,7 +169,7 @@ SpaceBar
 
 - [x] during drag drop, when hover over a folder node, it can expand and collapse the node if the cursor hovers over the node for some period of time. change that behaviour to only expand but not collapse.
 
-- [ ] Update live bookmark title - right now it shows the loaded tab's title if it has a live tab. add the bookmark name as prefix to the title "{bookmark title} - {url title}"
+- [x] Update live bookmark title - right now it shows the loaded tab's title if it has a live tab. add the bookmark name as prefix to the title "{bookmark title} - {url title}"
 
 - [x] change audio filter so it shows audio playing tab regardless of the active Space.
 
