@@ -23,22 +23,34 @@ export function getIconUrl(name: string): string
 // Fetch icon names from Iconify API
 export async function fetchIconNames(): Promise<string[]>
 {
-  const response = await fetch(ICONIFY_COLLECTION_API);
-  const data = await response.json();
-  const names: string[] = [];
-  if (data.uncategorized)
+  try
   {
-    names.push(...data.uncategorized);
-  }
-  if (data.categories)
-  {
-    for (const category of Object.values(data.categories))
+    const response = await fetch(ICONIFY_COLLECTION_API);
+    if (!response.ok)
     {
-      names.push(...(category as string[]));
+      throw new Error(`HTTP ${response.status}`);
     }
+    const data = await response.json();
+    const names: string[] = [];
+    if (data.uncategorized)
+    {
+      names.push(...data.uncategorized);
+    }
+    if (data.categories)
+    {
+      for (const category of Object.values(data.categories))
+      {
+        names.push(...(category as string[]));
+      }
+    }
+    names.sort();
+    return names;
   }
-  names.sort();
-  return names;
+  catch (error)
+  {
+    console.warn('Failed to fetch icon names:', error);
+    return [];
+  }
 }
 
 // Fetch icon SVG from CDN and convert to data URL with color
@@ -55,8 +67,9 @@ export async function iconToDataUrl(
     svg = svg.replace(/stroke="[^"]*"/g, `stroke="${color}"`);
     return `data:image/svg+xml,${encodeURIComponent(svg)}`;
   }
-  catch
+  catch (error)
   {
+    console.warn(`Failed to load icon "${iconName}":`, error);
     return '';
   }
 }

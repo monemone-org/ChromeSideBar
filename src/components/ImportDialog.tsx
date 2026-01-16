@@ -95,6 +95,15 @@ export function ImportDialog({
   };
 
   const handleFileSelect = (file: File) => {
+    // Limit to 10MB to prevent UI freeze on large files
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE)
+    {
+      setError('Backup file too large (max 10MB)');
+      setDialogState('preview');
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       // Skip if component unmounted during file read
