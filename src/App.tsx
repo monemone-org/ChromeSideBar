@@ -38,6 +38,7 @@ interface SidebarContentProps
   filterAudible: boolean;
   filterText: string;
   sortGroupsFirst: boolean;
+  useSpaces: boolean;
   onExternalDropTargetChange: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget: () => ResolveBookmarkDropTarget | null;
   onShowToast?: (message: string) => void;
@@ -53,6 +54,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   filterAudible,
   filterText,
   sortGroupsFirst,
+  useSpaces,
   onExternalDropTargetChange,
   resolveBookmarkDropTarget,
   onShowToast,
@@ -73,6 +75,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         filterText={filterText}
         activeSpace={activeSpace}
         onShowToast={onShowToast}
+        useSpaces={useSpaces}
       />
       <TabList
         onPin={onPin}
@@ -83,6 +86,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         filterAudible={filterAudible}
         filterText={filterText}
         activeSpace={activeSpace}
+        useSpaces={useSpaces}
       />
     </div>
   );
@@ -214,6 +218,15 @@ const SwipeableContainer: React.FC<SwipeableContainerProps> = (props) =>
     }
   }, [slideDirection]);
 
+  // Reset to "all" space when useSpaces is turned off
+  useEffect(() =>
+  {
+    if (!props.useSpaces && activeSpaceId !== 'all')
+    {
+      setActiveSpaceId('all');
+    }
+  }, [props.useSpaces, activeSpaceId, setActiveSpaceId]);
+
   const handleSwipe = useCallback((direction: 'left' | 'right') =>
   {
     if (direction === 'left' && canSwipeLeft)
@@ -275,6 +288,11 @@ function App() {
       },
       serialize: (v) => v
     }
+  );
+  const [spacesEnabled, setSpacesEnabled] = useLocalStorage(
+    'sidebar-use-spaces',
+    true,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
   );
   const [showFilterArea, setShowFilterArea] = useLocalStorage(
     'sidebar-show-filter-area',
@@ -340,6 +358,7 @@ function App() {
     setSortGroupsFirst(newSettings.sortGroupsFirst);
     setPinnedIconSize(newSettings.pinnedIconSize);
     setBookmarkOpenMode(newSettings.bookmarkOpenMode);
+    setSpacesEnabled(newSettings.useSpaces);
     setShowSettings(false);
   };
 
@@ -485,6 +504,7 @@ function App() {
           sortGroupsFirst,
           pinnedIconSize,
           bookmarkOpenMode,
+          useSpaces: spacesEnabled,
         }}
         onApply={handleApplySettings}
       />
@@ -659,6 +679,7 @@ function App() {
         filterAudible={filterAudible}
         filterText={filterText}
         sortGroupsFirst={sortGroupsFirst}
+        useSpaces={spacesEnabled}
         onExternalDropTargetChange={setExternalDropTarget}
         resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current}
         onShowToast={showToast}
@@ -674,12 +695,14 @@ function App() {
         onCloseDeleteDialog={() => setShowSpaceDeleteDialog(false)}
       />
 
-      {/* Space Bar */}
-      <SpaceBar
-        onCreateSpace={handleCreateSpace}
-        onEditSpace={handleEditSpace}
-        onDeleteSpace={handleDeleteSpace}
-      />
+      {/* Space Bar - only shown when useSpaces is enabled */}
+      {spacesEnabled && (
+        <SpaceBar
+          onCreateSpace={handleCreateSpace}
+          onEditSpace={handleEditSpace}
+          onDeleteSpace={handleDeleteSpace}
+        />
+      )}
 
       <Toast
         message={toastMessage}

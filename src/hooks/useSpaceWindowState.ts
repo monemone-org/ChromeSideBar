@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 export interface SpaceWindowState
 {
   activeSpaceId: string;
-  spaceTabGroupMap: Record<string, number>;  // space ID → Chrome tab group ID
+  spaceTabs: Record<string, number[]>;  // space ID → array of tab IDs
   spaceLastActiveTabMap: Record<string, number>;  // space ID → last active tab ID
 }
 
@@ -14,7 +14,7 @@ const getStorageKey = (windowId: number): string =>
 
 const DEFAULT_STATE: SpaceWindowState = {
   activeSpaceId: 'all',
-  spaceTabGroupMap: {},
+  spaceTabs: {},
   spaceLastActiveTabMap: {},
 };
 
@@ -109,15 +109,90 @@ export const useSpaceWindowState = () =>
     });
   }, [saveState]);
 
-  const setTabGroupForSpace = useCallback((spaceId: string, tabGroupId: number) =>
+  // Add a tab to a space (not used for "all" space - "all" shows all tabs)
+  const addTabToSpace = useCallback((tabId: number, spaceId: string) =>
+  {
+    if (spaceId === 'all') return;
+
+    setState(prev =>
+    {
+      // Remove from any existing space first
+      const newSpaceTabs = { ...prev.spaceTabs };
+      for (const [sid, tabs] of Object.entries(newSpaceTabs))
+      {
+        if (tabs.includes(tabId))
+        {
+          newSpaceTabs[sid] = tabs.filter(id => id !== tabId);
+        }
+      }
+
+      // Add to the new space
+      newSpaceTabs[spaceId] = [...(newSpaceTabs[spaceId] || []), tabId];
+
+      const newState = { ...prev, spaceTabs: newSpaceTabs };
+      saveState(newState);
+      return newState;
+    });
+  }, [saveState]);
+
+  // Remove a tab from all spaces
+  const removeTabFromSpace = useCallback((tabId: number) =>
+  {
+    setState(prev =>
+    {
+      const newSpaceTabs = { ...prev.spaceTabs };
+      let changed = false;
+
+      for (const [spaceId, tabs] of Object.entries(newSpaceTabs))
+      {
+        if (tabs.includes(tabId))
+        {
+          newSpaceTabs[spaceId] = tabs.filter(id => id !== tabId);
+          changed = true;
+        }
+      }
+
+      if (!changed) return prev;
+
+      const newState = { ...prev, spaceTabs: newSpaceTabs };
+      saveState(newState);
+      return newState;
+    });
+  }, [saveState]);
+
+  // Get the space ID for a given tab
+  const getSpaceForTab = useCallback((tabId: number): string | null =>
+  {
+    for (const [spaceId, tabs] of Object.entries(state.spaceTabs))
+    {
+      if (tabs.includes(tabId))
+      {
+        return spaceId;
+      }
+    }
+    return null;
+  }, [state.spaceTabs]);
+
+  // Get all tabs for a space
+  const getTabsForSpace = useCallback((spaceId: string): number[] =>
+  {
+    return state.spaceTabs[spaceId] || [];
+  }, [state.spaceTabs]);
+
+  const getLastActiveTabForSpace = useCallback((spaceId: string): number | undefined =>
+  {
+    return state.spaceLastActiveTabMap[spaceId];
+  }, [state.spaceLastActiveTabMap]);
+
+  const setLastActiveTabForSpace = useCallback((spaceId: string, tabId: number) =>
   {
     setState(prev =>
     {
       const newState = {
         ...prev,
-        spaceTabGroupMap: {
-          ...prev.spaceTabGroupMap,
-          [spaceId]: tabGroupId,
+        spaceLastActiveTabMap: {
+          ...prev.spaceLastActiveTabMap,
+          [spaceId]: tabId,
         },
       };
       saveState(newState);
@@ -125,40 +200,16 @@ export const useSpaceWindowState = () =>
     });
   }, [saveState]);
 
-  const clearTabGroupForSpace = useCallback((spaceId: string) =>
-  {
-    setState(prev =>
-    {
-      const { [spaceId]: _, ...rest } = prev.spaceTabGroupMap;
-      const newState = {
-        ...prev,
-        spaceTabGroupMap: rest,
-      };
-      saveState(newState);
-      return newState;
-    });
-  }, [saveState]);
-
-  const getTabGroupForSpace = useCallback((spaceId: string): number | undefined =>
-  {
-    return state.spaceTabGroupMap[spaceId];
-  }, [state.spaceTabGroupMap]);
-
-  const getLastActiveTabForSpace = useCallback((spaceId: string): number | undefined =>
-  {
-    return state.spaceLastActiveTabMap[spaceId];
-  }, [state.spaceLastActiveTabMap]);
-
   // Clear all state for a space (used when deleting a space)
   const clearStateForSpace = useCallback((spaceId: string) =>
   {
     setState(prev =>
     {
-      const { [spaceId]: _tabGroup, ...restTabGroupMap } = prev.spaceTabGroupMap;
+      const { [spaceId]: _tabs, ...restSpaceTabs } = prev.spaceTabs;
       const { [spaceId]: _lastTab, ...restLastActiveMap } = prev.spaceLastActiveTabMap;
       const newState = {
         ...prev,
-        spaceTabGroupMap: restTabGroupMap,
+        spaceTabs: restSpaceTabs,
         spaceLastActiveTabMap: restLastActiveMap,
       };
       saveState(newState);
@@ -166,39 +217,7 @@ export const useSpaceWindowState = () =>
     });
   }, [saveState]);
 
-  // Clear mapping when tab group is removed
-  const handleTabGroupRemoved = useCallback((tabGroupId: number) =>
-  {
-    const spaceId = Object.entries(state.spaceTabGroupMap).find(
-      ([_, groupId]) => groupId === tabGroupId
-    )?.[0];
-
-    if (spaceId)
-    {
-      clearTabGroupForSpace(spaceId);
-    }
-  }, [state.spaceTabGroupMap, clearTabGroupForSpace]);
-
-  // Listen for tab group removal
-  useEffect(() =>
-  {
-    if (!isInitialized) return;
-
-    const handleRemoved = (group: chrome.tabGroups.TabGroup) =>
-    {
-      handleTabGroupRemoved(group.id);
-    };
-
-    chrome.tabGroups?.onRemoved?.addListener(handleRemoved);
-
-    return () =>
-    {
-      chrome.tabGroups?.onRemoved?.removeListener(handleRemoved);
-    };
-  }, [isInitialized, handleTabGroupRemoved]);
-
   // Extract values to avoid depending on entire map objects (prevents race conditions)
-  const activeSpaceTabGroupId = state.spaceTabGroupMap[state.activeSpaceId];
   const activeSpaceLastTabId = state.spaceLastActiveTabMap[state.activeSpaceId];
 
   // Send active space to background whenever it changes
@@ -210,10 +229,9 @@ export const useSpaceWindowState = () =>
       action: 'set-active-space',
       windowId,
       spaceId: state.activeSpaceId,
-      spaceTabGroupId: activeSpaceTabGroupId,
       lastActiveTabId: activeSpaceLastTabId
     });
-  }, [windowId, isInitialized, state.activeSpaceId, activeSpaceTabGroupId, activeSpaceLastTabId]);
+  }, [windowId, isInitialized, state.activeSpaceId, activeSpaceLastTabId]);
 
   // Listen for history tab activation to switch spaces
   useEffect(() =>
@@ -237,13 +255,15 @@ export const useSpaceWindowState = () =>
   return {
     windowId,
     activeSpaceId: state.activeSpaceId,
-    spaceTabGroupMap: state.spaceTabGroupMap,
+    spaceTabs: state.spaceTabs,
     isInitialized,
     setActiveSpaceId,
-    setTabGroupForSpace,
-    clearTabGroupForSpace,
-    getTabGroupForSpace,
+    addTabToSpace,
+    removeTabFromSpace,
+    getSpaceForTab,
+    getTabsForSpace,
     getLastActiveTabForSpace,
+    setLastActiveTabForSpace,
     clearStateForSpace,
   };
 };

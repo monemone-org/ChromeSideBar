@@ -173,7 +173,7 @@ SpaceBar
 
 - [ ] update live bookmark title - right now it shows the loaded tab's title if it has a live tab.  add the bookmark name as prefix to the title "{bookmark title} - {url title}"
 
-
+- [ ] change audio filter so it shows audio playing tab regardless of the active Space.
 
 - Review Code:
       - [ ] Review code for O(n²) or less efficient logic.

@@ -10,6 +10,7 @@ export interface SettingsValues {
   sortGroupsFirst: boolean;
   pinnedIconSize: number;
   bookmarkOpenMode: BookmarkOpenMode;
+  useSpaces: boolean;
 }
 
 interface SettingsDialogProps {
@@ -31,6 +32,7 @@ export function SettingsDialog({
   const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(settings.sortGroupsFirst);
   const [tempPinnedIconSize, setTempPinnedIconSize] = useState(settings.pinnedIconSize);
   const [tempBookmarkOpenMode, setTempBookmarkOpenMode] = useState(settings.bookmarkOpenMode);
+  const [tempUseSpaces, setTempUseSpaces] = useState(settings.useSpaces);
 
   // Test results state (dev mode only)
   const [testResults, setTestResults] = useState<{ passed: number; failed: number; results: Array<{ name: string; passed: boolean; error?: string }> } | null>(null);
@@ -43,6 +45,7 @@ export function SettingsDialog({
       setTempSortGroupsFirst(settings.sortGroupsFirst);
       setTempPinnedIconSize(settings.pinnedIconSize);
       setTempBookmarkOpenMode(settings.bookmarkOpenMode);
+      setTempUseSpaces(settings.useSpaces);
     }
   }, [isOpen, settings]);
 
@@ -65,6 +68,7 @@ export function SettingsDialog({
       sortGroupsFirst: tempSortGroupsFirst,
       pinnedIconSize: tempPinnedIconSize,
       bookmarkOpenMode: tempBookmarkOpenMode,
+      useSpaces: tempUseSpaces,
     });
   };
 
@@ -160,6 +164,18 @@ export function SettingsDialog({
                   {tempBookmarkOpenMode === 'activeTab' && 'Replaces the current tab with the bookmark'}
                 </p>
               </div>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tempUseSpaces}
+                  onChange={(e) => setTempUseSpaces(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                Use Spaces
+              </label>
+              <p className="text-gray-500 dark:text-gray-400 ml-5">
+                Organize tabs and bookmarks into focused workspaces
+              </p>
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                 <input
                   type="checkbox"

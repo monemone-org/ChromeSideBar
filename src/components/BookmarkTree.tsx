@@ -516,11 +516,17 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               {!isSpecialFolder && <ContextMenu.Separator />}
             </>
           )}
-          {!isFolder && onPin && node.url && (
+          {!isFolder && node.url && (
             <>
-              <ContextMenu.Item onSelect={() => onPin(node.url!, node.title, getFaviconUrl(node.url!))}>
-                <Pin size={14} className="mr-2" /> Pin to Sidebar
+              {onPin && (
+                <ContextMenu.Item onSelect={() => onPin(node.url!, node.title, getFaviconUrl(node.url!))}>
+                  <Pin size={14} className="mr-2" /> Pin to Sidebar
+                </ContextMenu.Item>
+              )}
+              <ContextMenu.Item onSelect={() => onDuplicate(node.id)}>
+                <Copy size={14} className="mr-2" /> Duplicate
               </ContextMenu.Item>
+              <ContextMenu.Separator />
               <ContextMenu.Item onSelect={() => {
                 chrome.tabs.create({ url: node.url }, (tab) => {
                   if (tab?.id) chrome.tabs.ungroup(tab.id);
@@ -542,11 +548,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           )}
           {!isSpecialFolder && (
             <>
-              {!isFolder && (
-                <ContextMenu.Item onSelect={() => onDuplicate(node.id)}>
-                  <Copy size={14} className="mr-2" /> Duplicate
-                </ContextMenu.Item>
-              )}
+              <ContextMenu.Separator />
               <ContextMenu.Item onSelect={() => onEdit(node)}>
                 <Edit size={14} className="mr-2" /> Edit
               </ContextMenu.Item>
@@ -679,9 +681,10 @@ interface BookmarkTreeProps {
   filterText?: string;
   activeSpace?: Space | null;
   onShowToast?: (message: string) => void;
+  useSpaces?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace, onShowToast }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace } = useSpacesContext();
@@ -1178,7 +1181,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             onCloseBookmark={closeBookmarkTab}
             onMoveToNewWindow={moveBookmarkToNewWindow}
             onOpenAsTabGroup={handleOpenAsTabGroup}
-            onMoveToSpace={openMoveToSpaceDialog}
+            onMoveToSpace={useSpaces ? openMoveToSpaceDialog : undefined}
             externalDropTarget={externalDropTarget}
           />
         ))}

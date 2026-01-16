@@ -133,7 +133,7 @@ function removeFromHistory(windowId, tabId)
 }
 
 // Update last active tab for a space in session storage
-async function updateSpaceLastActiveTab(windowId, spaceId, tabId, tabGroupId)
+async function updateSpaceLastActiveTab(windowId, spaceId, tabId)
 {
   if (!spaceId || spaceId === 'all') return;
 
@@ -141,15 +141,15 @@ async function updateSpaceLastActiveTab(windowId, spaceId, tabId, tabGroupId)
   const result = await chrome.storage.session.get([storageKey]);
   const state = result[storageKey] || {
     activeSpaceId: 'all',
-    spaceTabGroupMap: {},
+    spaceTabs: {},
     spaceLastActiveTabMap: {}
   };
 
-  // Only record if tab belongs to this space or is ungrouped (pinned/live bookmark)
-  const spaceGroupId = state.spaceTabGroupMap[spaceId];
-  if (tabGroupId !== -1 && tabGroupId !== spaceGroupId)
+  // Only record if tab belongs to this space (check spaceTabs)
+  const spaceTabs = state.spaceTabs?.[spaceId] || [];
+  if (!spaceTabs.includes(tabId))
   {
-    return;  // Tab belongs to a different space, skip
+    return;  // Tab doesn't belong to this space, skip
   }
 
   state.spaceLastActiveTabMap = state.spaceLastActiveTabMap || {};
@@ -183,7 +183,7 @@ async function removeTabFromSpaceLastActive(windowId, tabId)
 }
 
 // Activate last tab for a space when switching spaces
-async function activateLastTabForSpace(windowId, spaceId, spaceTabGroupId, lastActiveTabId)
+async function activateLastTabForSpace(windowId, spaceId, lastActiveTabId)
 {
   if (spaceId === 'all') return { success: true, action: 'none' };
 
@@ -193,7 +193,7 @@ async function activateLastTabForSpace(windowId, spaceId, spaceTabGroupId, lastA
     try
     {
       const tab = await chrome.tabs.get(lastActiveTabId);
-      // Tab exists - activate it (don't check groupId as pinned/live bookmark tabs have groupId=-1)
+      // Tab exists - activate it
       if (tab)
       {
         await chrome.tabs.update(lastActiveTabId, { active: true });
@@ -203,19 +203,28 @@ async function activateLastTabForSpace(windowId, spaceId, spaceTabGroupId, lastA
     catch (e) { /* tab doesn't exist */ }
   }
 
-  // Fallback: first tab in group
-  if (spaceTabGroupId !== undefined && spaceTabGroupId !== -1)
+  // Fallback: first tab in space (from spaceTabs)
+  const storageKey = `spaceWindowState_${windowId}`;
+  const result = await chrome.storage.session.get([storageKey]);
+  const state = result[storageKey];
+  const spaceTabs = state?.spaceTabs?.[spaceId] || [];
+
+  if (spaceTabs.length > 0)
   {
-    try
+    // Try to activate the first valid tab in the space
+    for (const tabId of spaceTabs)
     {
-      const tabs = await chrome.tabs.query({ windowId, groupId: spaceTabGroupId });
-      if (tabs.length > 0)
+      try
       {
-        await chrome.tabs.update(tabs[0].id, { active: true });
-        return { success: true, action: 'activated-first', tabId: tabs[0].id };
+        const tab = await chrome.tabs.get(tabId);
+        if (tab)
+        {
+          await chrome.tabs.update(tabId, { active: true });
+          return { success: true, action: 'activated-first', tabId };
+        }
       }
+      catch (e) { /* tab doesn't exist, try next */ }
     }
-    catch (e) { /* failed to query */ }
   }
 
   // No tabs in space - do nothing (don't create blank page)
@@ -281,7 +290,7 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
       const spaceId = windowActiveSpaces.get(activeInfo.windowId);
       if (spaceId && spaceId !== 'all')
       {
-        updateSpaceLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId, tab.groupId);
+        updateSpaceLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId);
       }
     }
   });
@@ -330,7 +339,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
       activateLastTabForSpace(
         message.windowId,
         message.spaceId,
-        message.spaceTabGroupId,
         message.lastActiveTabId
       ).then(sendResponse);
 

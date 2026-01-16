@@ -609,6 +609,11 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             </ContextMenu.Item>
           )}
           <ContextMenu.Separator />
+          {onAddToBookmark && tab.url && (
+            <ContextMenu.Item onSelect={() => onAddToBookmark(tab)}>
+              <Bookmark size={14} className="mr-2" /> Add to Bookmark
+            </ContextMenu.Item>
+          )}
           {onOpenAddToGroupDialog && (
             <ContextMenu.Item onSelect={() => onOpenAddToGroupDialog(tab.id!, tab.groupId)}>
               <FolderPlus size={14} className="mr-2" /> Add to Group
@@ -617,11 +622,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           {onOpenMoveToSpaceDialog && (
             <ContextMenu.Item onSelect={() => onOpenMoveToSpaceDialog(tab.id!)}>
               <SquareStack size={14} className="mr-2" /> Move to Space
-            </ContextMenu.Item>
-          )}
-          {onAddToBookmark && tab.url && (
-            <ContextMenu.Item onSelect={() => onAddToBookmark(tab)}>
-              <Bookmark size={14} className="mr-2" /> Add to Bookmark
             </ContextMenu.Item>
           )}
           {onMoveToNewWindow && (
@@ -913,72 +913,44 @@ interface TabListProps {
   filterAudible?: boolean;
   filterText?: string;
   activeSpace?: Space;  // If provided, use this instead of context
+  useSpaces?: boolean;  // When true, show "Add to Space" menu; when false, show "Add to Group" menu
 }
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false, filterText = '', activeSpace: activeSpaceProp }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
-  const { spaces, activeSpace: activeSpaceFromContext, getTabGroupForSpace, createTabGroupForSpace, findTabGroupForSpace } = useSpacesContext();
+  const { spaces, activeSpace: activeSpaceFromContext, addTabToSpace, getTabsForSpace, removeTabFromSpace, windowId } = useSpacesContext();
 
   // Use prop if provided, otherwise use context
   const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
 
-  // Get active space's tab group ID (if not "all" space)
-  const activeSpaceTabGroupId = activeSpace?.id !== 'all'
-    ? getTabGroupForSpace(activeSpace.id)
-    : undefined;
+  // Get tabs in the active space
+  const activeSpaceTabIds = activeSpace?.id !== 'all'
+    ? getTabsForSpace(activeSpace.id)
+    : [];
 
   // Check if we're in a non-"all" space
   const isInSpace = activeSpace && activeSpace.id !== 'all';
 
-  // Restore tab group mapping when switching to a space (e.g., after extension reload)
-  // This finds the group by name if the mapping doesn't exist
+  // Auto-add new tabs (e.g., Cmd+T) to the active space
   useEffect(() =>
   {
-    if (isInSpace && activeSpace && activeSpaceTabGroupId === undefined)
-    {
-      findTabGroupForSpace(activeSpace.id);
-    }
-  }, [isInSpace, activeSpace?.id, activeSpaceTabGroupId, findTabGroupForSpace]);
+    if (!isInSpace || !activeSpace || !windowId) return;
 
-  // Auto-add new tabs (e.g., Cmd+T) to the active space's group
-  useEffect(() =>
-  {
-    if (!isInSpace || !activeSpace) return;
-
-    const handleTabCreated = async (tab: chrome.tabs.Tab) =>
+    const handleTabCreated = (tab: chrome.tabs.Tab) =>
     {
       // Skip tabs created for bookmarks/pinned sites (they should stay ungrouped)
       if (tab.id && isPendingManagedTab(tab.id)) return;
 
-      // Only handle tabs in current window and not already in a group
-      if (tab.windowId !== chrome.windows.WINDOW_ID_CURRENT && tab.groupId !== -1) return;
-
       // Check if this tab is in our window
-      const currentWindow = await chrome.windows.getCurrent();
-      if (tab.windowId !== currentWindow.id) return;
+      if (tab.windowId !== windowId) return;
 
-      // Skip if tab is already in a group
-      if (tab.groupId && tab.groupId !== -1) return;
-
-      // Add to active space's group
-      if (activeSpaceTabGroupId !== undefined && tab.id)
+      // Add to active space
+      if (tab.id)
       {
-        try
-        {
-          await chrome.tabs.group({ tabIds: [tab.id], groupId: activeSpaceTabGroupId });
-        }
-        catch (error)
-        {
-          console.error('Failed to add new tab to space group:', error);
-        }
-      }
-      else if (tab.id)
-      {
-        // No group exists yet - create one with this tab
-        await createTabGroupForSpace(activeSpace.id, tab.id);
+        addTabToSpace(tab.id, activeSpace.id);
       }
     };
 
@@ -988,7 +960,24 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     {
       chrome.tabs.onCreated.removeListener(handleTabCreated);
     };
-  }, [isInSpace, activeSpace, activeSpaceTabGroupId, createTabGroupForSpace]);
+  }, [isInSpace, activeSpace, addTabToSpace, windowId]);
+
+  // Remove tabs from space when closed (only for current window)
+  useEffect(() =>
+  {
+    const handleTabRemoved = (tabId: number, removeInfo: chrome.tabs.TabRemoveInfo) =>
+    {
+      if (windowId && removeInfo.windowId !== windowId) return;
+      removeTabFromSpace(tabId);
+    };
+
+    chrome.tabs.onRemoved.addListener(handleTabRemoved);
+
+    return () =>
+    {
+      chrome.tabs.onRemoved.removeListener(handleTabRemoved);
+    };
+  }, [removeTabFromSpace, windowId]);
 
   // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
   // Also apply audible filter, text filter, and space filter if enabled
@@ -997,19 +986,11 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     const managedTabIds = getManagedTabIds();
     let filtered = tabs.filter(tab => !managedTabIds.has(tab.id!));
 
-    // Space filter: when in a space, only show tabs in that space's tab group
-    // If the space has no tab group yet, show empty list
+    // Space filter: when in a space, only show tabs that belong to that space
     if (isInSpace)
     {
-      if (activeSpaceTabGroupId !== undefined)
-      {
-        filtered = filtered.filter(tab => tab.groupId === activeSpaceTabGroupId);
-      }
-      else
-      {
-        // Space has no tab group yet - show empty list
-        filtered = [];
-      }
+      const spaceTabIdSet = new Set(activeSpaceTabIds);
+      filtered = filtered.filter(tab => tab.id && spaceTabIdSet.has(tab.id));
     }
 
     if (filterAudible)
@@ -1023,52 +1004,21 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       );
     }
     return filtered;
-  }, [tabs, getManagedTabIds, filterAudible, filterText, isInSpace, activeSpaceTabGroupId]);
+  }, [tabs, getManagedTabIds, filterAudible, filterText, isInSpace, activeSpaceTabIds]);
 
-  // Filter tab groups - when a space is active, only show that space's tab group
-  // If the space has no tab group yet, show empty list
+  // Tab groups are independent from spaces - show all Chrome tab groups
+  // Users can use both Spaces (internal) and Chrome tab groups together
   const visibleTabGroups = useMemo(() =>
   {
-    if (isInSpace)
-    {
-      if (activeSpaceTabGroupId !== undefined)
-      {
-        return tabGroups.filter(g => g.id === activeSpaceTabGroupId);
-      }
-      // Space has no tab group yet - show empty list
-      return [];
-    }
     return tabGroups;
-  }, [tabGroups, isInSpace, activeSpaceTabGroupId]);
+  }, [tabGroups]);
 
   // Space-aware new tab creation
+  // When in a space, the onCreated listener will auto-add to the active space
   const handleNewTab = useCallback(async () =>
   {
-    if (isInSpace && activeSpace)
-    {
-      if (activeSpaceTabGroupId !== undefined)
-      {
-        // Space has an existing tab group - create tab in that group
-        createTabInGroup(activeSpaceTabGroupId);
-      }
-      else
-      {
-        // Space has no tab group yet - create tab then create group
-        chrome.tabs.create({ active: true }, async (tab) =>
-        {
-          if (tab?.id)
-          {
-            await createTabGroupForSpace(activeSpace.id, tab.id);
-          }
-        });
-      }
-    }
-    else
-    {
-      // "All" space - create normal ungrouped tab
-      createTab();
-    }
-  }, [isInSpace, activeSpace, activeSpaceTabGroupId, createTabInGroup, createTabGroupForSpace, createTab]);
+    createTab();
+  }, [createTab]);
 
   // Space-aware close all tabs - closes only visible tabs
   const handleCloseAllTabs = useCallback(() =>
@@ -1134,30 +1084,17 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setToastState({ isVisible: false, message: '' });
   }, []);
 
-  // Handler to move tab to a space's tab group
-  const handleMoveToSpace = useCallback(async (tabId: number, spaceId: string) =>
+  // Handler to move tab to a space (internal tracking, not Chrome groups)
+  const handleMoveToSpace = useCallback((tabId: number, spaceId: string) =>
   {
     const space = spaces.find(s => s.id === spaceId);
-
-    // Find existing tab group for space, or create new one
-    let groupId = await findTabGroupForSpace(spaceId);
-
-    if (groupId === null)
-    {
-      // Create new group with this tab as the first tab
-      groupId = await createTabGroupForSpace(spaceId, tabId);
-    }
-    else
-    {
-      // Move tab to existing group
-      await chrome.tabs.group({ tabIds: [tabId], groupId });
-    }
+    addTabToSpace(tabId, spaceId);
 
     if (space)
     {
       showToast(`Moved to ${space.name}`);
     }
-  }, [spaces, findTabGroupForSpace, createTabGroupForSpace, showToast]);
+  }, [spaces, addTabToSpace, showToast]);
 
   // Change Group Color dialog state
   const [changeColorDialog, setChangeColorDialog] = useState<{
@@ -1417,14 +1354,26 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   // Ref for end-of-list drop zone detection
   const endOfListRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to active tab when it changes
+  // Auto-scroll to active tab when it changes or when space changes
   const prevActiveTabIdRef = useRef<number | null>(null);
+  const prevSpaceIdRef = useRef<string | undefined>(undefined);
   useEffect(() =>
   {
     const activeTab = visibleTabs.find(t => t.active);
-    if (activeTab && activeTab.id !== prevActiveTabIdRef.current)
+    const currentSpaceId = activeSpace?.id;
+    const spaceChanged = currentSpaceId !== prevSpaceIdRef.current;
+    const tabChanged = activeTab && activeTab.id !== prevActiveTabIdRef.current;
+
+    // Update refs
+    prevSpaceIdRef.current = currentSpaceId;
+    if (activeTab)
     {
       prevActiveTabIdRef.current = activeTab.id ?? null;
+    }
+
+    // Scroll if tab changed or space changed (and there's an active tab to scroll to)
+    if (activeTab && (tabChanged || spaceChanged))
+    {
       // Scroll after DOM updates
       setTimeout(() =>
       {
@@ -1432,7 +1381,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }, 50);
     }
-  }, [visibleTabs]);
+  }, [visibleTabs, activeSpace]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -2182,21 +2131,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   const tabsMenuContent = (
     <>
       <ContextMenu.Item onSelect={() => {
-        // When in a space, use sortGroupTabs to avoid destroying the group
-        if (isInSpace && activeSpaceTabGroupId !== undefined) {
-          sortGroupTabs(activeSpaceTabGroupId, 'asc');
-        } else {
-          sortTabs('asc', visibleTabGroups, sortGroupsFirst);
-        }
+        sortTabs('asc', visibleTabGroups, sortGroupsFirst);
       }}>
         <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
       </ContextMenu.Item>
       <ContextMenu.Item onSelect={() => {
-        if (isInSpace && activeSpaceTabGroupId !== undefined) {
-          sortGroupTabs(activeSpaceTabGroupId, 'desc');
-        } else {
-          sortTabs('desc', visibleTabGroups, sortGroupsFirst);
-        }
+        sortTabs('desc', visibleTabGroups, sortGroupsFirst);
       }}>
         <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
       </ContextMenu.Item>
@@ -2247,8 +2187,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   onActivate={activateTab}
                   onDuplicate={duplicateTab}
                   onPin={onPin}
-                  onOpenAddToGroupDialog={openAddToGroupDialog}
-                  onOpenMoveToSpaceDialog={spaces.length > 0 ? openMoveToSpaceDialog : undefined}
+                  onOpenAddToGroupDialog={!useSpaces ? openAddToGroupDialog : undefined}
+                  onOpenMoveToSpaceDialog={useSpaces && spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                   onAddToBookmark={openAddToBookmarkDialog}
                   onMoveToNewWindow={moveToNewWindow}
                   onCloseTabsBefore={closeTabsBefore}
@@ -2280,8 +2220,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           onActivate={activateTab}
                           onDuplicate={duplicateTab}
                           onPin={onPin}
-                          onOpenAddToGroupDialog={openAddToGroupDialog}
-                          onOpenMoveToSpaceDialog={spaces.length > 0 ? openMoveToSpaceDialog : undefined}
+                          onOpenAddToGroupDialog={!useSpaces ? openAddToGroupDialog : undefined}
+                          onOpenMoveToSpaceDialog={useSpaces && spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                           onAddToBookmark={openAddToBookmarkDialog}
                           onMoveToNewWindow={moveToNewWindow}
                           onCloseTabsBefore={closeTabsBefore}
@@ -2351,8 +2291,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         onActivate={activateTab}
                         onDuplicate={duplicateTab}
                         onPin={onPin}
-                        onOpenAddToGroupDialog={openAddToGroupDialog}
-                        onOpenMoveToSpaceDialog={spaces.length > 0 ? openMoveToSpaceDialog : undefined}
+                        onOpenAddToGroupDialog={!useSpaces ? openAddToGroupDialog : undefined}
+                        onOpenMoveToSpaceDialog={useSpaces && spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                         onAddToBookmark={openAddToBookmarkDialog}
                         onMoveToNewWindow={moveToNewWindow}
                         onCloseTabsBefore={closeTabsBefore}
