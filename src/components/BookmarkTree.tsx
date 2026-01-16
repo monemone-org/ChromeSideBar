@@ -23,6 +23,7 @@ import {
   Edit,
   FolderPlus,
   FolderOpen,
+  FolderInput,
   ArrowDownAZ,
   Calendar,
   Pin,
@@ -281,9 +282,11 @@ interface BookmarkRowProps {
   getLiveTitle?: (bookmarkId: string) => string | undefined;
   onOpenBookmark?: (bookmarkId: string, url: string) => void;
   onCloseBookmark?: (bookmarkId: string) => void;
-  onMoveToNewWindow?: (bookmarkId: string) => void;
   onOpenAsTabGroup?: (folderId: string, folderName: string) => void;
+  onOpenAllTabs?: (folderId: string) => void;
+  onOpenAllTabsInNewWindow?: (folderId: string) => void;
   onMoveToSpace?: (bookmarkId: string) => void;
+  onMoveBookmark?: (bookmarkId: string, isFolder: boolean) => void;
   // External drop target (from tab drag)
   externalDropTarget?: ExternalDropTarget | null;
   // Drag-drop attributes
@@ -315,9 +318,11 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   liveTitle,
   onOpenBookmark,
   onCloseBookmark,
-  onMoveToNewWindow,
   onOpenAsTabGroup,
+  onOpenAllTabs,
+  onOpenAllTabsInNewWindow,
   onMoveToSpace,
+  onMoveBookmark,
   externalDropTarget,
   attributes,
   listeners
@@ -502,18 +507,39 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                   <span className="w-[14px] mr-2" /> Expand All
                 </ContextMenu.Item>
               )}
+              <ContextMenu.Separator />
               <ContextMenu.Item onSelect={() => onSort(node.id, 'name')}>
                 <ArrowDownAZ size={14} className="mr-2" /> Sort by Name
               </ContextMenu.Item>
               <ContextMenu.Item onSelect={() => onSort(node.id, 'dateAdded')}>
                 <Calendar size={14} className="mr-2" /> Sort by Date
               </ContextMenu.Item>
+              <ContextMenu.Separator />
+              {onOpenAllTabs && (
+                <ContextMenu.Item onSelect={() => onOpenAllTabs(node.id)}>
+                  <ExternalLink size={14} className="mr-2" /> Open All Tabs
+                </ContextMenu.Item>
+              )}
+              {onOpenAllTabsInNewWindow && (
+                <ContextMenu.Item onSelect={() => onOpenAllTabsInNewWindow(node.id)}>
+                  <ExternalLink size={14} className="mr-2" /> Open All Tabs in New Window
+                </ContextMenu.Item>
+              )}
               {onOpenAsTabGroup && (
                 <ContextMenu.Item onSelect={() => onOpenAsTabGroup(node.id, node.title)}>
                   <FolderOpen size={14} className="mr-2" /> Open as Tab Group
                 </ContextMenu.Item>
               )}
-              {!isSpecialFolder && <ContextMenu.Separator />}
+              {onMoveToSpace && (
+                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
+                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                </ContextMenu.Item>
+              )}
+              {onMoveBookmark && !isSpecialFolder && (
+                <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, true)}>
+                  <FolderInput size={14} className="mr-2" /> Move Folder...
+                </ContextMenu.Item>
+              )}
             </>
           )}
           {!isFolder && node.url && (
@@ -534,17 +560,20 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               }}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Tab
               </ContextMenu.Item>
+              <ContextMenu.Item onSelect={() => chrome.windows.create({ url: node.url })}>
+                <ExternalLink size={14} className="mr-2" /> Open in New Window
+              </ContextMenu.Item>
+              {onMoveToSpace && (
+                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
+                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                </ContextMenu.Item>
+              )}
+              {onMoveBookmark && (
+                <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, false)}>
+                  <FolderInput size={14} className="mr-2" /> Move Bookmark...
+                </ContextMenu.Item>
+              )}
             </>
-          )}
-          {!isFolder && isLoaded && onMoveToNewWindow && (
-            <ContextMenu.Item onSelect={() => onMoveToNewWindow(node.id)}>
-              <ExternalLink size={14} className="mr-2" /> Move to New Window
-            </ContextMenu.Item>
-          )}
-          {!isFolder && onMoveToSpace && (
-            <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
-              <SquareStack size={14} className="mr-2" /> Move to Space
-            </ContextMenu.Item>
           )}
           {!isSpecialFolder && (
             <>
@@ -686,18 +715,8 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark, getBookmarkLiveTitle } = useBookmarkTabsContext();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace } = useSpacesContext();
-
-  // Move bookmark's tab to a new window
-  const moveBookmarkToNewWindow = useCallback((bookmarkId: string) =>
-  {
-    const tabId = getTabIdForBookmark(bookmarkId);
-    if (tabId)
-    {
-      chrome.windows.create({ tabId });
-    }
-  }, [getTabIdForBookmark]);
 
   // Open all bookmarks in folder as a tab group
   const handleOpenAsTabGroup = useCallback(async (
@@ -731,6 +750,36 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
       await chrome.tabs.update(createdTabIds[0], { active: true });
       onShowToast?.(`Opened ${createdTabIds.length} tabs as "${folderName}"`);
     }
+  }, [getAllBookmarksInFolder, onShowToast]);
+
+  // Open all bookmarks in folder as separate tabs (no grouping)
+  const handleOpenAllTabs = useCallback(async (folderId: string) =>
+  {
+    const bookmarksList = await getAllBookmarksInFolder(folderId);
+    if (bookmarksList.length === 0)
+    {
+      onShowToast?.('No bookmarks found in folder');
+      return;
+    }
+    for (const bookmark of bookmarksList)
+    {
+      await chrome.tabs.create({ url: bookmark.url, active: false });
+    }
+    onShowToast?.(`Opened ${bookmarksList.length} tabs`);
+  }, [getAllBookmarksInFolder, onShowToast]);
+
+  // Open all bookmarks in a new window
+  const handleOpenAllTabsInNewWindow = useCallback(async (folderId: string) =>
+  {
+    const bookmarksList = await getAllBookmarksInFolder(folderId);
+    if (bookmarksList.length === 0)
+    {
+      onShowToast?.('No bookmarks found in folder');
+      return;
+    }
+    const urls = bookmarksList.map(b => b.url).filter(Boolean) as string[];
+    await chrome.windows.create({ url: urls });
+    onShowToast?.(`Opened ${urls.length} tabs in new window`);
   }, [getAllBookmarksInFolder, onShowToast]);
 
   // Recursively filter bookmarks based on a predicate function
@@ -805,6 +854,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     isOpen: boolean;
     bookmarkId: string | null;
   }>({ isOpen: false, bookmarkId: null });
+  const [moveBookmarkDialog, setMoveBookmarkDialog] = useState<{
+    isOpen: boolean;
+    bookmarkId: string | null;
+    isFolder: boolean;
+  }>({ isOpen: false, bookmarkId: null, isFolder: false });
 
   // Auto-expand space folder when it changes
   useEffect(() =>
@@ -1000,6 +1054,27 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setMoveToSpaceDialog({ isOpen: false, bookmarkId: null });
   }, []);
 
+  // Open move bookmark dialog
+  const openMoveBookmarkDialog = useCallback((bookmarkId: string, isFolder: boolean) =>
+  {
+    setMoveBookmarkDialog({ isOpen: true, bookmarkId, isFolder });
+  }, []);
+
+  const closeMoveBookmarkDialog = useCallback(() =>
+  {
+    setMoveBookmarkDialog({ isOpen: false, bookmarkId: null, isFolder: false });
+  }, []);
+
+  // Handle moving bookmark/folder to a selected folder
+  const handleMoveBookmarkToFolder = useCallback((folderId: string) =>
+  {
+    if (moveBookmarkDialog.bookmarkId)
+    {
+      moveBookmark(moveBookmarkDialog.bookmarkId, folderId, 'into');
+    }
+    closeMoveBookmarkDialog();
+  }, [moveBookmarkDialog.bookmarkId, moveBookmark, closeMoveBookmarkDialog]);
+
   // Handle moving bookmark to a space's folder
   const handleMoveBookmarkToSpace = useCallback(async (bookmarkId: string, spaceId: string) =>
   {
@@ -1179,9 +1254,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             getLiveTitle={getBookmarkLiveTitle}
             onOpenBookmark={openBookmarkTab}
             onCloseBookmark={closeBookmarkTab}
-            onMoveToNewWindow={moveBookmarkToNewWindow}
-            onOpenAsTabGroup={handleOpenAsTabGroup}
+            onOpenAsTabGroup={!useSpaces ? handleOpenAsTabGroup : undefined}
+            onOpenAllTabs={handleOpenAllTabs}
+            onOpenAllTabsInNewWindow={handleOpenAllTabsInNewWindow}
             onMoveToSpace={useSpaces ? openMoveToSpaceDialog : undefined}
+            onMoveBookmark={openMoveBookmarkDialog}
             externalDropTarget={externalDropTarget}
           />
         ))}
@@ -1229,6 +1306,13 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
         onMoveToSpace={handleMoveBookmarkToSpace}
         onClose={closeMoveToSpaceDialog}
         requireBookmarkFolder
+      />
+
+      <FolderPickerDialog
+        isOpen={moveBookmarkDialog.isOpen}
+        title={moveBookmarkDialog.isFolder ? "Move Folder to..." : "Move Bookmark to..."}
+        onSelect={handleMoveBookmarkToFolder}
+        onClose={closeMoveBookmarkDialog}
       />
     </>
   );

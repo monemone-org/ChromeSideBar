@@ -154,20 +154,19 @@ SpaceBar
    - if bookmark is not live, open a new tab with the bookmarked URL (same behaviour as CMD+click on the bookmark)
 
 
-- [-] bookmark popup menu: add "open in new tab" (same behaviour as CMD+click on the bookmark)
+- [x] bookmark popup menu: add "open in new tab" (same behaviour as CMD+click on the bookmark)
 
-- [-]  bookmark popup menu: add a "move to space" menu item. it moves
+- [x]  bookmark popup menu: add a "move to space" menu item. it moves
   the bookmark to under the target space's bookmark folder. then show a toast to confirm the new
   bookmark location by path. the target space's bookmark folder.
 
-- [-] tab popup menu: "move to bookmark" - change to always do "Add to bookmark" instead. position the menu item after "Add to Group"
+- [x] tab popup menu: "move to bookmark" - change to always do "Add to bookmark" instead. position the menu item after "Add to Group"
 
-
-- [ ] settings dialog, options to disable Space. 
+- [x] settings dialog, options to disable Space. 
       1. hide space bar
-      2. remove "Move to Space" popup menu item for both tabs and bookmarks.
+      
 
-- [ ] tab popup menu: "move to space" after moving tab to space, should active that space and bring that tab in that space visible in the side panel
+- [x] tab popup menu: "move to space" after moving tab to space, should active that space and bring that tab in that space visible in the side panel
 
 - [ ] during drag drop, when hover over a folder node, it can expand and collapse the node if the cursor hovers over the node for some period of time. change that behaviour to only expand but not collapse.
 

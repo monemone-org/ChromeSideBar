@@ -621,7 +621,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           )}
           {onOpenMoveToSpaceDialog && (
             <ContextMenu.Item onSelect={() => onOpenMoveToSpaceDialog(tab.id!)}>
-              <SquareStack size={14} className="mr-2" /> Move to Space
+              <SquareStack size={14} className="mr-2" /> Move to Space...
             </ContextMenu.Item>
           )}
           {onMoveToNewWindow && (
