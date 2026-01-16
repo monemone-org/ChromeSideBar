@@ -36,6 +36,8 @@ interface BookmarkTabsContextValue
   getActiveItemKey: () => string | null;
   // Tab filtering for sidebar
   getManagedTabIds: () => Set<number>;
+  // Get item key (bookmark-{id} or pinned-{id}) for a tab
+  getItemKeyForTab: (tabId: number) => string | null;
   // Common
   isInitialized: boolean;
   error: string | null;
@@ -607,6 +609,12 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return new Set(tabToItem.keys());
   }, [tabToItem]);
 
+  // Get item key for a tab (used to find bookmark element for scrolling)
+  const getItemKeyForTab = useCallback((tabId: number): string | null =>
+  {
+    return tabToItem.get(tabId) ?? null;
+  }, [tabToItem]);
+
 
   const value: BookmarkTabsContextValue = {
     openBookmarkTab,
@@ -626,6 +634,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     getPinnedLiveTitle,
     getActiveItemKey,
     getManagedTabIds,
+    getItemKeyForTab,
     isInitialized,
     error,
   };
