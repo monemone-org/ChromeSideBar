@@ -11,7 +11,8 @@ import { matchesFilter } from '../utils/searchParser';
 import { DropIndicators } from './DropIndicators';
 import { ExternalDropTarget, ResolveBookmarkDropTarget } from './TabList';
 import { BookmarkOpenMode } from './SettingsDialog';
-import { Dialog } from './Dialog';
+import { BookmarkEditModal } from './BookmarkEditModal';
+import { BookmarkCreateFolderModal } from './BookmarkCreateFolderModal';
 import * as ContextMenu from './ContextMenu';
 import { TreeRow } from './TreeRow';
 import { useInView } from '../hooks/useInView';
@@ -57,163 +58,6 @@ const getFaviconUrl = (url: string): string => {
   } catch {
     return '';
   }
-};
-
-// --- Edit Modal Component ---
-interface EditModalProps {
-  isOpen: boolean;
-  node: chrome.bookmarks.BookmarkTreeNode | null;
-  onSave: (id: string, title: string, url?: string) => void;
-  onClose: () => void;
-}
-
-const EditModal = ({ isOpen, node, onSave, onClose }: EditModalProps) =>
-{
-  const [title, setTitle] = useState('');
-  const [url, setUrl] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Reset state and focus input when dialog opens
-  useEffect(() =>
-  {
-    if (isOpen && node)
-    {
-      setTitle(node.title);
-      setUrl(node.url || '');
-      // Focus after a short delay to ensure portal is mounted
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  }, [isOpen, node]);
-
-  if (!node) return null;
-
-  const isFolder = !node.url;
-
-  const handleSubmit = (e: React.FormEvent) =>
-  {
-    e.preventDefault();
-    onSave(node.id, title, isFolder ? undefined : url);
-    onClose();
-  };
-
-  return (
-    <Dialog
-      isOpen={isOpen}
-      onClose={onClose}
-      title={`Edit ${isFolder ? 'Folder' : 'Bookmark'}`}
-      maxWidth="max-w-sm"
-    >
-      <form onSubmit={handleSubmit} className="p-4 space-y-3">
-        <div>
-          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Name</label>
-          <input
-            ref={inputRef}
-            className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
-
-        {!isFolder && (
-          <div>
-            <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">URL</label>
-            <input
-              className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-            />
-          </div>
-        )}
-
-        <div className="flex justify-end space-x-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
-          >
-            Save
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
-};
-
-// --- Create Folder Modal Component ---
-interface CreateFolderModalProps {
-  isOpen: boolean;
-  parentId: string | null;
-  onSave: (parentId: string, title: string) => void;
-  onClose: () => void;
-}
-
-const CreateFolderModal = ({ isOpen, parentId, onSave, onClose }: CreateFolderModalProps) =>
-{
-  const [title, setTitle] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  // Reset state and focus input when dialog opens
-  useEffect(() =>
-  {
-    if (isOpen && parentId)
-    {
-      setTitle('');
-      // Focus after a short delay to ensure portal is mounted
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
-  }, [isOpen, parentId]);
-
-  if (!parentId) return null;
-
-  const handleSubmit = (e: React.FormEvent) =>
-  {
-    e.preventDefault();
-    if (title.trim())
-    {
-      onSave(parentId, title.trim());
-      onClose();
-    }
-  };
-
-  return (
-    <Dialog isOpen={isOpen} onClose={onClose} title="New Folder" maxWidth="max-w-sm">
-      <form onSubmit={handleSubmit} className="p-4 space-y-3">
-        <div>
-          <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">Folder Name</label>
-          <input
-            ref={inputRef}
-            className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter folder name"
-          />
-        </div>
-
-        <div className="flex justify-end space-x-2 pt-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!title.trim()}
-            className="px-3 py-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white rounded-md"
-          >
-            Create
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
 };
 
 // Standard Chrome bookmark folder IDs
@@ -1272,14 +1116,14 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
         <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
       )}
 
-      <EditModal
+      <BookmarkEditModal
         isOpen={editingNode !== null}
         node={editingNode}
         onSave={updateBookmark}
         onClose={() => setEditingNode(null)}
       />
 
-      <CreateFolderModal
+      <BookmarkCreateFolderModal
         isOpen={creatingFolderParentId !== null}
         parentId={creatingFolderParentId}
         onSave={(parentId, title) => {

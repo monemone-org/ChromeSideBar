@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createChromeErrorHandler } from '../utils/chromeError';
 
 // Helper: safely extract hostname from URL
 const getHostname = (url: string | undefined): string =>
@@ -30,16 +31,10 @@ export const useTabs = () => {
   const [tabs, setTabs] = useState<chrome.tabs.Tab[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const handleError = useCallback((operation: string) => {
-    const err = chrome.runtime.lastError;
-    if (err) {
-      console.error(`Tab ${operation} error:`, err.message);
-      setError(err.message || `Failed to ${operation}`);
-      return true;
-    }
-    setError(null);
-    return false;
-  }, []);
+  const handleError = useCallback(
+    createChromeErrorHandler('Tab', setError),
+    []
+  );
 
   const fetchTabs = useCallback(() => {
     if (typeof chrome !== 'undefined' && chrome.tabs) {

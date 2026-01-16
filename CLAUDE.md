@@ -25,6 +25,24 @@ Do not run `git add` or `git commit`. Notify the user to add and commit.
 - Use TypeScript strict mode
 - Follow existing patterns in the codebase
 
+## Shared Utilities
+
+### Chrome API Error Handling
+
+Use `createChromeErrorHandler` from `src/utils/chromeError.ts` for handling Chrome API errors in hooks:
+
+```typescript
+import { createChromeErrorHandler } from '../utils/chromeError';
+
+const [error, setError] = useState<string | null>(null);
+const handleError = useCallback(
+  createChromeErrorHandler('YourContext', setError),
+  []
+);
+```
+
+This provides consistent error logging and state management across all Chrome API calls.
+
 ## Feature Documentation
 
 All feature docs in `docs/` must have YAML front matter:
@@ -39,11 +57,7 @@ status: draft | in-progress | completed | finalized
 
 - `created`: Date file was first committed
 - `after-version`: Extension version at time of creation (feature built after this version)
-- `status`:
-  - `draft` - Feature planned but not implemented
-  - `in-progress` - Feature partially implemented
-  - `completed` - Feature fully implemented
-  - `finalized` - Documentation complete and stable (test results, store info, etc.)
+- `status`: status 
 
 ## Versioning
 

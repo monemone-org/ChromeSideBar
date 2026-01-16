@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { createChromeErrorHandler } from '../utils/chromeError';
 
 // Helper to create window-scoped storage key
 const getStorageKey = (windowId: number) => `tabAssociations_${windowId}`;
@@ -88,18 +89,10 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     });
   }, []);
 
-  const handleError = useCallback((operation: string) =>
-  {
-    const err = chrome.runtime.lastError;
-    if (err)
-    {
-      console.error(`BookmarkTabs ${operation} error:`, err.message);
-      setError(err.message || `Failed to ${operation}`);
-      return true;
-    }
-    setError(null);
-    return false;
-  }, []);
+  const handleError = useCallback(
+    createChromeErrorHandler('BookmarkTabs', setError),
+    []
+  );
 
   // Rebuild associations from storage on init
   // Just validates that stored tabIds still exist - no URL matching

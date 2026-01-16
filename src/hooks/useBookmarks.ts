@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createChromeErrorHandler } from '../utils/chromeError';
 
 export type SortOption = 'none' | 'name' | 'dateAdded';
 
@@ -17,16 +18,10 @@ export const useBookmarks = () => {
   const [bookmarks, setBookmarks] = useState<chrome.bookmarks.BookmarkTreeNode[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const handleError = useCallback((operation: string) => {
-    const err = chrome.runtime.lastError;
-    if (err) {
-      console.error(`Bookmark ${operation} error:`, err.message);
-      setError(err.message || `Failed to ${operation}`);
-      return true;
-    }
-    setError(null);
-    return false;
-  }, []);
+  const handleError = useCallback(
+    createChromeErrorHandler('Bookmark', setError),
+    []
+  );
 
   const fetchBookmarks = useCallback(() => {
     if (typeof chrome !== 'undefined' && chrome.bookmarks) {
