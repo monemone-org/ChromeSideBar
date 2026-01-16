@@ -33,7 +33,6 @@ interface PinnedBarProps {
   iconSize: number;
   bookmarkOpenMode?: BookmarkOpenMode;
   filterLiveTabs?: boolean;
-  filterAudible?: boolean;
   filterText?: string;
 }
 
@@ -47,7 +46,6 @@ export const PinnedBar = ({
   iconSize,
   bookmarkOpenMode = 'arc',
   filterLiveTabs = false,
-  filterAudible = false,
   filterText = '',
 }: PinnedBarProps) => {
   const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned } = useBookmarkTabsContext();
@@ -62,13 +60,12 @@ export const PinnedBar = ({
     }
   };
 
-  // Filter pinned sites based on active filters (single pass instead of O(3n))
-  const hasFilters = filterLiveTabs || filterAudible || filterText.trim();
+  // Filter pinned sites based on active filters
+  const hasFilters = filterLiveTabs || filterText.trim();
   const visiblePinnedSites = hasFilters
     ? pinnedSites.filter(site =>
       {
         if (filterLiveTabs && !isPinnedLoaded(site.id)) return false;
-        if (filterAudible && !isPinnedAudible(site.id)) return false;
         if (filterText.trim() && !matchesFilter(site.title, site.url, filterText)) return false;
         return true;
       })

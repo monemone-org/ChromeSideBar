@@ -910,13 +910,12 @@ interface TabListProps {
   onExternalDropTargetChange?: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget?: () => ResolveBookmarkDropTarget | null;
   arcStyleEnabled?: boolean;
-  filterAudible?: boolean;
   filterText?: string;
   activeSpace?: Space;  // If provided, use this instead of context
   useSpaces?: boolean;  // When true, show "Add to Space" menu; when false, show "Add to Group" menu
 }
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterAudible = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
@@ -980,7 +979,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   }, [removeTabFromSpace, windowId]);
 
   // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
-  // Also apply audible filter, text filter, and space filter if enabled
+  // Also apply text filter and space filter if enabled
   const visibleTabs = useMemo(() =>
   {
     const managedTabIds = getManagedTabIds();
@@ -993,10 +992,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       filtered = filtered.filter(tab => tab.id && spaceTabIdSet.has(tab.id));
     }
 
-    if (filterAudible)
-    {
-      filtered = filtered.filter(tab => tab.audible);
-    }
     if (filterText.trim())
     {
       filtered = filtered.filter(tab =>
@@ -1004,7 +999,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       );
     }
     return filtered;
-  }, [tabs, getManagedTabIds, filterAudible, filterText, isInSpace, activeSpaceTabIds]);
+  }, [tabs, getManagedTabIds, filterText, isInSpace, activeSpaceTabIds]);
 
   // Tab groups are independent from spaces - show all Chrome tab groups
   // Users can use both Spaces (internal) and Chrome tab groups together

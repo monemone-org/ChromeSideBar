@@ -6,8 +6,7 @@ interface ToolbarProps
 {
   filterLiveTabsActive: boolean;
   onFilterLiveTabsToggle: () => void;
-  filterAudibleActive: boolean;
-  onFilterAudibleToggle: () => void;
+  onAudioDialogOpen: () => void;
   onMenuToggle: () => void;
   menuButtonRef: React.RefObject<HTMLButtonElement>;
   // Text filter props
@@ -31,8 +30,7 @@ const DEBOUNCE_MS = 300;
 export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   filterLiveTabsActive,
   onFilterLiveTabsToggle,
-  filterAudibleActive,
-  onFilterAudibleToggle,
+  onAudioDialogOpen,
   onMenuToggle,
   menuButtonRef,
   filterText,
@@ -308,7 +306,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   }, [inputValue, sessionRecentEntry, onUpdateRecent]);
 
   // Check if any filter is active
-  const hasActiveFilters = filterLiveTabsActive || filterAudibleActive || inputValue.trim() !== '';
+  const hasActiveFilters = filterLiveTabsActive || inputValue.trim() !== '';
 
   // Close dropdown when clicking outside or pressing Escape
   useEffect(() =>
@@ -584,6 +582,18 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
           {/* Separator */}
           <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-0.5" />
 
+          {/* Audio dialog button */}
+          <button
+            onClick={onAudioDialogOpen}
+            title="Show tabs playing audio/video"
+            className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
+          >
+            <Volume2 size={16} />
+          </button>
+
+          {/* Separator */}
+          <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-0.5" />
+
           {/* Filter buttons */}
           <button
             onClick={onFilterLiveTabsToggle}
@@ -593,16 +603,6 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             }`}
           >
             <Filter size={16} />
-          </button>
-
-          <button
-            onClick={onFilterAudibleToggle}
-            title={filterAudibleActive ? "Show all items" : "Show only items playing audio/video"}
-            className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
-              filterAudibleActive ? activeButtonClass : inactiveButtonClass
-            }`}
-          >
-            <Volume2 size={16} />
           </button>
 
           {/* Toggle search bar button */}

@@ -9,8 +9,10 @@ import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
 import { WelcomeDialog } from './components/WelcomeDialog';
+import { AudioTabsDialog } from './components/AudioTabsDialog';
 import { Toast } from './components/Toast';
 import { usePinnedSites } from './hooks/usePinnedSites';
+import { useTabs } from './hooks/useTabs';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation';
@@ -35,7 +37,6 @@ interface SidebarContentProps
   bookmarkOpenMode: BookmarkOpenMode;
   onResolverReady: (fn: ResolveBookmarkDropTarget) => void;
   filterLiveTabs: boolean;
-  filterAudible: boolean;
   filterText: string;
   sortGroupsFirst: boolean;
   useSpaces: boolean;
@@ -51,7 +52,6 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   bookmarkOpenMode,
   onResolverReady,
   filterLiveTabs,
-  filterAudible,
   filterText,
   sortGroupsFirst,
   useSpaces,
@@ -71,7 +71,6 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         bookmarkOpenMode={bookmarkOpenMode}
         onResolverReady={onResolverReady}
         filterLiveTabs={filterLiveTabs}
-        filterAudible={filterAudible}
         filterText={filterText}
         activeSpace={activeSpace}
         onShowToast={onShowToast}
@@ -83,7 +82,6 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         onExternalDropTargetChange={onExternalDropTargetChange}
         resolveBookmarkDropTarget={resolveBookmarkDropTarget}
         arcStyleEnabled={bookmarkOpenMode === 'arc'}
-        filterAudible={filterAudible}
         filterText={filterText}
         activeSpace={activeSpace}
         useSpaces={useSpaces}
@@ -311,7 +309,7 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
-  const [filterAudible, setFilterAudible] = useState(false);
+  const [showAudioDialog, setShowAudioDialog] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [savedFilters, setSavedFilters] = useLocalStorage<string[]>(
     'sidebar-saved-filters',
@@ -346,6 +344,7 @@ function App() {
     appendPinnedSites,
   } = usePinnedSites();
   const { bookmarks } = useBookmarks();
+  const { tabs, activateTab } = useTabs();
   const {
     spaces,
     replaceSpaces,
@@ -364,12 +363,6 @@ function App() {
 
   // Filter handlers
   const handleFilterTextChange = (text: string) => {
-    // Reset audible filter only when starting a new search (empty → non-empty)
-    // This shows all matched tabs, not just audible ones
-    // If user manually re-enables audible filter after, that choice is respected
-    if (filterText.trim() === '' && text.trim() !== '') {
-      setFilterAudible(false);
-    }
     setFilterText(text);
   };
 
@@ -384,10 +377,6 @@ function App() {
   };
 
   const handleApplyFilter = (text: string) => {
-    // Reset audible filter when applying a filter from empty state
-    if (filterText.trim() === '' && text.trim() !== '') {
-      setFilterAudible(false);
-    }
     setFilterText(text);
     // Add to recent filters (avoid duplicates, max 5)
     const trimmed = text.trim();
@@ -424,7 +413,6 @@ function App() {
   const handleResetFilters = useCallback(() => {
     setFilterText('');
     setFilterLiveTabs(false);
-    setFilterAudible(false);
   }, []);
 
   // Space handlers
@@ -541,6 +529,16 @@ function App() {
         }}
       />
 
+      <AudioTabsDialog
+        isOpen={showAudioDialog}
+        tabs={tabs.filter(t => t.audible)}
+        onTabSelect={(tabId) =>
+        {
+          activateTab(tabId);
+        }}
+        onClose={() => setShowAudioDialog(false)}
+      />
+
       {/* Toolbar */}
       <div ref={toolbarRef} className="relative">
         <Toolbar
@@ -549,15 +547,8 @@ function App() {
           {
             const newValue = !filterLiveTabs;
             setFilterLiveTabs(newValue);
-            if (newValue) setFilterAudible(false);
           }}
-          filterAudibleActive={filterAudible}
-          onFilterAudibleToggle={() =>
-          {
-            const newValue = !filterAudible;
-            setFilterAudible(newValue);
-            if (newValue) setFilterLiveTabs(false);
-          }}
+          onAudioDialogOpen={() => setShowAudioDialog(true)}
           onMenuToggle={() => setShowMenu(!showMenu)}
           menuButtonRef={buttonRef}
           filterText={filterText}
@@ -658,7 +649,6 @@ function App() {
         iconSize={pinnedIconSize}
         bookmarkOpenMode={bookmarkOpenMode}
         filterLiveTabs={filterLiveTabs}
-        filterAudible={filterAudible}
         filterText={filterText}
       />
 
@@ -676,7 +666,6 @@ function App() {
         bookmarkOpenMode={bookmarkOpenMode}
         onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }}
         filterLiveTabs={filterLiveTabs}
-        filterAudible={filterAudible}
         filterText={filterText}
         sortGroupsFirst={sortGroupsFirst}
         useSpaces={spacesEnabled}

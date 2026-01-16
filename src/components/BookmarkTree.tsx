@@ -706,14 +706,13 @@ interface BookmarkTreeProps {
   bookmarkOpenMode?: BookmarkOpenMode;
   onResolverReady?: (resolver: ResolveBookmarkDropTarget) => void;
   filterLiveTabs?: boolean;
-  filterAudible?: boolean;
   filterText?: string;
   activeSpace?: Space | null;
   onShowToast?: (message: string) => void;
   useSpaces?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace } = useSpacesContext();
@@ -833,14 +832,13 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     visibleBookmarks = [spaceFolder];
   }
 
-  // Apply all filters in a single pass instead of O(3n)
-  const hasFilters = filterLiveTabs || filterAudible || filterText.trim();
+  // Apply all filters in a single pass
+  const hasFilters = filterLiveTabs || filterText.trim();
   if (hasFilters)
   {
     visibleBookmarks = filterBookmarksRecursive(visibleBookmarks, (node) =>
     {
       if (filterLiveTabs && !isBookmarkLoaded(node.id)) return false;
-      if (filterAudible && !isBookmarkAudible(node.id)) return false;
       if (filterText.trim() && !matchesFilter(node.title, node.url ?? '', filterText)) return false;
       return true;
     });
