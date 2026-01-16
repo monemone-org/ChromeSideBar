@@ -37,13 +37,6 @@
       },
       "description": "Toggle Side Panel"
     },
-    "open-saved-filters": {
-      "suggested_key": {
-        "default": "Alt+Shift+F",
-        "mac": "Alt+Shift+F"
-      },
-      "description": "Open Saved Filters"
-    },
     "prev-used-tab": {
       "suggested_key": {
         "default": "Ctrl+Shift+Comma",
@@ -57,6 +50,13 @@
         "mac": "Command+Shift+Period"
       },
       "description": "Next Used Tab"
+    },
+    "navigate-spaces": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "Navigate Spaces"
     }
   }
 }

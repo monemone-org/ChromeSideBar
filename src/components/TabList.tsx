@@ -24,7 +24,7 @@ export type ResolveBookmarkDropTarget = (
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
 import { FolderPickerDialog } from './FolderPickerDialog';
-import { MoveToSpaceDialog } from './MoveToSpaceDialog';
+import { SpaceNavigatorDialog } from './SpaceNavigatorDialog';
 import { AddToGroupDialog } from './AddToGroupDialog';
 import { ChangeGroupColorDialog } from './ChangeGroupColorDialog';
 import { ExportConflictDialog, ExportConflictMode } from './ExportConflictDialog';
@@ -690,8 +690,11 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   }, []);
 
   // Handler to move tab to a space (internal tracking, not Chrome groups)
-  const handleMoveToSpace = useCallback((tabId: number, spaceId: string) =>
+  const handleMoveToSpace = useCallback((spaceId: string) =>
   {
+    const tabId = moveToSpaceDialog.tabId;
+    if (tabId === null) return;
+
     const space = spaces.find(s => s.id === spaceId);
     addTabToSpace(tabId, spaceId);
 
@@ -699,7 +702,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     {
       showToast(`Moved to ${space.name}`);
     }
-  }, [spaces, addTabToSpace, showToast]);
+  }, [moveToSpaceDialog.tabId, spaces, addTabToSpace, showToast]);
 
   // Change Group Color dialog state
   const [changeColorDialog, setChangeColorDialog] = useState<{
@@ -1944,13 +1947,14 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         onClose={closeAddToGroupDialog}
       />
 
-      <MoveToSpaceDialog
+      <SpaceNavigatorDialog
         isOpen={moveToSpaceDialog.isOpen}
-        itemId={moveToSpaceDialog.tabId}
-        spaces={spaces}
-        currentSpaceId={activeSpace?.id}
-        onMoveToSpace={handleMoveToSpace}
         onClose={closeMoveToSpaceDialog}
+        title="Move to Space"
+        hideAllSpace
+        excludeSpaceId={moveToSpaceDialog.currentSpaceId}
+        onSelectSpace={handleMoveToSpace}
+        showCurrentIndicator={false}
       />
 
       <ChangeGroupColorDialog

@@ -3,7 +3,7 @@ import { useBookmarks, SortOption } from '../hooks/useBookmarks';
 import { Space, useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { FolderPickerDialog } from './FolderPickerDialog';
-import { MoveToSpaceDialog } from './MoveToSpaceDialog';
+import { SpaceNavigatorDialog } from './SpaceNavigatorDialog';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
@@ -918,17 +918,35 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   }, [moveBookmarkDialog.bookmarkId, moveBookmark, closeMoveBookmarkDialog]);
 
   // Handle moving bookmark to a space's folder
-  const handleMoveBookmarkToSpace = useCallback(async (bookmarkId: string, spaceId: string) =>
+  // Returns error message if failed, undefined if successful
+  const handleMoveBookmarkToSpace = useCallback(async (spaceId: string): Promise<string | void> =>
   {
+    const bookmarkId = moveToSpaceDialog.bookmarkId;
+    if (!bookmarkId) return 'No bookmark selected';
+
     const space = spaces.find(s => s.id === spaceId);
-    if (!space?.bookmarkFolderPath) return;
+    if (!space?.bookmarkFolderPath)
+    {
+      return `"${space?.name || 'Space'}" has no bookmark folder configured`;
+    }
 
     const folder = findFolderByPath(space.bookmarkFolderPath);
-    if (!folder) return;
+    if (!folder)
+    {
+      return `Folder "${space.bookmarkFolderPath}" no longer exists`;
+    }
 
-    await chrome.bookmarks.move(bookmarkId, { parentId: folder.id });
-    onShowToast?.(`Moved to ${space.name}. New location: ${space.bookmarkFolderPath}`);
-  }, [spaces, findFolderByPath, onShowToast]);
+    try
+    {
+      await chrome.bookmarks.move(bookmarkId, { parentId: folder.id });
+      onShowToast?.(`Moved to ${space.name}. New location: ${space.bookmarkFolderPath}`);
+    }
+    catch (err)
+    {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return `Failed to move bookmark: ${message}`;
+    }
+  }, [moveToSpaceDialog.bookmarkId, spaces, findFolderByPath, onShowToast]);
 
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -1140,14 +1158,15 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
         onClose={() => setCreatingFolderParentId(null)}
       />
 
-      <MoveToSpaceDialog
+      <SpaceNavigatorDialog
         isOpen={moveToSpaceDialog.isOpen}
-        itemId={moveToSpaceDialog.bookmarkId}
-        spaces={spaces}
-        currentSpaceId={activeSpace?.id}
-        onMoveToSpace={handleMoveBookmarkToSpace}
         onClose={closeMoveToSpaceDialog}
+        title="Move to Space"
+        hideAllSpace
+        excludeSpaceId={activeSpace?.id}
         requireBookmarkFolder
+        onSelectSpace={handleMoveBookmarkToSpace}
+        showCurrentIndicator={false}
       />
 
       <FolderPickerDialog

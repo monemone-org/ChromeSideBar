@@ -399,17 +399,6 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       {
         focusInputWithCursorAtEnd();
       }
-      else if (command === 'open-saved-filters')
-      {
-        // Focus immediately to catch the event
-        focusInputWithCursorAtEnd();
-        
-        // Toggle dropdown instead of just opening
-        setShowDropdown(prev => !prev);
-        
-        // Re-focus after render to ensure it sticks
-        setTimeout(focusInputWithCursorAtEnd, 100);
-      }
     };
 
     chrome.commands.onCommand.addListener(handleCommand);

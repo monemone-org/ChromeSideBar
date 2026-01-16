@@ -172,7 +172,7 @@ SpaceBar
       - [x] Review code for O(n²) or less efficient logic.
       - [x] Refactor reusable or self-contained code into separate components. Remove duplicated code. 
       - [x] Security review
-      - [ ] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
-      - [ ] Simplify code.
+      - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
+      
 
 

@@ -10,6 +10,7 @@ import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
 import { WelcomeDialog } from './components/WelcomeDialog';
 import { AudioTabsDialog } from './components/AudioTabsDialog';
+import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
 import { usePinnedSites } from './hooks/usePinnedSites';
 import { useTabs } from './hooks/useTabs';
@@ -292,6 +293,7 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
+  const [showSpaceNavigator, setShowSpaceNavigator] = useState(false);
   const [filterText, setFilterText] = useState('');
   const [savedFilters, setSavedFilters] = useLocalStorage<string[]>(
     'sidebar-saved-filters',
@@ -455,6 +457,21 @@ function App() {
     {
       chrome.runtime.sendMessage({ action: 'set-debug-tab-history', enabled: true });
     }
+  }, []);
+
+  // Listen for navigate-spaces command
+  useEffect(() =>
+  {
+    const handleCommand = (command: string) =>
+    {
+      if (command === 'navigate-spaces')
+      {
+        setShowSpaceNavigator(true);
+      }
+    };
+
+    chrome.commands.onCommand.addListener(handleCommand);
+    return () => chrome.commands.onCommand.removeListener(handleCommand);
   }, []);
 
   return (
@@ -664,6 +681,12 @@ function App() {
         showDeleteDialog={showSpaceDeleteDialog}
         spaceToDelete={spaceToDelete}
         onCloseDeleteDialog={() => setShowSpaceDeleteDialog(false)}
+      />
+
+      {/* Space Navigator Dialog */}
+      <SpaceNavigatorDialog
+        isOpen={showSpaceNavigator}
+        onClose={() => setShowSpaceNavigator(false)}
       />
 
       {/* Space Bar - only shown when useSpaces is enabled */}

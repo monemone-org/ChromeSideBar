@@ -486,5 +486,5 @@ chrome.commands.onCommand.addListener((command) =>
       navigateHistory(tabs[0].windowId, direction);
     });
   }
-  // Note: focus-filter-input and open-saved-filters are handled directly in the side panel
+  // Note: focus-filter-input and navigate-spaces are handled directly in the side panel
 });
