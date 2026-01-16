@@ -1,3 +1,9 @@
+---
+created: 2026-01-15
+after-version: 1.0.149
+status: completed
+---
+
 # Last Active Tab Per Space
 
 When switching to a different space, automatically activate the last used tab in that space. Like how IDE tabs remember which file you were editing per project.

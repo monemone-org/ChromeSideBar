@@ -1,3 +1,9 @@
+---
+created: 2025-12-21
+after-version: 1.0.75
+status: completed
+---
+
 # Pinned Bookmarks Feature Overview
 
 ## Purpose

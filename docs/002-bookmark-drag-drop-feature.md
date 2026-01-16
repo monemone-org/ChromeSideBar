@@ -1,3 +1,9 @@
+---
+created: 2025-12-21
+after-version: 1.0.75
+status: completed
+---
+
 # Drag-Drop Feature Overview
 
 This document covers drag-and-drop functionality for both bookmarks and tabs/groups.

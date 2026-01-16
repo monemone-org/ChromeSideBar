@@ -1,3 +1,9 @@
+---
+created: 2026-01-12
+after-version: 1.0.146
+status: completed
+---
+
 # Performance Test Results - 2026-01-12
 
 ## Test Configuration

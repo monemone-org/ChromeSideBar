@@ -1,3 +1,9 @@
+---
+created: 2026-01-14
+after-version: 1.0.149
+status: completed
+---
+
 # Welcome Dialog
 
 ## Goal

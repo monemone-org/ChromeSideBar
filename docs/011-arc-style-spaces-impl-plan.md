@@ -1,3 +1,9 @@
+---
+created: 2026-01-13
+after-version: 1.0.149
+status: completed
+---
+
 # Arc-Style Spaces - Implementation Plan
 
 Detailed breakdown of implementation phases for the Spaces feature.

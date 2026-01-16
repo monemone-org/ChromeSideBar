@@ -1,3 +1,9 @@
+---
+created: 2026-01-07
+after-version: 1.0.136
+status: completed
+---
+
 # Tab History Navigation
 
 Navigate between recently used tabs like undo/redo. Super handy for jumping back to "that tab I was just looking at."

@@ -1,3 +1,9 @@
+---
+created: 2025-12-30
+after-version: 1.0.132
+status: draft
+---
+
 # Sanity Test Cases
 
 Manual test cases to verify core functionality of the Chrome Sidebar extension.

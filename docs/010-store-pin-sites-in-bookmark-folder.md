@@ -1,3 +1,9 @@
+---
+created: 2026-01-12
+after-version: 1.0.146
+status: draft
+---
+
 # 010-store-pin-sites-in-bookmark-folder.md
 
 

@@ -1,3 +1,9 @@
+---
+created: 2026-01-09
+after-version: 1.0.140
+status: completed
+---
+
 # Advanced Search Syntax
 
 ## Overview

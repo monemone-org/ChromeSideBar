@@ -1,3 +1,9 @@
+---
+created: 2026-01-14
+after-version: 1.0.149
+status: completed
+---
+
 ## Overview
 
 Open a bookmark folder as a Chrome tab group, creating tabs for all bookmarks (recursively) and grouping them together. This is the reverse of "Save to Bookmarks" (004).

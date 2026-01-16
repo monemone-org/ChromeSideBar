@@ -1,3 +1,9 @@
+---
+created: 2026-01-01
+after-version: 1.0.103
+status: completed
+---
+
 ## Overview
 
 Import and export sidebar data (pinned sites, bookmarks, and tabs/groups) via JSON backup files. Allows users to backup their data or transfer it between browsers/profiles.

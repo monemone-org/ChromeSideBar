@@ -1,4 +1,3 @@
-
 ## Summary from package
 Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
 

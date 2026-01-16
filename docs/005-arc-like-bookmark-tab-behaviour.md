@@ -1,3 +1,9 @@
+---
+created: 2026-01-01
+after-version: 1.0.103
+status: completed
+---
+
 # Arc-like Bookmark-Tab Behavior
 
 ## Purpose

@@ -25,6 +25,26 @@ Do not run `git add` or `git commit`. Notify the user to add and commit.
 - Use TypeScript strict mode
 - Follow existing patterns in the codebase
 
+## Feature Documentation
+
+All feature docs in `docs/` must have YAML front matter:
+
+```yaml
+---
+created: YYYY-MM-DD
+after-version: X.X.XXX
+status: draft | in-progress | completed | finalized
+---
+```
+
+- `created`: Date file was first committed
+- `after-version`: Extension version at time of creation (feature built after this version)
+- `status`:
+  - `draft` - Feature planned but not implemented
+  - `in-progress` - Feature partially implemented
+  - `completed` - Feature fully implemented
+  - `finalized` - Documentation complete and stable (test results, store info, etc.)
+
 ## Versioning
 
 **Before running command git-commit-msg**, update extension version number with:

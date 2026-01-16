@@ -1,3 +1,9 @@
+---
+created: 2025-12-24
+after-version: 1.0.22
+status: completed
+---
+
 # Chrome Tab Groups Feature Planning Document
 
 ## Purpose

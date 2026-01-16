@@ -1,3 +1,9 @@
+---
+created: 2026-01-03
+after-version: 1.0.108
+status: draft
+---
+
 # Multi-Selection Feature
 
 ## Overview

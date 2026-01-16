@@ -1,3 +1,9 @@
+---
+created: 2025-12-30
+after-version: 1.0.132
+status: completed
+---
+
 ## Overview
 
 Export a tab group as a bookmark folder under "Other Bookmarks", allowing users to preserve grouped tabs for later access.

@@ -1,3 +1,9 @@
+---
+created: 2026-01-13
+after-version: 1.0.149
+status: completed
+---
+
 # Arc-Style Spaces Test Plan (Phases 1-5)
 
 Manual test plan for the Spaces feature. A Space links a bookmark folder to a Chrome tab group, creating isolated workspaces.
