@@ -1,3 +1,9 @@
+---
+created: 2026-01-15
+after-version: 1.0.149
+status: draft
+---
+
  i feel that the current implementation of space is confusing when adding in
   Group in the user interface.
 
@@ -6,24 +12,26 @@
 
 Concept:
 
-  perssted grouip will have the same properties as Space:
+  Persisted Group is basically Space. It has properties:
   - name
   - icon
   - colour
-  - bookmark folder to filter on
-      -bookmark folder will optional.  if not provided, all bookmarks will be shown in the bookmark section.
-      -by default bookmark folder is empty. users can enter in edit/create group dialog (former edit/create space dialog)
+  - Bookmark folder to filter on
+      - differ from space, bookmark folder will optional.  if not provided, all bookmarks will be shown in the bookmark section.
+      - by default bookmark folder is empty.
+      - users can enter in edit/create group dialog (former edit/create space dialog)
+      - need a name for this.  "Focused Bookmark Fodler"? "Filtered Bookmark Folder"?  
+          Or create dialog doesn't set it.  Users in the bookmark tree can right click to "focus on" a folder. there is a "Reset" button on that focused bookmark folder row (i.e. the root space bookmark folder right now)to "Unfocus".
+
       
-SpaceBar:
+Space Bar -> Group Bar:
   - now "Group Bar"
-  - show all groups
-  - by default all persisted group are shown first in the group bar, then the temp groups.
-  - the order in space bar doesnt need to match the group order in tab bar.
+  - Show all groups
+  - when extension is started, all persisted group are shown first in the group bar, then the temp groups.
+  - user can reorder groups at runtime but only the relative order of persisted group is persisted.
+  - the order in Group Bar doesn't need to match the group order in Chrome's tab bar.
   - [+] will create a new persiste group. Same as in Space, but may not have a corresponding group till an tab is added.
+  - new group created (either persited group or normal chrome group) is added to the end.
 
-  means:
-  Space Bar -> Group Bar: it shows persisted groups and all the groups.
-  persisted group will be placed first in the bar by default. but users can
-  reorder them.
 
-update CLAUDE.md to explain the front matter requirements for the feature docs under docs/
+There will be no more both operation "Add to Group" and "Add to Space" because they will be the same.

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, X } from 'lucide-react';
 import { useFontSize } from '../contexts/FontSizeContext';
 
 interface ToastProps
@@ -36,11 +36,18 @@ export const Toast = ({
 
   return createPortal(
     <div
-      className="fixed bottom-4 left-4 right-4 z-50 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
+      className="fixed bottom-14 left-4 right-4 z-50 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
       style={{ fontSize: `${fontSize}px` }}
     >
       <CheckCircle size={16} className="shrink-0 self-start mt-0.5" />
-      <span>{message}</span>
+      <span className="flex-1">{message}</span>
+      <button
+        onClick={onDismiss}
+        className="shrink-0 p-0.5 hover:bg-green-500 rounded"
+        aria-label="Dismiss"
+      >
+        <X size={16} />
+      </button>
     </div>,
     document.body
   );

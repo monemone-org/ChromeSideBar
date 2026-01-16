@@ -5,14 +5,15 @@ import { Space } from '../contexts/SpacesContext';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getIconUrl } from '../utils/iconify';
 
-export interface MoveToSpaceDialogProps
+export interface MoveToSpaceDialogProps<T extends string | number>
 {
   isOpen: boolean;
-  tabId: number | null;
+  itemId: T | null;
   spaces: Space[];
   currentSpaceId?: string;
-  onMoveToSpace: (tabId: number, spaceId: string) => void;
+  onMoveToSpace: (itemId: T, spaceId: string) => void;
   onClose: () => void;
+  requireBookmarkFolder?: boolean;
 }
 
 // Get space icon element - mirrors SpaceIcon.tsx getIcon()
@@ -38,23 +39,25 @@ const getSpaceIcon = (iconName: string, size: number = 14): React.ReactNode =>
   );
 };
 
-export const MoveToSpaceDialog = ({
+export const MoveToSpaceDialog = <T extends string | number>({
   isOpen,
-  tabId,
+  itemId,
   spaces,
   currentSpaceId,
   onMoveToSpace,
-  onClose
-}: MoveToSpaceDialogProps) =>
+  onClose,
+  requireBookmarkFolder = false
+}: MoveToSpaceDialogProps<T>) =>
 {
   // Filter out "All" space and current space
   const availableSpaces = spaces.filter(s => s.id !== 'all' && s.id !== currentSpaceId);
 
-  if (tabId === null) return null;
+  if (itemId === null) return null;
 
-  const handleSelectSpace = (spaceId: string) =>
+  const handleSelectSpace = (space: Space) =>
   {
-    onMoveToSpace(tabId, spaceId);
+    if (requireBookmarkFolder && !space.bookmarkFolderPath) return;
+    onMoveToSpace(itemId, space.id);
     onClose();
   };
 
@@ -69,17 +72,27 @@ export const MoveToSpaceDialog = ({
           availableSpaces.map((space) =>
           {
             const colorStyle = GROUP_COLORS[space.color] || GROUP_COLORS.grey;
+            const isDisabled = requireBookmarkFolder && !space.bookmarkFolderPath;
             return (
               <button
                 key={space.id}
-                onClick={() => handleSelectSpace(space.id)}
-                className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
+                onClick={() => handleSelectSpace(space)}
+                disabled={isDisabled}
+                className={clsx(
+                  "w-full px-3 py-2 text-left flex items-center gap-2",
+                  isDisabled
+                    ? "text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                    : "text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                )}
               >
                 <span className={clsx("w-3 h-3 rounded-full flex-shrink-0", colorStyle.dot)} />
                 <span className="flex items-center justify-center w-4 h-4 flex-shrink-0">
                   {getSpaceIcon(space.icon, 14)}
                 </span>
                 <span className="truncate">{space.name}</span>
+                {isDisabled && (
+                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">No folder</span>
+                )}
               </button>
             );
           })

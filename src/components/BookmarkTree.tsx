@@ -3,6 +3,7 @@ import { useBookmarks, SortOption } from '../hooks/useBookmarks';
 import { Space, useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { FolderPickerDialog } from './FolderPickerDialog';
+import { MoveToSpaceDialog } from './MoveToSpaceDialog';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
@@ -28,7 +29,8 @@ import {
   X,
   Volume2,
   Copy,
-  ExternalLink
+  ExternalLink,
+  SquareStack
 } from 'lucide-react';
 import { getRandomGroupColor } from '../utils/groupColors';
 import clsx from 'clsx';
@@ -281,6 +283,7 @@ interface BookmarkRowProps {
   onCloseBookmark?: (bookmarkId: string) => void;
   onMoveToNewWindow?: (bookmarkId: string) => void;
   onOpenAsTabGroup?: (folderId: string, folderName: string) => void;
+  onMoveToSpace?: (bookmarkId: string) => void;
   // External drop target (from tab drag)
   externalDropTarget?: ExternalDropTarget | null;
   // Drag-drop attributes
@@ -314,6 +317,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onCloseBookmark,
   onMoveToNewWindow,
   onOpenAsTabGroup,
+  onMoveToSpace,
   externalDropTarget,
   attributes,
   listeners
@@ -517,11 +521,23 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onPin(node.url!, node.title, getFaviconUrl(node.url!))}>
                 <Pin size={14} className="mr-2" /> Pin to Sidebar
               </ContextMenu.Item>
+              <ContextMenu.Item onSelect={() => {
+                chrome.tabs.create({ url: node.url }, (tab) => {
+                  if (tab?.id) chrome.tabs.ungroup(tab.id);
+                });
+              }}>
+                <ExternalLink size={14} className="mr-2" /> Open in New Tab
+              </ContextMenu.Item>
             </>
           )}
           {!isFolder && isLoaded && onMoveToNewWindow && (
             <ContextMenu.Item onSelect={() => onMoveToNewWindow(node.id)}>
               <ExternalLink size={14} className="mr-2" /> Move to New Window
+            </ContextMenu.Item>
+          )}
+          {!isFolder && onMoveToSpace && (
+            <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
+              <SquareStack size={14} className="mr-2" /> Move to Space
             </ContextMenu.Item>
           )}
           {!isSpecialFolder && (
@@ -668,7 +684,7 @@ interface BookmarkTreeProps {
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterAudible = false, filterText = '', activeSpace, onShowToast }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getTabIdForBookmark, getBookmarkLiveTitle } = useBookmarkTabsContext();
-  const { updateSpace } = useSpacesContext();
+  const { spaces, updateSpace } = useSpacesContext();
 
   // Move bookmark's tab to a new window
   const moveBookmarkToNewWindow = useCallback((bookmarkId: string) =>
@@ -782,6 +798,10 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
   const [showSpaceFolderPicker, setShowSpaceFolderPicker] = useState(false);
+  const [moveToSpaceDialog, setMoveToSpaceDialog] = useState<{
+    isOpen: boolean;
+    bookmarkId: string | null;
+  }>({ isOpen: false, bookmarkId: null });
 
   // Auto-expand space folder when it changes
   useEffect(() =>
@@ -966,6 +986,30 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     updateSpace(activeSpace.id, { bookmarkFolderPath: path });
   }, [activeSpace, getBookmarkPath, updateSpace]);
 
+  // Open move to space dialog
+  const openMoveToSpaceDialog = useCallback((bookmarkId: string) =>
+  {
+    setMoveToSpaceDialog({ isOpen: true, bookmarkId });
+  }, []);
+
+  const closeMoveToSpaceDialog = useCallback(() =>
+  {
+    setMoveToSpaceDialog({ isOpen: false, bookmarkId: null });
+  }, []);
+
+  // Handle moving bookmark to a space's folder
+  const handleMoveBookmarkToSpace = useCallback(async (bookmarkId: string, spaceId: string) =>
+  {
+    const space = spaces.find(s => s.id === spaceId);
+    if (!space?.bookmarkFolderPath) return;
+
+    const folder = findFolderByPath(space.bookmarkFolderPath);
+    if (!folder) return;
+
+    await chrome.bookmarks.move(bookmarkId, { parentId: folder.id });
+    onShowToast?.(`Moved to ${space.name}. New location: ${space.bookmarkFolderPath}`);
+  }, [spaces, findFolderByPath, onShowToast]);
+
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
@@ -1134,6 +1178,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             onCloseBookmark={closeBookmarkTab}
             onMoveToNewWindow={moveBookmarkToNewWindow}
             onOpenAsTabGroup={handleOpenAsTabGroup}
+            onMoveToSpace={openMoveToSpaceDialog}
             externalDropTarget={externalDropTarget}
           />
         ))}
@@ -1171,6 +1216,16 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
           });
         }}
         onClose={() => setCreatingFolderParentId(null)}
+      />
+
+      <MoveToSpaceDialog
+        isOpen={moveToSpaceDialog.isOpen}
+        itemId={moveToSpaceDialog.bookmarkId}
+        spaces={spaces}
+        currentSpaceId={activeSpace?.id}
+        onMoveToSpace={handleMoveBookmarkToSpace}
+        onClose={closeMoveToSpaceDialog}
+        requireBookmarkFolder
       />
     </>
   );

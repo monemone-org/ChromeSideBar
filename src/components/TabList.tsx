@@ -464,7 +464,6 @@ interface DraggableTabProps {
   onCloseTabsBefore?: (tabId: number) => void;
   onCloseTabsAfter?: (tabId: number) => void;
   onCloseOthers?: (tabId: number) => void;
-  arcStyleEnabled?: boolean;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -492,7 +491,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onCloseTabsBefore,
   onCloseTabsAfter,
   onCloseOthers,
-  arcStyleEnabled,
   attributes,
   listeners
 }, ref) => {
@@ -623,7 +621,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           )}
           {onAddToBookmark && tab.url && (
             <ContextMenu.Item onSelect={() => onAddToBookmark(tab)}>
-              <Bookmark size={14} className="mr-2" /> {arcStyleEnabled ? 'Move to Bookmark' : 'Add to Bookmark'}
+              <Bookmark size={14} className="mr-2" /> Add to Bookmark
             </ContextMenu.Item>
           )}
           {onMoveToNewWindow && (
@@ -1120,9 +1118,27 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setMoveToSpaceDialog({ isOpen: false, tabId: null });
   }, []);
 
+  // Toast state (moved here so handleMoveToSpace can use it)
+  const [toastState, setToastState] = useState<{
+    isVisible: boolean;
+    message: string;
+  }>({ isVisible: false, message: '' });
+
+  const showToast = useCallback((message: string) =>
+  {
+    setToastState({ isVisible: true, message });
+  }, []);
+
+  const hideToast = useCallback(() =>
+  {
+    setToastState({ isVisible: false, message: '' });
+  }, []);
+
   // Handler to move tab to a space's tab group
   const handleMoveToSpace = useCallback(async (tabId: number, spaceId: string) =>
   {
+    const space = spaces.find(s => s.id === spaceId);
+
     // Find existing tab group for space, or create new one
     let groupId = await findTabGroupForSpace(spaceId);
 
@@ -1136,7 +1152,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       // Move tab to existing group
       await chrome.tabs.group({ tabIds: [tabId], groupId });
     }
-  }, [findTabGroupForSpace, createTabGroupForSpace]);
+
+    if (space)
+    {
+      showToast(`Moved to ${space.name}`);
+    }
+  }, [spaces, findTabGroupForSpace, createTabGroupForSpace, showToast]);
 
   // Change Group Color dialog state
   const [changeColorDialog, setChangeColorDialog] = useState<{
@@ -1219,21 +1240,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     group: chrome.tabGroups.TabGroup | null;
     groupTabs: chrome.tabs.Tab[];
   }>({ isOpen: false, group: null, groupTabs: [] });
-
-  const [toastState, setToastState] = useState<{
-    isVisible: boolean;
-    message: string;
-  }>({ isVisible: false, message: '' });
-
-  const showToast = useCallback((message: string) =>
-  {
-    setToastState({ isVisible: true, message });
-  }, []);
-
-  const hideToast = useCallback(() =>
-  {
-    setToastState({ isVisible: false, message: '' });
-  }, []);
 
   // Filter out empty new tabs
   const filterBookmarkableTabs = useCallback((tabList: chrome.tabs.Tab[]): chrome.tabs.Tab[] =>
@@ -2248,7 +2254,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   onCloseTabsBefore={closeTabsBefore}
                   onCloseTabsAfter={closeTabsAfter}
                   onCloseOthers={closeOthers}
-                  arcStyleEnabled={arcStyleEnabled}
                 />
               );
             }
@@ -2282,7 +2287,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           onCloseTabsBefore={closeTabsBefore}
                           onCloseTabsAfter={closeTabsAfter}
                           onCloseOthers={closeOthers}
-                          arcStyleEnabled={arcStyleEnabled}
                         />
                       );
                     })}
@@ -2354,7 +2358,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         onCloseTabsBefore={closeTabsBefore}
                         onCloseTabsAfter={closeTabsAfter}
                         onCloseOthers={closeOthers}
-                        arcStyleEnabled={arcStyleEnabled}
                       />
                     );
                   })}
@@ -2398,7 +2401,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
       <MoveToSpaceDialog
         isOpen={moveToSpaceDialog.isOpen}
-        tabId={moveToSpaceDialog.tabId}
+        itemId={moveToSpaceDialog.tabId}
         spaces={spaces}
         currentSpaceId={activeSpace?.id}
         onMoveToSpace={handleMoveToSpace}
@@ -2428,7 +2431,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
       <FolderPickerDialog
         isOpen={addToBookmarkDialog.isOpen}
-        title={arcStyleEnabled ? "Move Tab to Bookmark Folder" : "Add Tab to Bookmark Folder"}
+        title="Add Tab to Bookmark Folder"
         onSelect={handleAddToBookmarkFolderSelect}
         onClose={closeAddToBookmarkDialog}
         defaultFolderId={
