@@ -15,6 +15,9 @@ Jump between recently used tabs the way you do in VS Code—by usage order, not 
 **Arc-Style Unified Sidebar**
 Everything in one vertical panel, just like Arc—pinned favorites at the top, bookmarks organized in folders, and all your active tabs. No more digging through bookmark menus or scanning a crowded tab bar.
 
+**Arc-Style Spaces**
+Organize your browsing by context with Spaces—isolated workspaces that link a bookmark folder to a Chrome tab group. Switch between Work, Personal, and Projects with one click. Each space shows only its bookmarks and tabs, keeping your sidebar focused. Swipe with two fingers or click to switch spaces.
+
 **Tab Groups Support**
 Works with Chrome's tab groups. Drag tabs into groups, save groups as bookmark folders, rename and change colors—all from the sidebar.
 
@@ -25,6 +28,14 @@ Drag and drop to reorganize pretty much everything—pinned sites, bookmarks, fo
 Search and filter by text, live tabs, or tabs playing audio. Save your frequently used searches. Export and import everything as JSON.
 
 ## Detailed Features
+
+### Arc-Style Spaces
+- Create spaces that link a bookmark folder to a Chrome tab group
+- Switch spaces to show only relevant bookmarks and tabs
+- Customize each space with icons and colors
+- Swipe with two fingers to navigate between spaces
+- Drag to reorder spaces in the space bar
+- Import/export includes all your spaces
 
 ### Arc-Style Persistent Tabs (Optional)
 - Bookmarks and pinned sites act as live pages
@@ -67,7 +78,7 @@ Search and filter by text, live tabs, or tabs playing audio. Save your frequentl
 ### Tab Search & Filter
 - Search by title or URL
 - Filter to show only live tabs (bookmarks/pins with open tabs)
-- Filter to show only tabs playing audio
+- Audio tabs dialog shows all tabs playing sound with mute controls
 - Save frequently used searches for quick access
 
 ### Tab History Navigation
@@ -96,6 +107,18 @@ Search and filter by text, live tabs, or tabs playing audio. Save your frequentl
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
+
+## 1.0.189
+
+- Arc-style Spaces:
+  - Create isolated workspaces linking bookmark folders to Chrome tab groups
+  - Switch spaces to show only relevant bookmarks and tabs
+  - Customize with icons and colors
+  - Two-finger swipe or click to navigate between spaces
+  - Drag to reorder spaces
+  - Spaces included in import/export
+- Audio tabs dialog: Click the audible filter to see all tabs playing sound with mute controls
+- Welcome dialog guides first-time users through key features
 
 ## 1.0.149
 
