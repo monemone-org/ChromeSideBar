@@ -24,9 +24,9 @@ import { useSpaces } from './hooks/useSpaces';
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
-import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Pencil, X, Trash2 } from 'lucide-react';
+import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
-import * as ContextMenu from './components/ContextMenu';
+import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
 
 // Inner component that renders content for a single space
 interface SidebarContentProps
@@ -119,31 +119,13 @@ const SpaceTitle: React.FC<SpaceTitleProps> = ({ onEditSpace, onDeleteSpace, onC
     />
   );
 
-  // Build menu content
-  // NOTE: This menu is duplicated in SpaceIcon.tsx.
-  // Any changes here must also be updated there.
-  const menuContent = isAllSpace ? (
-    <ContextMenu.Item onSelect={() => onCloseAllTabs(activeSpace)}>
-      <X size={14} className="mr-2 flex-shrink-0" /> Close All Tabs
-    </ContextMenu.Item>
-  ) : (
-    <>
-      <ContextMenu.Item onSelect={() => onEditSpace(activeSpace)}>
-        <Pencil size={14} className="mr-2 flex-shrink-0" /> Edit
-      </ContextMenu.Item>
-
-      <ContextMenu.Separator />
-
-      <ContextMenu.Item onSelect={() => onCloseAllTabs(activeSpace)}>
-        <X size={14} className="mr-2 flex-shrink-0" /> Close All Tabs In Space
-      </ContextMenu.Item>
-
-      <ContextMenu.Separator />
-
-      <ContextMenu.Item danger onSelect={() => onDeleteSpace(activeSpace)}>
-        <Trash2 size={14} className="mr-2 flex-shrink-0" /> Delete
-      </ContextMenu.Item>
-    </>
+  const menuContent = (
+    <SpaceContextMenuContent
+      isAllSpace={isAllSpace}
+      onEdit={() => onEditSpace(activeSpace)}
+      onDelete={() => onDeleteSpace(activeSpace)}
+      onCloseAllTabs={() => onCloseAllTabs(activeSpace)}
+    />
   );
 
   return (

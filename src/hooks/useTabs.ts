@@ -1,10 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 
+// Helper: safely extract hostname from URL
+const getHostname = (url: string | undefined): string =>
+{
+  if (!url) return '';
+  try
+  {
+    return new URL(url).hostname.replace(/^www\./, '');
+  }
+  catch
+  {
+    return '';
+  }
+};
+
 // Helper: compare tabs by domain, then title
 const compareDomainTitle = (a: chrome.tabs.Tab, b: chrome.tabs.Tab): number =>
 {
-  const domainA = new URL(a.url || '').hostname.replace(/^www\./, '');
-  const domainB = new URL(b.url || '').hostname.replace(/^www\./, '');
+  const domainA = getHostname(a.url);
+  const domainB = getHostname(b.url);
   if (domainA !== domainB) return domainA.localeCompare(domainB);
   return (a.title || '').localeCompare(b.title || '');
 };

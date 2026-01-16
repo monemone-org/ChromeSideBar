@@ -3,10 +3,11 @@ import clsx from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import * as ContextMenu from './ContextMenu';
-import { LayoutGrid, Pencil, X, Trash2 } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 import { Space } from '../hooks/useSpaces';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getIconUrl } from '../utils/iconify';
+import { SpaceContextMenuContent } from './SpaceContextMenuContent';
 
 interface SpaceIconProps
 {
@@ -111,51 +112,20 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
     </button>
   );
 
-  // "All" space has a simpler context menu
-  if (isAllSpace)
-  {
-    return (
-      <ContextMenu.Root>
-        <ContextMenu.Trigger asChild>
-          {iconButton}
-        </ContextMenu.Trigger>
-
-        <ContextMenu.Portal>
-          <ContextMenu.Content>
-            <ContextMenu.Item onSelect={onCloseAllTabs}>
-              <X size={14} className="mr-2 flex-shrink-0" /> Close All Tabs
-            </ContextMenu.Item>
-          </ContextMenu.Content>
-        </ContextMenu.Portal>
-      </ContextMenu.Root>
-    );
-  }
-
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
         {iconButton}
       </ContextMenu.Trigger>
 
-      {/* NOTE: This menu is duplicated in SpaceTitle (App.tsx).
-          Any changes here must also be updated there. */}
       <ContextMenu.Portal>
         <ContextMenu.Content>
-          <ContextMenu.Item onSelect={onEdit}>
-            <Pencil size={14} className="mr-2 flex-shrink-0" /> Edit
-          </ContextMenu.Item>
-
-          <ContextMenu.Separator />
-
-          <ContextMenu.Item onSelect={onCloseAllTabs}>
-            <X size={14} className="mr-2 flex-shrink-0" /> Close All Tabs In Space
-          </ContextMenu.Item>
-
-          <ContextMenu.Separator />
-
-          <ContextMenu.Item danger onSelect={onDelete}>
-            <Trash2 size={14} className="mr-2 flex-shrink-0" /> Delete
-          </ContextMenu.Item>
+          <SpaceContextMenuContent
+            isAllSpace={isAllSpace}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onCloseAllTabs={onCloseAllTabs}
+          />
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>
