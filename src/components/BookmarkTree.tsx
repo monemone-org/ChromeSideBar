@@ -13,7 +13,7 @@ import { ExternalDropTarget, ResolveBookmarkDropTarget } from './TabList';
 import { BookmarkOpenMode } from './SettingsDialog';
 import { BookmarkEditModal } from './BookmarkEditModal';
 import { BookmarkCreateFolderModal } from './BookmarkCreateFolderModal';
-import * as ContextMenu from './ContextMenu';
+import * as ContextMenu from './menu/ContextMenu';
 import { TreeRow } from './TreeRow';
 import { useInView } from '../hooks/useInView';
 import { SPEAKER_ICON_SIZE } from '../constants';

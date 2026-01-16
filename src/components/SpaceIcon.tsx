@@ -2,7 +2,7 @@ import React from 'react';
 import clsx from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import * as ContextMenu from './ContextMenu';
+import * as ContextMenu from './menu/ContextMenu';
 import { LayoutGrid } from 'lucide-react';
 import { Space } from '../hooks/useSpaces';
 import { GROUP_COLORS } from '../utils/groupColors';

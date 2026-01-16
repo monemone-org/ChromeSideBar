@@ -1,4 +1,8 @@
-import {
+/**
+ * ContextMenu - Right-click context menu that positions at cursor
+ */
+import
+{
   createContext,
   useContext,
   useState,
@@ -15,7 +19,11 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import { useFontSize } from '../contexts/FontSizeContext';
+import { useFontSize } from '../../contexts/FontSizeContext';
+import { Item, Separator, Overlay, useEscapeKey, menuContainerClass } from './MenuBase';
+
+// Re-export shared components for convenience
+export { Item, Separator };
 
 // --- Context ---
 interface ContextMenuState
@@ -145,26 +153,8 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
     const fontSize = useFontSize();
     const menuRef = useRef<HTMLDivElement | null>(null);
 
-    // Handle escape key (clicks are handled by overlay)
-    useEffect(() =>
-    {
-      if (!isOpen) return;
-
-      const handleEscape = (e: KeyboardEvent) =>
-      {
-        if (e.key === 'Escape')
-        {
-          close();
-        }
-      };
-
-      document.addEventListener('keydown', handleEscape);
-
-      return () =>
-      {
-        document.removeEventListener('keydown', handleEscape);
-      };
-    }, [isOpen, close]);
+    // Use shared escape key handler
+    useEscapeKey(isOpen, close);
 
     // Adjust position to keep menu within viewport
     const [adjustedPosition, setAdjustedPosition] = useState(position);
@@ -200,16 +190,7 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
 
     return (
       <>
-        {/* Transparent overlay to intercept clicks outside the menu */}
-        <div
-          className="fixed inset-0 z-40"
-          onClick={close}
-          onContextMenu={(e) =>
-          {
-            e.preventDefault();
-            close();
-          }}
-        />
+        <Overlay onClose={close} />
         <div
           ref={(node) =>
           {
@@ -223,10 +204,7 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
               ref.current = node;
             }
           }}
-          className={clsx(
-            "fixed z-50 min-w-32 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg py-1",
-            className
-          )}
+          className={clsx(menuContainerClass, className)}
           style={{
             left: adjustedPosition.x,
             top: adjustedPosition.y,
@@ -242,58 +220,3 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
   }
 );
 Content.displayName = 'ContextMenu.Content';
-
-// --- Item ---
-interface ItemProps extends HTMLAttributes<HTMLDivElement>
-{
-  children: ReactNode;
-  danger?: boolean;
-  onSelect?: () => void;
-}
-
-export const Item = forwardRef<HTMLDivElement, ItemProps>(
-  ({ children, className, danger, onSelect, onClick, ...props }, ref) =>
-  {
-    const { close } = useContextMenuState();
-
-    const handleClick = (e: ReactMouseEvent<HTMLDivElement>) =>
-    {
-      onClick?.(e);
-      onSelect?.();
-      close();
-    };
-
-    return (
-      <div
-        ref={ref}
-        className={clsx(
-          "flex items-center w-full px-3 py-1.5 text-left cursor-pointer outline-none",
-          "hover:bg-gray-100 dark:hover:bg-gray-700",
-          danger
-            ? "text-red-500 dark:text-red-400"
-            : "text-gray-700 dark:text-gray-200",
-          className
-        )}
-        onClick={handleClick}
-        {...props}
-      >
-        {children}
-      </div>
-    );
-  }
-);
-Item.displayName = 'ContextMenu.Item';
-
-// --- Separator ---
-interface SeparatorProps extends HTMLAttributes<HTMLDivElement> {}
-
-export const Separator = forwardRef<HTMLDivElement, SeparatorProps>(
-  ({ className, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={clsx("h-px my-1 bg-gray-200 dark:bg-gray-700", className)}
-      {...props}
-    />
-  )
-);
-Separator.displayName = 'ContextMenu.Separator';

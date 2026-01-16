@@ -35,7 +35,7 @@ import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
 import { DropIndicators } from './DropIndicators';
-import * as ContextMenu from './ContextMenu';
+import * as ContextMenu from './menu/ContextMenu';
 import { useInView } from '../hooks/useInView';
 import {
   DndContext,
@@ -120,7 +120,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             e.stopPropagation();
             onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl);
           }}
-          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
           title="Pin"
           aria-label="Pin tab"
         >
@@ -134,7 +134,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           e.stopPropagation();
           if (tab.id) onClose(tab.id);
         }}
-        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded"
+        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
         aria-label="Close tab"
       >
         <X size={14} className="text-gray-700 dark:text-gray-200" />

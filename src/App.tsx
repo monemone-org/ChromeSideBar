@@ -28,6 +28,7 @@ import { getIconUrl } from './utils/iconify';
 import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
+import * as DropdownMenu from './components/menu/DropdownMenu';
 
 // Inner component that renders content for a single space
 interface SidebarContentProps
@@ -313,7 +314,6 @@ function App() {
   const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
   const [showSpaceDeleteDialog, setShowSpaceDeleteDialog] = useState(false);
   const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null!);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const {
@@ -415,40 +415,7 @@ function App() {
     setShowSpaceDeleteDialog(true);
   }, []);
 
-  // Close menu when clicking outside
-  useEffect(() =>
-  {
-    if (!showMenu) return;
-
-    const handleClickOutside = (e: MouseEvent) =>
-    {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(e.target as Node)
-      )
-      {
-        setShowMenu(false);
-      }
-    };
-
-    const handleEscape = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape')
-      {
-        setShowMenu(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-    return () =>
-    {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [showMenu]);
+  // DropdownMenu handles click-outside and escape key automatically
 
   // Enable tab history debug logging in DEV builds
   useEffect(() =>
@@ -564,77 +531,45 @@ function App() {
           onToggleFilterArea={() => setShowFilterArea(!showFilterArea)}
         />
 
-        {/* Popup menu - positioned below settings button */}
-        {showMenu && buttonRef.current && (
-          <div
-            ref={menuRef}
-            className="absolute right-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 min-w-32 z-50"
-            style={{
-              top: buttonRef.current.offsetTop + buttonRef.current.offsetHeight + 4,
-            }}
-          >
-            <button
-              onClick={() =>
-              {
-                setShowMenu(false);
-                setShowSettings(true);
-              }}
-              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
-            >
-              <Settings size={14} />
+        {/* Settings popup menu */}
+        <DropdownMenu.Root
+          open={showMenu}
+          onOpenChange={setShowMenu}
+          anchorRef={buttonRef}
+        >
+          <DropdownMenu.Content align="end">
+            <DropdownMenu.Item onSelect={() => setShowSettings(true)}>
+              <Settings size={14} className="mr-2" />
               Settings
-            </button>
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-            <button
-              onClick={() =>
-              {
-                setShowMenu(false);
-                setShowExport(true);
-              }}
-              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
-            >
-              <Upload size={14} />
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item onSelect={() => setShowExport(true)}>
+              <Upload size={14} className="mr-2" />
               Export...
-            </button>
-            <button
-              onClick={() =>
-              {
-                setShowMenu(false);
-                // Toggle off first to ensure state resets, then on
-                setShowImport(false);
-                setTimeout(() => setShowImport(true), 0);
-              }}
-              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
-            >
-              <Download size={14} />
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => {
+              setShowImport(false);
+              setTimeout(() => setShowImport(true), 0);
+            }}>
+              <Download size={14} className="mr-2" />
               Import...
-            </button>
-            <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-            <button
-              onClick={() =>
-              {
-                setShowMenu(false);
-                setShowAbout(true);
-              }}
-              className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
-            >
-              <Info size={14} />
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item onSelect={() => setShowAbout(true)}>
+              <Info size={14} className="mr-2" />
               About
-            </button>
+            </DropdownMenu.Item>
             {import.meta.env.DEV && (
               <>
-                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
-                <button
-                  onClick={() => chrome.runtime.reload()}
-                  className="w-full px-3 py-1.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 text-gray-700 dark:text-gray-200"
-                >
-                  <RefreshCw size={14} />
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item onSelect={() => chrome.runtime.reload()}>
+                  <RefreshCw size={14} className="mr-2" />
                   Reload Extension
-                </button>
+                </DropdownMenu.Item>
               </>
             )}
-          </div>
-        )}
+          </DropdownMenu.Content>
+        </DropdownMenu.Root>
       </div>
 
       {/* Pinned Sites */}

@@ -1,6 +1,6 @@
 import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcw, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
 import { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
-import { useFontSize } from '../contexts/FontSizeContext';
+import * as DropdownMenu from './menu/DropdownMenu';
 
 interface ToolbarProps
 {
@@ -47,10 +47,8 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   onToggleFilterArea,
 }, _ref) =>
 {
-  const activeButtonClass = 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400';
-  const inactiveButtonClass = 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700';
-
-  const fontSize = useFontSize();
+  const activeButtonClass = 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 active:bg-blue-200 dark:active:bg-blue-800';
+  const inactiveButtonClass = 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 active:bg-gray-300 dark:active:bg-gray-500';
 
   // Tab history navigation shortcuts
   const [prevTabShortcut, setPrevTabShortcut] = useState<string>('');
@@ -69,7 +67,6 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   const [historyBefore, setHistoryBefore] = useState<HistoryItem[]>([]);
   const [historyAfter, setHistoryAfter] = useState<HistoryItem[]>([]);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const historyDropdownRef = useRef<HTMLDivElement>(null);
   const prevButtonRef = useRef<HTMLButtonElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -177,43 +174,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
     setHistoryDropdown(null);
   }, []);
 
-  // Close history dropdown when clicking outside
-  useEffect(() =>
-  {
-    if (!historyDropdown) return;
-
-    const handleClickOutside = (e: MouseEvent) =>
-    {
-      if (
-        historyDropdownRef.current &&
-        !historyDropdownRef.current.contains(e.target as Node) &&
-        prevButtonRef.current &&
-        !prevButtonRef.current.contains(e.target as Node) &&
-        nextButtonRef.current &&
-        !nextButtonRef.current.contains(e.target as Node)
-      )
-      {
-        setHistoryDropdown(null);
-      }
-    };
-
-    const handleEscape = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape')
-      {
-        e.preventDefault();
-        setHistoryDropdown(null);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-    return () =>
-    {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [historyDropdown]);
+  // DropdownMenu handles click-outside and escape key automatically
 
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -467,106 +428,89 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       <div className="flex items-center justify-between px-2 py-1">
         {/* Left side - Tab history and Filter buttons */}
         <div className="flex items-center gap-1">
-          {/* Tab history navigation */}
-          <div className="relative">
+          {/* Tab history navigation - Previous */}
+          <DropdownMenu.Root
+            open={historyDropdown === 'prev'}
+            onOpenChange={(open) => !open && setHistoryDropdown(null)}
+            anchorRef={prevButtonRef}
+          >
             <button
               ref={prevButtonRef}
               onMouseDown={() => handleHistoryMouseDown('prev')}
               onMouseUp={() => handleHistoryMouseUp('prev')}
               onMouseLeave={handleHistoryMouseLeave}
               title={`Previous used tab${prevTabShortcut ? ` (${prevTabShortcut})` : ''}\nHold for history`}
-              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
+              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
+                historyDropdown === 'prev' ? activeButtonClass : inactiveButtonClass
+              }`}
             >
               <RotateCcwSquare size={16} className="-rotate-90" />
             </button>
 
-            {/* Previous history dropdown */}
-            {historyDropdown === 'prev' && historyBefore.length > 0 && (
-              <div
-                ref={historyDropdownRef}
-                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-48 max-w-72 max-h-64 overflow-y-auto font-sans"
-                style={{ fontSize: `${fontSize}px` }}
-              >
-                {historyBefore.map((item) => (
-                  <div
+            <DropdownMenu.Content className="min-w-48 max-w-72 max-h-64 overflow-y-auto">
+              {historyBefore.length > 0 ? (
+                historyBefore.map((item) => (
+                  <DropdownMenu.Item
                     key={item.tabId}
-                    onClick={() => handleHistoryItemClick(item.index)}
-                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    onSelect={() => handleHistoryItemClick(item.index)}
                   >
                     {item.favIconUrl ? (
-                      <img src={item.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />
+                      <img src={item.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0 mr-2" />
                     ) : (
-                      <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded" />
+                      <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded mr-2" />
                     )}
-                    <span className="text-gray-700 dark:text-gray-200 truncate">
-                      {item.title}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+                    <span className="truncate">{item.title}</span>
+                  </DropdownMenu.Item>
+                ))
+              ) : (
+                <div className="px-3 py-2 text-gray-500 dark:text-gray-400">
+                  No previous tabs
+                </div>
+              )}
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
 
-            {/* Empty state for prev */}
-            {historyDropdown === 'prev' && historyBefore.length === 0 && (
-              <div
-                ref={historyDropdownRef}
-                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 px-3 z-50 min-w-32 font-sans"
-                style={{ fontSize: `${fontSize}px` }}
-              >
-                <span className="text-gray-500 dark:text-gray-400">No previous tabs</span>
-              </div>
-            )}
-          </div>
-
-          <div className="relative">
+          {/* Tab history navigation - Next */}
+          <DropdownMenu.Root
+            open={historyDropdown === 'next'}
+            onOpenChange={(open) => !open && setHistoryDropdown(null)}
+            anchorRef={nextButtonRef}
+          >
             <button
               ref={nextButtonRef}
               onMouseDown={() => handleHistoryMouseDown('next')}
               onMouseUp={() => handleHistoryMouseUp('next')}
               onMouseLeave={handleHistoryMouseLeave}
               title={`Next used tab${nextTabShortcut ? ` (${nextTabShortcut})` : ''}\nHold for history`}
-              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
+              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
+                historyDropdown === 'next' ? activeButtonClass : inactiveButtonClass
+              }`}
             >
               <RotateCwSquare size={16} className="rotate-90" />
             </button>
 
-            {/* Next history dropdown */}
-            {historyDropdown === 'next' && historyAfter.length > 0 && (
-              <div
-                ref={historyDropdownRef}
-                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50 min-w-48 max-w-72 max-h-64 overflow-y-auto font-sans"
-                style={{ fontSize: `${fontSize}px` }}
-              >
-                {historyAfter.map((item) => (
-                  <div
+            <DropdownMenu.Content className="min-w-48 max-w-72 max-h-64 overflow-y-auto">
+              {historyAfter.length > 0 ? (
+                historyAfter.map((item) => (
+                  <DropdownMenu.Item
                     key={item.tabId}
-                    onClick={() => handleHistoryItemClick(item.index)}
-                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                    onSelect={() => handleHistoryItemClick(item.index)}
                   >
                     {item.favIconUrl ? (
-                      <img src={item.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />
+                      <img src={item.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0 mr-2" />
                     ) : (
-                      <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded" />
+                      <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded mr-2" />
                     )}
-                    <span className="text-gray-700 dark:text-gray-200 truncate">
-                      {item.title}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Empty state for next */}
-            {historyDropdown === 'next' && historyAfter.length === 0 && (
-              <div
-                ref={historyDropdownRef}
-                className="absolute left-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 px-3 z-50 min-w-32 font-sans"
-                style={{ fontSize: `${fontSize}px` }}
-              >
-                <span className="text-gray-500 dark:text-gray-400">No next tabs</span>
-              </div>
-            )}
-          </div>
+                    <span className="truncate">{item.title}</span>
+                  </DropdownMenu.Item>
+                ))
+              ) : (
+                <div className="px-3 py-2 text-gray-500 dark:text-gray-400">
+                  No next tabs
+                </div>
+              )}
+            </DropdownMenu.Content>
+          </DropdownMenu.Root>
 
           {/* Separator */}
           <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-0.5" />

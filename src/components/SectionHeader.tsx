@@ -1,6 +1,6 @@
 import React, { ReactNode, useRef } from 'react';
 import { MoreHorizontal } from 'lucide-react';
-import * as ContextMenu from './ContextMenu';
+import * as ContextMenu from './menu/ContextMenu';
 import { getIndentPadding } from '../utils/indent';
 
 interface SectionHeaderProps

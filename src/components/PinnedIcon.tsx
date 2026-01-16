@@ -4,7 +4,7 @@ import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePin
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import clsx from 'clsx';
-import * as ContextMenu from './ContextMenu';
+import * as ContextMenu from './menu/ContextMenu';
 import { IconColorPicker, PINNED_SITE_COLORS, DEFAULT_ICON_COLOR } from './IconColorPicker';
 import { iconToDataUrl } from '../utils/iconify';
 

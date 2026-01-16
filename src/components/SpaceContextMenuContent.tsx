@@ -1,5 +1,5 @@
 import React from 'react';
-import * as ContextMenu from './ContextMenu';
+import * as ContextMenu from './menu/ContextMenu';
 import { Pencil, X, Trash2 } from 'lucide-react';
 
 interface SpaceContextMenuContentProps
