@@ -972,7 +972,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     {
       setAutoExpandTimer(bookmarkId, () =>
       {
-        setExpandedState(prev => ({ ...prev, [bookmarkId]: !prev[bookmarkId] }));
+        setExpandedState(prev => prev[bookmarkId] ? prev : { ...prev, [bookmarkId]: true });
       });
     }
     else

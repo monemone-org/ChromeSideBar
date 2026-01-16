@@ -1526,8 +1526,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         {
           setAutoExpandTimer(targetGroupId, () =>
           {
-            // Toggle: expand if collapsed, collapse if expanded
-            setExpandedGroups(prev => ({ ...prev, [targetGroupId]: !prev[targetGroupId] }));
+            // Expand only (don't collapse if already expanded)
+            setExpandedGroups(prev => prev[targetGroupId] ? prev : { ...prev, [targetGroupId]: true });
           });
         }
         else

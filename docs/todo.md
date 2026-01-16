@@ -168,7 +168,7 @@ SpaceBar
 
 - [x] tab popup menu: "move to space" after moving tab to space, should active that space and bring that tab in that space visible in the side panel
 
-- [ ] during drag drop, when hover over a folder node, it can expand and collapse the node if the cursor hovers over the node for some period of time. change that behaviour to only expand but not collapse.
+- [-] during drag drop, when hover over a folder node, it can expand and collapse the node if the cursor hovers over the node for some period of time. change that behaviour to only expand but not collapse.
 
 - [ ] update live bookmark title - right now it shows the loaded tab's title if it has a live tab.  add the bookmark name as prefix to the title "{bookmark title} - {url title}"
 
