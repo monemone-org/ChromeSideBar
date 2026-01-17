@@ -301,16 +301,20 @@ function removeFromHistory(windowId: number, tabId: number): void
 // Update last active tab for a space (checks if tab belongs to space first)
 async function updateSpaceLastActiveTab(windowId: number, spaceId: string, tabId: number): Promise<void>
 {
-  if (!spaceId || spaceId === 'all') return;
+  if (!spaceId) return;
 
   // Check if tab belongs to this space (read spaceTabs from sidebar's storage)
-  const windowStateKey = `spaceWindowState_${windowId}`;
-  const windowStateResult = await chrome.storage.session.get([windowStateKey]);
-  const windowState = windowStateResult[windowStateKey];
-  const spaceTabs = windowState?.spaceTabs?.[spaceId] || [];
-  if (!spaceTabs.includes(tabId))
+  // Skip check for "all" space since all tabs belong to it
+  if (spaceId !== 'all')
   {
-    return;  // Tab doesn't belong to this space, skip
+    const windowStateKey = `spaceWindowState_${windowId}`;
+    const windowStateResult = await chrome.storage.session.get([windowStateKey]);
+    const windowState = windowStateResult[windowStateKey];
+    const spaceTabs = windowState?.spaceTabs?.[spaceId] || [];
+    if (!spaceTabs.includes(tabId))
+    {
+      return;  // Tab doesn't belong to this space, skip
+    }
   }
 
   state.setLastActiveTab(windowId, spaceId, tabId);
@@ -328,11 +332,6 @@ async function activateLastTabForSpace(
   spaceId: string
 ): Promise<{ success: boolean; action: string; tabId?: number }>
 {
-  if (spaceId === 'all')
-  {
-    if (import.meta.env.DEV) console.log(`[TabHistory] activateLastTabForSpace: result=none (all space)`);
-    return { success: true, action: 'none' };
-  }
 
   // Look up last active tab from BackgroundState
   const lastActiveTabId = state.getLastActiveTab(windowId, spaceId);
@@ -465,7 +464,7 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
 
       // Track last active tab for current space
       const spaceId = state.getActiveSpace(activeInfo.windowId);
-      if (spaceId && spaceId !== 'all')
+      if (spaceId)
       {
         updateSpaceLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId);
       }

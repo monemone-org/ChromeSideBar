@@ -179,7 +179,9 @@ SpaceBar
 
 - [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
 
-- [ ] in audio filter dialog, when clicking anywhere else in the panel should dismiss the audio filter dialog
+- [x] in audio filter dialog, when clicking anywhere else in the panel should dismiss the audio filter dialog
   so is "Navigate to Space" dialog
 
 - [ ] document all the session states stored: what data is for, which class/file owns it.
+
+- [x] last active tab id not working for "All" Space.
