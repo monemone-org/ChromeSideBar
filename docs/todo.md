@@ -182,6 +182,8 @@ SpaceBar
 - [x] in audio filter dialog, when clicking anywhere else in the panel should dismiss the audio filter dialog
   so is "Navigate to Space" dialog
 
-- [ ] document all the session states stored: what data is for, which class/file owns it.
+- [x] document all the session states stored: what data is for, which class/file owns it.
 
 - [x] last active tab id not working for "All" Space.
+
+- [-] When chrome restarts, it restores all the tabs, we need to find a way to remap live bookmarks , live pinned sites and space tab lists.
