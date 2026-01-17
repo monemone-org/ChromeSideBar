@@ -20,10 +20,10 @@ import
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { useFontSize } from '../../contexts/FontSizeContext';
-import { Item, Separator, Overlay, useEscapeKey, menuContainerClass } from './MenuBase';
+import { Item as BaseItem, Separator, Overlay, useEscapeKey, menuContainerClass } from './MenuBase';
 
-// Re-export shared components for convenience
-export { Item, Separator };
+// Re-export Separator (Item is wrapped below to add close behavior)
+export { Separator };
 
 // --- Context ---
 interface ContextMenuState
@@ -220,3 +220,27 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
   }
 );
 Content.displayName = 'ContextMenu.Content';
+
+// --- Item (wraps BaseItem to add close behavior) ---
+interface ItemProps extends HTMLAttributes<HTMLDivElement>
+{
+  children: ReactNode;
+  danger?: boolean;
+  onSelect?: () => void;
+}
+
+export const Item = forwardRef<HTMLDivElement, ItemProps>(
+  ({ onSelect, ...props }, ref) =>
+  {
+    const { close } = useContextMenuState();
+
+    const handleSelect = useCallback(() =>
+    {
+      onSelect?.();
+      close();
+    }, [onSelect, close]);
+
+    return <BaseItem ref={ref} onSelect={handleSelect} {...props} />;
+  }
+);
+Item.displayName = 'ContextMenu.Item';
