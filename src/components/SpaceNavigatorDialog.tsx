@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, useMemo } from 'react';
-import { Dialog } from './Dialog';
+import { QuickDismissDialog } from './QuickDismissDialog';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { LayoutGrid } from 'lucide-react';
 import { getIconUrl } from '../utils/iconify';
@@ -31,7 +31,7 @@ export const SpaceNavigatorDialog = ({
   showCurrentIndicator = true
 }: SpaceNavigatorDialogProps) =>
 {
-  const { allSpaces, spaces, setActiveSpaceId, activeSpaceId } = useSpacesContext();
+  const { allSpaces, spaces, switchToSpace, activeSpaceId } = useSpacesContext();
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -77,10 +77,10 @@ export const SpaceNavigatorDialog = ({
     }
     else
     {
-      setActiveSpaceId(spaceId);
+      switchToSpace(spaceId);
     }
     onClose();
-  }, [setActiveSpaceId, onSelectSpace, onClose]);
+  }, [switchToSpace, onSelectSpace, onClose]);
 
   // Handle keyboard navigation
   useEffect(() =>
@@ -159,7 +159,7 @@ export const SpaceNavigatorDialog = ({
   };
 
   return (
-    <Dialog isOpen={isOpen} onClose={onClose} title={title}>
+    <QuickDismissDialog isOpen={isOpen} onClose={onClose} title={title}>
       <div className="py-1">
         {filteredSpaces.length === 0 ? (
           <div className="px-3 py-2 text-gray-500 dark:text-gray-400">
@@ -241,6 +241,6 @@ export const SpaceNavigatorDialog = ({
           </div>
         )}
       </div>
-    </Dialog>
+    </QuickDismissDialog>
   );
 };

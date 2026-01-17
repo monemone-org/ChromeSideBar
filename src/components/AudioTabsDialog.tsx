@@ -1,5 +1,5 @@
 import { Globe, Volume2 } from 'lucide-react';
-import { Dialog } from './Dialog';
+import { QuickDismissDialog } from './QuickDismissDialog';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 
@@ -65,7 +65,7 @@ export const AudioTabsDialog = ({
   };
 
   return (
-    <Dialog isOpen={isOpen} onClose={onClose} title="Audio Playing">
+    <QuickDismissDialog isOpen={isOpen} onClose={onClose} title="Audio Playing">
       <div className="py-1 max-h-64 overflow-y-auto">
         {tabs.length === 0 ? (
           <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
@@ -94,6 +94,6 @@ export const AudioTabsDialog = ({
           })
         )}
       </div>
-    </Dialog>
+    </QuickDismissDialog>
   );
 };
