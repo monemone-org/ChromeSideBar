@@ -49,12 +49,15 @@ Feature spec: `docs/features/018-chrome-restart-state-restore.md`
 
 1. Add `chrome.runtime.onStartup` listener
 2. Implement debounce detection (2 second quiet period)
-3. Implement `runSpaceRestoration()`:
+3. Track restoration state (`isRestoring` flag)
+4. Implement `runSpaceRestoration()`:
    - For each window, compute fingerprint
    - Match against stored `WindowRestoreData`
    - If match: assign UUID, remap tab IDs, load states
    - If no match: generate new UUID
-4. Cleanup unmatched `WindowRestoreData` entries
+   - Log fingerprint matching attempts and results (only if `import.meta.env.DEV`)
+5. Cleanup unmatched `WindowRestoreData` entries
+6. Clear `isRestoring` flag and notify sidebars when done
 
 ### Phase 5: Update Message Handlers
 
@@ -80,6 +83,21 @@ Sidebar will send `windowUuid` instead of `windowId` in all messages.
 
 4. Update background.ts message handlers to expect `windowUuid`
 
+### Phase 6: Sidebar Loading State
+
+**Files:** `src/background.ts`, sidebar components
+
+1. Add `get-restoration-status` message handler in background.ts:
+   ```typescript
+   { action: 'get-restoration-status' }
+   // Returns: { isRestoring: boolean }
+   ```
+
+2. Sidebar checks restoration status on mount
+3. If restoring, show "Restoring session..." message and block interaction
+4. Background broadcasts `restoration-complete` message when done
+5. Sidebar listens for broadcast and removes loading state
+
 
 ## Critical Files
 
@@ -97,3 +115,9 @@ Sidebar will send `windowUuid` instead of `windowId` in all messages.
 2. **Multi-window:** Open 2 windows with different spaces, restart, verify each window restores correctly
 3. **New window after restart:** Open new window after restart, verify it gets fresh state
 4. **Cleanup test:** Close a window, restart, verify old data cleaned up
+5. **Loading state:** Open sidebar immediately after Chrome restart, verify "Restoring session..." appears then clears
+
+
+## Future Considerations
+
+**Fuzzy fingerprint matching**: Consider partial URL matching (e.g., 80% threshold) if exact matching proves too fragile. Deferred until we evaluate how well exact matching works in practice.

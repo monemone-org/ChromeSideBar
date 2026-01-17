@@ -162,3 +162,23 @@ export interface WindowState
 | Window closed, never restored | Delete data during next restoration cleanup |
 | New window opened after restart | Gets new UUID, no restoration needed |
 | Some tabs failed to restore | Fingerprint won't match, treated as new window |
+
+
+## Sidebar Loading State
+
+During the restoration debounce window, sidebar shows "Restoring session..." message:
+- Prevents user confusion if they open sidebar immediately after Chrome restart
+- Blocks interaction until restoration completes
+- Background notifies sidebar when restoration is done
+
+
+## Logging (Nice to Have)
+
+Add debug logging for restoration process:
+- Log fingerprint matching attempts and results
+- Helps troubleshoot when restoration fails
+
+
+## Future Considerations
+
+**Fuzzy fingerprint matching**: Consider partial URL matching (e.g., 80% threshold) if exact matching proves too fragile in practice. Deferred until we evaluate how well exact matching works
