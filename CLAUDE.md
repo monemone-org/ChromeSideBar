@@ -43,9 +43,15 @@ const handleError = useCallback(
 
 This provides consistent error logging and state management across all Chrome API calls.
 
-## Feature Documentation
+## Documentation
 
-All feature docs in `docs/` must have YAML front matter:
+- `docs/chrome-web-store-info.md` - Chrome Web Store listing (summary, description, key features, change logs)
+- `docs/features/` - Feature specs
+- `docs/state-reference.md` - Extension state reference
+
+### Feature Docs Format
+
+All feature docs in `docs/features/` must have YAML front matter:
 
 ```yaml
 ---
@@ -62,6 +68,7 @@ status: draft | in-progress | completed | finalized
 ## Versioning
 
 **Before running command git-commit-msg**, update extension version number with:
+
 ```bash
 ./tools/update-version.sh
 ```
