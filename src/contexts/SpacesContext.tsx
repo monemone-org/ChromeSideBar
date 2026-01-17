@@ -29,7 +29,8 @@ interface SpacesContextValue
 
   // Per-window state
   activeSpaceId: string;
-  setActiveSpaceId: (spaceId: string) => void;
+  setActiveSpaceId: (spaceId: string) => void;  // No tab activation (for code-initiated switches)
+  switchToSpace: (spaceId: string) => void;     // With tab activation (for user-initiated switches)
   spaceTabs: Record<string, number[]>;
 
   // Tab tracking (internal, not Chrome groups)
@@ -38,9 +39,7 @@ interface SpacesContextValue
   getSpaceForTab: (tabId: number) => string | null;
   getTabsForSpace: (spaceId: string) => number[];
 
-  // Last active tab tracking
-  getLastActiveTabForSpace: (spaceId: string) => number | undefined;
-  setLastActiveTabForSpace: (spaceId: string, tabId: number) => void;
+  // Space state cleanup
   clearStateForSpace: (spaceId: string) => void;
 }
 
@@ -65,12 +64,11 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     spaceTabs,
     isInitialized,
     setActiveSpaceId,
+    switchToSpace,
     addTabToSpace,
     removeTabFromSpace,
     getSpaceForTab,
     getTabsForSpace,
-    getLastActiveTabForSpace,
-    setLastActiveTabForSpace,
     clearStateForSpace,
   } = useSpaceWindowState();
 
@@ -108,13 +106,12 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     appendSpaces,
     activeSpaceId,
     setActiveSpaceId,
+    switchToSpace,
     spaceTabs,
     addTabToSpace,
     removeTabFromSpace,
     getSpaceForTab,
     getTabsForSpace,
-    getLastActiveTabForSpace,
-    setLastActiveTabForSpace,
     clearStateForSpace,
   };
 

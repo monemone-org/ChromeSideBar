@@ -34,7 +34,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   onDeleteSpace,
 }) =>
 {
-  const { allSpaces, activeSpaceId, setActiveSpaceId, moveSpace, getSpaceById } = useSpacesContext();
+  const { allSpaces, activeSpaceId, switchToSpace, moveSpace, getSpaceById } = useSpacesContext();
   const closeAllTabsInSpace = useCloseAllTabsInSpace();
   const [activeId, setActiveId] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -62,7 +62,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 
   const handleSpaceClick = (spaceId: string) =>
   {
-    setActiveSpaceId(spaceId);
+    switchToSpace(spaceId);
     // Tab group is NOT created on space switch
     // It will be created when first tab/bookmark is opened
   };

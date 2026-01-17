@@ -169,7 +169,7 @@ interface SwipeableContainerProps extends SidebarContentProps
 
 const SwipeableContainer: React.FC<SwipeableContainerProps> = (props) =>
 {
-  const { allSpaces, activeSpaceId, setActiveSpaceId } = useSpacesContext();
+  const { allSpaces, activeSpaceId, setActiveSpaceId, switchToSpace } = useSpacesContext();
   const containerRef = useRef<HTMLDivElement>(null);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const prevSpaceIdRef = useRef(activeSpaceId);
@@ -213,13 +213,13 @@ const SwipeableContainer: React.FC<SwipeableContainerProps> = (props) =>
   {
     if (direction === 'left' && canSwipeLeft)
     {
-      setActiveSpaceId(allSpaces[currentIndex + 1].id);
+      switchToSpace(allSpaces[currentIndex + 1].id);
     }
     else if (direction === 'right' && canSwipeRight)
     {
-      setActiveSpaceId(allSpaces[currentIndex - 1].id);
+      switchToSpace(allSpaces[currentIndex - 1].id);
     }
-  }, [allSpaces, currentIndex, canSwipeLeft, canSwipeRight, setActiveSpaceId]);
+  }, [allSpaces, currentIndex, canSwipeLeft, canSwipeRight, switchToSpace]);
 
   useSwipeNavigation(containerRef, { onSwipe: handleSwipe });
 
@@ -416,15 +416,6 @@ function App() {
   }, []);
 
   // DropdownMenu handles click-outside and escape key automatically
-
-  // Enable tab history debug logging in DEV builds
-  useEffect(() =>
-  {
-    if (import.meta.env.DEV)
-    {
-      chrome.runtime.sendMessage({ action: 'set-debug-tab-history', enabled: true });
-    }
-  }, []);
 
   // Listen for navigate-spaces command
   useEffect(() =>

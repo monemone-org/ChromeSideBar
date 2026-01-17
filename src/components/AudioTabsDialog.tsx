@@ -18,7 +18,7 @@ export const AudioTabsDialog = ({
   onClose
 }: AudioTabsDialogProps) =>
 {
-  const { getSpaceForTab, setActiveSpaceId, activeSpaceId, setLastActiveTabForSpace } = useSpacesContext();
+  const { getSpaceForTab, setActiveSpaceId, activeSpaceId } = useSpacesContext();
   const { getItemKeyForTab } = useBookmarkTabsContext();
 
   const handleSelectTab = (tab: chrome.tabs.Tab) =>
@@ -32,17 +32,12 @@ export const AudioTabsDialog = ({
     onTabSelect(tab.id);
     onClose();
 
-    // Switch to the space if needed
+    // Switch to the space if needed (UI only, no tab activation since we just activated it)
     // If tab not found in any space (e.g., live bookmark tab), fall back to "All" space
+    // Note: background.ts tracks last active tab via onActivated listener
     const targetSpaceId = spaceId || 'all';
     if (targetSpaceId !== activeSpaceId)
     {
-      // Set the audio tab as the "last active tab" for the target space
-      // This ensures the space switch won't override our tab activation
-      if (spaceId)
-      {
-        setLastActiveTabForSpace(spaceId, tab.id);
-      }
       setActiveSpaceId(targetSpaceId);
     }
 

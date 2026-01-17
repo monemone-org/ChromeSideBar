@@ -174,5 +174,12 @@ SpaceBar
       - [x] Security review
       - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
       
+- [ ] close tab after/before/others should be bounded within the active group of the active tab
+      if the active tab is ungrouped, then those actions will apply to all tabs (grouped or ungrouped)
 
+- [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
 
+- [ ] in audio filter dialog, when clicking anywhere else in the panel should dismiss the audio filter dialog
+  so is "Navigate to Space" dialog
+
+- [ ] document all the session states stored: what data is for, which class/file owns it.

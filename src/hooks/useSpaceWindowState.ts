@@ -4,7 +4,7 @@ export interface SpaceWindowState
 {
   activeSpaceId: string;
   spaceTabs: Record<string, number[]>;  // space ID → array of tab IDs
-  spaceLastActiveTabMap: Record<string, number>;  // space ID → last active tab ID
+  // Note: spaceLastActiveTabMap is now managed by background.ts in separate storage
 }
 
 const getStorageKey = (windowId: number): string =>
@@ -15,7 +15,6 @@ const getStorageKey = (windowId: number): string =>
 const DEFAULT_STATE: SpaceWindowState = {
   activeSpaceId: 'all',
   spaceTabs: {},
-  spaceLastActiveTabMap: {},
 };
 
 export const useSpaceWindowState = () =>
@@ -73,6 +72,10 @@ export const useSpaceWindowState = () =>
         const newState = changes[storageKey].newValue as SpaceWindowState | undefined;
         if (newState)
         {
+          if (import.meta.env.DEV)
+          {
+            console.log(`[Sidebar] storage change: activeSpaceId=${newState.activeSpaceId}`);
+          }
           setState(newState);
         }
       }
@@ -99,7 +102,39 @@ export const useSpaceWindowState = () =>
     });
   }, []);
 
+  // Update active space and notify background (no tab activation)
+  // Use for: history navigation, spaces disabled, create/delete space
   const setActiveSpaceId = useCallback((spaceId: string) =>
+  {
+    if (import.meta.env.DEV)
+    {
+      console.log(`[Sidebar] setActiveSpaceId: ${spaceId}`);
+    }
+    setState(prev =>
+    {
+      if (import.meta.env.DEV)
+      {
+        console.log(`[Sidebar] setState: ${prev.activeSpaceId} -> ${spaceId}`);
+      }
+      const newState = { ...prev, activeSpaceId: spaceId };
+      saveState(newState);
+      return newState;
+    });
+
+    // Notify background of space change (tracking only, no tab activation)
+    if (windowId)
+    {
+      chrome.runtime.sendMessage({
+        action: 'set-active-space',
+        windowId,
+        spaceId
+      });
+    }
+  }, [saveState, windowId]);
+
+  // Switch to space and activate its last active tab
+  // Use for: user clicks space bar, swipe gestures, space navigator
+  const switchToSpace = useCallback((spaceId: string) =>
   {
     setState(prev =>
     {
@@ -107,7 +142,18 @@ export const useSpaceWindowState = () =>
       saveState(newState);
       return newState;
     });
-  }, [saveState]);
+
+    // Notify background to switch space AND activate last tab
+    // Background will look up lastActiveTabId from its own storage
+    if (windowId)
+    {
+      chrome.runtime.sendMessage({
+        action: 'switch-to-space',
+        windowId,
+        spaceId
+      });
+    }
+  }, [saveState, windowId]);
 
   // Add a tab to a space (not used for "all" space - "all" shows all tabs)
   const addTabToSpace = useCallback((tabId: number, spaceId: string) =>
@@ -179,59 +225,21 @@ export const useSpaceWindowState = () =>
     return state.spaceTabs[spaceId] || [];
   }, [state.spaceTabs]);
 
-  const getLastActiveTabForSpace = useCallback((spaceId: string): number | undefined =>
-  {
-    return state.spaceLastActiveTabMap[spaceId];
-  }, [state.spaceLastActiveTabMap]);
-
-  const setLastActiveTabForSpace = useCallback((spaceId: string, tabId: number) =>
-  {
-    setState(prev =>
-    {
-      const newState = {
-        ...prev,
-        spaceLastActiveTabMap: {
-          ...prev.spaceLastActiveTabMap,
-          [spaceId]: tabId,
-        },
-      };
-      saveState(newState);
-      return newState;
-    });
-  }, [saveState]);
-
   // Clear all state for a space (used when deleting a space)
+  // Note: spaceLastActiveTabMap is managed by background.ts
   const clearStateForSpace = useCallback((spaceId: string) =>
   {
     setState(prev =>
     {
       const { [spaceId]: _tabs, ...restSpaceTabs } = prev.spaceTabs;
-      const { [spaceId]: _lastTab, ...restLastActiveMap } = prev.spaceLastActiveTabMap;
       const newState = {
         ...prev,
         spaceTabs: restSpaceTabs,
-        spaceLastActiveTabMap: restLastActiveMap,
       };
       saveState(newState);
       return newState;
     });
   }, [saveState]);
-
-  // Extract values to avoid depending on entire map objects (prevents race conditions)
-  const activeSpaceLastTabId = state.spaceLastActiveTabMap[state.activeSpaceId];
-
-  // Send active space to background whenever it changes
-  useEffect(() =>
-  {
-    if (!windowId || !isInitialized) return;
-
-    chrome.runtime.sendMessage({
-      action: 'set-active-space',
-      windowId,
-      spaceId: state.activeSpaceId,
-      lastActiveTabId: activeSpaceLastTabId
-    });
-  }, [windowId, isInitialized, state.activeSpaceId, activeSpaceLastTabId]);
 
   // Listen for history tab activation to switch spaces
   useEffect(() =>
@@ -244,6 +252,10 @@ export const useSpaceWindowState = () =>
     {
       if (message.action === 'history-tab-activated' && message.spaceId)
       {
+        if (import.meta.env.DEV)
+        {
+          console.log(`[Sidebar] history-tab-activated received: spaceId=${message.spaceId}`);
+        }
         setActiveSpaceId(message.spaceId);
       }
     };
@@ -258,12 +270,11 @@ export const useSpaceWindowState = () =>
     spaceTabs: state.spaceTabs,
     isInitialized,
     setActiveSpaceId,
+    switchToSpace,
     addTabToSpace,
     removeTabFromSpace,
     getSpaceForTab,
     getTabsForSpace,
-    getLastActiveTabForSpace,
-    setLastActiveTabForSpace,
     clearStateForSpace,
   };
 };
