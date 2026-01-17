@@ -108,7 +108,9 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
-## 1.0.189
+## Latest
+
+- Fixed used tab history being lost when Chrome suspends the background service worker
 
 - Arc-style Spaces:
   - Create isolated workspaces linking bookmark folders to Chrome tab groups

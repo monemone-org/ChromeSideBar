@@ -1,32 +1,126 @@
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
-// Track last active tab's groupId per window
-const windowActiveGroups = new Map();
+// Feature flags
+const ENABLE_AUTO_GROUP_NEW_TABS = false;
 
-// Track active space per window (sent from sidebar)
-const windowActiveSpaces = new Map(); // Map<windowId, spaceId>
-
-// Tab history navigation (undo/redo style)
-// Each entry is { tabId, spaceId } to restore both tab and space
-const MAX_HISTORY_SIZE = 25;
-const windowTabHistory = new Map(); // Map<windowId, { stack: {tabId, spaceId}[], index: number }>
-let isNavigating = false; // flag to skip history tracking during navigation
-let debugTabHistory = false; // enable via 'set-debug-tab-history' message from sidebar
-
-function getOrCreateHistory(windowId)
+// Centralized state management with granular persistence
+class BackgroundState
 {
-  if (!windowTabHistory.has(windowId))
+  // Storage keys for session persistence
+  static KEYS = {
+    ACTIVE_GROUPS: 'bg_windowActiveGroups',
+    ACTIVE_SPACES: 'bg_windowActiveSpaces',
+    TAB_HISTORY: 'bg_windowTabHistory'
+  };
+
+  #activeGroups = new Map();  // windowId -> groupId
+  #activeSpaces = new Map();  // windowId -> spaceId
+  #tabHistory = new Map();    // windowId -> { stack: {tabId, spaceId}[], index: number }
+
+  // --- Active Groups ---
+  getActiveGroup(windowId)
   {
-    windowTabHistory.set(windowId, { stack: [], index: -1 });
+    return this.#activeGroups.get(windowId);
   }
-  return windowTabHistory.get(windowId);
+
+  setActiveGroup(windowId, groupId)
+  {
+    this.#activeGroups.set(windowId, groupId);
+    chrome.storage.session.set({
+      [BackgroundState.KEYS.ACTIVE_GROUPS]: Array.from(this.#activeGroups.entries())
+    });
+  }
+
+  // --- Active Spaces ---
+  getActiveSpace(windowId)
+  {
+    return this.#activeSpaces.get(windowId);
+  }
+
+  setActiveSpace(windowId, spaceId)
+  {
+    this.#activeSpaces.set(windowId, spaceId);
+    chrome.storage.session.set({
+      [BackgroundState.KEYS.ACTIVE_SPACES]: Array.from(this.#activeSpaces.entries())
+    });
+  }
+
+  // --- Tab History ---
+  getHistory(windowId)
+  {
+    return this.#tabHistory.get(windowId);
+  }
+
+  hasHistory(windowId)
+  {
+    return this.#tabHistory.has(windowId);
+  }
+
+  getOrCreateHistory(windowId)
+  {
+    if (!this.#tabHistory.has(windowId))
+    {
+      this.#tabHistory.set(windowId, { stack: [], index: -1 });
+    }
+    return this.#tabHistory.get(windowId);
+  }
+
+  saveHistory()
+  {
+    chrome.storage.session.set({
+      [BackgroundState.KEYS.TAB_HISTORY]: Array.from(this.#tabHistory.entries())
+    });
+  }
+
+  // --- Load all state on startup ---
+  async load()
+  {
+    const result = await chrome.storage.session.get([
+      BackgroundState.KEYS.ACTIVE_GROUPS,
+      BackgroundState.KEYS.ACTIVE_SPACES,
+      BackgroundState.KEYS.TAB_HISTORY
+    ]);
+
+    if (result[BackgroundState.KEYS.ACTIVE_GROUPS])
+    {
+      for (const [key, value] of result[BackgroundState.KEYS.ACTIVE_GROUPS])
+      {
+        this.#activeGroups.set(key, value);
+      }
+    }
+
+    if (result[BackgroundState.KEYS.ACTIVE_SPACES])
+    {
+      for (const [key, value] of result[BackgroundState.KEYS.ACTIVE_SPACES])
+      {
+        this.#activeSpaces.set(key, value);
+      }
+    }
+
+    if (result[BackgroundState.KEYS.TAB_HISTORY])
+    {
+      for (const [key, value] of result[BackgroundState.KEYS.TAB_HISTORY])
+      {
+        this.#tabHistory.set(key, value);
+      }
+    }
+  }
 }
+
+// Global state instance
+const state = new BackgroundState();
+state.load();
+
+// Tab history config
+const MAX_HISTORY_SIZE = 25;
+let isNavigating = false;  // flag to skip history tracking during navigation
+let debugTabHistory = false;  // enable via 'set-debug-tab-history' message from sidebar
 
 // Debug: dump complete history with tab details
 async function dumpHistory(windowId, action)
 {
-  const history = windowTabHistory.get(windowId);
+  const history = state.getHistory(windowId);
   if (!history)
   {
     console.log(`[TabHistory] ${action} - windowId=${windowId}: NO HISTORY`);
@@ -57,8 +151,8 @@ async function dumpHistory(windowId, action)
 
 function pushToHistory(windowId, tabId)
 {
-  const history = getOrCreateHistory(windowId);
-  const spaceId = windowActiveSpaces.get(windowId) || 'all';
+  const history = state.getOrCreateHistory(windowId);
+  const spaceId = state.getActiveSpace(windowId) || 'all';
 
   // skip if same as current entry (same tab AND same space)
   if (history.index >= 0)
@@ -104,12 +198,13 @@ function pushToHistory(windowId, tabId)
     history.stack.splice(history.stack.length - trimCount, trimCount);
   }
 
+  state.saveHistory();
   if (debugTabHistory) dumpHistory(windowId, `PUSH tabId=${tabId}, spaceId=${spaceId}`);
 }
 
 function removeFromHistory(windowId, tabId)
 {
-  const history = windowTabHistory.get(windowId);
+  const history = state.getHistory(windowId);
   if (!history) return;
 
   const idx = history.stack.findIndex(e => e.tabId === tabId);
@@ -129,6 +224,7 @@ function removeFromHistory(windowId, tabId)
     history.index = -1;
   }
 
+  state.saveHistory();
   if (debugTabHistory) dumpHistory(windowId, `REMOVE tabId=${tabId}`);
 }
 
@@ -139,23 +235,23 @@ async function updateSpaceLastActiveTab(windowId, spaceId, tabId)
 
   const storageKey = `spaceWindowState_${windowId}`;
   const result = await chrome.storage.session.get([storageKey]);
-  const state = result[storageKey] || {
+  const windowState = result[storageKey] || {
     activeSpaceId: 'all',
     spaceTabs: {},
     spaceLastActiveTabMap: {}
   };
 
   // Only record if tab belongs to this space (check spaceTabs)
-  const spaceTabs = state.spaceTabs?.[spaceId] || [];
+  const spaceTabs = windowState.spaceTabs?.[spaceId] || [];
   if (!spaceTabs.includes(tabId))
   {
     return;  // Tab doesn't belong to this space, skip
   }
 
-  state.spaceLastActiveTabMap = state.spaceLastActiveTabMap || {};
-  state.spaceLastActiveTabMap[spaceId] = tabId;
+  windowState.spaceLastActiveTabMap = windowState.spaceLastActiveTabMap || {};
+  windowState.spaceLastActiveTabMap[spaceId] = tabId;
 
-  await chrome.storage.session.set({ [storageKey]: state });
+  await chrome.storage.session.set({ [storageKey]: windowState });
 }
 
 // Remove tab from all space last-active mappings when closed
@@ -163,22 +259,22 @@ async function removeTabFromSpaceLastActive(windowId, tabId)
 {
   const storageKey = `spaceWindowState_${windowId}`;
   const result = await chrome.storage.session.get([storageKey]);
-  const state = result[storageKey];
-  if (!state?.spaceLastActiveTabMap) return;
+  const windowState = result[storageKey];
+  if (!windowState?.spaceLastActiveTabMap) return;
 
   let changed = false;
-  for (const spaceId of Object.keys(state.spaceLastActiveTabMap))
+  for (const spaceId of Object.keys(windowState.spaceLastActiveTabMap))
   {
-    if (state.spaceLastActiveTabMap[spaceId] === tabId)
+    if (windowState.spaceLastActiveTabMap[spaceId] === tabId)
     {
-      delete state.spaceLastActiveTabMap[spaceId];
+      delete windowState.spaceLastActiveTabMap[spaceId];
       changed = true;
     }
   }
 
   if (changed)
   {
-    await chrome.storage.session.set({ [storageKey]: state });
+    await chrome.storage.session.set({ [storageKey]: windowState });
   }
 }
 
@@ -206,8 +302,8 @@ async function activateLastTabForSpace(windowId, spaceId, lastActiveTabId)
   // Fallback: first tab in space (from spaceTabs)
   const storageKey = `spaceWindowState_${windowId}`;
   const result = await chrome.storage.session.get([storageKey]);
-  const state = result[storageKey];
-  const spaceTabs = state?.spaceTabs?.[spaceId] || [];
+  const windowState = result[storageKey];
+  const spaceTabs = windowState?.spaceTabs?.[spaceId] || [];
 
   if (spaceTabs.length > 0)
   {
@@ -233,7 +329,7 @@ async function activateLastTabForSpace(windowId, spaceId, lastActiveTabId)
 
 function navigateHistory(windowId, direction)
 {
-  const history = windowTabHistory.get(windowId);
+  const history = state.getHistory(windowId);
   if (!history || history.stack.length === 0) return;
 
   const newIndex = history.index + direction;
@@ -243,6 +339,7 @@ function navigateHistory(windowId, direction)
 
   history.index = newIndex;
   const entry = history.stack[newIndex];
+  state.saveHistory();
 
   if (debugTabHistory)
   {
@@ -259,6 +356,10 @@ function navigateHistory(windowId, direction)
     // Skip if spaceId is empty (pinned sites)
     if (entry.spaceId)
     {
+      // Update the target space's last active tab BEFORE notifying sidebar
+      // This ensures activateLastTabForSpace() won't switch to a different tab
+      updateSpaceLastActiveTab(windowId, entry.spaceId, entry.tabId);
+
       chrome.runtime.sendMessage({
         action: 'history-tab-activated',
         tabId: entry.tabId,
@@ -281,13 +382,13 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
   {
     if (tab)
     {
-      if (tab.groupId !== undefined)
+      if (ENABLE_AUTO_GROUP_NEW_TABS && tab.groupId !== undefined)
       {
-        windowActiveGroups.set(activeInfo.windowId, tab.groupId);
+        state.setActiveGroup(activeInfo.windowId, tab.groupId);
       }
 
       // Track last active tab for current space
-      const spaceId = windowActiveSpaces.get(activeInfo.windowId);
+      const spaceId = state.getActiveSpace(activeInfo.windowId);
       if (spaceId && spaceId !== 'all')
       {
         updateSpaceLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId);
@@ -306,11 +407,13 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
 // Auto-group all new tabs when active tab is in a group
 chrome.tabs.onCreated.addListener((tab) =>
 {
-  const groupId = windowActiveGroups.get(tab.windowId);
-
-  if (groupId && groupId !== -1)
+  if (ENABLE_AUTO_GROUP_NEW_TABS)
   {
-    chrome.tabs.group({ tabIds: [tab.id], groupId });
+    const groupId = state.getActiveGroup(tab.windowId);
+    if (groupId && groupId !== -1)
+    {
+      chrome.tabs.group({ tabIds: [tab.id], groupId });
+    }
   }
 });
 
@@ -329,7 +432,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
   {
     if (message.windowId && message.spaceId)
     {
-      windowActiveSpaces.set(message.windowId, message.spaceId);
+      state.setActiveSpace(message.windowId, message.spaceId);
       if (debugTabHistory)
       {
         console.log(`[TabHistory] Active space set: windowId=${message.windowId}, spaceId=${message.spaceId}`);
@@ -367,7 +470,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
       }
 
       const windowId = tabs[0].windowId;
-      const history = windowTabHistory.get(windowId);
+      const history = state.getHistory(windowId);
 
       if (!history || history.stack.length === 0)
       {
@@ -425,12 +528,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
       if (tabs.length === 0) return;
 
       const windowId = tabs[0].windowId;
-      const history = windowTabHistory.get(windowId);
+      const history = state.getHistory(windowId);
 
       if (!history || message.index < 0 || message.index >= history.stack.length) return;
 
       history.index = message.index;
       const entry = history.stack[message.index];
+      state.saveHistory();
 
       if (debugTabHistory) dumpHistory(windowId, `NAVIGATE to index=${message.index}, tabId=${entry.tabId}, spaceId=${entry.spaceId}`);
 
@@ -443,6 +547,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) =>
         // Skip if spaceId is empty (pinned sites)
         if (entry.spaceId)
         {
+          // Update the target space's last active tab BEFORE notifying sidebar
+          // This ensures activateLastTabForSpace() won't switch to a different tab
+          updateSpaceLastActiveTab(windowId, entry.spaceId, entry.tabId);
+
           chrome.runtime.sendMessage({
             action: 'history-tab-activated',
             tabId: entry.tabId,
