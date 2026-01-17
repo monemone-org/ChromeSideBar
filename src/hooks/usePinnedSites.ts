@@ -6,7 +6,6 @@ export interface PinnedSite {
   url: string;
   title: string;
   favicon?: string;
-  order: number;
   customIconName?: string;  // Lucide icon name when using custom icon
   iconColor?: string;       // Custom icon color (hex, e.g., "#ef4444")
 }
@@ -52,8 +51,7 @@ export const usePinnedSites = () => {
     if (typeof chrome !== 'undefined' && chrome.storage) {
       chrome.storage.local.get([STORAGE_KEY], (result) => {
         if (!handleError('load')) {
-          const sites = result[STORAGE_KEY] || [];
-          setPinnedSites(sites.sort((a: PinnedSite, b: PinnedSite) => a.order - b.order));
+          setPinnedSites(result[STORAGE_KEY] || []);
         }
       });
     }
@@ -72,8 +70,7 @@ export const usePinnedSites = () => {
 
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
       if (changes[STORAGE_KEY]) {
-        const sites = changes[STORAGE_KEY].newValue || [];
-        setPinnedSites(sites.sort((a: PinnedSite, b: PinnedSite) => a.order - b.order));
+        setPinnedSites(changes[STORAGE_KEY].newValue || []);
       }
     };
 
@@ -83,11 +80,6 @@ export const usePinnedSites = () => {
       chrome.storage?.onChanged.removeListener(handleStorageChange);
     };
   }, [loadPinnedSites]);
-
-  const compactOrders = (sites: PinnedSite[]): PinnedSite[] => {
-    // Just assign order based on current array position, don't sort
-    return sites.map((site, index) => ({ ...site, order: index }));
-  };
 
   const addPin = useCallback(async (
     url: string,
@@ -108,7 +100,6 @@ export const usePinnedSites = () => {
       url,
       title,
       favicon,
-      order: pinnedSites.length,
     };
 
     const updatedSites = [...pinnedSites, newPin];
@@ -117,7 +108,7 @@ export const usePinnedSites = () => {
   }, [pinnedSites, savePinnedSites]);
 
   const removePin = useCallback((id: string) => {
-    const updatedSites = compactOrders(pinnedSites.filter(s => s.id !== id));
+    const updatedSites = pinnedSites.filter(s => s.id !== id);
     setPinnedSites(updatedSites);
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
@@ -174,9 +165,8 @@ export const usePinnedSites = () => {
     const [removed] = updatedSites.splice(oldIndex, 1);
     updatedSites.splice(newIndex, 0, removed);
 
-    const compacted = compactOrders(updatedSites);
-    setPinnedSites(compacted);
-    savePinnedSites(compacted);
+    setPinnedSites(updatedSites);
+    savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
 
   const duplicatePin = useCallback((id: string) => {
@@ -192,30 +182,26 @@ export const usePinnedSites = () => {
     const updatedSites = [...pinnedSites];
     updatedSites.splice(index + 1, 0, duplicate);
 
-    const compacted = compactOrders(updatedSites);
-    setPinnedSites(compacted);
-    savePinnedSites(compacted);
+    setPinnedSites(updatedSites);
+    savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
 
   // Replace all pinned sites (for full backup import)
   const replacePinnedSites = useCallback((sites: PinnedSite[]) => {
-    const reordered = sites.map((site, index) => ({
+    const newSites = sites.map(site => ({
       ...site,
       id: generateId(),
-      order: index,
     }));
-    setPinnedSites(reordered);
-    savePinnedSites(reordered);
+    setPinnedSites(newSites);
+    savePinnedSites(newSites);
   }, [savePinnedSites]);
 
   // Append pinned sites to existing ones (for full backup import)
   const appendPinnedSites = useCallback((sites: PinnedSite[]) => {
     setPinnedSites(current => {
-      const startOrder = current.length;
-      const newSites = sites.map((site, index) => ({
+      const newSites = sites.map(site => ({
         ...site,
         id: generateId(),
-        order: startOrder + index,
       }));
       const combined = [...current, ...newSites];
       savePinnedSites(combined);
