@@ -12,7 +12,7 @@ import {
   ImportResult,
 } from '../utils/backupRestore';
 import { PinnedSite } from '../hooks/usePinnedSites';
-import { Space } from '../hooks/useSpaces';
+import { Space } from '../contexts/SpacesContext';
 
 interface ImportDialogProps {
   isOpen: boolean;

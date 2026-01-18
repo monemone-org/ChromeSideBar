@@ -4,7 +4,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import * as ContextMenu from './menu/ContextMenu';
 import { LayoutGrid } from 'lucide-react';
-import { Space } from '../hooks/useSpaces';
+import { Space } from '../contexts/SpacesContext';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getIconUrl } from '../utils/iconify';
 import { SpaceContextMenuContent } from './SpaceContextMenuContent';

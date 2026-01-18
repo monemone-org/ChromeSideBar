@@ -12,16 +12,14 @@ import { WelcomeDialog } from './components/WelcomeDialog';
 import { AudioTabsDialog } from './components/AudioTabsDialog';
 import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
-import { usePinnedSites } from './hooks/usePinnedSites';
+import { usePinnedSites, PinnedSite } from './hooks/usePinnedSites';
 import { useTabs } from './hooks/useTabs';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
-import { useCloseAllTabsInSpace } from './hooks/useCloseAllTabsInSpace';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
-import { useSpaces } from './hooks/useSpaces';
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
@@ -151,7 +149,7 @@ interface SpaceTitleWrapperProps
 
 const SpaceTitleWrapper: React.FC<SpaceTitleWrapperProps> = ({ onEditSpace, onDeleteSpace }) =>
 {
-  const closeAllTabsInSpace = useCloseAllTabsInSpace();
+  const { closeAllTabsInSpace } = useSpacesContext();
 
   return (
     <SpaceTitle
@@ -235,6 +233,43 @@ const SwipeableContainer: React.FC<SwipeableContainerProps> = (props) =>
         <SidebarContent {...props} />
       </div>
     </div>
+  );
+};
+
+// Wrapper for ExportDialog that uses spaces from context
+interface ExportDialogWrapperProps
+{
+  isOpen: boolean;
+  onClose: () => void;
+  pinnedSites: PinnedSite[];
+  bookmarks: chrome.bookmarks.BookmarkTreeNode[];
+}
+
+const ExportDialogWrapper: React.FC<ExportDialogWrapperProps> = (props) =>
+{
+  const { spaces } = useSpacesContext();
+  return <ExportDialog {...props} spaces={spaces} />;
+};
+
+// Wrapper for ImportDialog that uses spaces from context
+interface ImportDialogWrapperProps
+{
+  isOpen: boolean;
+  onClose: () => void;
+  replacePinnedSites: (sites: PinnedSite[]) => void;
+  appendPinnedSites: (sites: PinnedSite[]) => void;
+}
+
+const ImportDialogWrapper: React.FC<ImportDialogWrapperProps> = (props) =>
+{
+  const { spaces, replaceSpaces, appendSpaces } = useSpacesContext();
+  return (
+    <ImportDialog
+      {...props}
+      replaceSpaces={replaceSpaces}
+      appendSpaces={appendSpaces}
+      existingSpaces={spaces}
+    />
   );
 };
 
@@ -329,11 +364,6 @@ function App() {
   } = usePinnedSites();
   const { bookmarks } = useBookmarks();
   const { tabs, activateTab } = useTabs();
-  const {
-    spaces,
-    replaceSpaces,
-    appendSpaces,
-  } = useSpaces();
 
   const handleApplySettings = (newSettings: SettingsValues) => {
     setFontSize(newSettings.fontSize);
@@ -460,22 +490,18 @@ function App() {
         onShowWelcome={() => setShowWelcome(true)}
       />
 
-      <ExportDialog
+      <ExportDialogWrapper
         isOpen={showExport}
         onClose={() => setShowExport(false)}
         pinnedSites={pinnedSites}
         bookmarks={bookmarks}
-        spaces={spaces}
       />
 
-      <ImportDialog
+      <ImportDialogWrapper
         isOpen={showImport}
         onClose={() => setShowImport(false)}
         replacePinnedSites={replacePinnedSites}
         appendPinnedSites={appendPinnedSites}
-        replaceSpaces={replaceSpaces}
-        appendSpaces={appendSpaces}
-        existingSpaces={spaces}
       />
 
       <WelcomeDialog

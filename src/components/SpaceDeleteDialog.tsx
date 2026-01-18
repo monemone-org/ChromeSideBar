@@ -1,6 +1,6 @@
 import React from 'react';
 import { Dialog } from './Dialog';
-import { Space } from '../hooks/useSpaces';
+import { Space } from '../contexts/SpacesContext';
 import { AlertTriangle } from 'lucide-react';
 
 interface SpaceDeleteDialogProps

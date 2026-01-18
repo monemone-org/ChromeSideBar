@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { PinnedSite } from '../hooks/usePinnedSites';
-import { Space } from '../hooks/useSpaces';
+import { Space } from '../contexts/SpacesContext';
 
 export interface ExportOptions {
   exportPinnedSites: boolean;

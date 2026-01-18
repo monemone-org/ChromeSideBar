@@ -187,3 +187,12 @@ SpaceBar
 - [x] last active tab id not working for "All" Space.
 
 - [-] When chrome restarts, it restores all the tabs, we need to find a way to remap live bookmarks , live pinned sites and space tab lists.
+
+- [ ] after deleting a space,
+      - close all tabs in the space
+      - if the active view is from that space, go back to history, 
+        find the most recent tab that is not in the deleted space, activate it.
+        if nothing found, just show 1st tab in  All.
+
+- [ ] support drag/drop tabs to "Space" button
+

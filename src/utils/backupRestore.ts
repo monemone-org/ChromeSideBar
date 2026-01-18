@@ -1,5 +1,5 @@
 import { PinnedSite } from '../hooks/usePinnedSites';
-import { Space } from '../hooks/useSpaces';
+import { Space } from '../contexts/SpacesContext';
 
 export interface TabGroupBackup {
   title: string;

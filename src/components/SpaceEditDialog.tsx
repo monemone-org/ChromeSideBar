@@ -4,7 +4,7 @@ import { Dialog } from './Dialog';
 import { FolderPickerDialog } from './FolderPickerDialog';
 import { IconColorPicker, ColorOption } from './IconColorPicker';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { Space } from '../hooks/useSpaces';
+import { Space } from '../contexts/SpacesContext';
 import { GROUP_COLOR_OPTIONS } from '../utils/groupColors';
 import { getIconUrl } from '../utils/iconify';
 import { Folder, FolderOpen } from 'lucide-react';
