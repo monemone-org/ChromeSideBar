@@ -1,7 +1,7 @@
 ---
 created: 2026-01-17
 after-version: 0.0.0
-status: draft
+status: aborted
 ---
 
 # Consolidate Space Management into SpacesContext
