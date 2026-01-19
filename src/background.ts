@@ -1,3 +1,5 @@
+import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
+
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
@@ -5,191 +7,183 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 const ENABLE_AUTO_GROUP_NEW_TABS = false;
 
 // =============================================================================
-// SpaceTabTracker - Manages active space and last-active-tab per space
+// SpaceWindowStateManager - Manages SpaceWindowState per window
 // =============================================================================
 
-interface ActivateResult
+class SpaceWindowStateManager
 {
-  success: boolean;
-  action: 'activated-last' | 'activated-first' | 'already-active' | 'none';
-  tabId?: number;
-}
+  static STORAGE_KEY_PREFIX = 'spaceWindowState_';
 
-class SpaceTabTracker
-{
-  static KEYS = {
-    ACTIVE_SPACES: 'bg_windowActiveSpaces',
-    LAST_ACTIVE_TABS: 'bg_spaceLastActiveTabs'
-  };
+  #states = new Map<number, SpaceWindowState>();  // windowId -> state
 
-  #activeSpaces = new Map<number, string>();  // windowId -> spaceId
-  #lastActiveTabs = new Map<number, Record<string, number>>();  // windowId -> {spaceId -> tabId}
-
-  // --- Active Space ---
-
-  getActiveSpace(windowId: number): string | undefined
+  private getStorageKey(windowId: number): string
   {
-    return this.#activeSpaces.get(windowId);
+    return `${SpaceWindowStateManager.STORAGE_KEY_PREFIX}${windowId}`;
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // State Access
+  // ─────────────────────────────────────────────────────────────────────────
+
+  getState(windowId: number): SpaceWindowState
+  {
+    return this.#states.get(windowId) || { ...DEFAULT_WINDOW_STATE };
+  }
+
+  getActiveSpace(windowId: number): string
+  {
+    return this.getState(windowId).activeSpaceId;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // State Mutations
+  // ─────────────────────────────────────────────────────────────────────────
 
   setActiveSpace(windowId: number, spaceId: string): void
   {
-    this.#activeSpaces.set(windowId, spaceId);
-    chrome.storage.session.set({
-      [SpaceTabTracker.KEYS.ACTIVE_SPACES]: Array.from(this.#activeSpaces.entries())
-    });
+    const state = this.getState(windowId);
+    const newState = { ...state, activeSpaceId: spaceId };
+    this.saveState(windowId, newState);
   }
 
-  // --- Last Active Tab per Space ---
-
-  getLastActiveTab(windowId: number, spaceId: string): number | undefined
+  addTabToSpace(windowId: number, tabId: number, spaceId: string): void
   {
-    return this.#lastActiveTabs.get(windowId)?.[spaceId];
-  }
+    if (spaceId === 'all') return;
 
-  private setLastActiveTab(windowId: number, spaceId: string, tabId: number): void
-  {
-    let windowMap = this.#lastActiveTabs.get(windowId);
-    if (!windowMap)
+    const state = this.getState(windowId);
+    const newSpaceTabs = { ...state.spaceTabs };
+
+    // Remove from any existing space first
+    for (const [sid, tabs] of Object.entries(newSpaceTabs))
     {
-      windowMap = {};
-      this.#lastActiveTabs.set(windowId, windowMap);
-    }
-    windowMap[spaceId] = tabId;
-    chrome.storage.session.set({
-      [SpaceTabTracker.KEYS.LAST_ACTIVE_TABS]: Array.from(this.#lastActiveTabs.entries())
-    });
-  }
-
-  // Update last active tab (checks if tab belongs to space first)
-  async updateLastActiveTab(windowId: number, spaceId: string, tabId: number): Promise<void>
-  {
-    if (!spaceId) return;
-
-    // Check if tab belongs to this space (read spaceTabs from sidebar's storage)
-    // Skip check for "all" space since all tabs belong to it
-    if (spaceId !== 'all')
-    {
-      const windowStateKey = `spaceWindowState_${windowId}`;
-      const result = await chrome.storage.session.get([windowStateKey]);
-      const windowState = result[windowStateKey];
-      const spaceTabs = windowState?.spaceTabs?.[spaceId] || [];
-      if (!spaceTabs.includes(tabId))
+      if (tabs.includes(tabId))
       {
-        return;  // Tab doesn't belong to this space
+        newSpaceTabs[sid] = tabs.filter(id => id !== tabId);
       }
     }
 
-    this.setLastActiveTab(windowId, spaceId, tabId);
+    // Add to the new space
+    newSpaceTabs[spaceId] = [...(newSpaceTabs[spaceId] || []), tabId];
+
+    const newState = { ...state, spaceTabs: newSpaceTabs };
+    this.saveState(windowId, newState);
   }
 
-  // Remove tab from all spaces' last-active mappings (when tab is closed)
   removeTab(windowId: number, tabId: number): void
   {
-    const windowMap = this.#lastActiveTabs.get(windowId);
-    if (!windowMap) return;
-
+    const state = this.getState(windowId);
+    const newSpaceTabs = { ...state.spaceTabs };
+    const newLastActiveTabs = { ...state.lastActiveTabs };
     let changed = false;
-    for (const spaceId of Object.keys(windowMap))
+
+    // Remove from spaceTabs
+    for (const [spaceId, tabs] of Object.entries(newSpaceTabs))
     {
-      if (windowMap[spaceId] === tabId)
+      if (tabs.includes(tabId))
       {
-        delete windowMap[spaceId];
+        newSpaceTabs[spaceId] = tabs.filter(id => id !== tabId);
+        changed = true;
+      }
+    }
+
+    // Remove from lastActiveTabs
+    for (const [spaceId, lastTabId] of Object.entries(newLastActiveTabs))
+    {
+      if (lastTabId === tabId)
+      {
+        delete newLastActiveTabs[spaceId];
         changed = true;
       }
     }
 
     if (changed)
     {
-      chrome.storage.session.set({
-        [SpaceTabTracker.KEYS.LAST_ACTIVE_TABS]: Array.from(this.#lastActiveTabs.entries())
-      });
+      const newState = { ...state, spaceTabs: newSpaceTabs, lastActiveTabs: newLastActiveTabs };
+      this.saveState(windowId, newState);
     }
   }
 
-  // Activate last tab when switching to a space
-  async activateLastTab(windowId: number, spaceId: string): Promise<ActivateResult>
+  moveTabToSpace(windowId: number, tabId: number, toSpaceId: string): void
   {
-    const lastActiveTabId = this.getLastActiveTab(windowId, spaceId);
+    const state = this.getState(windowId);
+    const newSpaceTabs = { ...state.spaceTabs };
 
-    if (import.meta.env.DEV)
+    // Remove from all spaces
+    for (const [sid, tabs] of Object.entries(newSpaceTabs))
     {
-      console.log(`[SpaceTabTracker] activateLastTab: spaceId="${spaceId}", lastActiveTabId=${lastActiveTabId}`);
-    }
-
-    // Try stored last active tab
-    if (lastActiveTabId)
-    {
-      try
+      if (tabs.includes(tabId))
       {
-        const tab = await chrome.tabs.get(lastActiveTabId);
-        if (tab && !tab.active)
-        {
-          if (import.meta.env.DEV) console.log(`[SpaceTabTracker] activateLastTab: result=activated-last, tabId=${lastActiveTabId}`);
-          await chrome.tabs.update(lastActiveTabId, { active: true });
-          return { success: true, action: 'activated-last', tabId: lastActiveTabId };
-        }
-        if (tab && tab.active)
-        {
-          if (import.meta.env.DEV) console.log(`[SpaceTabTracker] activateLastTab: result=already-active, tabId=${lastActiveTabId}`);
-          return { success: true, action: 'already-active', tabId: lastActiveTabId };
-        }
+        newSpaceTabs[sid] = tabs.filter(id => id !== tabId);
       }
-      catch { /* tab doesn't exist */ }
     }
 
-    // Fallback: first tab in space (from spaceTabs)
-    const storageKey = `spaceWindowState_${windowId}`;
-    const result = await chrome.storage.session.get([storageKey]);
-    const windowState = result[storageKey];
-    const spaceTabs = windowState?.spaceTabs?.[spaceId] || [];
-
-    for (const tabId of spaceTabs)
+    // Add to target space (unless "all")
+    if (toSpaceId !== 'all')
     {
-      try
-      {
-        const tab = await chrome.tabs.get(tabId);
-        if (tab && !tab.active)
-        {
-          if (import.meta.env.DEV) console.log(`[SpaceTabTracker] activateLastTab: result=activated-first, tabId=${tabId}`);
-          await chrome.tabs.update(tabId, { active: true });
-          return { success: true, action: 'activated-first', tabId };
-        }
-        if (tab && tab.active)
-        {
-          if (import.meta.env.DEV) console.log(`[SpaceTabTracker] activateLastTab: result=already-active, tabId=${tabId}`);
-          return { success: true, action: 'already-active', tabId };
-        }
-      }
-      catch { /* tab doesn't exist, try next */ }
+      newSpaceTabs[toSpaceId] = [...(newSpaceTabs[toSpaceId] || []), tabId];
     }
 
-    if (import.meta.env.DEV) console.log(`[SpaceTabTracker] activateLastTab: result=none (no tabs)`);
-    return { success: true, action: 'none' };
+    const newState = { ...state, spaceTabs: newSpaceTabs };
+    this.saveState(windowId, newState);
   }
 
-  // --- Persistence ---
+  setLastActiveTab(windowId: number, spaceId: string, tabId: number): void
+  {
+    const state = this.getState(windowId);
+    const newState = {
+      ...state,
+      lastActiveTabs: { ...state.lastActiveTabs, [spaceId]: tabId }
+    };
+    this.saveState(windowId, newState);
+  }
+
+  clearSpaceState(windowId: number, spaceId: string): void
+  {
+    const state = this.getState(windowId);
+    const { [spaceId]: _tabs, ...restSpaceTabs } = state.spaceTabs;
+    const { [spaceId]: _lastTab, ...restLastActiveTabs } = state.lastActiveTabs;
+    const newState = {
+      ...state,
+      spaceTabs: restSpaceTabs,
+      lastActiveTabs: restLastActiveTabs,
+    };
+    this.saveState(windowId, newState);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Persistence & Notification
+  // ─────────────────────────────────────────────────────────────────────────
+
+  private saveState(windowId: number, state: SpaceWindowState): void
+  {
+    this.#states.set(windowId, state);
+    chrome.storage.session.set({ [this.getStorageKey(windowId)]: state });
+
+    // Notify sidebar of state change
+    chrome.runtime.sendMessage({
+      action: SpaceMessageAction.STATE_CHANGED,
+      windowId,
+      state
+    }).catch(() =>
+    {
+      // Sidepanel may not be open - ignore error
+    });
+  }
 
   async load(): Promise<void>
   {
-    const result = await chrome.storage.session.get([
-      SpaceTabTracker.KEYS.ACTIVE_SPACES,
-      SpaceTabTracker.KEYS.LAST_ACTIVE_TABS
-    ]);
+    // Load all window states from session storage
+    const result = await chrome.storage.session.get(null);
 
-    if (result[SpaceTabTracker.KEYS.ACTIVE_SPACES])
+    for (const [key, value] of Object.entries(result))
     {
-      for (const [key, value] of result[SpaceTabTracker.KEYS.ACTIVE_SPACES])
+      if (key.startsWith(SpaceWindowStateManager.STORAGE_KEY_PREFIX))
       {
-        this.#activeSpaces.set(key, value);
-      }
-    }
-
-    if (result[SpaceTabTracker.KEYS.LAST_ACTIVE_TABS])
-    {
-      for (const [key, value] of result[SpaceTabTracker.KEYS.LAST_ACTIVE_TABS])
-      {
-        this.#lastActiveTabs.set(key, value);
+        const windowId = parseInt(key.replace(SpaceWindowStateManager.STORAGE_KEY_PREFIX, ''), 10);
+        if (!isNaN(windowId))
+        {
+          this.#states.set(windowId, value as SpaceWindowState);
+        }
       }
     }
   }
@@ -218,11 +212,11 @@ class TabHistoryManager
 
   #history = new Map<number, TabHistory>();  // windowId -> history
   #isNavigating = false;  // flag to skip history tracking during navigation
-  #spaceTracker: SpaceTabTracker;
+  #spaceStateManager: SpaceWindowStateManager;
 
-  constructor(spaceTracker: SpaceTabTracker)
+  constructor(spaceStateManager: SpaceWindowStateManager)
   {
-    this.#spaceTracker = spaceTracker;
+    this.#spaceStateManager = spaceStateManager;
   }
 
   get isNavigating(): boolean
@@ -254,7 +248,7 @@ class TabHistoryManager
   push(windowId: number, tabId: number): void
   {
     const history = this.getOrCreateHistory(windowId);
-    const spaceId = this.#spaceTracker.getActiveSpace(windowId) || 'all';
+    const spaceId = this.#spaceStateManager.getActiveSpace(windowId);
 
     // skip if same as current entry (same tab AND same space)
     if (history.index >= 0)
@@ -351,11 +345,11 @@ class TabHistoryManager
       if (import.meta.env.DEV) console.log(`[TabHistory] navigate callback: setting isNavigating=false`);
       this.#isNavigating = false;
 
+      // Notify sidepanel to switch to the space (lastActiveTabs updated by onActivated)
       if (entry.spaceId)
       {
-        this.#spaceTracker.updateLastActiveTab(windowId, entry.spaceId, entry.tabId);
         chrome.runtime.sendMessage({
-          action: 'history-tab-activated',
+          action: SpaceMessageAction.HISTORY_TAB_ACTIVATED,
           tabId: entry.tabId,
           spaceId: entry.spaceId
         });
@@ -379,11 +373,11 @@ class TabHistoryManager
     {
       this.#isNavigating = false;
 
+      // Notify sidepanel to switch to the space (lastActiveTabs updated by onActivated)
       if (entry.spaceId)
       {
-        this.#spaceTracker.updateLastActiveTab(windowId, entry.spaceId, entry.tabId);
         chrome.runtime.sendMessage({
-          action: 'history-tab-activated',
+          action: SpaceMessageAction.HISTORY_TAB_ACTIVATED,
           tabId: entry.tabId,
           spaceId: entry.spaceId
         });
@@ -537,13 +531,13 @@ class TabGroupTracker
 // Initialize trackers
 // =============================================================================
 
-const spaceTracker = new SpaceTabTracker();
-const historyManager = new TabHistoryManager(spaceTracker);
+const spaceStateManager = new SpaceWindowStateManager();
+const historyManager = new TabHistoryManager(spaceStateManager);
 const groupTracker = new TabGroupTracker();
 
 // Load persisted state
 Promise.all([
-  spaceTracker.load(),
+  spaceStateManager.load(),
   historyManager.load(),
   groupTracker.load()
 ]);
@@ -552,7 +546,7 @@ Promise.all([
 // Event Listeners
 // =============================================================================
 
-// Update tracked group when active tab changes + track history
+// Update tracked group when active tab changes + track history + update lastActiveTabs
 chrome.tabs.onActivated.addListener((activeInfo) =>
 {
   if (import.meta.env.DEV) console.log(`[TabHistory] onActivated: tabId=${activeInfo.tabId}, isNavigating=${historyManager.isNavigating}`);
@@ -563,39 +557,50 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
     historyManager.push(activeInfo.windowId, activeInfo.tabId);
   }
 
-  chrome.tabs.get(activeInfo.tabId, (tab) =>
+  // Update lastActiveTabs for current space
+  const spaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
+  if (spaceId && spaceId !== 'all')
   {
-    if (tab)
+    spaceStateManager.setLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId);
+  }
+
+  // Track tab group (for auto-grouping feature)
+  if (ENABLE_AUTO_GROUP_NEW_TABS)
+  {
+    chrome.tabs.get(activeInfo.tabId, (tab) =>
     {
-      if (ENABLE_AUTO_GROUP_NEW_TABS && tab.groupId !== undefined)
+      if (tab && tab.groupId !== undefined)
       {
         groupTracker.setActiveGroup(activeInfo.windowId, tab.groupId);
       }
-
-      // Track last active tab for current space
-      const spaceId = spaceTracker.getActiveSpace(activeInfo.windowId);
-      if (spaceId)
-      {
-        spaceTracker.updateLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId);
-      }
-    }
-  });
+    });
+  }
 });
 
-// Clean up history when tab is closed
+// Clean up when tab is closed
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
 {
   historyManager.remove(removeInfo.windowId, tabId);
-  spaceTracker.removeTab(removeInfo.windowId, tabId);
+  spaceStateManager.removeTab(removeInfo.windowId, tabId);
 });
 
-// Auto-group all new tabs when active tab is in a group
+// Add new tabs to active space + auto-group (feature flag)
 chrome.tabs.onCreated.addListener((tab) =>
 {
+  if (!tab.id || !tab.windowId) return;
+
+  // Add to active space
+  const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
+  if (activeSpaceId && activeSpaceId !== 'all')
+  {
+    spaceStateManager.addTabToSpace(tab.windowId, tab.id, activeSpaceId);
+  }
+
+  // Auto-group (feature flag)
   if (ENABLE_AUTO_GROUP_NEW_TABS)
   {
     const groupId = groupTracker.getActiveGroup(tab.windowId);
-    if (groupId && groupId !== -1 && tab.id)
+    if (groupId && groupId !== -1)
     {
       chrome.tabs.group({ tabIds: [tab.id], groupId });
     }
@@ -608,33 +613,43 @@ chrome.tabs.onCreated.addListener((tab) =>
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 {
-  // Track active space (no tab activation) - used by history navigation, etc.
-  if (message.action === 'set-active-space')
+  // Get current SpaceWindowState for a window
+  if (message.action === SpaceMessageAction.GET_WINDOW_STATE)
+  {
+    if (message.windowId)
+    {
+      const state = spaceStateManager.getState(message.windowId);
+      sendResponse(state);
+    }
+    return true;  // async response
+  }
+
+  // Set active space
+  if (message.action === SpaceMessageAction.SET_ACTIVE_SPACE)
   {
     if (message.windowId && message.spaceId)
     {
-      spaceTracker.setActiveSpace(message.windowId, message.spaceId);
-      if (import.meta.env.DEV)
-      {
-        console.log(`[SpaceTabTracker] set-active-space: spaceId="${message.spaceId}" (tracking only)`);
-      }
+      spaceStateManager.setActiveSpace(message.windowId, message.spaceId);
     }
     return;
   }
 
-  // Switch to space AND activate last tab - used by user clicks, swipes
-  if (message.action === 'switch-to-space')
+  // Move tab to a different space
+  if (message.action === SpaceMessageAction.MOVE_TAB_TO_SPACE)
+  {
+    if (message.windowId && message.tabId !== undefined && message.toSpaceId)
+    {
+      spaceStateManager.moveTabToSpace(message.windowId, message.tabId, message.toSpaceId);
+    }
+    return;
+  }
+
+  // Clear all state for a space (when space is deleted)
+  if (message.action === SpaceMessageAction.CLEAR_SPACE_STATE)
   {
     if (message.windowId && message.spaceId)
     {
-      spaceTracker.setActiveSpace(message.windowId, message.spaceId);
-      if (import.meta.env.DEV)
-      {
-        console.log(`[SpaceTabTracker] switch-to-space: spaceId="${message.spaceId}"`);
-      }
-
-      spaceTracker.activateLastTab(message.windowId, message.spaceId).then(sendResponse);
-      return true;  // async response
+      spaceStateManager.clearSpaceState(message.windowId, message.spaceId);
     }
     return;
   }

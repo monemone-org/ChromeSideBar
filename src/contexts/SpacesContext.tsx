@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useBookmarkTabsContext } from './BookmarkTabsContext';
 import { useBookmarks } from '../hooks/useBookmarks';
+import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from '../utils/spaceMessages';
 
 // =============================================================================
 // Types
@@ -13,12 +14,6 @@ export interface Space
   icon: string;                         // Lucide icon name or emoji
   color: chrome.tabGroups.ColorEnum;    // grey, blue, red, yellow, green, pink, purple, cyan, orange
   bookmarkFolderPath: string;           // e.g. "Bookmarks Bar/Work"
-}
-
-interface SpaceWindowState
-{
-  activeSpaceId: string;
-  spaceTabs: Record<string, number[]>;  // space ID → array of tab IDs
 }
 
 // Special "All" space - not stored, always present
@@ -36,11 +31,6 @@ export const ALL_SPACE: Space = {
 
 const SPACES_STORAGE_KEY = 'spaces';
 
-const DEFAULT_WINDOW_STATE: SpaceWindowState = {
-  activeSpaceId: 'all',
-  spaceTabs: {},
-};
-
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -48,11 +38,6 @@ const DEFAULT_WINDOW_STATE: SpaceWindowState = {
 const generateId = (): string =>
 {
   return `space_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-};
-
-const getWindowStateStorageKey = (windowId: number): string =>
-{
-  return `spaceWindowState_${windowId}`;
 };
 
 // Debug spaces for development - only included in dev builds
@@ -117,7 +102,6 @@ interface SpacesContextValue
 
   // Tab tracking (internal, not Chrome groups)
   addTabToSpace: (tabId: number, spaceId: string) => void;
-  removeTabFromSpace: (tabId: number) => void;
   getSpaceForTab: (tabId: number) => string | null;
   getTabsForSpace: (spaceId: string) => number[];
 
@@ -219,14 +203,13 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [loadSpaces]);
 
   // ---------------------------------------------------------------------------
-  // Per-window state (chrome.storage.session)
+  // Per-window state (read-only copy, synced from background.ts)
   // ---------------------------------------------------------------------------
   const [windowId, setWindowId] = useState<number | null>(null);
   const [windowState, setWindowState] = useState<SpaceWindowState>(DEFAULT_WINDOW_STATE);
   const [isInitialized, setIsInitialized] = useState(false);
-  const storageKeyRef = useRef<string | null>(null);
 
-  // Get current window ID on mount
+  // Get current window ID and initial state on mount
   useEffect(() =>
   {
     chrome.windows.getCurrent((window) =>
@@ -234,110 +217,52 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (window.id)
       {
         setWindowId(window.id);
-        storageKeyRef.current = getWindowStateStorageKey(window.id);
-      }
-    });
-  }, []);
 
-  // Load window state from session storage once we have window ID
-  useEffect(() =>
-  {
-    if (!windowId || !storageKeyRef.current) return;
-
-    const storageKey = storageKeyRef.current;
-
-    chrome.storage.session.get([storageKey], (result) =>
-    {
-      if (chrome.runtime.lastError)
-      {
-        console.error('Failed to load space window state:', chrome.runtime.lastError);
-        setIsInitialized(true);
-        return;
-      }
-
-      const loadedState = result[storageKey] as SpaceWindowState | undefined;
-      if (loadedState)
-      {
-        setWindowState(loadedState);
-      }
-      setIsInitialized(true);
-    });
-
-    // Listen for storage changes
-    const handleStorageChange = (
-      changes: { [key: string]: chrome.storage.StorageChange },
-      areaName: string
-    ) =>
-    {
-      if (areaName === 'session' && changes[storageKey])
-      {
-        const newState = changes[storageKey].newValue as SpaceWindowState | undefined;
-        if (newState)
-        {
-          if (import.meta.env.DEV)
+        // Request initial state from background
+        chrome.runtime.sendMessage(
+          { action: SpaceMessageAction.GET_WINDOW_STATE, windowId: window.id },
+          (response: SpaceWindowState) =>
           {
-            console.log(`[Sidebar] storage change: activeSpaceId=${newState.activeSpaceId}`);
+            if (chrome.runtime.lastError)
+            {
+              console.error('Failed to get window state:', chrome.runtime.lastError);
+            }
+            else if (response)
+            {
+              setWindowState(response);
+            }
+            setIsInitialized(true);
           }
-          setWindowState(newState);
-        }
-      }
-    };
-
-    chrome.storage.onChanged.addListener(handleStorageChange);
-
-    return () =>
-    {
-      chrome.storage.onChanged.removeListener(handleStorageChange);
-    };
-  }, [windowId]);
-
-  const saveWindowState = useCallback((newState: SpaceWindowState) =>
-  {
-    if (!storageKeyRef.current) return;
-
-    chrome.storage.session.set({ [storageKeyRef.current]: newState }, () =>
-    {
-      if (chrome.runtime.lastError)
-      {
-        console.error('Failed to save space window state:', chrome.runtime.lastError);
+        );
       }
     });
   }, []);
 
-  // Listen for history tab activation to switch spaces
+  // Listen for state changes from background
   useEffect(() =>
   {
     const handleMessage = (
-      message: { action: string; spaceId?: string },
+      message: { action: string; windowId?: number; state?: SpaceWindowState; spaceId?: string },
       _sender: chrome.runtime.MessageSender,
       _sendResponse: (response?: unknown) => void
     ) =>
     {
-      if (message.action === 'history-tab-activated' && message.spaceId)
+      // Update local state when background sends STATE_CHANGED
+      if (message.action === SpaceMessageAction.STATE_CHANGED &&
+          message.windowId === windowId &&
+          message.state)
       {
-        if (import.meta.env.DEV)
-        {
-          console.log(`[Sidebar] history-tab-activated received: spaceId=${message.spaceId}`);
-        }
-        // Inline setActiveSpaceId logic to avoid dependency issues
-        setWindowState(prev =>
-        {
-          const newState = { ...prev, activeSpaceId: message.spaceId! };
-          if (storageKeyRef.current)
-          {
-            chrome.storage.session.set({ [storageKeyRef.current]: newState });
-          }
-          return newState;
-        });
+        setWindowState(message.state);
+      }
 
-        if (windowId)
-        {
-          chrome.runtime.sendMessage({
-            action: 'set-active-space',
-            windowId,
-            spaceId: message.spaceId
-          });
-        }
+      // Switch active space when history navigation activates a tab in different space
+      if (message.action === SpaceMessageAction.HISTORY_TAB_ACTIVATED && message.spaceId && windowId)
+      {
+        chrome.runtime.sendMessage({
+          action: SpaceMessageAction.SET_ACTIVE_SPACE,
+          windowId,
+          spaceId: message.spaceId
+        });
       }
     };
 
@@ -435,112 +360,96 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [spaces, saveSpaces]);
 
   // ---------------------------------------------------------------------------
-  // Per-window state operations
+  // Per-window state operations (send messages to background, state updates via STATE_CHANGED)
   // ---------------------------------------------------------------------------
 
-  // Update active space and notify background (no tab activation)
+  // Update active space (no tab activation)
   // Use for: history navigation, spaces disabled, create/delete space
   const setActiveSpaceId = useCallback((spaceId: string) =>
   {
-    if (import.meta.env.DEV)
-    {
-      console.log(`[Sidebar] setActiveSpaceId: ${spaceId}`);
-    }
-    setWindowState(prev =>
-    {
-      if (import.meta.env.DEV)
-      {
-        console.log(`[Sidebar] setState: ${prev.activeSpaceId} -> ${spaceId}`);
-      }
-      const newState = { ...prev, activeSpaceId: spaceId };
-      saveWindowState(newState);
-      return newState;
-    });
+    // Update local state immediately for responsive UI
+    setWindowState(prev => ({ ...prev, activeSpaceId: spaceId }));
 
-    // Notify background of space change (tracking only, no tab activation)
+    // Notify background
     if (windowId)
     {
       chrome.runtime.sendMessage({
-        action: 'set-active-space',
+        action: SpaceMessageAction.SET_ACTIVE_SPACE,
         windowId,
         spaceId
       });
     }
-  }, [saveWindowState, windowId]);
+  }, [windowId]);
 
   // Switch to space and activate its last active tab
   // Use for: user clicks space bar, swipe gestures, space navigator
-  const switchToSpace = useCallback((spaceId: string) =>
+  const switchToSpace = useCallback(async (spaceId: string) =>
   {
-    setWindowState(prev =>
-    {
-      const newState = { ...prev, activeSpaceId: spaceId };
-      saveWindowState(newState);
-      return newState;
-    });
+    // Update local state immediately for responsive UI
+    setWindowState(prev => ({ ...prev, activeSpaceId: spaceId }));
 
-    // Notify background to switch space AND activate last tab
-    // Background will look up lastActiveTabId from its own storage
+    const lastActiveTabId = windowState.lastActiveTabs[spaceId];
+    const spaceTabs = windowState.spaceTabs[spaceId] || [];
+    let activated = false;
+
+    // Try lastActiveTab first
+    if (lastActiveTabId)
+    {
+      try
+      {
+        await chrome.tabs.get(lastActiveTabId);
+        await chrome.tabs.update(lastActiveTabId, { active: true });
+        activated = true;
+      }
+      catch
+      {
+        // Tab doesn't exist, fall through to spaceTabs
+      }
+    }
+
+    // Fallback: try spaceTabs in order
+    if (!activated)
+    {
+      for (const tabId of spaceTabs)
+      {
+        if (tabId === lastActiveTabId) continue;  // Already tried
+        try
+        {
+          await chrome.tabs.get(tabId);
+          await chrome.tabs.update(tabId, { active: true });
+          break;
+        }
+        catch
+        {
+          // Tab doesn't exist, try next
+        }
+      }
+    }
+
+    // Notify background
     if (windowId)
     {
       chrome.runtime.sendMessage({
-        action: 'switch-to-space',
+        action: SpaceMessageAction.SET_ACTIVE_SPACE,
         windowId,
         spaceId
       });
     }
-  }, [saveWindowState, windowId]);
+  }, [windowState.lastActiveTabs, windowState.spaceTabs, windowId]);
 
-  // Add a tab to a space (not used for "all" space - "all" shows all tabs)
+  // Add/move a tab to a space (send to background)
   const addTabToSpace = useCallback((tabId: number, spaceId: string) =>
   {
-    if (spaceId === 'all') return;
+    if (!windowId) return;
 
-    setWindowState(prev =>
-    {
-      // Remove from any existing space first
-      const newSpaceTabs = { ...prev.spaceTabs };
-      for (const [sid, tabs] of Object.entries(newSpaceTabs))
-      {
-        if (tabs.includes(tabId))
-        {
-          newSpaceTabs[sid] = tabs.filter(id => id !== tabId);
-        }
-      }
-
-      // Add to the new space
-      newSpaceTabs[spaceId] = [...(newSpaceTabs[spaceId] || []), tabId];
-
-      const newState = { ...prev, spaceTabs: newSpaceTabs };
-      saveWindowState(newState);
-      return newState;
+    chrome.runtime.sendMessage({
+      action: SpaceMessageAction.MOVE_TAB_TO_SPACE,
+      windowId,
+      tabId,
+      toSpaceId: spaceId
     });
-  }, [saveWindowState]);
+  }, [windowId]);
 
-  // Remove a tab from all spaces
-  const removeTabFromSpace = useCallback((tabId: number) =>
-  {
-    setWindowState(prev =>
-    {
-      const newSpaceTabs = { ...prev.spaceTabs };
-      let changed = false;
-
-      for (const [spaceId, tabs] of Object.entries(newSpaceTabs))
-      {
-        if (tabs.includes(tabId))
-        {
-          newSpaceTabs[spaceId] = tabs.filter(id => id !== tabId);
-          changed = true;
-        }
-      }
-
-      if (!changed) return prev;
-
-      const newState = { ...prev, spaceTabs: newSpaceTabs };
-      saveWindowState(newState);
-      return newState;
-    });
-  }, [saveWindowState]);
 
   // Get the space ID for a given tab
   const getSpaceForTab = useCallback((tabId: number): string | null =>
@@ -564,17 +473,14 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Clear all state for a space (used when deleting a space)
   const clearStateForSpace = useCallback((spaceId: string) =>
   {
-    setWindowState(prev =>
-    {
-      const { [spaceId]: _tabs, ...restSpaceTabs } = prev.spaceTabs;
-      const newState = {
-        ...prev,
-        spaceTabs: restSpaceTabs,
-      };
-      saveWindowState(newState);
-      return newState;
+    if (!windowId) return;
+
+    chrome.runtime.sendMessage({
+      action: SpaceMessageAction.CLEAR_SPACE_STATE,
+      windowId,
+      spaceId
     });
-  }, [saveWindowState]);
+  }, [windowId]);
 
   // Wrap deleteSpace to also clean up spaceTabs
   const deleteSpace = useCallback((id: string) =>
@@ -692,7 +598,6 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     switchToSpace,
     spaceTabs: windowState.spaceTabs,
     addTabToSpace,
-    removeTabFromSpace,
     getSpaceForTab,
     getTabsForSpace,
     clearStateForSpace,

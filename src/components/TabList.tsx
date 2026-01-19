@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback, forwardRef } from 'react';
 import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
-import { useBookmarkTabsContext, isPendingManagedTab } from '../contexts/BookmarkTabsContext';
+import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
@@ -530,7 +530,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
-  const { spaces, activeSpace: activeSpaceFromContext, addTabToSpace, getTabsForSpace, removeTabFromSpace, windowId } = useSpacesContext();
+  const { spaces, activeSpace: activeSpaceFromContext, addTabToSpace, getTabsForSpace } = useSpacesContext();
 
   // Use prop if provided, otherwise use context
   const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
@@ -543,50 +543,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   // Check if we're in a non-"all" space
   const isInSpace = activeSpace && activeSpace.id !== 'all';
 
-  // Auto-add new tabs (e.g., Cmd+T) to the active space
-  useEffect(() =>
-  {
-    if (!isInSpace || !activeSpace || !windowId) return;
-
-    const handleTabCreated = (tab: chrome.tabs.Tab) =>
-    {
-      // Skip tabs created for bookmarks/pinned sites (they should stay ungrouped)
-      if (tab.id && isPendingManagedTab(tab.id)) return;
-
-      // Check if this tab is in our window
-      if (tab.windowId !== windowId) return;
-
-      // Add to active space
-      if (tab.id)
-      {
-        addTabToSpace(tab.id, activeSpace.id);
-      }
-    };
-
-    chrome.tabs.onCreated.addListener(handleTabCreated);
-
-    return () =>
-    {
-      chrome.tabs.onCreated.removeListener(handleTabCreated);
-    };
-  }, [isInSpace, activeSpace, addTabToSpace, windowId]);
-
-  // Remove tabs from space when closed (only for current window)
-  useEffect(() =>
-  {
-    const handleTabRemoved = (tabId: number, removeInfo: chrome.tabs.TabRemoveInfo) =>
-    {
-      if (windowId && removeInfo.windowId !== windowId) return;
-      removeTabFromSpace(tabId);
-    };
-
-    chrome.tabs.onRemoved.addListener(handleTabRemoved);
-
-    return () =>
-    {
-      chrome.tabs.onRemoved.removeListener(handleTabRemoved);
-    };
-  }, [removeTabFromSpace, windowId]);
+  // Note: Tab creation/removal is now handled by background.ts SpaceWindowStateManager
+  // - onCreated: adds new tabs to active space
+  // - onRemoved: removes tabs from spaceTabs/lastActiveTabs
 
   // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
   // Also apply text filter and space filter if enabled
@@ -618,8 +577,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     return tabGroups;
   }, [tabGroups]);
 
-  // Space-aware new tab creation
-  // When in a space, the onCreated listener will auto-add to the active space
+  // Create new tab - background.ts will auto-add to active space
   const handleNewTab = useCallback(async () =>
   {
     createTab();

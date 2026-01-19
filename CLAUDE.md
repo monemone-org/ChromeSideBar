@@ -43,6 +43,16 @@ const handleError = useCallback(
 
 This provides consistent error logging and state management across all Chrome API calls.
 
+### debug log with console.log
+
+Only enable logging in debug build:
+```typescript
+  if (import.meta.env.DEV)
+  {
+      console.log(...);
+  }
+```
+
 ## Documentation
 
 - `docs/chrome-web-store-info.md` - Chrome Web Store listing (summary, description, key features, change logs)
