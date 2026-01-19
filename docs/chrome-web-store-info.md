@@ -9,14 +9,14 @@ I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, book
 **Arc-Style Persistent Tabs**
 In Arc, bookmarks aren't just static links—they're live pages that stick around in your sidebar even after you close them. Click to open, click again to jump back. Your bookmarks stay organized in folders while you can see what's actually loaded. No more drowning in 50 open tabs.
 
-**IDE-Style Tab History Navigation**
-Jump between recently used tabs the way you do in VS Code—by usage order, not position. Keyboard shortcuts (Cmd+Shift+< / >) or toolbar buttons let you navigate your actual workflow instead of hunting through the tab bar. Super useful when you're researching something across a bunch of tabs.
+**Arc-Style Spaces**
+Organize your browsing by context with Spaces—isolated workspaces that link a bookmark folder to a Chrome tab group. Switch between Work, Personal, and Projects with one click. Each space shows only its bookmarks and tabs, keeping your sidebar focused. Swipe with two fingers or click to switch spaces.
 
 **Arc-Style Unified Sidebar**
 Everything in one vertical panel, just like Arc—pinned favorites at the top, bookmarks organized in folders, and all your active tabs. No more digging through bookmark menus or scanning a crowded tab bar.
 
-**Arc-Style Spaces**
-Organize your browsing by context with Spaces—isolated workspaces that link a bookmark folder to a Chrome tab group. Switch between Work, Personal, and Projects with one click. Each space shows only its bookmarks and tabs, keeping your sidebar focused. Swipe with two fingers or click to switch spaces.
+**IDE-Style Tab History Navigation**
+Jump between recently used tabs the way you do in VS Code—by usage order, not position. Keyboard shortcuts (Cmd+Shift+< / >) or toolbar buttons let you navigate your actual workflow instead of hunting through the tab bar. Super useful when you're researching something across a bunch of tabs.
 
 **Tab Groups Support**
 Works with Chrome's tab groups. Drag tabs into groups, save groups as bookmark folders, rename and change colors—all from the sidebar.
@@ -29,6 +29,13 @@ Search and filter by text, live tabs, or tabs playing audio. Save your frequentl
 
 ## Detailed Features
 
+### Arc-Style Persistent Tabs (Optional)
+- Bookmarks and pinned sites act as live pages
+- Click to load, click again to switch
+- Close tabs freely—bookmarks stay in the sidebar
+- Enable/disable in Settings (On by default)
+- Note: Tab associations are session-only. When Chrome restarts, bookmarks/pins show as unloaded and can be re-clicked to open.
+
 ### Arc-Style Spaces
 - Create spaces that link a bookmark folder to a Chrome tab group
 - Switch spaces to show only relevant bookmarks and tabs
@@ -36,13 +43,6 @@ Search and filter by text, live tabs, or tabs playing audio. Save your frequentl
 - Swipe with two fingers to navigate between spaces
 - Drag to reorder spaces in the space bar
 - Import/export includes all your spaces
-
-### Arc-Style Persistent Tabs (Optional)
-- Bookmarks and pinned sites act as live pages
-- Click to load, click again to switch
-- Close tabs freely—bookmarks stay in the sidebar
-- Enable/disable in Settings (On by default)
-- Note: Tab associations are session-only. When Chrome restarts, bookmarks/pins show as unloaded and can be re-clicked to open.
 
 ### Pinned Sites
 - Quick-access icon bar at the top
@@ -111,16 +111,14 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Latest
 
-- Fixed used tab history being lost when Chrome suspends the background service worker
-
 - Arc-style Spaces:
   - Create isolated workspaces linking bookmark folders to Chrome tab groups
   - Switch spaces to show only relevant bookmarks and tabs
   - Customize with icons and colors
-  - Two-finger swipe or click to navigate between spaces
   - Drag to reorder spaces
   - Spaces included in import/export
 - Audio tabs dialog: Click the audible filter to see all tabs playing sound with mute controls
+- Fixed used tab history being lost when Chrome suspends the background service worker
 - Welcome dialog guides first-time users through key features
 
 ## 1.0.149

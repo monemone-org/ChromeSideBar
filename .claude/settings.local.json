@@ -9,7 +9,8 @@
       "WebFetch(domain:github.com)",
       "Bash(npx tsc:*)",
       "Skill(git-commit-msg)",
-      "WebFetch(domain:developer.chrome.com)"
+      "WebFetch(domain:developer.chrome.com)",
+      "Bash(echo:*)"
     ]
   }
 }
