@@ -1,5 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useBookmarks } from '../hooks/useBookmarks';
+import { useSpacesContext, Space } from '../contexts/SpacesContext';
+import { getIconUrl } from '../utils/iconify';
+import { GROUP_COLORS } from '../utils/groupColors';
 import { Dialog } from './Dialog';
 import { TreeRow } from './TreeRow';
 import { Folder, FolderPlus } from 'lucide-react';
@@ -31,6 +34,7 @@ interface FolderItemProps
   onNewFolderNameChange: (name: string) => void;
   onNewFolderSubmit: () => void;
   onNewFolderCancel: () => void;
+  getMatchingSpace: (folderId: string) => Space | undefined;
 }
 
 const FolderItem = ({
@@ -44,7 +48,8 @@ const FolderItem = ({
   onSelect,
   onNewFolderNameChange,
   onNewFolderSubmit,
-  onNewFolderCancel
+  onNewFolderCancel,
+  getMatchingSpace
 }: FolderItemProps) =>
 {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,6 +62,43 @@ const FolderItem = ({
   const isExpanded = expandedState[node.id];
   const isSelected = selectedFolderId === node.id;
   const isCreatingHere = creatingInFolderId === node.id;
+
+  // Check if this folder is linked to a space
+  const matchingSpace = getMatchingSpace(node.id);
+  const spaceColorClass = matchingSpace ? GROUP_COLORS[matchingSpace.color]?.text : undefined;
+
+  // Render space icon overlay - handles both emoji and Lucide icon names
+  const renderSpaceIconOverlay = (iconName: string, colorStyle: typeof GROUP_COLORS[string]) =>
+  {
+    // Check if it's an emoji (starts with high Unicode codepoint)
+    const isEmoji = iconName.codePointAt(0)! > 255;
+    if (isEmoji)
+    {
+      return <span className="text-[10px] leading-none">{iconName}</span>;
+    }
+    // Lucide icon - load from Iconify CDN, displayed on colored badge
+    return (
+      <span className={`flex items-center justify-center w-[14px] h-[14px] rounded-full ${colorStyle.badge}`}>
+        <img
+          src={getIconUrl(iconName)}
+          alt=""
+          className="w-[10px] h-[10px] invert dark:invert-0"
+        />
+      </span>
+    );
+  };
+
+  // Folder icon with optional space overlay
+  const folderIcon = matchingSpace ? (
+    <div className="relative">
+      <Folder size={16} className={spaceColorClass} />
+      <span className="absolute -bottom-[5px] -right-[5px] flex items-center justify-center">
+        {renderSpaceIconOverlay(matchingSpace.icon, GROUP_COLORS[matchingSpace.color] || GROUP_COLORS.grey)}
+      </span>
+    </div>
+  ) : (
+    <Folder size={16} className="text-gray-500" />
+  );
 
   // Focus input when creating folder here
   useEffect(() =>
@@ -73,7 +115,7 @@ const FolderItem = ({
         <TreeRow
           depth={depth}
           title={node.title || 'Untitled'}
-          icon={<Folder size={16} className="text-yellow-500" />}
+          icon={folderIcon}
           hasChildren={hasChildren || isCreatingHere}
           isExpanded={isExpanded || isCreatingHere}
           isActive={isSelected}
@@ -97,6 +139,7 @@ const FolderItem = ({
               onNewFolderNameChange={onNewFolderNameChange}
               onNewFolderSubmit={onNewFolderSubmit}
               onNewFolderCancel={onNewFolderCancel}
+              getMatchingSpace={getMatchingSpace}
             />
           ))}
           {isCreatingHere && (
@@ -134,7 +177,7 @@ const FolderItem = ({
                   className="w-full px-1 py-0.5 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
                 />
               }
-              icon={<Folder size={16} className="text-yellow-500" />}
+              icon={<Folder size={16} className="text-gray-500" />}
               hasChildren={false}
             />
           )}
@@ -152,8 +195,33 @@ export const FolderPickerDialog = ({
   defaultFolderId
 }: FolderPickerDialogProps) =>
 {
-  const { bookmarks, createFolder, getBookmark } = useBookmarks();
+  const { bookmarks, createFolder, getBookmark, findFolderByPath } = useBookmarks();
+  const { spaces } = useSpacesContext();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Build lookup: folderId → Space (always build it since this is a picker dialog)
+  const folderIdToSpace = useMemo(() =>
+  {
+    const map = new Map<string, Space>();
+    spaces.forEach(space =>
+    {
+      if (space.bookmarkFolderPath)
+      {
+        const folder = findFolderByPath(space.bookmarkFolderPath);
+        if (folder)
+        {
+          map.set(folder.id, space);
+        }
+      }
+    });
+    return map;
+  }, [spaces, findFolderByPath]);
+
+  // Lookup function to get matching Space for a folder
+  const getMatchingSpace = useCallback((folderId: string): Space | undefined =>
+  {
+    return folderIdToSpace.get(folderId);
+  }, [folderIdToSpace]);
 
   // Default expand Bookmarks Bar and Other Bookmarks, select Other Bookmarks by default
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({
@@ -313,6 +381,7 @@ export const FolderPickerDialog = ({
               onNewFolderNameChange={setNewFolderName}
               onNewFolderSubmit={handleNewFolderSubmit}
               onNewFolderCancel={handleNewFolderCancel}
+              getMatchingSpace={getMatchingSpace}
             />
           ))}
         </div>
