@@ -29,7 +29,7 @@ export const SpaceContextMenuContent: React.FC<SpaceContextMenuContentProps> = (
   return (
     <>
       <ContextMenu.Item onSelect={onEdit}>
-        <Pencil size={14} className="mr-2 flex-shrink-0" /> Edit
+        <Pencil size={14} className="mr-2 flex-shrink-0" /> Edit Space...
       </ContextMenu.Item>
 
       <ContextMenu.Separator />

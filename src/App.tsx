@@ -24,6 +24,7 @@ import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContex
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
+import { GROUP_COLORS } from './utils/groupColors';
 import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
@@ -109,17 +110,27 @@ const SpaceTitle: React.FC<SpaceTitleProps> = ({ onEditSpace, onDeleteSpace, onC
   const titleFontSize = fontSize - 1;
   const iconSize = titleFontSize;
   const isAllSpace = activeSpace.id === 'all';
+  const colorStyle = GROUP_COLORS[activeSpace.color] ?? GROUP_COLORS.grey;
 
-  // Build icon element
+  // Build icon element - both Lucide and img icons use currentColor (inherited from text color)
   const iconElement = activeSpace.icon === 'LayoutGrid' ? (
     <LayoutGrid size={iconSize} />
   ) : (
-    <img
-      src={getIconUrl(activeSpace.icon)}
-      alt=""
-      width={iconSize}
-      height={iconSize}
-      className="opacity-60 dark:invert dark:opacity-50"
+    <span
+      style={{
+        display: 'inline-block',
+        width: iconSize,
+        height: iconSize,
+        backgroundColor: 'currentColor',
+        maskImage: `url(${getIconUrl(activeSpace.icon)})`,
+        maskSize: 'contain',
+        maskRepeat: 'no-repeat',
+        maskPosition: 'center',
+        WebkitMaskImage: `url(${getIconUrl(activeSpace.icon)})`,
+        WebkitMaskSize: 'contain',
+        WebkitMaskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+      }}
     />
   );
 
@@ -139,7 +150,8 @@ const SpaceTitle: React.FC<SpaceTitleProps> = ({ onEditSpace, onDeleteSpace, onC
       menuContent={menuContent}
       menuTitle="Space options"
       fontSize={titleFontSize}
-      showMenuButton={false}
+      showMenuButton={true}
+      textClassName={colorStyle.text}
     />
   );
 };

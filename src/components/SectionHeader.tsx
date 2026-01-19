@@ -11,6 +11,7 @@ interface SectionHeaderProps
   menuTitle?: string;
   fontSize?: number;  // Optional custom font size in px
   showMenuButton?: boolean;  // Show "..." button (default true). When false, use right-click for menu.
+  textClassName?: string;  // Optional custom text color classes (overrides default gray)
 }
 
 export const SectionHeader: React.FC<SectionHeaderProps> = ({
@@ -20,6 +21,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   menuTitle = 'Options',
   fontSize,
   showMenuButton = true,
+  textClassName,
 }) =>
 {
   const menuJustClosedRef = useRef(false);
@@ -53,9 +55,11 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
     openMenu(rect.right, rect.bottom);
   };
 
+  const defaultTextColor = 'text-gray-500 dark:text-gray-400';
+
   const headerContent = (
     <div
-      className="group relative flex items-center py-1 rounded select-none outline-none border-2 border-transparent text-gray-500 dark:text-gray-400"
+      className={`group relative flex items-center py-1 rounded select-none outline-none border-2 border-transparent ${textClassName ?? defaultTextColor}`}
       style={{
         paddingLeft: `${getIndentPadding(0)}px`,
         paddingRight: '8px',
@@ -63,7 +67,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
       }}
     >
       {icon && (
-        <span className="flex-shrink-0 mr-1.5">
+        <span className="flex-shrink-0 mr-1.5 flex items-center">
           {icon}
         </span>
       )}
@@ -96,7 +100,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
       {({ open: openMenu, isOpen: isMenuOpen }) => (
         <>
           <div
-            className="group relative flex items-center py-1 rounded select-none outline-none border-2 border-transparent text-gray-500 dark:text-gray-400"
+            className={`group relative flex items-center py-1 rounded select-none outline-none border-2 border-transparent ${textClassName ?? defaultTextColor}`}
             style={{
               paddingLeft: `${getIndentPadding(0)}px`,
               paddingRight: '8px',
@@ -104,7 +108,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
             }}
           >
             {icon && (
-              <span className="flex-shrink-0 mr-1.5">
+              <span className="flex-shrink-0 mr-1.5 flex items-center">
                 {icon}
               </span>
             )}
