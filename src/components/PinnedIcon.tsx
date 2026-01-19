@@ -293,6 +293,19 @@ export const PinnedIcon = ({
                 <ContextMenu.Separator />
               </>
             )}
+            <ContextMenu.Item onSelect={() =>
+            {
+              chrome.tabs.create({ url: site.url }, (tab) =>
+              {
+                if (tab?.id)
+                {
+                  chrome.tabs.ungroup(tab.id);
+                }
+              });
+            }}>
+              <ExternalLink size={14} className="mr-2" /> Open in New Tab
+            </ContextMenu.Item>
+            <ContextMenu.Separator />
             <ContextMenu.Item onSelect={handleEdit}>
               <Edit size={14} className="mr-2" /> Edit
             </ContextMenu.Item>

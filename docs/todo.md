@@ -186,10 +186,9 @@ SpaceBar
 
 - [x] cannot collapse "Orphaned Tabs" group
 
+- [x] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
+
 - [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
 
 - [ ] multiple selection of the same type of rows (bookmarks+folders, tabs): drag/drop, common popup menu (move to folder  or move to space and delete)
-
-- [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
-
 
