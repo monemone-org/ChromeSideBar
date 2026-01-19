@@ -9,7 +9,7 @@
  * SpacesContext.tsx holds a read-only copy that syncs via messages.
  *
  * Communication flow:
- *   sidebar → background: GET_WINDOW_STATE, SET_ACTIVE_SPACE, MOVE_TAB_TO_SPACE
+ *   sidebar → background: GET_WINDOW_STATE, SET_ACTIVE_SPACE
  *   background → sidebar: STATE_CHANGED, HISTORY_TAB_ACTIVATED
  */
 export const SpaceMessageAction = {
@@ -36,24 +36,6 @@ export const SpaceMessageAction = {
    */
   SET_ACTIVE_SPACE: 'set-active-space',
 
-  /**
-   * SpacesContext.tsx → background.ts
-   *
-   * User moved a tab to a different space via UI.
-   *
-   * Payload: { windowId: number, tabId: number, toSpaceId: string }
-   */
-  MOVE_TAB_TO_SPACE: 'move-tab-to-space',
-
-  /**
-   * SpacesContext.tsx → background.ts
-   *
-   * Clear all state for a space (when space is deleted).
-   *
-   * Payload: { windowId: number, spaceId: string }
-   */
-  CLEAR_SPACE_STATE: 'clear-space-state',
-
   // ─────────────────────────────────────────────────────────────────────────
   // Background → Sidebar
   // ─────────────────────────────────────────────────────────────────────────
@@ -61,7 +43,7 @@ export const SpaceMessageAction = {
   /**
    * background.ts → SpacesContext.tsx
    *
-   * Notify sidebar of SpaceWindowState changes (tab created, removed, etc.).
+   * Notify sidebar of SpaceWindowState changes (activeSpaceId changed).
    * Sidebar updates its read-only copy and re-renders.
    *
    * Payload: { windowId: number, state: SpaceWindowState }
@@ -88,16 +70,17 @@ export type SpaceMessageActionType = typeof SpaceMessageAction[keyof typeof Spac
 
 /**
  * Per-window space state managed by background.ts.
+ *
+ * Space ↔ Chrome tab group linking:
+ * - Spaces link to Chrome tab groups by matching Space.name to group.title
+ * - This allows automatic reconnection after Chrome restart
+ * - Each window can have its own group for the same Space
  */
 export interface SpaceWindowState
 {
   activeSpaceId: string;
-  spaceTabs: Record<string, number[]>;     // space ID → array of tab IDs
-  lastActiveTabs: Record<string, number>;  // space ID → last active tab ID
 }
 
 export const DEFAULT_WINDOW_STATE: SpaceWindowState = {
   activeSpaceId: 'all',
-  spaceTabs: {},
-  lastActiveTabs: {},
 };

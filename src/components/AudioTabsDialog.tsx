@@ -1,7 +1,9 @@
+import { useCallback } from 'react';
 import { Globe, Volume2 } from 'lucide-react';
 import { QuickDismissDialog } from './QuickDismissDialog';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
+import { useTabGroups } from '../hooks/useTabGroups';
 
 export interface AudioTabsDialogProps
 {
@@ -18,23 +20,35 @@ export const AudioTabsDialog = ({
   onClose
 }: AudioTabsDialogProps) =>
 {
-  const { getSpaceForTab, setActiveSpaceId, activeSpaceId } = useSpacesContext();
+  const { spaces, setActiveSpaceId, activeSpaceId } = useSpacesContext();
   const { getItemKeyForTab } = useBookmarkTabsContext();
+  const { tabGroups } = useTabGroups();
+
+  // Find space ID for a tab based on its Chrome group title
+  const getSpaceForTab = useCallback((tab: chrome.tabs.Tab): string | null =>
+  {
+    if (!tab.groupId || tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return null;
+
+    const group = tabGroups.find(g => g.id === tab.groupId);
+    if (!group || !group.title) return null;
+
+    const space = spaces.find(s => s.name === group.title);
+    return space?.id ?? null;
+  }, [tabGroups, spaces]);
 
   const handleSelectTab = (tab: chrome.tabs.Tab) =>
   {
     if (tab.id === undefined) return;
 
-    // Find which space the tab belongs to
-    const spaceId = getSpaceForTab(tab.id);
+    // Find which space the tab belongs to (via Chrome group title)
+    const spaceId = getSpaceForTab(tab);
 
     // Activate the tab
     onTabSelect(tab.id);
     onClose();
 
-    // Switch to the space if needed (UI only, no tab activation since we just activated it)
-    // If tab not found in any space (e.g., live bookmark tab), fall back to "All" space
-    // Note: background.ts tracks last active tab via onActivated listener
+    // Switch to the space if needed
+    // If tab not in any space (e.g., live bookmark tab), fall back to "All" space
     const targetSpaceId = spaceId || 'all';
     if (targetSpaceId !== activeSpaceId)
     {

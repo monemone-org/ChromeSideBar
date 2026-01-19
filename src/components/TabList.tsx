@@ -530,35 +530,35 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
-  const { spaces, activeSpace: activeSpaceFromContext, addTabToSpace, getTabsForSpace } = useSpacesContext();
+  const { spaces, activeSpace: activeSpaceFromContext } = useSpacesContext();
 
   // Use prop if provided, otherwise use context
   const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
 
-  // Get tabs in the active space
-  const activeSpaceTabIds = activeSpace?.id !== 'all'
-    ? getTabsForSpace(activeSpace.id)
-    : [];
-
   // Check if we're in a non-"all" space
   const isInSpace = activeSpace && activeSpace.id !== 'all';
 
-  // Note: Tab creation/removal is now handled by background.ts SpaceWindowStateManager
-  // - onCreated: adds new tabs to active space
-  // - onRemoved: removes tabs from spaceTabs/lastActiveTabs
-
   // Filter out tabs managed by bookmark-tab associations (Arc-style persistent tabs)
-  // Also apply text filter and space filter if enabled
+  // Also apply text filter and space filter (using Chrome tab groups)
   const visibleTabs = useMemo(() =>
   {
     const managedTabIds = getManagedTabIds();
     let filtered = tabs.filter(tab => !managedTabIds.has(tab.id!));
 
-    // Space filter: when in a space, only show tabs that belong to that space
-    if (isInSpace)
+    // Space filter: when in a space, show tabs in Chrome group matching Space name
+    if (isInSpace && activeSpace)
     {
-      const spaceTabIdSet = new Set(activeSpaceTabIds);
-      filtered = filtered.filter(tab => tab.id && spaceTabIdSet.has(tab.id));
+      // Find Chrome group with matching name
+      const matchingGroup = tabGroups.find(g => g.title === activeSpace.name);
+      if (matchingGroup)
+      {
+        filtered = filtered.filter(tab => tab.groupId === matchingGroup.id);
+      }
+      else
+      {
+        // Space has no group yet - show no tabs
+        filtered = [];
+      }
     }
 
     if (filterText.trim())
@@ -568,10 +568,10 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       );
     }
     return filtered;
-  }, [tabs, getManagedTabIds, filterText, isInSpace, activeSpaceTabIds]);
+  }, [tabs, getManagedTabIds, filterText, isInSpace, activeSpace, tabGroups]);
 
-  // Tab groups are independent from spaces - show all Chrome tab groups
-  // Users can use both Spaces (internal) and Chrome tab groups together
+  // Get all tab groups in current window
+  // Spaces link to Chrome groups by matching Space.name to group.title
   const visibleTabGroups = useMemo(() =>
   {
     return tabGroups;
@@ -647,20 +647,46 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setToastState({ isVisible: false, message: '' });
   }, []);
 
-  // Handler to move tab to a space (internal tracking, not Chrome groups)
-  const handleMoveToSpace = useCallback((spaceId: string) =>
+  // Handler to move tab to a space (adds to Chrome group matching Space name)
+  const handleMoveToSpace = useCallback(async (spaceId: string) =>
   {
     const tabId = moveToSpaceDialog.tabId;
     if (tabId === null) return;
 
     const space = spaces.find(s => s.id === spaceId);
-    addTabToSpace(tabId, spaceId);
+    if (!space) return;
 
-    if (space)
+    try
     {
+      // Get current window
+      const currentWindow = await chrome.windows.getCurrent();
+      if (!currentWindow.id) return;
+
+      // Find existing Chrome group with Space's name
+      const groups = await chrome.tabGroups.query({ windowId: currentWindow.id, title: space.name });
+
+      if (groups.length > 0)
+      {
+        // Add to existing group
+        await chrome.tabs.group({ tabIds: [tabId], groupId: groups[0].id });
+      }
+      else
+      {
+        // Create new group with this tab
+        const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
+        await chrome.tabGroups.update(newGroupId, {
+          title: space.name,
+          color: space.color,
+        });
+      }
+
       showToast(`Moved to ${space.name}`);
     }
-  }, [moveToSpaceDialog.tabId, spaces, addTabToSpace, showToast]);
+    catch (error)
+    {
+      if (import.meta.env.DEV) console.error('[handleMoveToSpace] Failed:', error);
+    }
+  }, [moveToSpaceDialog.tabId, spaces, showToast]);
 
   // Change Group Color dialog state
   const [changeColorDialog, setChangeColorDialog] = useState<{

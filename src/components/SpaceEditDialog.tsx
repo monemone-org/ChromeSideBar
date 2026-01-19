@@ -162,28 +162,38 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
 
     let finalPath = bookmarkFolderPath;
 
-    // If creating new space without existing folder, create the folder
+    // If creating new space without existing folder, find or create the folder
     if (isCreateMode && !useExistingFolder)
     {
       const folderName = name.trim();
       const parentPath = 'Other Bookmarks';
+      const targetPath = `${parentPath}/${folderName}`;
 
-      // Create folder under Other Bookmarks
-      await new Promise<void>((resolve, reject) =>
+      // Check if folder already exists
+      const existingFolder = findFolderByPath(targetPath);
+      if (existingFolder)
       {
-        createFolder('2', folderName, (newFolder) =>
+        finalPath = targetPath;
+      }
+      else
+      {
+        // Create folder under Other Bookmarks
+        await new Promise<void>((resolve, reject) =>
         {
-          if (newFolder)
+          createFolder('2', folderName, (newFolder) =>
           {
-            finalPath = `${parentPath}/${folderName}`;
-            resolve();
-          }
-          else
-          {
-            reject(new Error('Failed to create folder'));
-          }
+            if (newFolder)
+            {
+              finalPath = targetPath;
+              resolve();
+            }
+            else
+            {
+              reject(new Error('Failed to create folder'));
+            }
+          });
         });
-      });
+      }
     }
 
     // In edit mode, check if folder path is valid

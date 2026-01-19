@@ -86,7 +86,7 @@ interface SpacesContextValue
     bookmarkFolderPath: string
   ) => Space;
   updateSpace: (id: string, updates: Partial<Omit<Space, 'id'>>) => void;
-  deleteSpace: (id: string) => void;
+  deleteSpace: (id: string) => Promise<void>;
   moveSpace: (activeId: string, overId: string) => void;
   getSpaceById: (id: string) => Space | undefined;
 
@@ -97,16 +97,10 @@ interface SpacesContextValue
   // Per-window state
   activeSpaceId: string;
   setActiveSpaceId: (spaceId: string) => void;  // No tab activation (for code-initiated switches)
-  switchToSpace: (spaceId: string) => void;     // With tab activation (for user-initiated switches)
-  spaceTabs: Record<string, number[]>;
+  switchToSpace: (spaceId: string) => void;     // Switch space without tab activation
 
-  // Tab tracking (internal, not Chrome groups)
-  addTabToSpace: (tabId: number, spaceId: string) => void;
-  getSpaceForTab: (tabId: number) => string | null;
-  getTabsForSpace: (spaceId: string) => number[];
-
-  // Space state cleanup
-  clearStateForSpace: (spaceId: string) => void;
+  // Tab query (uses Chrome tab groups)
+  getTabsForSpace: (spaceId: string) => Promise<chrome.tabs.Tab[]>;
 
   // Actions
   closeAllTabsInSpace: (space: Space) => Promise<void>;
@@ -295,17 +289,48 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return newSpace;
   }, [spaces, saveSpaces]);
 
-  const updateSpace = useCallback((
+  const getSpaceById = useCallback((id: string): Space | undefined =>
+  {
+    if (id === 'all') return ALL_SPACE;
+    return spaces.find(s => s.id === id);
+  }, [spaces]);
+
+  const updateSpace = useCallback(async (
     id: string,
     updates: Partial<Omit<Space, 'id'>>
   ) =>
   {
-    const updatedSpaces = spaces.map(space =>
-      space.id === id ? { ...space, ...updates } : space
+    const space = getSpaceById(id);
+    if (!space || id === 'all') return;
+
+    // Update Space in storage
+    const updatedSpaces = spaces.map(s =>
+      s.id === id ? { ...s, ...updates } : s
     );
     setSpaces(updatedSpaces);
     saveSpaces(updatedSpaces);
-  }, [spaces, saveSpaces]);
+
+    // Sync name/color changes to Chrome group
+    if (windowId && (updates.name || updates.color))
+    {
+      try
+      {
+        // Find Chrome group with the OLD name
+        const groups = await chrome.tabGroups.query({ windowId, title: space.name });
+        if (groups.length > 0)
+        {
+          await chrome.tabGroups.update(groups[0].id, {
+            title: updates.name ?? space.name,
+            color: updates.color ?? space.color,
+          });
+        }
+      }
+      catch (error)
+      {
+        if (import.meta.env.DEV) console.error('[updateSpace] Failed to sync to Chrome group:', error);
+      }
+    }
+  }, [spaces, saveSpaces, getSpaceById, windowId]);
 
   const deleteSpaceBase = useCallback((id: string) =>
   {
@@ -329,12 +354,6 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSpaces(updatedSpaces);
     saveSpaces(updatedSpaces);
   }, [spaces, saveSpaces]);
-
-  const getSpaceById = useCallback((id: string): Space | undefined =>
-  {
-    if (id === 'all') return ALL_SPACE;
-    return spaces.find(s => s.id === id);
-  }, [spaces]);
 
   // Replace all spaces (for import with "Replace" option)
   const replaceSpaces = useCallback((newSpaces: Space[]) =>
@@ -381,50 +400,13 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [windowId]);
 
-  // Switch to space and activate its last active tab
+  // Switch to space (just update active space, no tab activation)
+  // Tab activation happens naturally when user clicks on a tab
   // Use for: user clicks space bar, swipe gestures, space navigator
-  const switchToSpace = useCallback(async (spaceId: string) =>
+  const switchToSpace = useCallback((spaceId: string) =>
   {
     // Update local state immediately for responsive UI
     setWindowState(prev => ({ ...prev, activeSpaceId: spaceId }));
-
-    const lastActiveTabId = windowState.lastActiveTabs[spaceId];
-    const spaceTabs = windowState.spaceTabs[spaceId] || [];
-    let activated = false;
-
-    // Try lastActiveTab first
-    if (lastActiveTabId)
-    {
-      try
-      {
-        await chrome.tabs.get(lastActiveTabId);
-        await chrome.tabs.update(lastActiveTabId, { active: true });
-        activated = true;
-      }
-      catch
-      {
-        // Tab doesn't exist, fall through to spaceTabs
-      }
-    }
-
-    // Fallback: try spaceTabs in order
-    if (!activated)
-    {
-      for (const tabId of spaceTabs)
-      {
-        if (tabId === lastActiveTabId) continue;  // Already tried
-        try
-        {
-          await chrome.tabs.get(tabId);
-          await chrome.tabs.update(tabId, { active: true });
-          break;
-        }
-        catch
-        {
-          // Tab doesn't exist, try next
-        }
-      }
-    }
 
     // Notify background
     if (windowId)
@@ -435,65 +417,68 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         spaceId
       });
     }
-  }, [windowState.lastActiveTabs, windowState.spaceTabs, windowId]);
-
-  // Add/move a tab to a space (send to background)
-  const addTabToSpace = useCallback((tabId: number, spaceId: string) =>
-  {
-    if (!windowId) return;
-
-    chrome.runtime.sendMessage({
-      action: SpaceMessageAction.MOVE_TAB_TO_SPACE,
-      windowId,
-      tabId,
-      toSpaceId: spaceId
-    });
   }, [windowId]);
 
-
-  // Get the space ID for a given tab
-  const getSpaceForTab = useCallback((tabId: number): string | null =>
+  // Get all tabs for a space (queries Chrome groups by matching Space name to group title)
+  const getTabsForSpace = useCallback(async (spaceId: string): Promise<chrome.tabs.Tab[]> =>
   {
-    for (const [spaceId, tabs] of Object.entries(windowState.spaceTabs))
+    if (spaceId === 'all' || !windowId) return [];
+
+    const space = getSpaceById(spaceId);
+    if (!space) return [];
+
+    try
     {
-      if (tabs.includes(tabId))
+      // Find Chrome group with matching name
+      const groups = await chrome.tabGroups.query({ windowId, title: space.name });
+      if (groups.length === 0) return [];
+
+      // Get tabs in that group
+      return chrome.tabs.query({ groupId: groups[0].id });
+    }
+    catch
+    {
+      return [];
+    }
+  }, [windowId, getSpaceById]);
+
+  // Delete space and close all tabs in its associated Chrome group
+  const deleteSpace = useCallback(async (id: string) =>
+  {
+    if (id === 'all') return;
+
+    const space = getSpaceById(id);
+    if (space && windowId)
+    {
+      try
       {
-        return spaceId;
+        // Find Chrome group with matching name and close its tabs
+        const groups = await chrome.tabGroups.query({ windowId, title: space.name });
+        if (groups.length > 0)
+        {
+          const tabs = await chrome.tabs.query({ groupId: groups[0].id });
+          const tabIds = tabs.map(t => t.id).filter((id): id is number => id !== undefined);
+          if (tabIds.length > 0)
+          {
+            await chrome.tabs.remove(tabIds);
+          }
+        }
+      }
+      catch (error)
+      {
+        if (import.meta.env.DEV) console.error('[deleteSpace] Failed to close tabs:', error);
       }
     }
-    return null;
-  }, [windowState.spaceTabs]);
 
-  // Get all tabs for a space
-  const getTabsForSpace = useCallback((spaceId: string): number[] =>
-  {
-    return windowState.spaceTabs[spaceId] || [];
-  }, [windowState.spaceTabs]);
-
-  // Clear all state for a space (used when deleting a space)
-  const clearStateForSpace = useCallback((spaceId: string) =>
-  {
-    if (!windowId) return;
-
-    chrome.runtime.sendMessage({
-      action: SpaceMessageAction.CLEAR_SPACE_STATE,
-      windowId,
-      spaceId
-    });
-  }, [windowId]);
-
-  // Wrap deleteSpace to also clean up spaceTabs
-  const deleteSpace = useCallback((id: string) =>
-  {
-    clearStateForSpace(id);
+    // Delete space from storage
     deleteSpaceBase(id);
-  }, [clearStateForSpace, deleteSpaceBase]);
+  }, [getSpaceById, windowId, deleteSpaceBase]);
 
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
-  // Close all tabs in a space (Chrome API, no local state)
+  // Close all tabs in a space (uses Chrome tab groups)
   const closeAllTabsInSpace = useCallback(async (space: Space) =>
   {
     if (import.meta.env.DEV) console.log('[closeAllTabsInSpace] Called with space:', space);
@@ -517,17 +502,33 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    // 1. Get tabs tracked in spaceTabs for this space
-    const spaceTabs = getTabsForSpace(space.id);
-    if (import.meta.env.DEV) console.log('[closeAllTabsInSpace] Tabs in space:', spaceTabs);
-    const tabIdsToClose: number[] = [...spaceTabs];
+    if (!windowId) return;
 
-    // 2. Find live bookmark tabs for bookmarks in the space's folder
+    const tabIdsToClose: number[] = [];
+
+    // 1. Get tabs in Chrome group matching Space name
+    try
+    {
+      const groups = await chrome.tabGroups.query({ windowId, title: space.name });
+      if (groups.length > 0)
+      {
+        const groupTabs = await chrome.tabs.query({ groupId: groups[0].id });
+        groupTabs.forEach(tab =>
+        {
+          if (tab.id !== undefined) tabIdsToClose.push(tab.id);
+        });
+      }
+    }
+    catch (error)
+    {
+      if (import.meta.env.DEV) console.error('[closeAllTabsInSpace] Failed to get group tabs:', error);
+    }
+
+    // 2. Also find live bookmark tabs for bookmarks in the space's folder
     const spaceFolder = findFolderByPath(space.bookmarkFolderPath);
     if (spaceFolder)
     {
       const bookmarksInFolder = await getAllBookmarksInFolder(spaceFolder.id);
-      // Use Set for O(1) lookup instead of Array.includes() which is O(n)
       const tabIdsSet = new Set(tabIdsToClose);
       bookmarksInFolder.forEach((bookmark: { id: string; title: string; url: string }) =>
       {
@@ -558,7 +559,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     {
       if (import.meta.env.DEV) console.log('[closeAllTabsInSpace] No tabs to close');
     }
-  }, [getTabsForSpace, findFolderByPath, getAllBookmarksInFolder, getTabIdForBookmark]);
+  }, [windowId, findFolderByPath, getAllBookmarksInFolder, getTabIdForBookmark]);
 
   // ---------------------------------------------------------------------------
   // Derived state
@@ -596,11 +597,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     activeSpaceId: windowState.activeSpaceId,
     setActiveSpaceId,
     switchToSpace,
-    spaceTabs: windowState.spaceTabs,
-    addTabToSpace,
-    getSpaceForTab,
     getTabsForSpace,
-    clearStateForSpace,
     closeAllTabsInSpace,
   };
 

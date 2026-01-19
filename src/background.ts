@@ -46,110 +46,6 @@ class SpaceWindowStateManager
     this.saveState(windowId, newState);
   }
 
-  addTabToSpace(windowId: number, tabId: number, spaceId: string): void
-  {
-    if (spaceId === 'all') return;
-
-    const state = this.getState(windowId);
-    const newSpaceTabs = { ...state.spaceTabs };
-
-    // Remove from any existing space first
-    for (const [sid, tabs] of Object.entries(newSpaceTabs))
-    {
-      if (tabs.includes(tabId))
-      {
-        newSpaceTabs[sid] = tabs.filter(id => id !== tabId);
-      }
-    }
-
-    // Add to the new space
-    newSpaceTabs[spaceId] = [...(newSpaceTabs[spaceId] || []), tabId];
-
-    const newState = { ...state, spaceTabs: newSpaceTabs };
-    this.saveState(windowId, newState);
-  }
-
-  removeTab(windowId: number, tabId: number): void
-  {
-    const state = this.getState(windowId);
-    const newSpaceTabs = { ...state.spaceTabs };
-    const newLastActiveTabs = { ...state.lastActiveTabs };
-    let changed = false;
-
-    // Remove from spaceTabs
-    for (const [spaceId, tabs] of Object.entries(newSpaceTabs))
-    {
-      if (tabs.includes(tabId))
-      {
-        newSpaceTabs[spaceId] = tabs.filter(id => id !== tabId);
-        changed = true;
-      }
-    }
-
-    // Remove from lastActiveTabs
-    for (const [spaceId, lastTabId] of Object.entries(newLastActiveTabs))
-    {
-      if (lastTabId === tabId)
-      {
-        delete newLastActiveTabs[spaceId];
-        changed = true;
-      }
-    }
-
-    if (changed)
-    {
-      const newState = { ...state, spaceTabs: newSpaceTabs, lastActiveTabs: newLastActiveTabs };
-      this.saveState(windowId, newState);
-    }
-  }
-
-  moveTabToSpace(windowId: number, tabId: number, toSpaceId: string): void
-  {
-    const state = this.getState(windowId);
-    const newSpaceTabs = { ...state.spaceTabs };
-
-    // Remove from all spaces
-    for (const [sid, tabs] of Object.entries(newSpaceTabs))
-    {
-      if (tabs.includes(tabId))
-      {
-        newSpaceTabs[sid] = tabs.filter(id => id !== tabId);
-      }
-    }
-
-    // Add to target space (unless "all")
-    if (toSpaceId !== 'all')
-    {
-      newSpaceTabs[toSpaceId] = [...(newSpaceTabs[toSpaceId] || []), tabId];
-    }
-
-    const newState = { ...state, spaceTabs: newSpaceTabs };
-    this.saveState(windowId, newState);
-  }
-
-  setLastActiveTab(windowId: number, spaceId: string, tabId: number): void
-  {
-    const state = this.getState(windowId);
-    const newState = {
-      ...state,
-      lastActiveTabs: { ...state.lastActiveTabs, [spaceId]: tabId }
-    };
-    this.saveState(windowId, newState);
-  }
-
-  clearSpaceState(windowId: number, spaceId: string): void
-  {
-    const state = this.getState(windowId);
-    const { [spaceId]: _tabs, ...restSpaceTabs } = state.spaceTabs;
-    const { [spaceId]: _lastTab, ...restLastActiveTabs } = state.lastActiveTabs;
-    const newState = {
-      ...state,
-      spaceTabs: restSpaceTabs,
-      lastActiveTabs: restLastActiveTabs,
-    };
-    this.saveState(windowId, newState);
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
   // Persistence & Notification
   // ─────────────────────────────────────────────────────────────────────────
@@ -345,7 +241,7 @@ class TabHistoryManager
       if (import.meta.env.DEV) console.log(`[TabHistory] navigate callback: setting isNavigating=false`);
       this.#isNavigating = false;
 
-      // Notify sidepanel to switch to the space (lastActiveTabs updated by onActivated)
+      // Notify sidepanel to switch to the space
       if (entry.spaceId)
       {
         chrome.runtime.sendMessage({
@@ -373,7 +269,7 @@ class TabHistoryManager
     {
       this.#isNavigating = false;
 
-      // Notify sidepanel to switch to the space (lastActiveTabs updated by onActivated)
+      // Notify sidepanel to switch to the space
       if (entry.spaceId)
       {
         chrome.runtime.sendMessage({
@@ -528,6 +424,41 @@ class TabGroupTracker
 }
 
 // =============================================================================
+// Space-Group Helper Functions
+// =============================================================================
+
+interface Space
+{
+  id: string;
+  name: string;
+  color: chrome.tabGroups.ColorEnum;
+}
+
+// Find Chrome group by name in a window
+async function findGroupByName(windowId: number, name: string): Promise<number | undefined>
+{
+  const groups = await chrome.tabGroups.query({ windowId, title: name });
+  return groups[0]?.id;
+}
+
+// Get a space by ID from storage
+async function getSpaceById(spaceId: string): Promise<Space | undefined>
+{
+  const result = await chrome.storage.local.get(['spaces']);
+  const spaces: Space[] = result.spaces || [];
+  return spaces.find(s => s.id === spaceId);
+}
+
+// Find a space by name from storage
+async function findSpaceByName(name: string | undefined): Promise<Space | undefined>
+{
+  if (!name) return undefined;
+  const result = await chrome.storage.local.get(['spaces']);
+  const spaces: Space[] = result.spaces || [];
+  return spaces.find(s => s.name === name);
+}
+
+// =============================================================================
 // Initialize trackers
 // =============================================================================
 
@@ -546,8 +477,8 @@ Promise.all([
 // Event Listeners
 // =============================================================================
 
-// Update tracked group when active tab changes + track history + update lastActiveTabs
-chrome.tabs.onActivated.addListener((activeInfo) =>
+// Update tracked group when active tab changes + track history + switch to tab's Space
+chrome.tabs.onActivated.addListener(async (activeInfo) =>
 {
   if (import.meta.env.DEV) console.log(`[TabHistory] onActivated: tabId=${activeInfo.tabId}, isNavigating=${historyManager.isNavigating}`);
 
@@ -557,11 +488,31 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
     historyManager.push(activeInfo.windowId, activeInfo.tabId);
   }
 
-  // Update lastActiveTabs for current space
-  const spaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
-  if (spaceId && spaceId !== 'all')
+  // Switch sidebar to tab's Space based on its Chrome group
+  // Skip if currently in "All" space (user wants to stay in overview mode)
+  if (spaceStateManager.getActiveSpace(activeInfo.windowId) !== 'all')
   {
-    spaceStateManager.setLastActiveTab(activeInfo.windowId, spaceId, activeInfo.tabId);
+    try
+    {
+      const tab = await chrome.tabs.get(activeInfo.tabId);
+      if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
+      {
+        const group = await chrome.tabGroups.get(tab.groupId);
+        const space = await findSpaceByName(group.title);
+        if (space)
+        {
+          const currentSpaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
+          if (currentSpaceId !== space.id)
+          {
+            spaceStateManager.setActiveSpace(activeInfo.windowId, space.id);
+          }
+        }
+      }
+    }
+    catch
+    {
+      // Tab or group may have been closed
+    }
   }
 
   // Track tab group (for auto-grouping feature)
@@ -577,33 +528,49 @@ chrome.tabs.onActivated.addListener((activeInfo) =>
   }
 });
 
-// Clean up when tab is closed
+// Clean up history when tab is closed
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
 {
   historyManager.remove(removeInfo.windowId, tabId);
-  spaceStateManager.removeTab(removeInfo.windowId, tabId);
 });
 
-// Add new tabs to active space + auto-group (feature flag)
-chrome.tabs.onCreated.addListener((tab) =>
+// Add new ungrouped tabs to active Space's Chrome group
+chrome.tabs.onCreated.addListener(async (tab) =>
 {
   if (!tab.id || !tab.windowId) return;
 
-  // Add to active space
-  const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
-  if (activeSpaceId && activeSpaceId !== 'all')
-  {
-    spaceStateManager.addTabToSpace(tab.windowId, tab.id, activeSpaceId);
-  }
+  // Skip if tab is already grouped
+  if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return;
 
-  // Auto-group (feature flag)
-  if (ENABLE_AUTO_GROUP_NEW_TABS)
+  const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
+  if (!activeSpaceId || activeSpaceId === 'all') return;
+
+  try
   {
-    const groupId = groupTracker.getActiveGroup(tab.windowId);
-    if (groupId && groupId !== -1)
+    const space = await getSpaceById(activeSpaceId);
+    if (!space) return;
+
+    // Find existing Chrome group with Space's name
+    const existingGroupId = await findGroupByName(tab.windowId, space.name);
+
+    if (existingGroupId)
     {
-      chrome.tabs.group({ tabIds: [tab.id], groupId });
+      // Add to existing group
+      await chrome.tabs.group({ tabIds: [tab.id], groupId: existingGroupId });
     }
+    else
+    {
+      // Create new group with this tab
+      const newGroupId = await chrome.tabs.group({ tabIds: [tab.id] });
+      await chrome.tabGroups.update(newGroupId, {
+        title: space.name,
+        color: space.color,
+      });
+    }
+  }
+  catch (error)
+  {
+    if (import.meta.env.DEV) console.error('[onCreated] Failed to add tab to space group:', error);
   }
 });
 
@@ -630,26 +597,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
     if (message.windowId && message.spaceId)
     {
       spaceStateManager.setActiveSpace(message.windowId, message.spaceId);
-    }
-    return;
-  }
-
-  // Move tab to a different space
-  if (message.action === SpaceMessageAction.MOVE_TAB_TO_SPACE)
-  {
-    if (message.windowId && message.tabId !== undefined && message.toSpaceId)
-    {
-      spaceStateManager.moveTabToSpace(message.windowId, message.tabId, message.toSpaceId);
-    }
-    return;
-  }
-
-  // Clear all state for a space (when space is deleted)
-  if (message.action === SpaceMessageAction.CLEAR_SPACE_STATE)
-  {
-    if (message.windowId && message.spaceId)
-    {
-      spaceStateManager.clearSpaceState(message.windowId, message.spaceId);
     }
     return;
   }
