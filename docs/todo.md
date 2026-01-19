@@ -194,4 +194,6 @@ SpaceBar
 
 - [ ] "open link in new tab" from live bookmark tabs, will have the tab opened as orphaned tab.  in this case, we need the new tab in active group or ungrouped if active group is "All"
 
-- [ ] "Orphaned Tabs" should only appear in "App" space
+- [x] "Orphaned Tabs" should only appear in "App" space
+
+- [ ] cannot collapse "Orphaned Tabs" group

@@ -1907,7 +1907,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     onSpaceDropTargetChange?.(null);
   }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, onExternalDropTargetChange, onSpaceDropTargetChange]);
 
-  const toggleGroup = (groupId: number) =>
+  const toggleGroup = (groupId: number | string) =>
   {
     setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
   };
@@ -2178,7 +2178,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                             title={titleComponent}
                             hideIcon
                             hasChildren={true}
-                            isExpanded={true}
+                            isExpanded={expandedGroups['orphaned-tabs'] !== false}
+                            onToggle={() => toggleGroup('orphaned-tabs')}
+                            onClick={() => toggleGroup('orphaned-tabs')}
                             className={clsx(
                               "rounded-t-lg rounded-b-none",
                               colorStyle.bg
@@ -2208,7 +2210,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     )}
                   </ContextMenu.Root>
                   {/* Render orphaned tabs (draggable to move out of group, but not drop targets) */}
-                  {item.tabs.map((tab, index) =>
+                  {expandedGroups['orphaned-tabs'] !== false && item.tabs.map((tab, index) =>
                   {
                     const isLastTab = index === item.tabs.length - 1;
                     return (
