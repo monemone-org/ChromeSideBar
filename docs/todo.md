@@ -187,8 +187,8 @@ SpaceBar
 
 - [ ] support drag/drop tabs to "Space" button
 
-- [ ] close tab after/before/others should be bounded within the active group of the active tab
+- [x] close tab after/before/others should be bounded within the active group of the active tab
       if the active tab is ungrouped, then those actions will apply to all tabs (grouped or ungrouped)
 
-- [ ] tabList, render space group with space icon. non space group with a generic group icon.
+- [x] tabList, render space group with space icon. non space group with a generic group icon.
 

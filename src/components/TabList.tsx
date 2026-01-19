@@ -1842,12 +1842,20 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     chrome.windows.create({ tabId });
   }, []);
 
-  // Close tabs before/after/others (based on visibleTabs order)
+  // Close tabs before/after/others (bounded to group if tab is grouped)
   const closeTabsBefore = useCallback((tabId: number) =>
   {
-    const index = visibleTabs.findIndex(t => t.id === tabId);
+    const targetTab = visibleTabs.find(t => t.id === tabId);
+    if (!targetTab) return;
+
+    // If target tab is in a group, only operate on tabs in that group
+    const scopedTabs = (targetTab.groupId && targetTab.groupId > 0)
+      ? visibleTabs.filter(t => t.groupId === targetTab.groupId)
+      : visibleTabs;
+
+    const index = scopedTabs.findIndex(t => t.id === tabId);
     if (index <= 0) return;
-    const tabIds = visibleTabs.slice(0, index)
+    const tabIds = scopedTabs.slice(0, index)
       .map(t => t.id)
       .filter((id): id is number => id !== undefined);
     closeTabs(tabIds);
@@ -1855,9 +1863,16 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
   const closeTabsAfter = useCallback((tabId: number) =>
   {
-    const index = visibleTabs.findIndex(t => t.id === tabId);
-    if (index < 0 || index >= visibleTabs.length - 1) return;
-    const tabIds = visibleTabs.slice(index + 1)
+    const targetTab = visibleTabs.find(t => t.id === tabId);
+    if (!targetTab) return;
+
+    const scopedTabs = (targetTab.groupId && targetTab.groupId > 0)
+      ? visibleTabs.filter(t => t.groupId === targetTab.groupId)
+      : visibleTabs;
+
+    const index = scopedTabs.findIndex(t => t.id === tabId);
+    if (index < 0 || index >= scopedTabs.length - 1) return;
+    const tabIds = scopedTabs.slice(index + 1)
       .map(t => t.id)
       .filter((id): id is number => id !== undefined);
     closeTabs(tabIds);
@@ -1865,7 +1880,14 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
   const closeOthers = useCallback((tabId: number) =>
   {
-    const tabIds = visibleTabs
+    const targetTab = visibleTabs.find(t => t.id === tabId);
+    if (!targetTab) return;
+
+    const scopedTabs = (targetTab.groupId && targetTab.groupId > 0)
+      ? visibleTabs.filter(t => t.groupId === targetTab.groupId)
+      : visibleTabs;
+
+    const tabIds = scopedTabs
       .filter(t => t.id !== tabId)
       .map(t => t.id)
       .filter((id): id is number => id !== undefined);
