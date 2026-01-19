@@ -67,13 +67,13 @@ All feature docs in `docs/features/` must have YAML front matter:
 ---
 created: YYYY-MM-DD
 after-version: X.X.XXX
-status: draft | in-progress | completed | finalized
+status: draft | in-progress | completed | finalized | aborted
 ---
 ```
 
 - `created`: Date file was first committed
 - `after-version`: Extension version at time of creation (feature built after this version)
-- `status`: status 
+- `status`: Feature status 
 
 ## Versioning
 

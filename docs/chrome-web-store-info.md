@@ -42,6 +42,7 @@ Search and filter by text, live tabs, or tabs playing audio. Save your frequentl
 - Click to load, click again to switch
 - Close tabs freely—bookmarks stay in the sidebar
 - Enable/disable in Settings (On by default)
+- Note: Tab associations are session-only. When Chrome restarts, bookmarks/pins show as unloaded and can be re-clicked to open.
 
 ### Pinned Sites
 - Quick-access icon bar at the top

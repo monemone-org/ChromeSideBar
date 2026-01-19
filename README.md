@@ -156,6 +156,7 @@ Gear icon in the bottom-left corner:
 - **Pinned icon size**: 12-48px (default: 22px)
 - **Open bookmark**: Choose how bookmarks open
   - Arc style: Bookmarks act as persistent tabs (hidden from Tabs section)
+    - Note: Tab associations are session-only. When Chrome restarts, bookmarks/pins show as unloaded and can be re-clicked to open.
   - In new tab: Opens bookmark in a new background tab
   - In active tab: Replaces the current tab with the bookmark
 - **Sort tab groups first**: When sorting tabs, keep tab groups at the top

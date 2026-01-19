@@ -1,12 +1,36 @@
 ---
 created: 2026-01-16
 after-version: 1.0.149
-status: draft
+status: aborted
 ---
 
 # Chrome Restart State Restoration
 
-## Goal
+## Status: Aborted
+
+Too complicated for the value it provides. Key issues:
+
+1. **No reliable session restore detection** - Chrome doesn't fire a "restore complete" event. Debounce-based detection is hacky and unreliable.
+
+2. **Fragile fingerprinting** - Window identification via URL concatenation breaks easily:
+   - Tab order can change
+   - Tabs may fail to restore
+   - Multiple windows could have identical fingerprints
+   - Any mismatch = treated as new window, losing all associations
+
+3. **UUID management overhead** - Maintaining our own window ID system adds complexity and potential sync issues with Chrome's native IDs.
+
+4. **Race conditions** - Timing between Chrome's restore, our detection, and sidebar loading is hard to coordinate.
+
+5. **Low ROI** - All this complexity just to preserve which bookmark opened which tab. Users can re-click bookmarks after restart.
+
+**Alternative**: Accept that tab associations are session-only. Spaces already persist via Chrome tab groups. Live bookmark tabs can be re-opened from bookmarks.
+
+---
+
+## Original Spec (for reference)
+
+### Goal
 
 Restore live bookmark tabs and pinned site associations after Chrome restarts.
 
