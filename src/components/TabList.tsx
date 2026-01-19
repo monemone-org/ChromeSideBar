@@ -52,6 +52,7 @@ import {
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import clsx from 'clsx';
 import { GROUP_COLORS } from '../utils/groupColors';
+import { getIcon } from '../utils/spaceIcons';
 
 interface DraggableTabProps {
   tab: chrome.tabs.Tab;
@@ -353,6 +354,7 @@ const DraggableTab = (props: DraggableTabProps) => {
 
 interface TabGroupHeaderProps {
   group: chrome.tabGroups.TabGroup;
+  matchedSpace?: Space;
   isExpanded: boolean;
   isDragging?: boolean;
   showDropBefore: boolean;
@@ -373,6 +375,7 @@ interface TabGroupHeaderProps {
 
 const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
   group,
+  matchedSpace,
   isExpanded,
   isDragging,
   showDropBefore,
@@ -392,9 +395,16 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
 {
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
 
-  // Render badge as the title component
+  // Show space icon if group title matches a space, otherwise generic SquareStack
+  // Icon is shown inside the badge with inverted colors for contrast
+  const iconElement = matchedSpace
+    ? getIcon(matchedSpace.icon, 12, true)
+    : <SquareStack size={12} />;
+
+  // Render badge as the title component with icon inside (like orphaned tabs group)
   const titleComponent = (
-    <span className={clsx("px-2 py-0.5 rounded-full font-medium truncate text-white dark:text-black", colorStyle.badge)}>
+    <span className={clsx("px-2 py-0.5 rounded-full font-medium text-white dark:text-black flex items-center gap-1 w-fit", colorStyle.badge)}>
+      {iconElement}
       {group.title || 'Unnamed Group'}
     </span>
   );
@@ -418,7 +428,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
               dndAttributes={attributes}
               dndListeners={listeners}
               className={clsx(
-                "rounded-t-lg rounded-b-none", // Original rounding for background
+                "rounded-t-lg rounded-b-none",
                 showDropInto
                   ? "bg-blue-100 dark:bg-blue-900/50"
                   : colorStyle.bg
@@ -500,13 +510,20 @@ const DraggableGroupHeader = ({ group, tabCount, ...props }: DraggableGroupHeade
 };
 
 // Drag overlay content for groups
-const GroupDragOverlay = ({ group, tabCount }: { group: chrome.tabGroups.TabGroup; tabCount: number }) =>
+const GroupDragOverlay = ({ group, matchedSpace, tabCount }: { group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number }) =>
 {
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
-  
+
+  // Show space icon if group title matches a space, otherwise generic SquareStack
+  // Icon is shown inside the badge with inverted colors for contrast
+  const iconElement = matchedSpace
+    ? getIcon(matchedSpace.icon, 12, true)
+    : <SquareStack size={12} />;
+
   const titleComponent = (
     <div className="flex items-center">
-      <span className={clsx("px-2 py-0.5 rounded-full font-medium text-white dark:text-black", colorStyle.badge)}>
+      <span className={clsx("px-2 py-0.5 rounded-full font-medium text-white dark:text-black flex items-center gap-1 w-fit", colorStyle.badge)}>
+        {iconElement}
         {group.title || 'Unnamed Group'}
       </span>
       <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
@@ -519,7 +536,7 @@ const GroupDragOverlay = ({ group, tabCount }: { group: chrome.tabGroups.TabGrou
     <TreeRow
       depth={0}
       title={titleComponent}
-      icon={<SquareStack size={16} className="text-gray-500" />}
+      hideIcon
       hasChildren={true}
       className="pointer-events-none"
     />
@@ -1976,6 +1993,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                 <div key={`group-${item.group.id}`}>
                   <DraggableGroupHeader
                     group={item.group}
+                    matchedSpace={spaces.find(s => s.name === item.group.title)}
                     tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
                     showDropBefore={isTarget && dropPosition === 'before'}
@@ -2039,7 +2057,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
               // Title component with warning icon
               const titleComponent = (
-                <span className={clsx("px-2 py-0.5 rounded-full font-medium truncate text-white dark:text-black flex items-center gap-1", colorStyle.badge)}>
+                <span className={clsx("px-2 py-0.5 rounded-full font-medium text-white dark:text-black flex items-center gap-1 w-fit", colorStyle.badge)}>
                   <AlertTriangle size={12} />
                   {item.title}
                 </span>
@@ -2134,7 +2152,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
           <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
             {activeTab && <TabDragOverlay tab={activeTab} />}
-            {activeGroup && <GroupDragOverlay group={activeGroup.group} tabCount={activeGroup.tabCount} />}
+            {activeGroup && <GroupDragOverlay group={activeGroup.group} matchedSpace={spaces.find(s => s.name === activeGroup.group.title)} tabCount={activeGroup.tabCount} />}
           </DragOverlay>
         </DndContext>
 

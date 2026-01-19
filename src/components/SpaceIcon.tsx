@@ -3,10 +3,9 @@ import clsx from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import * as ContextMenu from './menu/ContextMenu';
-import { LayoutGrid } from 'lucide-react';
 import { Space } from '../contexts/SpacesContext';
 import { GROUP_COLORS } from '../utils/groupColors';
-import { getIconUrl } from '../utils/iconify';
+import { getIcon } from '../utils/spaceIcons';
 import { SpaceContextMenuContent } from './SpaceContextMenuContent';
 
 interface SpaceIconProps
@@ -20,38 +19,6 @@ interface SpaceIconProps
   isAllSpace?: boolean;
   isDraggable?: boolean;
 }
-
-// Get icon element by name - uses Iconify CDN for dynamic icons
-// isActive: when true, icon needs to be white (light) or black (dark) for contrast on badge
-const getIcon = (iconName: string, size: number = 14, isActive: boolean = false): React.ReactNode =>
-{
-  // Special case: LayoutGrid is used for the "All" space
-  if (iconName === 'LayoutGrid')
-  {
-    return <LayoutGrid size={size} />;
-  }
-
-  // Icon filter classes:
-  // - Normal: dark:invert (black in light mode, white in dark mode)
-  // - Active: invert dark:invert-0 (white in light mode, black in dark mode)
-  const filterClass = isActive ? "invert dark:invert-0" : "dark:invert";
-
-  // Use Iconify CDN for Lucide icons
-  return (
-    <img
-      src={getIconUrl(iconName)}
-      alt={iconName}
-      width={size}
-      height={size}
-      className={filterClass}
-      onError={(e) =>
-      {
-        // Fallback to Circle icon on error
-        e.currentTarget.style.display = 'none';
-      }}
-    />
-  );
-};
 
 export const SpaceIcon: React.FC<SpaceIconProps> = ({
   space,
