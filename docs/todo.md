@@ -174,9 +174,6 @@ SpaceBar
       - [x] Security review
       - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
       
-- [ ] close tab after/before/others should be bounded within the active group of the active tab
-      if the active tab is ungrouped, then those actions will apply to all tabs (grouped or ungrouped)
-
 - [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
 
 - [x] in audio filter dialog, when clicking anywhere else in the panel should dismiss the audio filter dialog
@@ -189,4 +186,9 @@ SpaceBar
 - [-] When chrome restarts, it restores all the tabs, we need to find a way to remap live bookmarks , live pinned sites and space tab lists.
 
 - [ ] support drag/drop tabs to "Space" button
+
+- [ ] close tab after/before/others should be bounded within the active group of the active tab
+      if the active tab is ungrouped, then those actions will apply to all tabs (grouped or ungrouped)
+
+- [ ] tabList, render space group with space icon. non space group with a generic group icon.
 

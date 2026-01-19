@@ -5,7 +5,7 @@ import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { SPEAKER_ICON_SIZE } from '../constants';
+import { SPEAKER_ICON_SIZE, LIVEBOOKMARKS_GROUP_NAME } from '../constants';
 
 // External drop target type for tab → bookmark drops
 export interface ExternalDropTarget
@@ -29,7 +29,7 @@ import { AddToGroupDialog } from './AddToGroupDialog';
 import { ChangeGroupColorDialog } from './ChangeGroupColorDialog';
 import { ExportConflictDialog, ExportConflictMode } from './ExportConflictDialog';
 import { RenameGroupDialog } from './RenameGroupDialog';
-import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink, AlertTriangle, Unlink } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
@@ -74,6 +74,7 @@ interface DraggableTabProps {
   onCloseTabsBefore?: (tabId: number) => void;
   onCloseTabsAfter?: (tabId: number) => void;
   onCloseOthers?: (tabId: number) => void;
+  onKeepAsRegularTab?: (id: number) => void;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -101,6 +102,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onCloseTabsBefore,
   onCloseTabsAfter,
   onCloseOthers,
+  onKeepAsRegularTab,
   attributes,
   listeners
 }, ref) => {
@@ -125,6 +127,21 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           aria-label="Pin tab"
         >
           <Pin size={14} className="text-gray-700 dark:text-gray-200" />
+        </button>
+      )}
+      {onKeepAsRegularTab && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) =>
+          {
+            e.stopPropagation();
+            if (tab.id) onKeepAsRegularTab(tab.id);
+          }}
+          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
+          title="Keep as Regular Tab"
+          aria-label="Keep as regular tab"
+        >
+          <Unlink size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       )}
       <button
@@ -206,19 +223,30 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content>
-          {onPin && tab.url && !tab.pinned && (
+          {onKeepAsRegularTab && (
             <>
-              <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
-                <Pin size={14} className="mr-2" /> Pin to Sidebar
+              <ContextMenu.Item onSelect={() => { if (tab.id) onKeepAsRegularTab(tab.id); }}>
+                <Unlink size={14} className="mr-2" /> Keep as Regular Tab
               </ContextMenu.Item>
-             </>
+              <ContextMenu.Separator />
+            </>
+          )}
+          {onPin && tab.url && !tab.pinned && (
+            <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
+              <Pin size={14} className="mr-2" /> Pin to Sidebar
+            </ContextMenu.Item>
           )}
           {onDuplicate && tab.url && (
             <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
               <Copy size={14} className="mr-2" /> Duplicate
             </ContextMenu.Item>
           )}
-          <ContextMenu.Separator />
+          {/* Separator after Pin/Duplicate section - only if items exist above AND below */}
+          {((onPin && tab.url && !tab.pinned) || (onDuplicate && tab.url)) &&
+           (onAddToBookmark || onOpenAddToGroupDialog || onOpenMoveToSpaceDialog || onMoveToNewWindow ||
+            onCloseTabsBefore || onCloseTabsAfter || onCloseOthers) && (
+            <ContextMenu.Separator />
+          )}
           {onAddToBookmark && tab.url && (
             <ContextMenu.Item onSelect={() => onAddToBookmark(tab)}>
               <Bookmark size={14} className="mr-2" /> Add to Bookmark
@@ -239,7 +267,11 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               <ExternalLink size={14} className="mr-2" /> Move to New Window
             </ContextMenu.Item>
           )}
-          <ContextMenu.Separator />
+          {/* Separator after organize section - only if items exist above AND below */}
+          {(onAddToBookmark || onOpenAddToGroupDialog || onOpenMoveToSpaceDialog || onMoveToNewWindow) &&
+           (onCloseTabsBefore || onCloseTabsAfter || onCloseOthers) && (
+            <ContextMenu.Separator />
+          )}
           {onCloseTabsBefore && (
             <ContextMenu.Item onSelect={() => onCloseTabsBefore(tab.id!)}>
               <span className="w-[14px] mr-2" /> Close Tabs Before
@@ -255,7 +287,12 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               <span className="w-[14px] mr-2" /> Close Other Tabs
             </ContextMenu.Item>
           )}
-          <ContextMenu.Separator />
+          {/* Separator before Close - only if items exist above */}
+          {((onPin && tab.url && !tab.pinned) || (onDuplicate && tab.url) ||
+            onAddToBookmark || onOpenAddToGroupDialog || onOpenMoveToSpaceDialog || onMoveToNewWindow ||
+            onCloseTabsBefore || onCloseTabsAfter || onCloseOthers) && (
+            <ContextMenu.Separator />
+          )}
           <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
             <X size={14} className="mr-2" /> Close
           </ContextMenu.Item>
@@ -512,7 +549,8 @@ const TabDragOverlay = ({ tab }: { tab: chrome.tabs.Tab }) =>
 // Display item types for rendering
 type DisplayItem =
   | { type: 'group'; group: chrome.tabGroups.TabGroup; tabs: chrome.tabs.Tab[]; startIndex: number }
-  | { type: 'tab'; tab: chrome.tabs.Tab };
+  | { type: 'tab'; tab: chrome.tabs.Tab }
+  | { type: 'virtual-group'; id: string; title: string; tabs: chrome.tabs.Tab[]; color: string };
 
 interface TabListProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
@@ -576,6 +614,47 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   {
     return tabGroups;
   }, [tabGroups]);
+
+  // Detect orphaned tabs: tabs in LiveBookmarks group but not managed by BookmarkTabsContext
+  // These are tabs from a previous session where the association was lost (e.g., Chrome restart)
+  const orphanedTabs = useMemo(() =>
+  {
+    const managedIds = getManagedTabIds();
+
+    // Find LiveBookmarks group for current window
+    const liveBookmarksGroup = visibleTabGroups.find(
+      g => g.title === LIVEBOOKMARKS_GROUP_NAME
+    );
+
+    if (!liveBookmarksGroup) return [];
+
+    // Tabs in LiveBookmarks group but not managed = orphaned
+    return tabs.filter(tab =>
+      tab.groupId === liveBookmarksGroup.id &&
+      tab.id &&
+      !managedIds.has(tab.id)
+    );
+  }, [tabs, visibleTabGroups, getManagedTabIds]);
+
+  // Handle "Keep as Regular Tabs" - ungroup orphaned tabs from LiveBookmarks
+  const handleKeepAsRegularTabs = useCallback(async () =>
+  {
+    const tabIds = orphanedTabs.map(t => t.id).filter(Boolean) as number[];
+    if (tabIds.length > 0)
+    {
+      await chrome.tabs.ungroup(tabIds);
+    }
+  }, [orphanedTabs]);
+
+  // Handle "Close Orphaned Tabs" - close all orphaned tabs
+  const handleCloseOrphanedTabs = useCallback(() =>
+  {
+    const tabIds = orphanedTabs.map(t => t.id).filter(Boolean) as number[];
+    if (tabIds.length > 0)
+    {
+      closeTabs(tabIds);
+    }
+  }, [orphanedTabs, closeTabs]);
 
   // Create new tab - background.ts will auto-add to active space
   const handleNewTab = useCallback(async () =>
@@ -981,17 +1060,32 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
   // Build display items: groups and ungrouped tabs in natural browser order
   // Uses visibleTabs and visibleTabGroups to exclude SideBarForArc group
+  // Also excludes LiveBookmarks group (those are shown as orphaned tabs if not managed)
   const displayItems = useMemo<DisplayItem[]>(() =>
   {
+    // Find LiveBookmarks group to exclude from normal display
+    const liveBookmarksGroup = visibleTabGroups.find(
+      g => g.title === LIVEBOOKMARKS_GROUP_NAME
+    );
+    const liveBookmarksGroupId = liveBookmarksGroup?.id;
+
     const groupMap = new Map<number, chrome.tabGroups.TabGroup>();
-    visibleTabGroups.forEach((g) => groupMap.set(g.id, g));
+    visibleTabGroups.forEach((g) =>
+    {
+      // Skip LiveBookmarks group
+      if (g.id !== liveBookmarksGroupId)
+      {
+        groupMap.set(g.id, g);
+      }
+    });
 
     const tabsByGroup = new Map<number, chrome.tabs.Tab[]>();
 
     visibleTabs.forEach((tab) =>
     {
       const groupId = tab.groupId ?? -1;
-      if (groupId !== -1)
+      // Skip tabs in LiveBookmarks group (they're handled as orphaned tabs)
+      if (groupId !== -1 && groupId !== liveBookmarksGroupId)
       {
         if (!tabsByGroup.has(groupId))
         {
@@ -1002,11 +1096,30 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     });
 
     const items: DisplayItem[] = [];
+
+    // Add virtual orphaned tabs group at the TOP if there are orphans
+    if (orphanedTabs.length > 0)
+    {
+      items.push({
+        type: 'virtual-group',
+        id: 'orphaned-tabs',
+        title: `Orphaned Tabs (${orphanedTabs.length})`,
+        tabs: orphanedTabs,
+        color: 'grey'
+      });
+    }
+
     const processedGroups = new Set<number>();
 
     visibleTabs.forEach((tab, index) =>
     {
       const groupId = tab.groupId ?? -1;
+
+      // Skip tabs in LiveBookmarks group
+      if (groupId === liveBookmarksGroupId)
+      {
+        return;
+      }
 
       if (groupId === -1)
       {
@@ -1025,7 +1138,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     });
 
     return items;
-  }, [visibleTabs, visibleTabGroups]);
+  }, [visibleTabs, visibleTabGroups, orphanedTabs]);
 
   const handleDragStart = useCallback((event: DragStartEvent) =>
   {
@@ -1044,13 +1157,14 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     }
     else
     {
-      // Dragging a tab
+      // Dragging a tab (could be from visibleTabs or orphanedTabs)
       const tabId = id as number;
       setActiveId(tabId);
-      setActiveTab(visibleTabs.find(t => t.id === tabId) || null);
+      const tab = visibleTabs.find(t => t.id === tabId) || orphanedTabs.find(t => t.id === tabId);
+      setActiveTab(tab || null);
       setActiveGroup(null);
     }
-  }, [visibleTabs, visibleTabGroups, setActiveId]);
+  }, [visibleTabs, visibleTabGroups, orphanedTabs, setActiveId]);
 
   const handleDragMove = useCallback((event: DragMoveEvent) =>
   {
@@ -1066,6 +1180,19 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
     // Find element under pointer
     const elements = document.elementsFromPoint(currentX, currentY);
+
+    // Disable drops on orphaned tabs area (header or tabs)
+    const isOverOrphanedArea = elements.some(el =>
+      el.hasAttribute('data-orphaned-group-header') ||
+      el.hasAttribute('data-is-orphaned-tab')
+    );
+    if (isOverOrphanedArea)
+    {
+      setDropTargetId(null);
+      setDropPosition(null);
+      clearAutoExpandTimer();
+      return;
+    }
 
     // Check for group header first
     const groupHeaderElement = elements.find(el =>
@@ -1247,7 +1374,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     // Handle external drop (tab → bookmark) first
     if (localExternalTarget && activeId && typeof activeId === 'number')
     {
-      const tab = visibleTabs.find(t => t.id === activeId);
+      const tab = visibleTabs.find(t => t.id === activeId) || orphanedTabs.find(t => t.id === activeId);
       if (tab && tab.url && tab.title)
       {
         const { bookmarkId: targetBookmarkId, position, isFolder } = localExternalTarget;
@@ -1483,7 +1610,10 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     else
     {
       // --- TAB DRAG HANDLING ---
-      const sourceTab = visibleTabs.find(t => t.id === activeId);
+      // Check both visibleTabs and orphanedTabs for the source
+      const sourceTab = visibleTabs.find(t => t.id === activeId) || orphanedTabs.find(t => t.id === activeId);
+      const isOrphanedTab = orphanedTabs.some(t => t.id === activeId);
+
       if (!sourceTab)
       {
         setActiveId(null);
@@ -1494,7 +1624,13 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         return;
       }
 
-      const sourceGroupId = sourceTab.groupId ?? -1;
+      // For orphaned tabs, ungroup first so they leave the LiveBookmarks group
+      if (isOrphanedTab)
+      {
+        ungroupTab(activeId as number);
+      }
+
+      const sourceGroupId = isOrphanedTab ? -1 : (sourceTab.groupId ?? -1);
       const sourceIndex = sourceTab.index; // Chrome's real index
       const isGroupHeaderTarget = dropTargetId.startsWith('group-');
 
@@ -1654,7 +1790,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setDropPosition(null);
     setLocalExternalTarget(null);
     onExternalDropTargetChange?.(null);
-  }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab]);
+  }, [activeId, dropTargetId, dropPosition, visibleTabs, orphanedTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
@@ -1789,7 +1925,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                 />
               );
             }
-            else
+            else if (item.type === 'group')
             {
               // When in a space, show tabs without group header (flat list)
               if (isInSpace)
@@ -1895,6 +2031,87 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   })}
                 </div>
               );
+            }
+            else if (item.type === 'virtual-group')
+            {
+              // Virtual group for orphaned tabs (tabs in LiveBookmarks group but not managed)
+              const colorStyle = GROUP_COLORS[item.color] || GROUP_COLORS.grey;
+
+              // Title component with warning icon
+              const titleComponent = (
+                <span className={clsx("px-2 py-0.5 rounded-full font-medium truncate text-white dark:text-black flex items-center gap-1", colorStyle.badge)}>
+                  <AlertTriangle size={12} />
+                  {item.title}
+                </span>
+              );
+
+              return (
+                <div key={`virtual-${item.id}`}>
+                  <ContextMenu.Root>
+                    {({ isOpen }) => (
+                      <>
+                        <ContextMenu.Trigger asChild>
+                          <TreeRow
+                            depth={0}
+                            title={titleComponent}
+                            hideIcon
+                            hasChildren={true}
+                            isExpanded={true}
+                            className={clsx(
+                              "rounded-t-lg rounded-b-none",
+                              colorStyle.bg
+                            )}
+                            data-orphaned-group-header="true"
+                          >
+                            {/* Hover border overlay */}
+                            <div className={clsx(
+                              "absolute inset-0 rounded-md border-2 pointer-events-none",
+                              colorStyle.border,
+                              isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )} />
+                          </TreeRow>
+                        </ContextMenu.Trigger>
+                        <ContextMenu.Portal>
+                          <ContextMenu.Content>
+                            <ContextMenu.Item onSelect={handleKeepAsRegularTabs}>
+                              <Unlink size={14} className="mr-2" /> Keep as Regular Tabs
+                            </ContextMenu.Item>
+                            <ContextMenu.Separator />
+                            <ContextMenu.Item danger onSelect={handleCloseOrphanedTabs}>
+                              <X size={14} className="mr-2" /> Close Orphaned Tabs
+                            </ContextMenu.Item>
+                          </ContextMenu.Content>
+                        </ContextMenu.Portal>
+                      </>
+                    )}
+                  </ContextMenu.Root>
+                  {/* Render orphaned tabs (draggable to move out of group, but not drop targets) */}
+                  {item.tabs.map((tab, index) =>
+                  {
+                    const isLastTab = index === item.tabs.length - 1;
+                    return (
+                      <div key={tab.id} data-is-orphaned-tab="true">
+                        <DraggableTab
+                          tab={tab}
+                          indentLevel={1}
+                          isBeingDragged={activeId === tab.id}
+                          showDropBefore={false}
+                          showDropAfter={false}
+                          groupColor={item.color}
+                          isLastInGroup={isLastTab}
+                          onClose={closeTab}
+                          onActivate={activateTab}
+                          onKeepAsRegularTab={(tabId) => ungroupTab(tabId)}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            }
+            else
+            {
+              return null;
             }
           })}
 

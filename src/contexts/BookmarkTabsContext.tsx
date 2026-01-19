@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
+import { LIVEBOOKMARKS_GROUP_NAME } from '../constants';
 
 // Helper to create window-scoped storage key
 const getStorageKey = (windowId: number) => `tabAssociations_${windowId}`;
@@ -13,6 +14,35 @@ const makePinnedKey = (pinnedId: string) => `pinned-${pinnedId}`;
 const pendingManagedTabs = new Set<number>();
 
 export const isPendingManagedTab = (tabId: number): boolean => pendingManagedTabs.has(tabId);
+
+// Add a tab to the LiveBookmarks group (create group if needed)
+const addTabToLiveBookmarksGroup = async (tabId: number): Promise<void> =>
+{
+  const tab = await chrome.tabs.get(tabId);
+  const windowId = tab.windowId;
+
+  // Find existing LiveBookmarks group in this window
+  const groups = await chrome.tabGroups.query({
+    windowId,
+    title: LIVEBOOKMARKS_GROUP_NAME
+  });
+
+  if (groups.length > 0)
+  {
+    // Add to existing group
+    await chrome.tabs.group({ tabIds: [tabId], groupId: groups[0].id });
+  }
+  else
+  {
+    // Create new group
+    const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
+    await chrome.tabGroups.update(newGroupId, {
+      title: LIVEBOOKMARKS_GROUP_NAME,
+      color: 'grey',
+      collapsed: true
+    });
+  }
+};
 
 interface BookmarkTabsContextValue
 {
@@ -390,17 +420,13 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           pendingManagedTabs.add(tabId);
 
           // Clean up after a delay (onCreated listener should have checked by then)
-          // Also ungroup the tab in case it somehow got grouped
+          // Add the tab to LiveBookmarks group
           setTimeout(async () =>
           {
             pendingManagedTabs.delete(tabId);
             try
             {
-              const currentTab = await chrome.tabs.get(tabId);
-              if (currentTab.groupId && currentTab.groupId !== -1)
-              {
-                await chrome.tabs.ungroup(tabId);
-              }
+              await addTabToLiveBookmarksGroup(tabId);
             }
             catch
             {
