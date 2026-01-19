@@ -1133,7 +1133,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     const items: DisplayItem[] = [];
 
     // Add virtual orphaned tabs group at the TOP if there are orphans
-    if (orphanedTabs.length > 0)
+    // Only show in "All" space (not when viewing a specific space)
+    if (orphanedTabs.length > 0 && !isInSpace)
     {
       items.push({
         type: 'virtual-group',
