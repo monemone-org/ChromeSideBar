@@ -1,7 +1,7 @@
 ---
 created: 2026-01-15
 after-version: 1.0.149
-status: in-progress
+status: completed
 ---
 
 # Decouple Space and Group 

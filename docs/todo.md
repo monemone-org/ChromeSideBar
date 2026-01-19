@@ -51,12 +51,6 @@ bugs:
         
 - [x] empty row at the end of tabList. so the gear setting button is not mixed up with the last tab row's speaker icon.
 
-- [ ] Pinned site sometimes opens in unnamed group instead of "SideBarForArc"
-      **Problem:** After reloading extension, deleting existing SideBarForArc group, then clicking a pinned site - the tab opens in an unnamed group.
-      **Potential cause:** In `BookmarkTabsContext.tsx` `createItemTab()`, when `chrome.tabs.group` creates a new group, Chrome returns `newGroupId` in the callback. Then `chrome.tabGroups.update(newGroupId, {title: 'SideBarForArc', ...})` sets the name. If `newGroupId` is invalid or `tabGroups.update` fails silently, the group remains unnamed.
-      **Suggested fix:** Add validation `typeof newGroupId !== 'number'` before calling `chrome.tabGroups.update` in both the error recovery path (line ~379) and normal create path (line ~443).
-      **Status:** Cannot reproduce consistently. May be a transient race condition.
-
 - [x] inefficent batch operation 
    - delete group causes fetchTabs to be called many times (148)
 
@@ -64,8 +58,6 @@ bugs:
 
 - [x] drag group to bookmark folder to create bookmark subfolder
 - [x] change toast message from "Export
-
-- [ ] multiple selection : drag/drop, copy/paste and delete
 
 - [x] settings: 
       Behaviour:
@@ -136,8 +128,6 @@ SpaceBar
 
 - [x] when space has no bookmark (i.e. the bookmark folder has no bookmarks), i can't drop tab to bookmark section to create bookmarks.
 
-- [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
-
 - [x] tab popup menu "move to bookmark" , if in a space, use the space bookmark folder as the default selection in the select folder dialog.
 
 - [x]  when switching to a new space A from space B, right now the extension will record the current
@@ -174,8 +164,6 @@ SpaceBar
       - [x] Security review
       - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
       
-- [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
-
 - [x] in audio filter dialog, when clicking anywhere else in the panel should dismiss the audio filter dialog
   so is "Navigate to Space" dialog
 
@@ -192,8 +180,16 @@ SpaceBar
 
 - [x] tabList, render space group with space icon. non space group with a generic group icon.
 
-- [ ] "open link in new tab" from live bookmark tabs, will have the tab opened as orphaned tab.  in this case, we need the new tab in active group or ungrouped if active group is "All"
+- [x] "open link in new tab" from live bookmark tabs, will have the tab opened as orphaned tab.  in this case, we need the new tab in active group or ungrouped if active group is "All"
 
 - [x] "Orphaned Tabs" should only appear in "App" space
 
 - [x] cannot collapse "Orphaned Tabs" group
+
+- [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
+
+- [ ] multiple selection of the same type of rows (bookmarks+folders, tabs): drag/drop, common popup menu (move to folder  or move to space and delete)
+
+- [ ] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
+
+

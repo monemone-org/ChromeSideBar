@@ -195,6 +195,12 @@ Built with the usual modern web stack:
 │   └── utils/      # Helper functions (drag-drop)
 ```
 
+## Documentation
+
+- `docs/chrome-web-store-info.md` - Chrome Web Store listing (summary, description, key features, change logs)
+- `docs/features/` - Feature specs
+- `docs/state-reference.md` - Extension state reference
+
 
 ## Setup & Build
 
@@ -210,6 +216,7 @@ npm install
 ### Build
 ```bash
 npm run build
+npm run build:debug
 ```
 Outputs production build to `dist/` folder.
 
