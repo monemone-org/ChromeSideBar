@@ -43,6 +43,7 @@ interface SidebarContentProps
   onExternalDropTargetChange: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget: () => ResolveBookmarkDropTarget | null;
   onShowToast?: (message: string) => void;
+  onSpaceDropTargetChange?: (spaceId: string | null) => void;
 }
 
 const SidebarContent: React.FC<SidebarContentProps> = ({
@@ -58,6 +59,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   onExternalDropTargetChange,
   resolveBookmarkDropTarget,
   onShowToast,
+  onSpaceDropTargetChange,
 }) =>
 {
   const { activeSpace } = useSpacesContext();
@@ -85,6 +87,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         filterText={filterText}
         activeSpace={activeSpace}
         useSpaces={useSpaces}
+        onSpaceDropTargetChange={onSpaceDropTargetChange}
       />
     </div>
   );
@@ -344,6 +347,7 @@ function App() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastVisible, setToastVisible] = useState(false);
   const [externalDropTarget, setExternalDropTarget] = useState<ExternalDropTarget | null>(null);
+  const [spaceDropTargetId, setSpaceDropTargetId] = useState<string | null>(null);
   const [spaceToEdit, setSpaceToEdit] = useState<Space | null>(null);
   const [showSpaceEditDialog, setShowSpaceEditDialog] = useState(false);
   const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
@@ -630,6 +634,7 @@ function App() {
         onExternalDropTargetChange={setExternalDropTarget}
         resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current}
         onShowToast={showToast}
+        onSpaceDropTargetChange={setSpaceDropTargetId}
       />
 
       {/* Space Dialogs */}
@@ -654,6 +659,7 @@ function App() {
           onCreateSpace={handleCreateSpace}
           onEditSpace={handleEditSpace}
           onDeleteSpace={handleDeleteSpace}
+          dropTargetSpaceId={spaceDropTargetId}
         />
       )}
 

@@ -578,9 +578,10 @@ interface TabListProps {
   filterText?: string;
   activeSpace?: Space;  // If provided, use this instead of context
   useSpaces?: boolean;  // When true, show "Add to Space" menu; when false, show "Add to Group" menu
+  onSpaceDropTargetChange?: (spaceId: string | null) => void;
 }
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true }: TabListProps) =>
+export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
@@ -743,17 +744,23 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setToastState({ isVisible: false, message: '' });
   }, []);
 
-  // Handler to move tab to a space (adds to Chrome group matching Space name)
-  const handleMoveToSpace = useCallback(async (spaceId: string) =>
+  // Core function to move a tab to a space (adds to Chrome group matching Space name)
+  // Special case: "all" space ungroups the tab
+  const moveTabToSpace = useCallback(async (tabId: number, spaceId: string) =>
   {
-    const tabId = moveToSpaceDialog.tabId;
-    if (tabId === null) return;
-
-    const space = spaces.find(s => s.id === spaceId);
-    if (!space) return;
-
     try
     {
+      // Special case: "All" space - ungroup the tab
+      if (spaceId === 'all')
+      {
+        await chrome.tabs.ungroup(tabId);
+        showToast('Removed from group');
+        return;
+      }
+
+      const space = spaces.find(s => s.id === spaceId);
+      if (!space) return;
+
       // Get current window
       const currentWindow = await chrome.windows.getCurrent();
       if (!currentWindow.id) return;
@@ -780,9 +787,17 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     }
     catch (error)
     {
-      if (import.meta.env.DEV) console.error('[handleMoveToSpace] Failed:', error);
+      if (import.meta.env.DEV) console.error('[moveTabToSpace] Failed:', error);
     }
-  }, [moveToSpaceDialog.tabId, spaces, showToast]);
+  }, [spaces, showToast]);
+
+  // Handler for dialog-based move to space
+  const handleMoveToSpace = useCallback(async (spaceId: string) =>
+  {
+    const tabId = moveToSpaceDialog.tabId;
+    if (tabId === null) return;
+    await moveTabToSpace(tabId, spaceId);
+  }, [moveToSpaceDialog.tabId, moveTabToSpace]);
 
   // Change Group Color dialog state
   const [changeColorDialog, setChangeColorDialog] = useState<{
@@ -1016,6 +1031,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
   // External drop target for cross-context drops (tab → bookmark)
   const [localExternalTarget, setLocalExternalTarget] = useState<ExternalDropTarget | null>(null);
+
+  // Space drop target for tab → space drops
+  const [localSpaceDropTarget, setLocalSpaceDropTarget] = useState<string | null>(null);
 
   // Helper to check if we're dragging a group
   const isDraggingGroup = typeof activeId === 'string' && String(activeId).startsWith('group-');
@@ -1360,8 +1378,42 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       // Clear internal drop targets
       setDropTargetId(null);
       setDropPosition(null);
+      onSpaceDropTargetChange?.(null);
       // Auto-expand timer is managed by the resolver
       return;
+    }
+
+    // Check for space button (tab → space drop) - only for tabs, not groups
+    if (!isDraggingGroupNow)
+    {
+      const spaceButton = elements.find(el =>
+        el.hasAttribute('data-space-button')
+      ) as HTMLElement | undefined;
+
+      if (spaceButton)
+      {
+        const spaceId = spaceButton.getAttribute('data-space-id');
+        if (spaceId)
+        {
+          // Set space as drop target (both local state and callback)
+          setLocalSpaceDropTarget(spaceId);
+          onSpaceDropTargetChange?.(spaceId);
+          // Clear other drop targets
+          setDropTargetId(null);
+          setDropPosition(null);
+          setLocalExternalTarget(null);
+          onExternalDropTargetChange?.(null);
+          clearAutoExpandTimer();
+          return;
+        }
+      }
+    }
+
+    // Clear space drop target when not hovering space button
+    if (localSpaceDropTarget)
+    {
+      setLocalSpaceDropTarget(null);
+      onSpaceDropTargetChange?.(null);
     }
 
     // Check if pointer is in end-of-list drop zone (using sentinel element)
@@ -1381,8 +1433,10 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setDropPosition(null);
     setLocalExternalTarget(null);
     onExternalDropTargetChange?.(null);
+    setLocalSpaceDropTarget(null);
+    onSpaceDropTargetChange?.(null);
     clearAutoExpandTimer();
-  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange, expandedGroups]);
+  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange, expandedGroups, localSpaceDropTarget, onSpaceDropTargetChange]);
 
   const handleDragEnd = useCallback(async (_event: DragEndEvent) =>
   {
@@ -1449,6 +1503,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       setDropPosition(null);
       setLocalExternalTarget(null);
       onExternalDropTargetChange?.(null);
+      setLocalSpaceDropTarget(null);
+      onSpaceDropTargetChange?.(null);
       return;
     }
 
@@ -1530,6 +1586,27 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       setActiveGroup(null);
       setDropTargetId(null);
       setDropPosition(null);
+      setLocalExternalTarget(null);
+      onExternalDropTargetChange?.(null);
+      setLocalSpaceDropTarget(null);
+      onSpaceDropTargetChange?.(null);
+      return;
+    }
+
+    // Handle space drop (tab → space) - moves tab to space's Chrome group
+    if (localSpaceDropTarget && activeId && typeof activeId === 'number')
+    {
+      await moveTabToSpace(activeId, localSpaceDropTarget);
+
+      // Clear all state
+      wasValidDropRef.current = true;
+      setActiveId(null);
+      setActiveTab(null);
+      setActiveGroup(null);
+      setDropTargetId(null);
+      setDropPosition(null);
+      setLocalSpaceDropTarget(null);
+      onSpaceDropTargetChange?.(null);
       setLocalExternalTarget(null);
       onExternalDropTargetChange?.(null);
       return;
@@ -1807,7 +1884,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setDropPosition(null);
     setLocalExternalTarget(null);
     onExternalDropTargetChange?.(null);
-  }, [activeId, dropTargetId, dropPosition, visibleTabs, orphanedTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab]);
+    setLocalSpaceDropTarget(null);
+    onSpaceDropTargetChange?.(null);
+  }, [activeId, dropTargetId, dropPosition, visibleTabs, orphanedTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab, localSpaceDropTarget, onSpaceDropTargetChange, moveTabToSpace]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
@@ -1823,7 +1902,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setDropPosition(null);
     setLocalExternalTarget(null);
     onExternalDropTargetChange?.(null);
-  }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, onExternalDropTargetChange]);
+    setLocalSpaceDropTarget(null);
+    onSpaceDropTargetChange?.(null);
+  }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, onExternalDropTargetChange, onSpaceDropTargetChange]);
 
   const toggleGroup = (groupId: number) =>
   {

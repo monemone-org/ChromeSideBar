@@ -25,12 +25,14 @@ interface SpaceBarProps
   onCreateSpace: () => void;
   onEditSpace: (space: Space) => void;
   onDeleteSpace: (space: Space) => void;
+  dropTargetSpaceId?: string | null;
 }
 
 export const SpaceBar: React.FC<SpaceBarProps> = ({
   onCreateSpace,
   onEditSpace,
   onDeleteSpace,
+  dropTargetSpaceId,
 }) =>
 {
   const { allSpaces, activeSpaceId, switchToSpace, moveSpace, getSpaceById, closeAllTabsInSpace } = useSpacesContext();
@@ -130,6 +132,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
                 onCloseAllTabs={() => closeAllTabsInSpace(space)}
                 isAllSpace={space.id === 'all'}
                 isDraggable={space.id !== 'all'}
+                isDropTarget={dropTargetSpaceId === space.id}
               />
             ))}
           </SortableContext>
