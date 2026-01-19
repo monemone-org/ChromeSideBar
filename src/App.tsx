@@ -545,7 +545,14 @@ function App() {
           onShowToast={showToast}
           onResetFilters={handleResetFilters}
           showFilterArea={showFilterArea}
-          onToggleFilterArea={() => setShowFilterArea(!showFilterArea)}
+          onToggleFilterArea={() => {
+            const newShowFilterArea = !showFilterArea;
+            setShowFilterArea(newShowFilterArea);
+            if (!newShowFilterArea)
+            {
+              setFilterText('');
+            }
+          }}
         />
 
         {/* Settings popup menu */}
