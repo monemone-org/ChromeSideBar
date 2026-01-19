@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, FlaskConical } from 'lucide-react';
 import { runSearchParserTests } from '../utils/searchParser.test';
 
@@ -37,16 +37,30 @@ export function SettingsDialog({
   // Test results state (dev mode only)
   const [testResults, setTestResults] = useState<{ passed: number; failed: number; results: Array<{ name: string; passed: boolean; error?: string }> } | null>(null);
 
-  // Sync temp state when dialog opens
+  // Track previous isOpen to detect when dialog opens
+  const wasOpen = useRef(false);
+
+  // Sync temp state when dialog opens (not on every settings change)
+  // Read fresh values from localStorage for visual preferences (may be stale in parent state
+  // if changed in another window). Chrome storage settings are always up-to-date via listener.
   useEffect(() => {
-    if (isOpen) {
-      setTempFontSize(settings.fontSize);
+    // Only run when dialog opens, not when settings change while open
+    if (isOpen && !wasOpen.current) {
+      // Read fresh from localStorage for visual preferences
+      const storedFontSize = localStorage.getItem('sidebar-font-size-px');
+      const storedPinnedIconSize = localStorage.getItem('sidebar-pinned-icon-size-px');
+      const storedSortGroupsFirst = localStorage.getItem('sidebar-sort-groups-first');
+
+      setTempFontSize(storedFontSize ? parseInt(storedFontSize, 10) : settings.fontSize);
+      setTempPinnedIconSize(storedPinnedIconSize ? parseInt(storedPinnedIconSize, 10) : settings.pinnedIconSize);
+      setTempSortGroupsFirst(storedSortGroupsFirst ? storedSortGroupsFirst === 'true' : settings.sortGroupsFirst);
+
+      // These don't need fresh read - not shown in dialog or use chrome.storage.local
       setTempHideOtherBookmarks(settings.hideOtherBookmarks);
-      setTempSortGroupsFirst(settings.sortGroupsFirst);
-      setTempPinnedIconSize(settings.pinnedIconSize);
       setTempBookmarkOpenMode(settings.bookmarkOpenMode);
       setTempUseSpaces(settings.useSpaces);
     }
+    wasOpen.current = isOpen;
   }, [isOpen, settings]);
 
   // Escape key handler

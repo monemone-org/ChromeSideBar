@@ -16,6 +16,7 @@ import { usePinnedSites, PinnedSite } from './hooks/usePinnedSites';
 import { useTabs } from './hooks/useTabs';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { useChromeLocalStorage } from './hooks/useChromeLocalStorage';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
@@ -296,7 +297,7 @@ function App() {
     22,
     { parse: (v) => parseInt(v, 10), serialize: (v) => v.toString() }
   );
-  const [bookmarkOpenMode, setBookmarkOpenMode] = useLocalStorage<BookmarkOpenMode>(
+  const [bookmarkOpenMode, setBookmarkOpenMode] = useChromeLocalStorage<BookmarkOpenMode>(
     'sidebar-bookmark-open-mode',
     'arc',
     {
@@ -309,7 +310,7 @@ function App() {
       serialize: (v) => v
     }
   );
-  const [spacesEnabled, setSpacesEnabled] = useLocalStorage(
+  const [spacesEnabled, setSpacesEnabled] = useChromeLocalStorage(
     'sidebar-use-spaces',
     true,
     { parse: (v) => v === 'true', serialize: (v) => v.toString() }
@@ -334,12 +335,12 @@ function App() {
   const [showAudioDialog, setShowAudioDialog] = useState(false);
   const [showSpaceNavigator, setShowSpaceNavigator] = useState(false);
   const [filterText, setFilterText] = useState('');
-  const [savedFilters, setSavedFilters] = useLocalStorage<string[]>(
+  const [savedFilters, setSavedFilters] = useChromeLocalStorage<string[]>(
     'sidebar-saved-filters',
     [],
     { parse: (v) => JSON.parse(v), serialize: (v) => JSON.stringify(v) }
   );
-  const [recentFilters, setRecentFilters] = useLocalStorage<string[]>(
+  const [recentFilters, setRecentFilters] = useChromeLocalStorage<string[]>(
     'sidebar-recent-filters',
     [],
     { parse: (v) => JSON.parse(v), serialize: (v) => JSON.stringify(v) }
