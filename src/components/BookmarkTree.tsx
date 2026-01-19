@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, forwardRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect, forwardRef, useMemo } from 'react';
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
 import { Space, useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
@@ -8,6 +8,7 @@ import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
+import { getIconUrl } from '../utils/iconify';
 import { DropIndicators } from './DropIndicators';
 import { ExternalDropTarget, ResolveBookmarkDropTarget } from './TabList';
 import { BookmarkOpenMode } from './SettingsDialog';
@@ -31,10 +32,9 @@ import {
   X,
   Volume2,
   Copy,
-  ExternalLink,
-  SquareStack
+  ExternalLink
 } from 'lucide-react';
-import { getRandomGroupColor } from '../utils/groupColors';
+import { getRandomGroupColor, GROUP_COLORS } from '../utils/groupColors';
 import clsx from 'clsx';
 import {
   DndContext,
@@ -110,6 +110,7 @@ interface BookmarkRowProps {
   onDuplicate: (id: string) => void;
   onExpandAll?: (folderId: string) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
+  matchingSpace?: Space;  // Space that uses this folder as its bookmark folder
   isDragging?: boolean;
   activeId?: string | null;
   dropTargetId?: string | null;
@@ -131,6 +132,7 @@ interface BookmarkRowProps {
   onOpenAllTabsInNewWindow?: (folderId: string) => void;
   onMoveToSpace?: (bookmarkId: string) => void;
   onMoveBookmark?: (bookmarkId: string, isFolder: boolean) => void;
+  getMatchingSpace?: (folderId: string) => Space | undefined;
   // External drop target (from tab drag)
   externalDropTarget?: ExternalDropTarget | null;
   // Drag-drop attributes
@@ -151,6 +153,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onDuplicate,
   onExpandAll,
   onPin,
+  matchingSpace,
   isDragging: _isDragging,
   activeId,
   dropTargetId,
@@ -165,7 +168,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onOpenAsTabGroup,
   onOpenAllTabs,
   onOpenAllTabsInNewWindow,
-  onMoveToSpace,
+  onMoveToSpace: _onMoveToSpace,
   onMoveBookmark,
   externalDropTarget,
   attributes,
@@ -228,8 +231,40 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     }
   };
 
+  const spaceColorClass = matchingSpace ? GROUP_COLORS[matchingSpace.color]?.text : undefined;
+
+  // Render space icon overlay - handles both emoji and Lucide icon names
+  const renderSpaceIconOverlay = (iconName: string, colorStyle: typeof GROUP_COLORS[string]) =>
+  {
+    // Check if it's an emoji (starts with high Unicode codepoint)
+    const isEmoji = iconName.codePointAt(0)! > 255;
+    if (isEmoji)
+    {
+      return <span className="text-[10px] leading-none">{iconName}</span>;
+    }
+    // Lucide icon - load from Iconify CDN, displayed on colored badge
+    return (
+      <span className={`flex items-center justify-center w-[14px] h-[14px] rounded-full ${colorStyle.badge}`}>
+        <img
+          src={getIconUrl(iconName)}
+          alt=""
+          className="w-[10px] h-[10px] invert dark:invert-0"
+        />
+      </span>
+    );
+  };
+
   const icon = isFolder ? (
-    <Folder size={16} className="text-gray-500" />
+    matchingSpace ? (
+      <div className="relative">
+        <Folder size={16} className={spaceColorClass} />
+        <span className="absolute -bottom-[5px] -right-[5px] flex items-center justify-center">
+          {renderSpaceIconOverlay(matchingSpace.icon, GROUP_COLORS[matchingSpace.color] || GROUP_COLORS.grey)}
+        </span>
+      </div>
+    ) : (
+      <Folder size={16} className="text-gray-500" />
+    )
   ) : node.url ? (
     <img
       src={getFaviconUrl(node.url)}
@@ -370,11 +405,14 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                   <FolderOpen size={14} className="mr-2" /> Open as Tab Group
                 </ContextMenu.Item>
               )}
-              {onMoveToSpace && (
+              
+              {/* 2026-01-18 mone: disabled "Move to Space". It is confusing. also we have Move folder... which does 
+              almost the same thing.
+                {onMoveToSpace && (
                 <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
                   <SquareStack size={14} className="mr-2" /> Move to Space...
                 </ContextMenu.Item>
-              )}
+              )} */}
               {onMoveBookmark && !isSpecialFolder && (
                 <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, true)}>
                   <FolderInput size={14} className="mr-2" /> Move Folder...
@@ -403,11 +441,13 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => chrome.windows.create({ url: node.url })}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Window
               </ContextMenu.Item>
+              {/* 2026-01-18 mone: disabled "Move to Space". It is confusing. also we have Move folder... which does 
+              almost the same thing.
               {onMoveToSpace && (
                 <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
                   <SquareStack size={14} className="mr-2" /> Move to Space...
                 </ContextMenu.Item>
-              )}
+              )} */}
               {onMoveBookmark && (
                 <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, false)}>
                   <FolderInput size={14} className="mr-2" /> Move Bookmark...
@@ -475,16 +515,19 @@ StaticBookmarkRow.displayName = 'StaticBookmarkRow';
 
 // --- Recursive Item ---
 const BookmarkItem = (props: BookmarkRowProps) => {
-  const { node, expandedState, depth = 0, checkIsLoaded, checkIsAudible, checkIsActive, getLiveTitle } = props;
+  const { node, expandedState, depth = 0, checkIsLoaded, checkIsAudible, checkIsActive, getLiveTitle, getMatchingSpace } = props;
   const isFolder = !node.url;
   const { ref, isInView } = useInView<HTMLDivElement>();
+
+  // Compute matchingSpace for folders
+  const matchingSpace = isFolder && getMatchingSpace ? getMatchingSpace(node.id) : undefined;
 
   return (
     <>
       {isInView ? (
-        <DraggableBookmarkRow ref={ref} {...props} />
+        <DraggableBookmarkRow ref={ref} {...props} matchingSpace={matchingSpace} />
       ) : (
-        <StaticBookmarkRow ref={ref} {...props} />
+        <StaticBookmarkRow ref={ref} {...props} matchingSpace={matchingSpace} />
       )}
 
       {isFolder && expandedState[node.id] && node.children && (
@@ -556,6 +599,32 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace } = useSpacesContext();
+
+  // Build lookup: folderId → Space (only when in "All" space)
+  const folderIdToSpace = useMemo(() =>
+  {
+    if (activeSpace?.id !== 'all') return new Map<string, Space>();
+
+    const map = new Map<string, Space>();
+    spaces.forEach(space =>
+    {
+      if (space.bookmarkFolderPath)
+      {
+        const folder = findFolderByPath(space.bookmarkFolderPath);
+        if (folder)
+        {
+          map.set(folder.id, space);
+        }
+      }
+    });
+    return map;
+  }, [activeSpace?.id, spaces, findFolderByPath]);
+
+  // Lookup function to get matching Space for a folder
+  const getMatchingSpace = useCallback((folderId: string): Space | undefined =>
+  {
+    return folderIdToSpace.get(folderId);
+  }, [folderIdToSpace]);
 
   // Open all bookmarks in folder as a tab group
   const handleOpenAsTabGroup = useCallback(async (
@@ -1115,6 +1184,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             onOpenAllTabsInNewWindow={handleOpenAllTabsInNewWindow}
             onMoveToSpace={useSpaces ? openMoveToSpaceDialog : undefined}
             onMoveBookmark={openMoveBookmarkDialog}
+            getMatchingSpace={getMatchingSpace}
             externalDropTarget={externalDropTarget}
           />
         ))}
