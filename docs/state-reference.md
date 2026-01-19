@@ -108,6 +108,12 @@ Bookmark/pinned site → tab ID mapping (Record: itemKey → tabId)
 - Consumers: `src/components/PinnedBar.tsx`, `src/components/TabList.tsx`
 - Instances: 1 per window
 
+### `bookmarkExpandedState_${windowId}`
+Folder expand/collapse state (Record: folderId → boolean)
+- Owner: `src/components/BookmarkTree.tsx`
+- Consumers: `src/components/BookmarkTree.tsx`
+- Instances: 1 per window
+
 ---
 
 ## Chrome Local Storage
@@ -223,10 +229,11 @@ Lost on page reload or service worker restart.
 │                    SESSION STORAGE                              │
 ├─────────────────────────────────────────────────────────────────┤
 │  chrome.storage.session (cleared on browser close)              │
-│  ├─ bg_windowActiveGroups      (per window)                     │
-│  ├─ bg_windowTabHistory        (per window)                     │
-│  ├─ spaceWindowState_{winId}   (per window)                     │
-│  └─ tabAssociations_{winId}    (per window)                     │
+│  ├─ bg_windowActiveGroups           (per window)                │
+│  ├─ bg_windowTabHistory             (per window)                │
+│  ├─ spaceWindowState_{winId}        (per window)                │
+│  ├─ tabAssociations_{winId}         (per window)                │
+│  └─ bookmarkExpandedState_{winId}   (per window)                │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐

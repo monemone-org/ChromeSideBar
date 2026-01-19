@@ -65,6 +65,9 @@ const BOOKMARKS_BAR_ID = '1';
 const OTHER_BOOKMARKS_ID = '2';
 const MOBILE_BOOKMARKS_ID = '3';
 
+// Storage key for persisting folder expand/collapse state
+const getExpandedStateKey = (windowId: number) => `bookmarkExpandedState_${windowId}`;
+
 // Special folder IDs that cannot be edited/deleted
 const SPECIAL_FOLDER_IDS = [BOOKMARKS_BAR_ID, OTHER_BOOKMARKS_ID, MOBILE_BOOKMARKS_ID];
 
@@ -598,7 +601,7 @@ interface BookmarkTreeProps {
 export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
-  const { spaces, updateSpace } = useSpacesContext();
+  const { spaces, updateSpace, windowId } = useSpacesContext();
 
   // Build lookup: folderId → Space (only when in "All" space)
   const folderIdToSpace = useMemo(() =>
@@ -754,6 +757,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   }
 
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
+  const [expandedStateLoaded, setExpandedStateLoaded] = useState(false);
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
   const [showSpaceFolderPicker, setShowSpaceFolderPicker] = useState(false);
@@ -767,18 +771,49 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     isFolder: boolean;
   }>({ isOpen: false, bookmarkId: null, isFolder: false });
 
-  // Auto-expand space folder when it changes
+  // Load expanded state from session storage on mount
   useEffect(() =>
   {
-    if (spaceFolder)
+    if (!windowId) return;
+
+    const storageKey = getExpandedStateKey(windowId);
+    chrome.storage.session.get(storageKey, (result) =>
     {
-      setExpandedState(prev =>
+      if (result[storageKey])
       {
-        if (prev[spaceFolder.id]) return prev;  // Already expanded
-        return { ...prev, [spaceFolder.id]: true };
-      });
-    }
-  }, [spaceFolder?.id]);
+        setExpandedState(result[storageKey]);
+      }
+      setExpandedStateLoaded(true);
+    });
+  }, [windowId]);
+
+  // Save expanded state to session storage on change (debounced)
+  useEffect(() =>
+  {
+    if (!windowId || !expandedStateLoaded) return;
+
+    const timeoutId = setTimeout(() =>
+    {
+      const storageKey = getExpandedStateKey(windowId);
+      chrome.storage.session.set({ [storageKey]: expandedState });
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [expandedState, windowId, expandedStateLoaded]);
+
+  // Auto-expand space folder when it changes (wait for loaded state)
+  useEffect(() =>
+  {
+    if (!expandedStateLoaded || !spaceFolder) return;
+
+    setExpandedState(prev =>
+    {
+      // Respect saved state (expanded or collapsed)
+      if (spaceFolder.id in prev) return prev;
+      // No saved state - auto-expand
+      return { ...prev, [spaceFolder.id]: true };
+    });
+  }, [spaceFolder?.id, expandedStateLoaded]);
 
   // Auto-scroll to active bookmark when it changes
   const prevActiveItemKeyRef = useRef<string | null>(null);
