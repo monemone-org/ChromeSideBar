@@ -185,7 +185,7 @@ SpaceBar
 
 - [x] When chrome restarts, it restores all the tabs, we need to find a way to remap live bookmarks , live pinned sites and space tab lists.
 
-- [-] support drag/drop tabs to "Space" button
+- [x] support drag/drop tabs to "Space" button
 
 - [x] close tab after/before/others should be bounded within the active group of the active tab
       if the active tab is ungrouped, then those actions will apply to all tabs (grouped or ungrouped)
@@ -196,4 +196,4 @@ SpaceBar
 
 - [x] "Orphaned Tabs" should only appear in "App" space
 
-- [ ] cannot collapse "Orphaned Tabs" group
+- [x] cannot collapse "Orphaned Tabs" group

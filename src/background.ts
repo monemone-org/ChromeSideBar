@@ -1,4 +1,5 @@
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
+import { LIVEBOOKMARKS_GROUP_NAME } from './constants';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -534,21 +535,18 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
   historyManager.remove(removeInfo.windowId, tabId);
 });
 
-// Add new ungrouped tabs to active Space's Chrome group
-chrome.tabs.onCreated.addListener(async (tab) =>
+// Helper to add a tab to the active space's Chrome group
+async function addTabToActiveSpaceGroup(tab: chrome.tabs.Tab): Promise<boolean>
 {
-  if (!tab.id || !tab.windowId) return;
-
-  // Skip if tab is already grouped
-  if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return;
+  if (!tab.id || !tab.windowId) return false;
 
   const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
-  if (!activeSpaceId || activeSpaceId === 'all') return;
+  if (!activeSpaceId || activeSpaceId === 'all') return false;
 
   try
   {
     const space = await getSpaceById(activeSpaceId);
-    if (!space) return;
+    if (!space) return false;
 
     // Find existing Chrome group with Space's name
     const existingGroupId = await findGroupByName(tab.windowId, space.name);
@@ -567,11 +565,58 @@ chrome.tabs.onCreated.addListener(async (tab) =>
         color: space.color,
       });
     }
+    return true;
   }
   catch (error)
   {
-    if (import.meta.env.DEV) console.error('[onCreated] Failed to add tab to space group:', error);
+    if (import.meta.env.DEV) console.error('[addTabToActiveSpaceGroup] Failed:', error);
+    return false;
   }
+}
+
+// Add new tabs to active Space's Chrome group
+// Special handling: tabs opened from LiveBookmarks inherit that group, so move them
+chrome.tabs.onCreated.addListener(async (tab) =>
+{
+  if (!tab.id || !tab.windowId) return;
+
+  // Check if tab is in LiveBookmarks group - needs special handling
+  if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
+  {
+    try
+    {
+      const group = await chrome.tabGroups.get(tab.groupId);
+      if (group.title === LIVEBOOKMARKS_GROUP_NAME)
+      {
+        // Only move if opened from a tab that's also in LiveBookmarks group
+        if (!tab.openerTabId) return;
+
+        const openerTab = await chrome.tabs.get(tab.openerTabId);
+        if (openerTab.groupId !== tab.groupId) return;
+
+        const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
+        if (!activeSpaceId || activeSpaceId === 'all')
+        {
+          // Ungroup the tab (make it orphaned)
+          await chrome.tabs.ungroup(tab.id);
+          return;
+        }
+
+        addTabToActiveSpaceGroup(tab)
+        return;
+      }
+    }
+    catch
+    {
+      // Group or opener tab might not exist, continue
+    }
+
+    // Tab is in a non-LiveBookmarks group - leave it alone
+    return;
+  }
+
+  // Ungrouped tab - add to active space's group
+  await addTabToActiveSpaceGroup(tab);
 });
 
 // =============================================================================
