@@ -1,7 +1,7 @@
 ---
 created: 2025-01-18
 after-version: 1.0.xxx
-status: draft
+status: completed
 ---
 
 # Recouple Space with Chrome Tab Groups

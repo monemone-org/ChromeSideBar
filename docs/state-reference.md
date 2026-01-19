@@ -83,12 +83,6 @@ Active tab group per window (Map: windowId → groupId)
 - Consumers: `src/background.ts`
 - Instances: 1 per window
 
-### `bg_windowActiveSpaces`
-Active space per window (Map: windowId → spaceId)
-- Owner: `src/background.ts` (BackgroundState class)
-- Consumers: `src/background.ts` (pushToHistory, message handlers)
-- Instances: 1 per window
-
 ### `bg_windowTabHistory`
 Back/forward navigation stack (Map: windowId → {stack, index})
 - Owner: `src/background.ts` (BackgroundState class)
@@ -96,23 +90,17 @@ Back/forward navigation stack (Map: windowId → {stack, index})
 - Instances: 1 per window
 - Max size: 25 entries per window
 
-### `bg_spaceLastActiveTabs`
-Last active tab per space (Map: windowId → {spaceId → tabId})
-- Owner: `src/background.ts` (BackgroundState class)
-- Consumers: `src/background.ts` (activateLastTabForSpace)
-- Instances: 1 per window
-
 ### `spaceWindowState_${windowId}`
-Space tabs & active space per window
+Active space per window
 ```typescript
 {
-  activeSpaceId: string,
-  spaceTabs: Record<spaceId, tabId[]>
+  activeSpaceId: string
 }
 ```
-- Owner: `src/hooks/useSpaceWindowState.ts`
-- Consumers: `src/contexts/SpacesContext.tsx`, sidebar components
+- Owner: `src/background.ts` (SpaceWindowStateManager class)
+- Consumers: `src/contexts/SpacesContext.tsx` (read-only copy synced via messages)
 - Instances: 1 per window
+- Note: Space-tab membership uses Chrome tab groups (Space.name matches group.title). See `021-recouple-group-space.md`.
 
 ### `tabAssociations_${windowId}`
 Bookmark/pinned site → tab ID mapping (Record: itemKey → tabId)
@@ -236,9 +224,7 @@ Lost on page reload or service worker restart.
 ├─────────────────────────────────────────────────────────────────┤
 │  chrome.storage.session (cleared on browser close)              │
 │  ├─ bg_windowActiveGroups      (per window)                     │
-│  ├─ bg_windowActiveSpaces      (per window)                     │
 │  ├─ bg_windowTabHistory        (per window)                     │
-│  ├─ bg_spaceLastActiveTabs     (per window)                     │
 │  ├─ spaceWindowState_{winId}   (per window)                     │
 │  └─ tabAssociations_{winId}    (per window)                     │
 └─────────────────────────────────────────────────────────────────┘

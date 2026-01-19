@@ -99,6 +99,33 @@ Navigate back and forward through your recently used tabs—like undo/redo for t
     - Reorder tab groups
     - Drag tab groups to Bookmarks section to save as folder
 
+### Spaces
+
+Organize your browsing by context with Arc-style Spaces—isolated workspaces that filter the sidebar to show only relevant bookmarks and tabs.
+
+- **What is a Space?** A Space links a bookmark folder to a Chrome tab group with a name, icon, and color
+- **"All" Space**: Built-in space that shows all bookmarks and tabs (no filtering)
+- **SpaceBar**: Horizontal row of space icons at the bottom of the panel
+  - Click to switch spaces
+  - Active space shows with a ring indicator
+  - Swipe left/right to switch spaces
+- **Creating Spaces**:
+  - Click "+" in the SpaceBar
+  - Pick a name, icon, color, and bookmark folder
+  - Folder auto-creates if it doesn't exist
+- **Filtering**:
+  - Active space shows only its bookmark folder and Chrome tab group
+  - New tabs (Cmd+T) automatically join the active space's group
+  - Tab operations (Close All, Sort) only affect the current space's tabs
+- **Chrome Tab Group Integration**:
+  - Each Space links to a Chrome tab group by matching names
+  - Space remains in sidebar even when its Chrome group is empty/closed
+  - Renaming a Space updates its Chrome group name
+- **Context menu** (right-click space icon):
+  - Edit (name, icon, color, bookmark folder)
+  - Delete (with confirmation)
+- **Multi-window**: Each window has independent Space ↔ group mappings
+
 ### Import & Export
 
 - Full backup and restore capability via JSON files

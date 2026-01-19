@@ -8,23 +8,35 @@ status: draft
 
 ## Goal
 
-Restore space-tab assignments and bookmark/pinned-site associations after Chrome restarts.
+Restore live bookmark tabs and pinned site associations after Chrome restarts.
 
-**Problem:** Chrome assigns new window and tab IDs on restart. Current state stored with old IDs becomes orphaned.
+**Problem:** Chrome assigns new tab IDs on restart. Tab associations stored with old IDs become orphaned.
+
+**What's already handled:**
+- Space-tab membership: Spaces use Chrome tab groups (see 021-recouple-group-space.md), which persist across restarts. Spaces reconnect to groups by name matching.
+- Active space: Derived from active tab's Chrome group.
+
+
+## Scope
+
+Only need to restore:
+- **Live bookmark tabs**: tab ↔ bookmark ID associations
+- **Pinned sites**: tab ↔ pinned site ID associations
+
+These are stored in `tabAssociations_{windowId}` and need tab ID remapping after restart.
 
 
 ## Approach
 
 ### 1. Debounce Session Restoration
 
-Chrome doesn't fire a "session restore complete" event. We detect completion by waiting for activity to settle:
+Chrome doesn't fire a "session restore complete" event. Detect completion by waiting for activity to settle:
 
 ```typescript
 // In background.ts
 let restoreTimeout: number | null = null;
 
 chrome.runtime.onStartup.addListener(() => {
-  // Mark that we're in startup mode
   startListeningForRestoration();
 });
 
@@ -33,7 +45,7 @@ function startListeningForRestoration() {
     if (restoreTimeout) clearTimeout(restoreTimeout);
     restoreTimeout = setTimeout(() => {
       // No new tabs/windows for 2 seconds = probably done
-      runSpaceRestoration();
+      runTabAssociationRestoration();
     }, 2000);
   };
 
@@ -63,11 +75,11 @@ Window ID will be a UUID (`window_uuid`) that we generate.
 
 ### 4. Store State in chrome.storage.local
 
-Store all live tabs and space tabs state in `chrome.storage.local` (see State Changes section).
+Store tab associations in `chrome.storage.local` (see State Changes section).
 
 ### 5. Update WindowRestoreData on Tab Changes
 
-When a tab is loaded/closed/reordered, recompute the fingerprint and store in `chrome.storage.local` at key `window_restore_data`:
+When a tab is loaded/closed/reordered, recompute the fingerprint and store in `chrome.storage.local`:
 
 ```typescript
 interface WindowRestoreData
@@ -83,7 +95,7 @@ interface WindowRestoreData
 
 ### 6. Restoration Process
 
-When reconstructing live tabs and space tabs after Chrome restarts:
+When reconstructing tab associations after Chrome restarts:
 
 1. Wait for debounce timer to fire
 2. For each window:
@@ -92,9 +104,10 @@ When reconstructing live tabs and space tabs after Chrome restarts:
    - Find matching entry by fingerprint
    - If match found:
      - Assign the stored `window_uuid` to this window
-     - Load all window states (see State Changes section)
+     - Load `tabAssociations_{uuid}` from storage
      - Remap old tab IDs to new tab IDs using array index
        - `oldTabIds[i]` → `newTabs[i].id`
+     - Save remapped associations
    - If no match found:
      - Treat as new window
      - Generate new `window_uuid`
@@ -113,23 +126,9 @@ Window ID will be a UUID (`window_uuid`) that we generate.
 
 Read `docs/state-reference.md` for how data is currently stored.
 
-Data stored in `chrome.storage.session` will be moved to `chrome.storage.local`:
-
-### spaceWindowState_{uuid}
-
-Formerly `spaceWindowState_{windowId}`
-
-```typescript
-export interface SpaceWindowState
-{
-  activeSpaceId: string;
-  spaceTabs: Record<string, number[]>;  // space ID → array of tab IDs
-}
-```
-
 ### tabAssociations_{uuid}
 
-Formerly `tabAssociations_{windowId}`
+Formerly `tabAssociations_{windowId}`. Move from session to local storage.
 
 ```typescript
 // Storage format: Record<number, string>
@@ -137,20 +136,10 @@ Formerly `tabAssociations_{windowId}`
 // Value: itemKey (bookmark ID or pinned site ID)
 ```
 
-### bg_windowState_{uuid}
+### What's NOT restored
 
-Consolidates former `bg_windowActiveGroups`, `bg_windowActiveSpaces`, `bg_spaceLastActiveTabs` into one structure.
-
-**Note:** `bg_windowTabHistory` will not be supported (tab navigation history won't be restored).
-
-```typescript
-export interface WindowState
-{
-  activeGroupId: number | null;
-  activeSpaceId: string;
-  spaceLastActiveTabs: Record<string, number>;  // spaceId → tabId
-}
-```
+- **SpaceWindowState**: No longer needed. Spaces use Chrome tab groups which persist natively.
+- **Tab navigation history**: Not supported (acceptable UX trade-off).
 
 
 ## Edge Cases
@@ -181,4 +170,4 @@ Add debug logging for restoration process:
 
 ## Future Considerations
 
-**Fuzzy fingerprint matching**: Consider partial URL matching (e.g., 80% threshold) if exact matching proves too fragile in practice. Deferred until we evaluate how well exact matching works
+**Fuzzy fingerprint matching**: Consider partial URL matching (e.g., 80% threshold) if exact matching proves too fragile in practice. Deferred until we evaluate how well exact matching works.
