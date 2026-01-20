@@ -341,50 +341,51 @@ class TabHistoryManager
   }
 
   // Debug: dump complete history with tab details
-  private async dump(windowId: number, action: string): Promise<void>
+  private async dump(_windowId: number, _action: string): Promise<void>
   {
-    const history = this.#history.get(windowId);
-    if (!history)
-    {
-      console.log(`[TabHistory] ${action} - windowId=${windowId}: NO HISTORY`);
-      return;
-    }
+    return;
+  //   const history = this.#history.get(windowId);
+  //   if (!history)
+  //   {
+  //     console.log(`[TabHistory] ${action} - windowId=${windowId}: NO HISTORY`);
+  //     return;
+  //   }
 
-    const uniqueSpaceIds = [...new Set(history.stack.map(e => e.spaceId))];
-    const spaceNameMap: Record<string, string> = { all: 'All' };
-    const result = await chrome.storage.local.get(['spaces']);
-    const spaces = result.spaces || [];
-    for (const spaceId of uniqueSpaceIds)
-    {
-      if (spaceId !== 'all')
-      {
-        const space = spaces.find((s: { id: string; name: string }) => s.id === spaceId);
-        spaceNameMap[spaceId] = space ? space.name : spaceId;
-      }
-    }
+  //   const uniqueSpaceIds = [...new Set(history.stack.map(e => e.spaceId))];
+  //   const spaceNameMap: Record<string, string> = { all: 'All' };
+  //   const result = await chrome.storage.local.get(['spaces']);
+  //   const spaces = result.spaces || [];
+  //   for (const spaceId of uniqueSpaceIds)
+  //   {
+  //     if (spaceId !== 'all')
+  //     {
+  //       const space = spaces.find((s: { id: string; name: string }) => s.id === spaceId);
+  //       spaceNameMap[spaceId] = space ? space.name : spaceId;
+  //     }
+  //   }
 
-    console.log(`\n[TabHistory] --- begin ---`);
-    console.log(`[TabHistory] ${action} - windowId=${windowId}, index=${history.index}, size=${history.stack.length}`);
-    console.log(`[TabHistory] spaces: ${uniqueSpaceIds.map(id => `${spaceNameMap[id]}`).join(', ')}`);
+  //   console.log(`\n[TabHistory] --- begin ---`);
+  //   console.log(`[TabHistory] ${action} - windowId=${windowId}, index=${history.index}, size=${history.stack.length}`);
+  //   console.log(`[TabHistory] spaces: ${uniqueSpaceIds.map(id => `${spaceNameMap[id]}`).join(', ')}`);
 
-    for (let i = 0; i < history.stack.length; i++)
-    {
-      const entry = history.stack[i];
-      const marker = i === history.index ? ">>>" : "   ";
-      const spaceName = spaceNameMap[entry.spaceId] || "(not found)";
-      try
-      {
-        const tab = await chrome.tabs.get(entry.tabId);
-        const title = tab.title || "(no title)";
-        const url = tab.url || tab.pendingUrl || "(no url)";
-        console.log(`${marker} [${i}] space="${spaceName}", spaceId="${entry.spaceId}", title="${title}", url="${url}"`);
-      }
-      catch
-      {
-        console.log(`${marker} [${i}] space="${spaceName}", spaceId="${entry.spaceId}", (tab not found - closed?)`);
-      }
-    }
-    console.log(`[TabHistory] --- end ---`);
+  //   for (let i = 0; i < history.stack.length; i++)
+  //   {
+  //     const entry = history.stack[i];
+  //     const marker = i === history.index ? ">>>" : "   ";
+  //     const spaceName = spaceNameMap[entry.spaceId] || "(not found)";
+  //     try
+  //     {
+  //       const tab = await chrome.tabs.get(entry.tabId);
+  //       const title = tab.title || "(no title)";
+  //       const url = tab.url || tab.pendingUrl || "(no url)";
+  //       console.log(`${marker} [${i}] space="${spaceName}", spaceId="${entry.spaceId}", title="${title}", url="${url}"`);
+  //     }
+  //     catch
+  //     {
+  //       console.log(`${marker} [${i}] space="${spaceName}", spaceId="${entry.spaceId}", (tab not found - closed?)`);
+  //     }
+  //   }
+  //   console.log(`[TabHistory] --- end ---`);
   }
 }
 
@@ -481,7 +482,7 @@ Promise.all([
 // Update tracked group when active tab changes + track history + switch to tab's Space
 chrome.tabs.onActivated.addListener(async (activeInfo) =>
 {
-  if (import.meta.env.DEV) console.log(`[TabHistory] onActivated: tabId=${activeInfo.tabId}, isNavigating=${historyManager.isNavigating}`);
+  //if (import.meta.env.DEV) console.log(`[TabHistory] onActivated: tabId=${activeInfo.tabId}, isNavigating=${historyManager.isNavigating}`);
 
   // Track tab history (skip if this activation was triggered by navigation)
   if (!historyManager.isNavigating)

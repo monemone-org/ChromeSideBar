@@ -10,116 +10,66 @@ status: draft
 
 Add multi-selection support for drag/drop and delete/close operations in both tabs/groups and bookmarks/folders sections.
 
+Functionalities supported multi-selection
+
+- drag/drop
+
+- popup menu
+
+   Bookmark:
+      - Pin To Sidebar     
+      ---         
+      - Open In New Tab             
+      - Open In New Window
+      - Move Bookmark...
+      ---
+      - Delete
+
+   Tabs
+      - Pin To Sidebar     
+      ---         
+      - Add To Bookmark...
+      - Move To Space...
+      - Move To New Window      
+      ---
+      - Close
+
+
 ## Design Decisions
 
 | Feature | Decision |
 |---------|----------|
-| Selection UX | Click=select one, Shift+click=range, Cmd/Ctrl+click=toggle |
+| Selection UX | Click=select one, Shift+click=expand range, Cmd/Ctrl+click=toggle |
 | Tab/Bookmark scope | Separate selection states (independent) |
 | Mixed types | Allowed - can select both tabs AND groups, or bookmarks AND folders |
 | Multi-drag | Drag any selected item → moves all selected items |
-| Tab groups into groups | Block "drop INTO" when selection contains groups |
+| Tab groups into groups | Move all the tabs from the drag source groups into the drop target group |
 | Folders into folders | Allow nesting (bookmarks support nested folders) |
 | Delete confirmation | Show dialog: "Delete N items?" with details |
 
 ---
 
-## New Files
+## Shift-Click Expand Behavior
 
-### 1. `src/contexts/SelectionContext.tsx`
-
-Selection state provider with separate tab and bookmark selection:
+Shift-click always **expands** the selection to cover the maximum extent. It finds the min and max indices across all currently selected items plus the clicked item, then selects everything in between.
 
 ```
-State:
-├── Tab Selection
-│   ├── selectedTabIds: Set<number>
-│   ├── selectedGroupIds: Set<number>
-│   └── lastSelectedTabId / lastSelectedGroupId (for range)
-└── Bookmark Selection
-    ├── selectedBookmarkIds: Set<string>
-    └── lastSelectedBookmarkId (for range)
+Items:   [1] [2] [3] [4] [5] [6] [7] [8]
 
-Methods:
-├── selectTab(id, mode: 'replace'|'toggle'|'range')
-├── selectGroup(id, mode)
-├── selectBookmark(id, isFolder, mode)
-├── clearTabSelection() / clearBookmarkSelection()
-├── isTabSelected(id) / isGroupSelected(id) / isBookmarkSelected(id)
-└── getSelectedTabIds() / getSelectedGroupIds() / getSelectedBookmarkIds()
+Step 1: Click 4
+         [1] [2] [3] [4*] [5] [6] [7] [8]
+         Selection: [4]
+
+Step 2: Shift-click 6
+         [1] [2] [3] [4*] [5*] [6*] [7] [8]
+         Selection: [4,5,6]
+
+Step 3: Shift-click 1
+         [1*] [2*] [3*] [4*] [5*] [6*] [7] [8]
+         Selection: [1,2,3,4,5,6]  ← expands to cover min(1) to max(6)
 ```
 
-### 2. `src/hooks/useSelection.ts`
-
-Hook encapsulating click handlers and selection logic:
-
-```typescript
-handleTabClick(tabId, event)      // Determines mode from event modifiers
-handleGroupClick(groupId, event)
-handleBookmarkClick(bookmarkId, isFolder, event)
-```
-
-### 3. `src/components/ConfirmDeleteDialog.tsx`
-
-Confirmation dialog for bulk delete:
-
-```
-┌───────────────────────────────────────┐
-│ Delete 5 items?                       │
-├───────────────────────────────────────┤
-│ This will close 3 tabs and all tabs   │
-│ in 2 groups.                          │
-│                                       │
-│            [Cancel]  [Delete]         │
-└───────────────────────────────────────┘
-```
-
----
-
-## File Modifications
-
-### `src/components/TreeRow.tsx`
-
-- Add `isSelected?: boolean` prop
-- Add selected styling: `bg-blue-50 dark:bg-blue-900/20 ring-2 ring-blue-400`
-- Style priority: Normal < Selected < Active < Dragging
-
-### `src/components/TabList.tsx`
-
-1. **Selection integration**
-   - Wire up click handlers from `useSelection`
-   - Pass `isSelected` to `TreeRow`
-
-2. **Multi-drag changes**
-   - `handleDragStart`: If dragging selected item, collect all selected items
-   - `handleDragMove`: Block "into" position when `selectionContainsGroups`
-   - `handleDragEnd`: Move all items in order, clear selection
-   - `DragOverlay`: Show first item + "+N more" badge
-
-3. **Multi-delete**
-   - Context menu shows "Close N items" when multi-selected
-   - Collect all tabs (including tabs in selected groups)
-   - Show confirmation dialog, then call `closeTabs(tabIds[])`
-
-### `src/components/BookmarkTree.tsx`
-
-1. **Selection integration**
-   - Wire up click handlers from `useSelection`
-   - Pass `isSelected` to `TreeRow`
-
-2. **Multi-drag changes**
-   - `handleDragStart`: Collect all selected items
-   - `handleDragMove`: Allow nesting (folders into folders OK)
-   - `handleDragEnd`: Move all items in order, clear selection
-   - `DragOverlay`: Show first item + "+N more" badge
-
-3. **Multi-delete**
-   - Context menu shows "Delete N items" when multi-selected
-   - Show confirmation, then call `removeBookmark` for each
-
-### `src/App.tsx`
-
-- Wrap app with `SelectionProvider`
+This differs from anchor-based selection where shift-click would replace the selection with anchor→clicked range.
 
 ---
 

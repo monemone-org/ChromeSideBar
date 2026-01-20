@@ -1,7 +1,7 @@
 ---
 created: 2026-01-16
 after-version: 1.0.149
-status: in-progress
+status: completed
 ---
 
 # UI State Cross Window Sync 

@@ -106,6 +106,72 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
+  // Move multiple tabs to a target index, maintaining their relative order
+  // When moving forward (to higher index): process from last to first
+  // When moving backward (to lower index): process from first to last
+  const moveTabs = useCallback(async (tabIds: number[], targetIndex: number) =>
+  {
+    if (tabIds.length === 0) return;
+    if (tabIds.length === 1)
+    {
+      moveTab(tabIds[0], targetIndex);
+      return;
+    }
+
+    // Get current tab info to determine direction
+    const currentTabs = tabs.filter(t => t.id !== undefined && tabIds.includes(t.id));
+    if (currentTabs.length === 0) return;
+
+    // Sort by current index
+    const sortedTabs = [...currentTabs].sort((a, b) => a.index - b.index);
+    const maxSourceIndex = sortedTabs[sortedTabs.length - 1].index;
+
+    // Determine direction: forward if target > maxSourceIndex
+    const movingForward = targetIndex > maxSourceIndex;
+
+    isBatchOperation = true;
+    try
+    {
+      if (movingForward)
+      {
+        // Move from last to first, each to the same target (they stack)
+        for (let i = sortedTabs.length - 1; i >= 0; i--)
+        {
+          const tab = sortedTabs[i];
+          await new Promise<void>((resolve) =>
+          {
+            chrome.tabs.move(tab.id!, { index: targetIndex }, () =>
+            {
+              handleError('move tabs');
+              resolve();
+            });
+          });
+        }
+      }
+      else
+      {
+        // Move from first to last, incrementing target position
+        for (let i = 0; i < sortedTabs.length; i++)
+        {
+          const tab = sortedTabs[i];
+          await new Promise<void>((resolve) =>
+          {
+            chrome.tabs.move(tab.id!, { index: targetIndex + i }, () =>
+            {
+              handleError('move tabs');
+              resolve();
+            });
+          });
+        }
+      }
+    }
+    finally
+    {
+      isBatchOperation = false;
+      fetchTabs();
+    }
+  }, [tabs, moveTab, handleError, fetchTabs]);
+
   const sortTabs = useCallback(async (direction: 'asc' | 'desc' = 'asc',
                                       tabGroups: chrome.tabGroups.TabGroup[] = [],
                                       groupsFirst: boolean = true) =>
@@ -275,9 +341,25 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
+  // Group multiple tabs into an existing group
+  const groupTabs = useCallback((tabIds: number[], groupId: number) => {
+    if (tabIds.length === 0) return;
+    chrome.tabs.group({ tabIds, groupId }, () => {
+      handleError('group tabs');
+    });
+  }, [handleError]);
+
   const ungroupTab = useCallback((tabId: number) => {
     chrome.tabs.ungroup([tabId], () => {
       handleError('ungroup');
+    });
+  }, [handleError]);
+
+  // Ungroup multiple tabs
+  const ungroupTabs = useCallback((tabIds: number[]) => {
+    if (tabIds.length === 0) return;
+    chrome.tabs.ungroup(tabIds, () => {
+      handleError('ungroup tabs');
     });
   }, [handleError]);
 
@@ -393,8 +475,11 @@ export const useTabs = () => {
     closeTabs,
     activateTab,
     moveTab,
+    moveTabs,
     groupTab,
+    groupTabs,
     ungroupTab,
+    ungroupTabs,
     createGroupWithTab,
     createTabInGroup,
     createTab,

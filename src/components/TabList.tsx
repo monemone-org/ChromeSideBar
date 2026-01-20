@@ -3,6 +3,8 @@ import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
+import { SelectionItem } from '../contexts/SelectionContext';
+import { useSelection } from '../hooks/useSelection';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SPEAKER_ICON_SIZE, LIVEBOOKMARKS_GROUP_NAME } from '../constants';
@@ -24,6 +26,7 @@ export type ResolveBookmarkDropTarget = (
 import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
 import { FolderPickerDialog } from './FolderPickerDialog';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { SpaceNavigatorDialog } from './SpaceNavigatorDialog';
 import { AddToGroupDialog } from './AddToGroupDialog';
 import { ChangeGroupColorDialog } from './ChangeGroupColorDialog';
@@ -64,6 +67,7 @@ interface DraggableTabProps {
   afterIndentPx?: number;
   groupColor?: string;
   isLastInGroup?: boolean;
+  isSelected?: boolean;
   onClose: (id: number) => void;
   onActivate: (id: number) => void;
   onDuplicate?: (id: number) => void;
@@ -76,6 +80,9 @@ interface DraggableTabProps {
   onCloseTabsAfter?: (tabId: number) => void;
   onCloseOthers?: (tabId: number) => void;
   onKeepAsRegularTab?: (id: number) => void;
+  onSelectionClick?: (e: React.MouseEvent) => void;
+  onSelectionContextMenu?: () => void;
+  selectionCount?: number;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -92,6 +99,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   afterIndentPx,
   groupColor,
   isLastInGroup,
+  isSelected,
   onClose,
   onActivate,
   onDuplicate,
@@ -104,6 +112,9 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onCloseTabsAfter,
   onCloseOthers,
   onKeepAsRegularTab,
+  onSelectionClick,
+  onSelectionContextMenu,
+  selectionCount,
   attributes,
   listeners
 }, ref) => {
@@ -175,15 +186,21 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   );
 
   // Computed class for coloring - restore original rounding for background
+  // Priority: selected > active > default
   const rowClassName = clsx(
     groupColor ? (isLastInGroup ? "rounded-b-lg rounded-t-none" : "rounded-none") : "",
-    tab.active
-      ? groupColor
-        ? clsx(GROUP_COLORS[groupColor]?.bgStrong, "text-gray-900 dark:text-gray-100")
-        : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
-      : groupColor
-        ? clsx(GROUP_COLORS[groupColor]?.bg, "text-gray-700 dark:text-gray-200")
-        : "hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200"
+    tab.active && "font-semibold",
+    isSelected && groupColor
+      ? clsx(GROUP_COLORS[groupColor]?.bgSelected, "text-gray-900 dark:text-gray-100")
+      : tab.active
+        ? groupColor
+          ? clsx(GROUP_COLORS[groupColor]?.bgStrong, "text-gray-900 dark:text-gray-100")
+          : isSelected
+            ? undefined  // TreeRow handles selected+active ungrouped tabs
+            : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
+        : groupColor
+          ? clsx(GROUP_COLORS[groupColor]?.bg, "text-gray-700 dark:text-gray-200")
+          : "hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200"
   );
 
   return (
@@ -199,12 +216,24 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               icon={icon}
               hasChildren={false}
               isActive={false} // Disable default active style, we handle it via className
-              isHighlighted={!groupColor && isOpen}
+              isSelected={isSelected && !groupColor}  // Don't show selection highlight for grouped tabs (they have their own color)
+              isHighlighted={!groupColor && !isSelected && isOpen}
               isDragging={isBeingDragged}
               dndAttributes={attributes}
               dndListeners={listeners}
               className={rowClassName}
-              onClick={() => onActivate(tab.id!)}
+              onClick={(e) =>
+              {
+                // Always update selection state on click
+                onSelectionClick?.(e);
+
+                // For plain clicks (no modifiers), also activate the tab
+                if (!e.metaKey && !e.ctrlKey && !e.shiftKey)
+                {
+                  onActivate(tab.id!);
+                }
+              }}
+              onContextMenu={() => onSelectionContextMenu?.()}
               leadingIndicator={leadingIndicator}
               actions={actions}
               badges={badges}
@@ -295,7 +324,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             <ContextMenu.Separator />
           )}
           <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
-            <X size={14} className="mr-2" /> Close
+            <X size={14} className="mr-2" /> {selectionCount && selectionCount > 1 ? `Close ${selectionCount} Tabs` : 'Close'}
           </ContextMenu.Item>
             </ContextMenu.Content>
           </ContextMenu.Portal>
@@ -356,11 +385,13 @@ interface TabGroupHeaderProps {
   group: chrome.tabGroups.TabGroup;
   matchedSpace?: Space;
   isExpanded: boolean;
+  isSelected?: boolean;
   isDragging?: boolean;
   showDropBefore: boolean;
   showDropAfter: boolean;
   showDropInto: boolean;
   afterDropIndentPx?: number;
+  onClick?: (e: React.MouseEvent) => void;
   onToggle: () => void;
   onCloseGroup: () => void;
   onSortGroup: (direction: 'asc' | 'desc') => void;
@@ -377,11 +408,13 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
   group,
   matchedSpace,
   isExpanded,
+  isSelected,
   isDragging,
   showDropBefore,
   showDropAfter,
   showDropInto,
   afterDropIndentPx,
+  onClick,
   onToggle,
   onCloseGroup,
   onSortGroup,
@@ -422,8 +455,9 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
               hasChildren={true} // It's a group
               isExpanded={isExpanded}
               onToggle={(e) => { e.stopPropagation(); onToggle(); }}
-              onClick={onToggle}
+              onClick={onClick}
               isActive={false}
+              isSelected={false}  // Handle selection via className for consistent group styling
               isDragging={isDragging}
               dndAttributes={attributes}
               dndListeners={listeners}
@@ -431,7 +465,9 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
                 "rounded-t-lg rounded-b-none",
                 showDropInto
                   ? "bg-blue-100 dark:bg-blue-900/50"
-                  : colorStyle.bg
+                  : isSelected
+                    ? colorStyle.bgSelected
+                    : colorStyle.bg
               )}
               data-group-header-id={group.id}
               data-is-group-header="true"
@@ -583,7 +619,7 @@ interface TabListProps {
 
 export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange }: TabListProps) =>
 {
-  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
+  const { tabs, closeTab, closeTabs, activateTab, moveTab, moveTabs, groupTab, groupTabs, ungroupTab, ungroupTabs, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
   const { spaces, activeSpace: activeSpaceFromContext } = useSpacesContext();
@@ -1176,6 +1212,87 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     return items;
   }, [visibleTabs, visibleTabGroups, orphanedTabs]);
 
+  // Build flat list of visible items for selection range calculation
+  const flatVisibleItems = useMemo((): SelectionItem[] =>
+  {
+    const items: SelectionItem[] = [];
+    let index = 0;
+
+    for (const displayItem of displayItems)
+    {
+      if (displayItem.type === 'tab')
+      {
+        items.push({
+          id: String(displayItem.tab.id),
+          type: 'tab',
+          index: index++
+        });
+      }
+      else if (displayItem.type === 'group')
+      {
+        // Add group header
+        items.push({
+          id: `group-${displayItem.group.id}`,
+          type: 'group',
+          index: index++
+        });
+        // Add tabs in expanded groups
+        if (expandedGroups[displayItem.group.id])
+        {
+          for (const tab of displayItem.tabs)
+          {
+            items.push({
+              id: String(tab.id),
+              type: 'tab',
+              index: index++
+            });
+          }
+        }
+      }
+      else if (displayItem.type === 'virtual-group')
+      {
+        // Add orphaned tabs if expanded
+        if (expandedGroups[displayItem.id] !== false)
+        {
+          for (const tab of displayItem.tabs)
+          {
+            items.push({
+              id: String(tab.id),
+              type: 'tab',
+              index: index++
+            });
+          }
+        }
+      }
+    }
+    return items;
+  }, [displayItems, expandedGroups]);
+
+  // Get items in range for shift-click selection
+  const getTabItemsInRange = useCallback((startIndex: number, endIndex: number): SelectionItem[] =>
+  {
+    return flatVisibleItems.filter(item => item.index >= startIndex && item.index <= endIndex);
+  }, [flatVisibleItems]);
+
+  // Selection hook
+  const {
+    isSelected: isTabSelected,
+    handleClick: handleSelectionClick,
+    handleContextMenu: handleSelectionContextMenu,
+    selectionCount,
+    getSelectedItems,
+    clearSelection,
+  } = useSelection({
+    section: 'tabs',
+    getItemsInRange: getTabItemsInRange
+  });
+
+  // Confirm delete dialog for multi-close
+  const [confirmDeleteDialog, setConfirmDeleteDialog] = useState<{
+    isOpen: boolean;
+    tabIds: number[];
+  }>({ isOpen: false, tabIds: [] });
+
   const handleDragStart = useCallback((event: DragStartEvent) =>
   {
     const id = event.active.id;
@@ -1187,6 +1304,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       const group = visibleTabGroups.find(g => g.id === groupId);
       const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === groupId);
 
+      // For groups: if not in selection, clear selection
+      if (!isTabSelected(id))
+      {
+        clearSelection();
+      }
+
       setActiveId(id);
       setActiveTab(null);
       setActiveGroup(group ? { group, tabCount: groupTabs.length } : null);
@@ -1195,12 +1318,21 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     {
       // Dragging a tab (could be from visibleTabs or orphanedTabs)
       const tabId = id as number;
+      const tabIdStr = String(tabId);
+
+      // If dragged item is NOT in selection, clear selection and select only this item
+      if (!isTabSelected(tabIdStr))
+      {
+        clearSelection();
+      }
+      // If dragged item IS in selection, keep selection (drag all selected)
+
       setActiveId(tabId);
       const tab = visibleTabs.find(t => t.id === tabId) || orphanedTabs.find(t => t.id === tabId);
       setActiveTab(tab || null);
       setActiveGroup(null);
     }
-  }, [visibleTabs, visibleTabGroups, orphanedTabs, setActiveId]);
+  }, [visibleTabs, visibleTabGroups, orphanedTabs, setActiveId, isTabSelected, clearSelection]);
 
   const handleDragMove = useCallback((event: DragMoveEvent) =>
   {
@@ -1705,6 +1837,16 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     else
     {
       // --- TAB DRAG HANDLING ---
+      // Get selected items to determine if this is a multi-drag
+      const selectedItems = getSelectedItems();
+      const selectedTabIds = selectedItems
+        .filter(item => item.type === 'tab')
+        .map(item => parseInt(item.id, 10))
+        .filter(id => !isNaN(id));
+
+      // Check if dragged item is in selection (multi-drag scenario)
+      const isMultiDrag = selectedTabIds.length > 1 && selectedTabIds.includes(activeId as number);
+
       // Check both visibleTabs and orphanedTabs for the source
       const sourceTab = visibleTabs.find(t => t.id === activeId) || orphanedTabs.find(t => t.id === activeId);
       const isOrphanedTab = orphanedTabs.some(t => t.id === activeId);
@@ -1719,39 +1861,221 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         return;
       }
 
-      // For orphaned tabs, ungroup first so they leave the LiveBookmarks group
-      if (isOrphanedTab)
-      {
-        ungroupTab(activeId as number);
-      }
-
-      const sourceGroupId = isOrphanedTab ? -1 : (sourceTab.groupId ?? -1);
-      const sourceIndex = sourceTab.index; // Chrome's real index
       const isGroupHeaderTarget = dropTargetId.startsWith('group-');
 
-      if (isGroupHeaderTarget)
+      if (isMultiDrag)
       {
-        const targetGroupId = parseInt(dropTargetId.replace('group-', ''));
+        // --- MULTI-TAB DRAG ---
+        // Get all selected tabs (filter orphaned tabs from selection for now - they need special handling)
+        const selectedTabs = selectedTabIds
+          .map(id => visibleTabs.find(t => t.id === id))
+          .filter((t): t is chrome.tabs.Tab => t !== undefined);
 
-        if (dropPosition === 'into')
+        if (selectedTabs.length === 0)
         {
-          // Move tab into group at the end
-          if (sourceGroupId !== targetGroupId)
+          // Fallback to single-tab behavior
+          return;
+        }
+
+        // Calculate target index and group based on drop target
+        let targetIndex = -1;
+        let targetGroupId = -1; // -1 means ungrouped
+
+        if (isGroupHeaderTarget)
+        {
+          const groupId = parseInt(dropTargetId.replace('group-', ''));
+          const groupTabsList = visibleTabs.filter(t => (t.groupId ?? -1) === groupId);
+
+          if (dropPosition === 'into' || dropPosition === 'intoFirst')
           {
-            groupTab(activeId as number, targetGroupId);
+            // Move into group
+            targetGroupId = groupId;
+            if (dropPosition === 'intoFirst' && groupTabsList.length > 0)
+            {
+              targetIndex = groupTabsList[0].index;
+            }
+            else if (groupTabsList.length > 0)
+            {
+              targetIndex = groupTabsList[groupTabsList.length - 1].index + 1;
+            }
+          }
+          else if (dropPosition === 'before' && groupTabsList.length > 0)
+          {
+            // Place before group (ungrouped)
+            targetIndex = groupTabsList[0].index;
+            targetGroupId = -1;
+          }
+          else if (dropPosition === 'after' && groupTabsList.length > 0)
+          {
+            // Place after group (ungrouped)
+            targetIndex = groupTabsList[groupTabsList.length - 1].index + 1;
+            targetGroupId = -1;
+          }
+        }
+        else if (dropTargetId === 'end-of-list')
+        {
+          if (visibleTabs.length > 0)
+          {
+            const lastTab = visibleTabs[visibleTabs.length - 1];
+            targetIndex = lastTab.index + 1;
+          }
+          targetGroupId = -1;
+        }
+        else
+        {
+          // Target is a tab
+          const targetTabId = parseInt(dropTargetId);
+          const targetTab = visibleTabs.find(t => t.id === targetTabId);
+          if (targetTab)
+          {
+            targetGroupId = targetTab.groupId ?? -1;
+            targetIndex = dropPosition === 'before' ? targetTab.index : targetTab.index + 1;
+          }
+        }
+
+        if (targetIndex >= 0)
+        {
+          // Get tab IDs that need ungrouping (those currently in a group but target is ungrouped)
+          const tabsToUngroup = selectedTabs
+            .filter(t => (t.groupId ?? -1) !== -1 && targetGroupId === -1)
+            .map(t => t.id!);
+
+          // Get tab IDs that need grouping (those not in target group)
+          const tabsToGroup = selectedTabs
+            .filter(t => targetGroupId !== -1 && (t.groupId ?? -1) !== targetGroupId)
+            .map(t => t.id!);
+
+          // Ungroup first if needed
+          if (tabsToUngroup.length > 0)
+          {
+            ungroupTabs(tabsToUngroup);
           }
 
-          // Move to end of group
-          const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
-          if (groupTabs.length > 0)
-          {
-            const lastTabIndex = groupTabs[groupTabs.length - 1].index;
-            let targetIndex = lastTabIndex + 1;
+          // Move all tabs to target position
+          await moveTabs(selectedTabIds, targetIndex);
 
-            // Account for source removal when moving forward
+          // Group if needed
+          if (tabsToGroup.length > 0 && targetGroupId !== -1)
+          {
+            groupTabs(selectedTabIds, targetGroupId);
+          }
+
+          // Clear selection after successful multi-drag
+          clearSelection();
+        }
+      }
+      else
+      {
+        // --- SINGLE TAB DRAG (existing logic) ---
+        // For orphaned tabs, ungroup first so they leave the LiveBookmarks group
+        if (isOrphanedTab)
+        {
+          ungroupTab(activeId as number);
+        }
+
+        const sourceGroupId = isOrphanedTab ? -1 : (sourceTab.groupId ?? -1);
+        const sourceIndex = sourceTab.index; // Chrome's real index
+
+        if (isGroupHeaderTarget)
+        {
+          const targetGroupId = parseInt(dropTargetId.replace('group-', ''));
+
+          if (dropPosition === 'into')
+          {
+            // Move tab into group at the end
+            if (sourceGroupId !== targetGroupId)
+            {
+              groupTab(activeId as number, targetGroupId);
+            }
+
+            // Move to end of group
+            const groupTabsList = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+            if (groupTabsList.length > 0)
+            {
+              const lastTabIndex = groupTabsList[groupTabsList.length - 1].index;
+              let targetIndex = lastTabIndex + 1;
+
+              // Account for source removal when moving forward
+              if (sourceIndex < targetIndex)
+              {
+                targetIndex--;
+              }
+
+              moveTab(activeId as number, targetIndex);
+            }
+          }
+          else
+          {
+            // 'before', 'after', or 'intoFirst' on group header
+            const groupTabsList = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+            if (groupTabsList.length > 0)
+            {
+              if (dropPosition === 'before')
+              {
+                // Place before the group (as sibling, outside)
+                let targetIndex = groupTabsList[0].index;
+                // Account for source removal when moving forward
+                if (sourceIndex < targetIndex)
+                {
+                  targetIndex--;
+                }
+                if (sourceGroupId !== -1)
+                {
+                  ungroupTab(activeId as number);
+                }
+                moveTab(activeId as number, targetIndex);
+              }
+              else if (dropPosition === 'intoFirst')
+              {
+                // Insert inside group at index 0 (expanded folder, bottom 25% zone)
+                const firstTabIndex = groupTabsList[0].index;
+                let targetIndex = firstTabIndex;
+                if (sourceIndex < targetIndex)
+                {
+                  targetIndex--;
+                }
+                moveTab(activeId as number, targetIndex);
+                if (sourceGroupId !== targetGroupId)
+                {
+                  groupTab(activeId as number, targetGroupId);
+                }
+              }
+              else
+              {
+                // 'after': sibling after group (after last tab in group)
+                const lastTabIndex = groupTabsList[groupTabsList.length - 1].index;
+                let targetIndex = lastTabIndex + 1;
+                if (sourceIndex < targetIndex)
+                {
+                  targetIndex--;
+                }
+                if (sourceGroupId !== -1)
+                {
+                  ungroupTab(activeId as number);
+                }
+                moveTab(activeId as number, targetIndex);
+              }
+            }
+          }
+        }
+        else if (dropTargetId === 'end-of-list')
+        {
+          // Move tab to very end as ungrouped
+          if (visibleTabs.length > 0)
+          {
+            const lastTab = visibleTabs[visibleTabs.length - 1];
+            let targetIndex = lastTab.index + 1;
+
+            // Account for source removal
             if (sourceIndex < targetIndex)
             {
               targetIndex--;
+            }
+
+            // Ungroup if currently in a group
+            if (sourceGroupId !== -1)
+            {
+              ungroupTab(activeId as number);
             }
 
             moveTab(activeId as number, targetIndex);
@@ -1759,120 +2083,44 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         }
         else
         {
-          // 'before', 'after', or 'intoFirst' on group header
-          const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
-          if (groupTabs.length > 0)
+          // Target is a tab
+          const targetTabId = parseInt(dropTargetId);
+          const targetTab = visibleTabs.find(t => t.id === targetTabId);
+
+          if (targetTab)
           {
-            if (dropPosition === 'before')
+            const targetGroupId = targetTab.groupId ?? -1;
+
+            // Handle group membership change
+            if (targetGroupId !== sourceGroupId)
             {
-              // Place before the group (as sibling, outside)
-              let targetIndex = groupTabs[0].index;
-              // Account for source removal when moving forward
-              if (sourceIndex < targetIndex)
+              if (targetGroupId === -1)
               {
-                targetIndex--;
+                // Target is ungrouped - ungroup source
+                if (sourceGroupId !== -1)
+                {
+                  ungroupTab(activeId as number);
+                }
               }
-              if (sourceGroupId !== -1)
+              else
               {
-                ungroupTab(activeId as number);
-              }
-              moveTab(activeId as number, targetIndex);
-            }
-            else if (dropPosition === 'intoFirst')
-            {
-              // Insert inside group at index 0 (expanded folder, bottom 25% zone)
-              const firstTabIndex = groupTabs[0].index;
-              let targetIndex = firstTabIndex;
-              if (sourceIndex < targetIndex)
-              {
-                targetIndex--;
-              }
-              moveTab(activeId as number, targetIndex);
-              if (sourceGroupId !== targetGroupId)
-              {
+                // Target is in a group - add source to that group
                 groupTab(activeId as number, targetGroupId);
               }
             }
-            else
+
+            // Reorder - use Chrome's real index
+            const targetIndex = targetTab.index;
+            let newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
+
+            // When moving forward, account for source removal shifting tabs left
+            if (sourceIndex < newIndex)
             {
-              // 'after': sibling after group (after last tab in group)
-              const lastTabIndex = groupTabs[groupTabs.length - 1].index;
-              let targetIndex = lastTabIndex + 1;
-              if (sourceIndex < targetIndex)
-              {
-                targetIndex--;
-              }
-              if (sourceGroupId !== -1)
-              {
-                ungroupTab(activeId as number);
-              }
-              moveTab(activeId as number, targetIndex);
+              newIndex--;
             }
+
+            moveTab(activeId as number, newIndex);
           }
-        }
-      }
-      else if (dropTargetId === 'end-of-list')
-      {
-        // Move tab to very end as ungrouped
-        if (visibleTabs.length > 0)
-        {
-          const lastTab = visibleTabs[visibleTabs.length - 1];
-          let targetIndex = lastTab.index + 1;
-
-          // Account for source removal
-          if (sourceIndex < targetIndex)
-          {
-            targetIndex--;
-          }
-
-          // Ungroup if currently in a group
-          if (sourceGroupId !== -1)
-          {
-            ungroupTab(activeId as number);
-          }
-
-          moveTab(activeId as number, targetIndex);
-        }
-      }
-      else
-      {
-        // Target is a tab
-        const targetTabId = parseInt(dropTargetId);
-        const targetTab = visibleTabs.find(t => t.id === targetTabId);
-
-        if (targetTab)
-        {
-          const targetGroupId = targetTab.groupId ?? -1;
-
-          // Handle group membership change
-          if (targetGroupId !== sourceGroupId)
-          {
-            if (targetGroupId === -1)
-            {
-              // Target is ungrouped - ungroup source
-              if (sourceGroupId !== -1)
-              {
-                ungroupTab(activeId as number);
-              }
-            }
-            else
-            {
-              // Target is in a group - add source to that group
-              groupTab(activeId as number, targetGroupId);
-            }
-          }
-
-          // Reorder - use Chrome's real index
-          const targetIndex = targetTab.index;
-          let newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
-
-          // When moving forward, account for source removal shifting tabs left
-          if (sourceIndex < newIndex)
-          {
-            newIndex--;
-          }
-
-          moveTab(activeId as number, newIndex);
         }
       }
     }
@@ -1887,7 +2135,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     onExternalDropTargetChange?.(null);
     setLocalSpaceDropTarget(null);
     onSpaceDropTargetChange?.(null);
-  }, [activeId, dropTargetId, dropPosition, visibleTabs, orphanedTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab, localSpaceDropTarget, onSpaceDropTargetChange, moveTabToSpace]);
+  }, [activeId, dropTargetId, dropPosition, visibleTabs, orphanedTabs, expandedGroups, groupTab, groupTabs, ungroupTab, ungroupTabs, moveTab, moveTabs, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab, localSpaceDropTarget, onSpaceDropTargetChange, moveTabToSpace, getSelectedItems, clearSelection]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
@@ -1976,6 +2224,34 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     closeTabs(tabIds);
   }, [visibleTabs, closeTabs]);
 
+  // Close selected tabs (or single tab if not in selection)
+  const handleCloseSelectedTabs = useCallback((clickedTabId: number) =>
+  {
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length > 1)
+    {
+      // Multiple selected - show confirmation dialog
+      const tabIds = selectedItems
+        .filter(item => item.type === 'tab')
+        .map(item => parseInt(item.id, 10))
+        .filter(id => !isNaN(id));
+      setConfirmDeleteDialog({ isOpen: true, tabIds });
+    }
+    else
+    {
+      // Single tab - close directly
+      closeTab(clickedTabId);
+    }
+  }, [getSelectedItems, closeTab]);
+
+  // Confirm multi-close
+  const handleConfirmMultiClose = useCallback(() =>
+  {
+    closeTabs(confirmDeleteDialog.tabIds);
+    clearSelection();
+    setConfirmDeleteDialog({ isOpen: false, tabIds: [] });
+  }, [confirmDeleteDialog.tabIds, closeTabs, clearSelection]);
+
   // Build menu content for Tabs section header
   const tabsMenuContent = (
     <>
@@ -2024,6 +2300,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
             {
               const tabId = String(item.tab.id);
               const isTarget = dropTargetId === tabId;
+              const itemIndex = flatVisibleItems.findIndex(i => i.id === tabId);
+              const selectionItem: SelectionItem = { id: tabId, type: 'tab', index: itemIndex };
               return (
                 <DraggableTab
                   key={item.tab.id}
@@ -2032,7 +2310,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   isBeingDragged={activeId === item.tab.id}
                   showDropBefore={isTarget && dropPosition === 'before'}
                   showDropAfter={isTarget && dropPosition === 'after'}
-                  onClose={closeTab}
+                  isSelected={isTabSelected(tabId)}
+                  onClose={handleCloseSelectedTabs}
                   onActivate={activateTab}
                   onDuplicate={duplicateTab}
                   onPin={onPin}
@@ -2043,6 +2322,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   onCloseTabsBefore={closeTabsBefore}
                   onCloseTabsAfter={closeTabsAfter}
                   onCloseOthers={closeOthers}
+                  onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
+                  onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
+                  selectionCount={selectionCount}
                 />
               );
             }
@@ -2057,6 +2339,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     {
                       const tabId = String(tab.id);
                       const isTabTarget = dropTargetId === tabId;
+                      const itemIndex = flatVisibleItems.findIndex(i => i.id === tabId);
+                      const selectionItem: SelectionItem = { id: tabId, type: 'tab', index: itemIndex };
                       return (
                         <DraggableTab
                           key={tab.id}
@@ -2065,7 +2349,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           isBeingDragged={activeId === tab.id}
                           showDropBefore={isTabTarget && dropPosition === 'before'}
                           showDropAfter={isTabTarget && dropPosition === 'after'}
-                          onClose={closeTab}
+                          isSelected={isTabSelected(tabId)}
+                          onClose={handleCloseSelectedTabs}
                           onActivate={activateTab}
                           onDuplicate={duplicateTab}
                           onPin={onPin}
@@ -2076,6 +2361,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           onCloseTabsBefore={closeTabsBefore}
                           onCloseTabsAfter={closeTabsAfter}
                           onCloseOthers={closeOthers}
+                          onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
+                          onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
+                          selectionCount={selectionCount}
                         />
                       );
                     })}
@@ -2093,6 +2381,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
               const isGroupAfterTarget = isDraggingGroup && isTarget && dropPosition === 'after';
               // Show 'after' indicator for both 'after' and 'intoFirst' positions
               const showDropAfter = !isDraggingGroup && isTarget && (dropPosition === 'after' || dropPosition === 'intoFirst');
+              // Selection item for group header
+              const groupItemIndex = flatVisibleItems.findIndex(i => i.id === groupTargetId);
+              const groupSelectionItem: SelectionItem = { id: groupTargetId, type: 'group', index: groupItemIndex };
               return (
                 <div key={`group-${item.group.id}`}>
                   <DraggableGroupHeader
@@ -2100,6 +2391,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     matchedSpace={spaces.find(s => s.name === item.group.title)}
                     tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
+                    isSelected={isTabSelected(groupTargetId)}
                     showDropBefore={isTarget && dropPosition === 'before'}
                     showDropAfter={showDropAfter}
                     showDropInto={showDropInto}
@@ -2108,6 +2400,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         ? getIndentPadding(1)
                         : undefined
                     }
+                    onClick={(e) => handleSelectionClick(groupSelectionItem, e)}
                     onToggle={() => toggleGroup(item.group.id)}
                     onCloseGroup={() => closeGroup(item.tabs)}
                     onSortGroup={(direction) => sortGroupTabs(item.group.id, direction)}
@@ -2125,6 +2418,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     const showGroupAfterOnLastTab = isLastTab && isGroupAfterTarget;
                     // Indent lines for tabs in group since drop stays within group
                     const indentPx = isTabTarget ? getIndentPadding(1) : undefined;
+                    const itemIndex = flatVisibleItems.findIndex(i => i.id === tabId);
+                    const selectionItem: SelectionItem = { id: tabId, type: 'tab', index: itemIndex };
                     return (
                       <DraggableTab
                         key={tab.id}
@@ -2137,7 +2432,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         afterIndentPx={dropPosition === 'after' ? indentPx : undefined}
                         groupColor={item.group.color}
                         isLastInGroup={isLastTab}
-                        onClose={closeTab}
+                        isSelected={isTabSelected(tabId)}
+                        onClose={handleCloseSelectedTabs}
                         onActivate={activateTab}
                         onDuplicate={duplicateTab}
                         onPin={onPin}
@@ -2148,6 +2444,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         onCloseTabsBefore={closeTabsBefore}
                         onCloseTabsAfter={closeTabsAfter}
                         onCloseOthers={closeOthers}
+                        onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
+                        onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
+                        selectionCount={selectionCount}
                       />
                     );
                   })}
@@ -2180,7 +2479,6 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                             hasChildren={true}
                             isExpanded={expandedGroups['orphaned-tabs'] !== false}
                             onToggle={() => toggleGroup('orphaned-tabs')}
-                            onClick={() => toggleGroup('orphaned-tabs')}
                             className={clsx(
                               "rounded-t-lg rounded-b-none",
                               colorStyle.bg
@@ -2210,9 +2508,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     )}
                   </ContextMenu.Root>
                   {/* Render orphaned tabs (draggable to move out of group, but not drop targets) */}
-                  {expandedGroups['orphaned-tabs'] !== false && item.tabs.map((tab, index) =>
+                  {expandedGroups['orphaned-tabs'] !== false && item.tabs.map((tab, tabIndex) =>
                   {
-                    const isLastTab = index === item.tabs.length - 1;
+                    const isLastTab = tabIndex === item.tabs.length - 1;
+                    const tabId = String(tab.id);
+                    const itemIndex = flatVisibleItems.findIndex(i => i.id === tabId);
+                    const selectionItem: SelectionItem = { id: tabId, type: 'tab', index: itemIndex };
                     return (
                       <div key={tab.id} data-is-orphaned-tab="true">
                         <DraggableTab
@@ -2223,9 +2524,13 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           showDropAfter={false}
                           groupColor={item.color}
                           isLastInGroup={isLastTab}
+                          isSelected={isTabSelected(tabId)}
                           onClose={closeTab}
                           onActivate={activateTab}
                           onKeepAsRegularTab={(tabId) => ungroupTab(tabId)}
+                          onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
+                          onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
+                          selectionCount={selectionCount}
                         />
                       </div>
                     );
@@ -2320,6 +2625,14 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         folderName={exportConflictDialog.folderName}
         onConfirm={handleExportConflictConfirm}
         onClose={closeExportConflictDialog}
+      />
+
+      <ConfirmDeleteDialog
+        isOpen={confirmDeleteDialog.isOpen}
+        itemCount={confirmDeleteDialog.tabIds.length}
+        itemType="tabs"
+        onConfirm={handleConfirmMultiClose}
+        onClose={() => setConfirmDeleteDialog({ isOpen: false, tabIds: [] })}
       />
 
       <Toast

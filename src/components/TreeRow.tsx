@@ -19,6 +19,7 @@ export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
   onToggle?: (e: React.MouseEvent) => void;
   // onClick, onContextMenu, onPointerEnter, onPointerLeave are covered by HTMLAttributes but we can keep specific overrides if needed
   isActive?: boolean;
+  isSelected?: boolean;     // Multi-selection highlight (same visual as isActive)
   isHighlighted?: boolean;  // Show ring highlight (e.g. during context menu)
   isDragging?: boolean;
   // Slots for extra content
@@ -47,6 +48,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
   onToggle,
   // Removed explicit handlers that are now in ...props or handled specifically if needed
   isActive,
+  isSelected,
   isHighlighted,
   isDragging,
   leadingIndicator,
@@ -70,10 +72,14 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       title={tooltip}
       className={clsx(
         'group flex items-center h-7 rounded-md cursor-default select-none transition-colors relative pr-2 outline-none',
-        isActive
-          ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100'
-          : `${RING_HIGHLIGHT_HOVER} text-gray-700 dark:text-gray-200`,
-        !isActive && isHighlighted && RING_HIGHLIGHT,
+        // Selection style (brighter blue background)
+        isSelected && 'bg-blue-200 dark:bg-blue-800/60 text-blue-800 dark:text-blue-50',
+        // Active tab style (subtle background)
+        isActive && !isSelected && 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100',
+        // Default style (ring hover) - only when neither active nor selected
+        !isActive && !isSelected && `${RING_HIGHLIGHT_HOVER} text-gray-700 dark:text-gray-200`,
+        // Highlight ring (e.g. during context menu)
+        !isActive && !isSelected && isHighlighted && RING_HIGHLIGHT,
         isDragging && 'opacity-50',
         className
       )}
@@ -136,7 +142,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       )}
 
       {/* Title */}
-      <div className="flex-1 truncate min-w-0 mr-2">
+      <div className={clsx("flex-1 truncate min-w-0 mr-2", isActive && "font-semibold")}>
         {title}
       </div>
 

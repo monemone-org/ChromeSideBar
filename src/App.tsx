@@ -21,6 +21,7 @@ import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
+import { SelectionProvider } from './contexts/SelectionContext';
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
@@ -483,6 +484,7 @@ function App() {
     <FontSizeContext.Provider value={fontSize}>
       <BookmarkTabsProvider>
       <SpacesProvider>
+      <SelectionProvider>
       <div
         className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
         style={{ fontSize: `${fontSize}px` }}
@@ -682,6 +684,7 @@ function App() {
         onDismiss={hideToast}
       />
       </div>
+      </SelectionProvider>
       </SpacesProvider>
       </BookmarkTabsProvider>
     </FontSizeContext.Provider>

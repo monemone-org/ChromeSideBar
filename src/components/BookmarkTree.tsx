@@ -2,8 +2,11 @@ import React, { useState, useCallback, useRef, useEffect, forwardRef, useMemo } 
 import { useBookmarks, SortOption } from '../hooks/useBookmarks';
 import { Space, useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
+import { SelectionItem } from '../contexts/SelectionContext';
+import { useSelection } from '../hooks/useSelection';
 import { FolderPickerDialog } from './FolderPickerDialog';
 import { SpaceNavigatorDialog } from './SpaceNavigatorDialog';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
@@ -124,6 +127,7 @@ interface BookmarkRowProps {
   isAudible?: boolean;
   isActive?: boolean;
   liveTitle?: string;
+  isSelected?: boolean;
   checkIsLoaded?: (bookmarkId: string) => boolean;
   checkIsAudible?: (bookmarkId: string) => boolean;
   checkIsActive?: (bookmarkId: string) => boolean;
@@ -138,6 +142,15 @@ interface BookmarkRowProps {
   getMatchingSpace?: (folderId: string) => Space | undefined;
   // External drop target (from tab drag)
   externalDropTarget?: ExternalDropTarget | null;
+  // Selection handlers
+  onSelectionClick?: (e: React.MouseEvent) => void;
+  onSelectionContextMenu?: () => void;
+  selectionCount?: number;
+  // Selection helpers for recursive items
+  checkIsSelected?: (id: string) => boolean;
+  getSelectionItem?: (id: string, isFolder: boolean) => SelectionItem;
+  onChildSelectionClick?: (item: SelectionItem, e: React.MouseEvent) => void;
+  onChildSelectionContextMenu?: (item: SelectionItem) => void;
   // Drag-drop attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -166,6 +179,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   isAudible,
   isActive,
   liveTitle,
+  isSelected,
   onOpenBookmark,
   onCloseBookmark,
   onOpenAsTabGroup,
@@ -174,6 +188,9 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onMoveToSpace: _onMoveToSpace,
   onMoveBookmark,
   externalDropTarget,
+  onSelectionClick,
+  onSelectionContextMenu,
+  selectionCount,
   attributes,
   listeners
 }, ref) => {
@@ -212,16 +229,18 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   }
 
   const handleRowClick = (e: React.MouseEvent) => {
-    if (isFolder) {
-      toggleFolder(node.id, !expandedState[node.id]);
-    } else if (node.url) {
-      if (e.shiftKey) {
-        // Shift+Click: open in new window
-        chrome.windows.create({ url: node.url });
-      } else if (e.metaKey || e.ctrlKey) {
-        // Cmd+Click: open in new tab (added to active Space by background.ts)
-        chrome.tabs.create({ url: node.url });
-      } else if (bookmarkOpenMode === 'arc' && onOpenBookmark) {
+    // Always update selection state on click
+    onSelectionClick?.(e);
+
+    // For modifier clicks (Ctrl/Cmd/Shift), only update selection, don't perform action
+    if (e.metaKey || e.ctrlKey || e.shiftKey)
+    {
+      return;
+    }
+
+    // Plain click: perform action for bookmarks (folders only expand/collapse via chevron)
+    if (node.url) {
+      if (bookmarkOpenMode === 'arc' && onOpenBookmark) {
         // Arc-style: open as managed tab in SideBarForArc group
         onOpenBookmark(node.id, node.url);
       } else if (bookmarkOpenMode === 'activeTab') {
@@ -355,8 +374,10 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               isExpanded={expandedState[node.id]}
               onToggle={() => toggleFolder(node.id, !expandedState[node.id])}
               onClick={handleRowClick}
+              onContextMenu={() => onSelectionContextMenu?.()}
               isActive={bookmarkOpenMode === 'arc' && isActive}
-              isHighlighted={isOpen}
+              isSelected={isSelected}
+              isHighlighted={!isSelected && isOpen}
               isDragging={isBeingDragged}
               dndAttributes={attributes}
               dndListeners={listeners}
@@ -465,7 +486,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 <Edit size={14} className="mr-2" /> Edit
               </ContextMenu.Item>
               <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
-                <Trash size={14} className="mr-2" /> Delete
+                <Trash size={14} className="mr-2" /> {selectionCount && selectionCount > 1 ? `Delete ${selectionCount} Items` : 'Delete'}
               </ContextMenu.Item>
             </>
           )}
@@ -518,7 +539,21 @@ StaticBookmarkRow.displayName = 'StaticBookmarkRow';
 
 // --- Recursive Item ---
 const BookmarkItem = (props: BookmarkRowProps) => {
-  const { node, expandedState, depth = 0, checkIsLoaded, checkIsAudible, checkIsActive, getLiveTitle, getMatchingSpace } = props;
+  const {
+    node,
+    expandedState,
+    depth = 0,
+    checkIsLoaded,
+    checkIsAudible,
+    checkIsActive,
+    getLiveTitle,
+    getMatchingSpace,
+    checkIsSelected,
+    getSelectionItem,
+    onChildSelectionClick,
+    onChildSelectionContextMenu,
+    selectionCount
+  } = props;
   const isFolder = !node.url;
   const { ref, isInView } = useInView<HTMLDivElement>();
 
@@ -535,18 +570,37 @@ const BookmarkItem = (props: BookmarkRowProps) => {
 
       {isFolder && expandedState[node.id] && node.children && (
         <div>
-          {node.children.map((child) => (
-            <BookmarkItem
-              key={child.id}
-              {...props} // Pass through all handlers
-              node={child}
-              depth={depth + 1}
-              isLoaded={checkIsLoaded ? checkIsLoaded(child.id) : false}
-              isAudible={checkIsAudible ? checkIsAudible(child.id) : false}
-              isActive={checkIsActive ? checkIsActive(child.id) : false}
-              liveTitle={getLiveTitle ? getLiveTitle(child.id) : undefined}
-            />
-          ))}
+          {node.children.map((child, childIndex) =>
+          {
+            const childIsFolder = !child.url;
+            // Always create a selection item for child - use parent's getSelectionItem if available,
+            // otherwise create a fallback with relative index
+            const childSelectionItem: SelectionItem = getSelectionItem
+              ? getSelectionItem(child.id, childIsFolder)
+              : { id: child.id, type: childIsFolder ? 'folder' : 'bookmark', index: childIndex };
+            return (
+              <BookmarkItem
+                key={child.id}
+                {...props} // Pass through all handlers
+                node={child}
+                depth={depth + 1}
+                isLoaded={checkIsLoaded ? checkIsLoaded(child.id) : false}
+                isAudible={checkIsAudible ? checkIsAudible(child.id) : false}
+                isActive={checkIsActive ? checkIsActive(child.id) : false}
+                liveTitle={getLiveTitle ? getLiveTitle(child.id) : undefined}
+                isSelected={checkIsSelected ? checkIsSelected(child.id) : false}
+                onSelectionClick={onChildSelectionClick
+                  ? (e) => onChildSelectionClick(childSelectionItem, e)
+                  : undefined
+                }
+                onSelectionContextMenu={onChildSelectionContextMenu
+                  ? () => onChildSelectionContextMenu(childSelectionItem)
+                  : undefined
+                }
+                selectionCount={selectionCount}
+              />
+            );
+          })}
         </div>
       )}
     </>
@@ -770,6 +824,70 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     bookmarkId: string | null;
     isFolder: boolean;
   }>({ isOpen: false, bookmarkId: null, isFolder: false });
+
+  // Confirm delete dialog for multi-delete
+  const [confirmDeleteDialog, setConfirmDeleteDialog] = useState<{
+    isOpen: boolean;
+    bookmarkIds: string[];
+  }>({ isOpen: false, bookmarkIds: [] });
+
+  // Build flat list of visible bookmark items for selection range calculation
+  const flatVisibleBookmarkItems = useMemo((): SelectionItem[] =>
+  {
+    const items: SelectionItem[] = [];
+    let index = 0;
+
+    const flattenNode = (node: chrome.bookmarks.BookmarkTreeNode, isExpanded: boolean) =>
+    {
+      const isFolder = !node.url;
+      const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
+
+      // Add non-special items to the list
+      if (!isSpecialFolder)
+      {
+        items.push({
+          id: node.id,
+          type: isFolder ? 'folder' : 'bookmark',
+          index: index++
+        });
+      }
+
+      // Include children if folder is expanded (even for special folders)
+      if (isFolder && isExpanded && node.children)
+      {
+        for (const child of node.children)
+        {
+          flattenNode(child, !!expandedState[child.id]);
+        }
+      }
+    };
+
+    for (const bookmark of visibleBookmarks)
+    {
+      flattenNode(bookmark, !!expandedState[bookmark.id]);
+    }
+
+    return items;
+  }, [visibleBookmarks, expandedState]);
+
+  // Get items in range for shift-click selection
+  const getBookmarkItemsInRange = useCallback((startIndex: number, endIndex: number): SelectionItem[] =>
+  {
+    return flatVisibleBookmarkItems.filter(item => item.index >= startIndex && item.index <= endIndex);
+  }, [flatVisibleBookmarkItems]);
+
+  // Selection hook
+  const {
+    isSelected: isBookmarkSelected,
+    handleClick: handleSelectionClick,
+    handleContextMenu: handleSelectionContextMenu,
+    selectionCount,
+    getSelectedItems,
+    clearSelection,
+  } = useSelection({
+    section: 'bookmarks',
+    getItemsInRange: getBookmarkItemsInRange
+  });
 
   // Load expanded state from session storage on mount
   useEffect(() =>
@@ -1048,16 +1166,59 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     }
   }, [moveToSpaceDialog.bookmarkId, spaces, findFolderByPath, onShowToast]);
 
+  // Delete selected bookmarks (or single bookmark if not in selection)
+  const handleDeleteSelectedBookmarks = useCallback((clickedBookmarkId: string) =>
+  {
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length > 1)
+    {
+      // Multiple selected - show confirmation dialog
+      const bookmarkIds = selectedItems.map(item => item.id);
+      setConfirmDeleteDialog({ isOpen: true, bookmarkIds });
+    }
+    else
+    {
+      // Single bookmark - delete directly
+      removeBookmark(clickedBookmarkId);
+    }
+  }, [getSelectedItems, removeBookmark]);
+
+  // Confirm multi-delete
+  const handleConfirmMultiDelete = useCallback(async () =>
+  {
+    for (const id of confirmDeleteDialog.bookmarkIds)
+    {
+      try
+      {
+        await chrome.bookmarks.removeTree(id);
+      }
+      catch
+      {
+        // Ignore errors (bookmark might have already been deleted if it was a child)
+      }
+    }
+    clearSelection();
+    setConfirmDeleteDialog({ isOpen: false, bookmarkIds: [] });
+  }, [confirmDeleteDialog.bookmarkIds, clearSelection]);
+
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
+
+    // If dragged item is NOT in selection, clear selection
+    if (!isBookmarkSelected(id))
+    {
+      clearSelection();
+    }
+    // If dragged item IS in selection, keep selection (drag all selected)
+
     setActiveId(id);
     setActiveNode(findNode(id));
     // Read depth from DOM element
     const element = document.querySelector(`[data-bookmark-id="${id}"]`);
     const depth = element?.getAttribute('data-depth');
     setActiveDepth(depth ? parseInt(depth, 10) : 0);
-  }, [findNode, setActiveId]);
+  }, [findNode, setActiveId, isBookmarkSelected, clearSelection]);
 
   // Drag move handler - calculate drop position based on pointer
   const handleDragMove = useCallback((event: DragMoveEvent) => {
@@ -1104,7 +1265,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   }, [bookmarks, resolveBookmarkDropTarget, clearAutoExpandTimer, setDropTargetId, setDropPosition]);
 
   // Drag end handler
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     clearAutoExpandTimer();
 
     const { active } = event;
@@ -1116,11 +1277,105 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
 
     // Perform the move if we have a valid drop target
     if (isValidDrop) {
-      moveBookmark(sourceId, dropTargetId!, dropPosition!);
+      // Get selected items to determine if this is a multi-drag
+      const selectedItems = getSelectedItems();
+      const selectedIds = selectedItems.map(item => item.id);
 
-      // Auto-expand folder if dropping into it
-      if ((dropPosition === 'into') && !expandedState[dropTargetId!]) {
-        setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
+      // Check if dragged item is in selection (multi-drag scenario)
+      const isMultiDrag = selectedIds.length > 1 && selectedIds.includes(sourceId);
+
+      if (isMultiDrag)
+      {
+        // --- MULTI-BOOKMARK DRAG ---
+        // Calculate target position (parentId and starting index)
+        let targetParentId: string;
+        let baseIndex: number;
+
+        if (dropPosition === 'into')
+        {
+          // Move into folder at the end
+          targetParentId = dropTargetId!;
+          const children = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) => {
+            chrome.bookmarks.getChildren(dropTargetId!, (result) => resolve(result || []));
+          });
+          baseIndex = children.length;
+        }
+        else if (dropPosition === 'intoFirst')
+        {
+          // Move into folder at the beginning
+          targetParentId = dropTargetId!;
+          baseIndex = 0;
+        }
+        else
+        {
+          // Move before/after destination item
+          const dest = await new Promise<chrome.bookmarks.BookmarkTreeNode | null>((resolve) => {
+            chrome.bookmarks.get(dropTargetId!, (results) => {
+              resolve(results && results.length > 0 ? results[0] : null);
+            });
+          });
+          if (!dest || !dest.parentId || dest.index === undefined)
+          {
+            // Invalid target, reset state
+            setActiveId(null);
+            setActiveNode(null);
+            setActiveDepth(0);
+            setDropTargetId(null);
+            setDropPosition(null);
+            return;
+          }
+          targetParentId = dest.parentId;
+          baseIndex = dropPosition === 'before' ? dest.index : dest.index + 1;
+        }
+
+        // Get bookmark info for selected items to sort by index
+        const bookmarkInfos = await Promise.all(
+          selectedIds.map(async (id) => {
+            const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) => {
+              chrome.bookmarks.get(id, (res) => resolve(res || []));
+            });
+            return results[0] || null;
+          })
+        );
+
+        // Filter out nulls and sort by index (within same parent) or keep original selection order
+        const validBookmarks = bookmarkInfos.filter((b): b is chrome.bookmarks.BookmarkTreeNode => b !== null);
+
+        // Sort by their original index to maintain relative order
+        validBookmarks.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+        // Determine direction: need to check if moving forward or backward
+        // For simplicity, move each bookmark in order, incrementing the index
+        // This works because each move shifts subsequent indices
+        for (let i = 0; i < validBookmarks.length; i++)
+        {
+          const bookmark = validBookmarks[i];
+          await new Promise<void>((resolve) => {
+            chrome.bookmarks.move(bookmark.id, { parentId: targetParentId, index: baseIndex + i }, () => {
+              resolve();
+            });
+          });
+        }
+
+        // Auto-expand folder if dropping into it
+        if ((dropPosition === 'into' || dropPosition === 'intoFirst') && !expandedState[dropTargetId!])
+        {
+          setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
+        }
+
+        // Clear selection after successful multi-drag
+        clearSelection();
+      }
+      else
+      {
+        // --- SINGLE BOOKMARK DRAG (existing logic) ---
+        moveBookmark(sourceId, dropTargetId!, dropPosition!);
+
+        // Auto-expand folder if dropping into it
+        if ((dropPosition === 'into') && !expandedState[dropTargetId!])
+        {
+          setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
+        }
       }
     }
 
@@ -1130,7 +1385,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setActiveDepth(0);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [dropTargetId, dropPosition, moveBookmark, expandedState, findNode, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
+  }, [dropTargetId, dropPosition, moveBookmark, expandedState, findNode, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, getSelectedItems, clearSelection]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() => {
@@ -1185,44 +1440,65 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
         onDragEnd={handleDragEnd}
         onDragCancel={handleDragCancel}
       >
-        {visibleBookmarks.map((node) => (
-          <BookmarkItem
-            key={node.id}
-            node={node}
-            depth={0}
-            expandedState={expandedState}
-            toggleFolder={toggleFolder}
-            onRemove={removeBookmark}
-            onEdit={setEditingNode}
-            onCreateFolder={handleCreateFolder}
-            onSort={sortBookmarks}
-            onDuplicate={duplicateBookmark}
-            onExpandAll={handleExpandAll}
-            onPin={onPin}
-            isDragging={!!activeId}
-            activeId={activeId}
-            dropTargetId={dropTargetId}
-            dropPosition={dropPosition}
-            bookmarkOpenMode={bookmarkOpenMode}
-            isLoaded={isBookmarkLoaded(node.id)}
-            isAudible={isBookmarkAudible(node.id)}
-            isActive={isBookmarkActive(node.id)}
-            liveTitle={getBookmarkLiveTitle(node.id)}
-            checkIsLoaded={isBookmarkLoaded}
-            checkIsAudible={isBookmarkAudible}
-            checkIsActive={isBookmarkActive}
-            getLiveTitle={getBookmarkLiveTitle}
-            onOpenBookmark={openBookmarkTab}
-            onCloseBookmark={closeBookmarkTab}
-            onOpenAsTabGroup={!useSpaces ? handleOpenAsTabGroup : undefined}
-            onOpenAllTabs={handleOpenAllTabs}
-            onOpenAllTabsInNewWindow={handleOpenAllTabsInNewWindow}
-            onMoveToSpace={useSpaces ? openMoveToSpaceDialog : undefined}
-            onMoveBookmark={openMoveBookmarkDialog}
-            getMatchingSpace={getMatchingSpace}
-            externalDropTarget={externalDropTarget}
-          />
-        ))}
+        {visibleBookmarks.map((node) =>
+        {
+          const itemIndex = flatVisibleBookmarkItems.findIndex(i => i.id === node.id);
+          const selectionItem: SelectionItem = {
+            id: node.id,
+            type: !node.url ? 'folder' : 'bookmark',
+            index: itemIndex
+          };
+          return (
+            <BookmarkItem
+              key={node.id}
+              node={node}
+              depth={0}
+              expandedState={expandedState}
+              toggleFolder={toggleFolder}
+              onRemove={handleDeleteSelectedBookmarks}
+              onEdit={setEditingNode}
+              onCreateFolder={handleCreateFolder}
+              onSort={sortBookmarks}
+              onDuplicate={duplicateBookmark}
+              onExpandAll={handleExpandAll}
+              onPin={onPin}
+              isDragging={!!activeId}
+              activeId={activeId}
+              dropTargetId={dropTargetId}
+              dropPosition={dropPosition}
+              bookmarkOpenMode={bookmarkOpenMode}
+              isLoaded={isBookmarkLoaded(node.id)}
+              isAudible={isBookmarkAudible(node.id)}
+              isActive={isBookmarkActive(node.id)}
+              liveTitle={getBookmarkLiveTitle(node.id)}
+              isSelected={isBookmarkSelected(node.id)}
+              checkIsLoaded={isBookmarkLoaded}
+              checkIsAudible={isBookmarkAudible}
+              checkIsActive={isBookmarkActive}
+              getLiveTitle={getBookmarkLiveTitle}
+              onOpenBookmark={openBookmarkTab}
+              onCloseBookmark={closeBookmarkTab}
+              onOpenAsTabGroup={!useSpaces ? handleOpenAsTabGroup : undefined}
+              onOpenAllTabs={handleOpenAllTabs}
+              onOpenAllTabsInNewWindow={handleOpenAllTabsInNewWindow}
+              onMoveToSpace={useSpaces ? openMoveToSpaceDialog : undefined}
+              onMoveBookmark={openMoveBookmarkDialog}
+              getMatchingSpace={getMatchingSpace}
+              externalDropTarget={externalDropTarget}
+              onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
+              onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
+              selectionCount={selectionCount}
+              checkIsSelected={isBookmarkSelected}
+              getSelectionItem={(id, isFolder) =>
+              {
+                const idx = flatVisibleBookmarkItems.findIndex(i => i.id === id);
+                return { id, type: isFolder ? 'folder' : 'bookmark', index: idx };
+              }}
+              onChildSelectionClick={handleSelectionClick}
+              onChildSelectionContextMenu={handleSelectionContextMenu}
+            />
+          );
+        })}
 
         {/* Drag overlay - no animation for valid drops, default animation for cancelled */}
         <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
@@ -1275,6 +1551,14 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
         title={moveBookmarkDialog.isFolder ? "Move Folder to..." : "Move Bookmark to..."}
         onSelect={handleMoveBookmarkToFolder}
         onClose={closeMoveBookmarkDialog}
+      />
+
+      <ConfirmDeleteDialog
+        isOpen={confirmDeleteDialog.isOpen}
+        itemCount={confirmDeleteDialog.bookmarkIds.length}
+        itemType="bookmarks"
+        onConfirm={handleConfirmMultiDelete}
+        onClose={() => setConfirmDeleteDialog({ isOpen: false, bookmarkIds: [] })}
       />
     </>
   );
