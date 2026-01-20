@@ -347,6 +347,7 @@ function App() {
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
   const [showSpaceNavigator, setShowSpaceNavigator] = useState(false);
+  const [lastAudibleTab, setLastAudibleTab] = useState<chrome.tabs.Tab | undefined>(undefined);
   const [filterText, setFilterText] = useState('');
   const [savedFilters, setSavedFilters] = useChromeLocalStorage<string[]>(
     'sidebar-saved-filters',
@@ -463,6 +464,38 @@ function App() {
     setShowSpaceDeleteDialog(true);
   }, []);
 
+  // Audio dialog handler - query for last audible tab before opening
+  const handleOpenAudioDialog = useCallback(async () => {
+    // Check if we already have audible tabs
+    const audibleTabs = tabs.filter(t => t.audible);
+    if (audibleTabs.length > 0)
+    {
+      setLastAudibleTab(undefined);
+      setShowAudioDialog(true);
+      return;
+    }
+
+    // No audible tabs - query background for last audible tab
+    try
+    {
+      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' });
+      if (response?.tabId)
+      {
+        const tab = tabs.find(t => t.id === response.tabId);
+        setLastAudibleTab(tab);
+      }
+      else
+      {
+        setLastAudibleTab(undefined);
+      }
+    }
+    catch
+    {
+      setLastAudibleTab(undefined);
+    }
+    setShowAudioDialog(true);
+  }, [tabs]);
+
   // DropdownMenu handles click-outside and escape key automatically
 
   // Listen for navigate-spaces command
@@ -534,6 +567,7 @@ function App() {
       <AudioTabsDialog
         isOpen={showAudioDialog}
         tabs={tabs.filter(t => t.audible)}
+        lastAudibleTab={lastAudibleTab}
         onTabSelect={(tabId) =>
         {
           activateTab(tabId);
@@ -550,7 +584,7 @@ function App() {
             const newValue = !filterLiveTabs;
             setFilterLiveTabs(newValue);
           }}
-          onAudioDialogOpen={() => setShowAudioDialog(true)}
+          onAudioDialogOpen={handleOpenAudioDialog}
           onMenuToggle={() => setShowMenu(!showMenu)}
           menuButtonRef={buttonRef}
           filterText={filterText}

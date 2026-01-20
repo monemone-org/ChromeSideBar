@@ -426,6 +426,43 @@ class TabGroupTracker
 }
 
 // =============================================================================
+// LastAudibleTracker - Tracks the most recently audible tab
+// =============================================================================
+
+class LastAudibleTracker
+{
+  static STORAGE_KEY = 'bg_lastAudibleTabId';
+
+  #lastAudibleTabId: number | null = null;
+
+  getLastAudibleTabId(): number | null
+  {
+    return this.#lastAudibleTabId;
+  }
+
+  setLastAudibleTabId(tabId: number): void
+  {
+    this.#lastAudibleTabId = tabId;
+    chrome.storage.session.set({ [LastAudibleTracker.STORAGE_KEY]: tabId });
+  }
+
+  clearIfMatches(tabId: number): void
+  {
+    if (this.#lastAudibleTabId === tabId)
+    {
+      this.#lastAudibleTabId = null;
+      chrome.storage.session.remove(LastAudibleTracker.STORAGE_KEY);
+    }
+  }
+
+  async load(): Promise<void>
+  {
+    const result = await chrome.storage.session.get([LastAudibleTracker.STORAGE_KEY]);
+    this.#lastAudibleTabId = result[LastAudibleTracker.STORAGE_KEY] ?? null;
+  }
+}
+
+// =============================================================================
 // Space-Group Helper Functions
 // =============================================================================
 
@@ -467,12 +504,14 @@ async function findSpaceByName(name: string | undefined): Promise<Space | undefi
 const spaceStateManager = new SpaceWindowStateManager();
 const historyManager = new TabHistoryManager(spaceStateManager);
 const groupTracker = new TabGroupTracker();
+const lastAudibleTracker = new LastAudibleTracker();
 
 // Load persisted state
 Promise.all([
   spaceStateManager.load(),
   historyManager.load(),
-  groupTracker.load()
+  groupTracker.load(),
+  lastAudibleTracker.load()
 ]);
 
 // =============================================================================
@@ -530,10 +569,20 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
   }
 });
 
-// Clean up history when tab is closed
+// Clean up history and last audible tracker when tab is closed
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
 {
   historyManager.remove(removeInfo.windowId, tabId);
+  lastAudibleTracker.clearIfMatches(tabId);
+});
+
+// Track when a tab stops being audible
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) =>
+{
+  if (changeInfo.audible === false)
+  {
+    lastAudibleTracker.setLastAudibleTabId(tabId);
+  }
 });
 
 // Helper to add a tab to the active space's Chrome group
@@ -679,6 +728,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
       if (tabs.length === 0) return;
       historyManager.navigateToIndex(tabs[0].windowId, message.index);
     });
+  }
+  else if (message.action === 'get-last-audible-tab')
+  {
+    sendResponse({ tabId: lastAudibleTracker.getLastAudibleTabId() });
+    return true;
   }
 });
 
