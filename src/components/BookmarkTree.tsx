@@ -118,6 +118,7 @@ interface BookmarkRowProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   matchingSpace?: Space;  // Space that uses this folder as its bookmark folder
   isDragging?: boolean;
+  isMultiDrag?: boolean;
   activeId?: string | null;
   dropTargetId?: string | null;
   dropPosition?: DropPosition;
@@ -171,6 +172,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onPin,
   matchingSpace,
   isDragging: _isDragging,
+  isMultiDrag,
   activeId,
   dropTargetId,
   dropPosition,
@@ -197,7 +199,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   const isFolder = !node.url;
   const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
 
-  const isBeingDragged = activeId === node.id;
+  const isBeingDragged = activeId === node.id && !isMultiDrag;
   const isDropTarget = dropTargetId === node.id;
   // Check for external drop target (tab → bookmark)
   const isExternalDropTarget = externalDropTarget?.bookmarkId === node.id;
@@ -615,7 +617,7 @@ interface DragOverlayContentProps {
 
 const DragOverlayContent = ({ node, depth }: DragOverlayContentProps) => {
   const isFolder = !node.url;
-  
+
   const icon = isFolder ? (
     <Folder size={16} className="text-gray-500" />
   ) : node.url ? (
@@ -636,6 +638,66 @@ const DragOverlayContent = ({ node, depth }: DragOverlayContentProps) => {
       hasChildren={isFolder}
       className="pointer-events-none"
     />
+  );
+};
+
+// Multi-bookmark drag overlay - shows stacked bookmarks for multi-selection drag
+interface MultiBookmarkDragOverlayProps {
+  nodes: chrome.bookmarks.BookmarkTreeNode[];
+}
+
+const MultiBookmarkDragOverlay = ({ nodes }: MultiBookmarkDragOverlayProps) =>
+{
+  // Show up to 3 stacked layers
+  const maxVisible = 3;
+  const visibleNodes = nodes.slice(0, maxVisible);
+  const firstNode = visibleNodes[0];
+  const isFolder = firstNode && !firstNode.url;
+
+  const icon = isFolder ? (
+    <Folder size={16} className="text-gray-500" />
+  ) : firstNode?.url ? (
+    <img
+      src={getFaviconUrl(firstNode.url)}
+      alt=""
+      className="w-4 h-4"
+    />
+  ) : (
+    <Globe size={16} className="text-gray-500" />
+  );
+
+  return (
+    <div className="relative pointer-events-none">
+      {/* Stacked background layers (shown in reverse order for proper z-indexing) */}
+      {visibleNodes.length > 2 && (
+        <div
+          className="absolute w-full bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800"
+          style={{ top: 12, left: 12, height: 28 }}
+        />
+      )}
+      {visibleNodes.length > 1 && (
+        <div
+          className="absolute w-full bg-blue-100 dark:bg-blue-900/70 rounded border border-blue-200 dark:border-blue-700"
+          style={{ top: 6, left: 6, height: 28 }}
+        />
+      )}
+      {/* Front bookmark with content */}
+      <div className="relative bg-blue-100 dark:bg-blue-900/50 rounded border border-blue-300 dark:border-blue-600">
+        {firstNode && (
+          <TreeRow
+            depth={0}
+            title={firstNode.title}
+            icon={icon}
+            hasChildren={isFolder}
+            badges={
+              <span className="text-xs font-medium text-blue-600 dark:text-blue-300 bg-blue-200 dark:bg-blue-800 px-1.5 py-0.5 rounded-full">
+                {nodes.length} items
+              </span>
+            }
+          />
+        )}
+      </div>
+    </div>
   );
 };
 
@@ -974,6 +1036,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   // Bookmark-specific drag state
   const [activeNode, setActiveNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [activeDepth, setActiveDepth] = useState<number>(0);
+  const [activeSelectedNodes, setActiveSelectedNodes] = useState<chrome.bookmarks.BookmarkTreeNode[]>([]);
 
   // Find a node by ID in the bookmark tree
   const findNode = useCallback((id: string): chrome.bookmarks.BookmarkTreeNode | null => {
@@ -1205,12 +1268,21 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const handleDragStart = useCallback((event: DragStartEvent) => {
     const id = event.active.id as string;
 
-    // If dragged item is NOT in selection, clear selection
+    // If dragged item is NOT in selection, clear selection and reset selected nodes
     if (!isBookmarkSelected(id))
     {
       clearSelection();
+      setActiveSelectedNodes([]);
     }
-    // If dragged item IS in selection, keep selection (drag all selected)
+    else
+    {
+      // Dragged item IS in selection - capture all selected nodes for multi-drag overlay
+      const selectedItems = getSelectedItems();
+      const selectedNodes = selectedItems
+        .map(item => findNode(item.id))
+        .filter((node): node is chrome.bookmarks.BookmarkTreeNode => node !== null);
+      setActiveSelectedNodes(selectedNodes);
+    }
 
     setActiveId(id);
     setActiveNode(findNode(id));
@@ -1218,7 +1290,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     const element = document.querySelector(`[data-bookmark-id="${id}"]`);
     const depth = element?.getAttribute('data-depth');
     setActiveDepth(depth ? parseInt(depth, 10) : 0);
-  }, [findNode, setActiveId, isBookmarkSelected, clearSelection]);
+  }, [findNode, setActiveId, isBookmarkSelected, clearSelection, getSelectedItems]);
 
   // Drag move handler - calculate drop position based on pointer
   const handleDragMove = useCallback((event: DragMoveEvent) => {
@@ -1320,6 +1392,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
             setActiveId(null);
             setActiveNode(null);
             setActiveDepth(0);
+            setActiveSelectedNodes([]);
             setDropTargetId(null);
             setDropPosition(null);
             return;
@@ -1383,6 +1456,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setActiveId(null);
     setActiveNode(null);
     setActiveDepth(0);
+    setActiveSelectedNodes([]);
     setDropTargetId(null);
     setDropPosition(null);
   }, [dropTargetId, dropPosition, moveBookmark, expandedState, findNode, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, getSelectedItems, clearSelection]);
@@ -1396,6 +1470,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setActiveId(null);
     setActiveNode(null);
     setActiveDepth(0);
+    setActiveSelectedNodes([]);
     setDropTargetId(null);
     setDropPosition(null);
   }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
@@ -1463,6 +1538,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
               onExpandAll={handleExpandAll}
               onPin={onPin}
               isDragging={!!activeId}
+              isMultiDrag={activeSelectedNodes.length > 1}
               activeId={activeId}
               dropTargetId={dropTargetId}
               dropPosition={dropPosition}
@@ -1502,7 +1578,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
 
         {/* Drag overlay - no animation for valid drops, default animation for cancelled */}
         <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
-          {activeNode ? <DragOverlayContent node={activeNode} depth={activeDepth} /> : null}
+          {activeSelectedNodes.length > 1 ? (
+            <MultiBookmarkDragOverlay nodes={activeSelectedNodes} />
+          ) : activeNode ? (
+            <DragOverlayContent node={activeNode} depth={activeDepth} />
+          ) : null}
         </DragOverlay>
       </DndContext>
 

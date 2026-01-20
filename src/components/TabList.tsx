@@ -599,6 +599,57 @@ const TabDragOverlay = ({ tab }: { tab: chrome.tabs.Tab }) =>
   );
 };
 
+// Multi-tab drag overlay - shows stacked items for multi-selection drag
+type MultiDragFirstItemType =
+  | { type: 'tab'; tab: chrome.tabs.Tab }
+  | { type: 'group'; group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number };
+
+interface MultiTabDragOverlayProps {
+  count: number;
+  firstItem: MultiDragFirstItemType;
+}
+
+const MultiTabDragOverlay = ({ count, firstItem }: MultiTabDragOverlayProps) =>
+{
+  // Render the appropriate overlay component based on first item type
+  const overlayContent = firstItem.type === 'group' ? (
+    <GroupDragOverlay
+      group={firstItem.group}
+      matchedSpace={firstItem.matchedSpace}
+      tabCount={firstItem.tabCount}
+    />
+  ) : (
+    <TabDragOverlay tab={firstItem.tab} />
+  );
+
+  return (
+    <div className="relative pointer-events-none">
+      {/* Stacked background layers (shown in reverse order for proper z-indexing) */}
+      {count > 2 && (
+        <div
+          className="absolute w-full bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800"
+          style={{ top: 12, left: 12, height: 28 }}
+        />
+      )}
+      {count > 1 && (
+        <div
+          className="absolute w-full bg-blue-100 dark:bg-blue-900/70 rounded border border-blue-200 dark:border-blue-700"
+          style={{ top: 6, left: 6, height: 28 }}
+        />
+      )}
+      {/* Front item with content */}
+      <div className="relative bg-blue-100 dark:bg-blue-900/50 rounded border border-blue-300 dark:border-blue-600 flex items-center">
+        <div className="flex-1">
+          {overlayContent}
+        </div>
+        <span className="text-xs font-medium text-blue-600 dark:text-blue-300 bg-blue-200 dark:bg-blue-800 px-1.5 py-0.5 rounded-full mr-2">
+          {count} items
+        </span>
+      </div>
+    </div>
+  );
+};
+
 // Display item types for rendering
 type DisplayItem =
   | { type: 'group'; group: chrome.tabGroups.TabGroup; tabs: chrome.tabs.Tab[]; startIndex: number }
@@ -1064,6 +1115,11 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
   // Drag state for tab or group
   const [activeTab, setActiveTab] = useState<chrome.tabs.Tab | null>(null);
   const [activeGroup, setActiveGroup] = useState<{ group: chrome.tabGroups.TabGroup; tabCount: number } | null>(null);
+  // Multi-selection drag state - first item can be tab or group
+  type MultiDragFirstItem =
+    | { type: 'tab'; tab: chrome.tabs.Tab }
+    | { type: 'group'; group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number };
+  const [multiDragInfo, setMultiDragInfo] = useState<{ count: number; firstItem: MultiDragFirstItem } | null>(null);
 
   // External drop target for cross-context drops (tab → bookmark)
   const [localExternalTarget, setLocalExternalTarget] = useState<ExternalDropTarget | null>(null);
@@ -1308,6 +1364,58 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       if (!isTabSelected(id))
       {
         clearSelection();
+        setMultiDragInfo(null);
+      }
+      else
+      {
+        // Group is in selection - check for multi-drag
+        const selectedItems = getSelectedItems();
+        if (selectedItems.length > 1)
+        {
+          // Sort by index to get first visible item
+          const sortedItems = [...selectedItems].sort((a, b) => a.index - b.index);
+          const firstItem = sortedItems[0];
+          const allTabs = [...visibleTabs, ...orphanedTabs];
+
+          let firstItemInfo: MultiDragFirstItem | null = null;
+          if (firstItem.type === 'group')
+          {
+            const firstGroupId = parseInt(firstItem.id.replace('group-', ''), 10);
+            const firstGroup = visibleTabGroups.find(g => g.id === firstGroupId);
+            if (firstGroup)
+            {
+              const firstGroupTabCount = allTabs.filter(t => (t.groupId ?? -1) === firstGroupId).length;
+              const firstGroupMatchedSpace = spaces.find(s => s.name === firstGroup.title);
+              firstItemInfo = {
+                type: 'group',
+                group: firstGroup,
+                matchedSpace: firstGroupMatchedSpace,
+                tabCount: firstGroupTabCount
+              };
+            }
+          }
+          else if (firstItem.type === 'tab')
+          {
+            const tab = allTabs.find(t => String(t.id) === firstItem.id);
+            if (tab)
+            {
+              firstItemInfo = { type: 'tab', tab };
+            }
+          }
+
+          if (firstItemInfo)
+          {
+            setMultiDragInfo({ count: selectedItems.length, firstItem: firstItemInfo });
+          }
+          else
+          {
+            setMultiDragInfo(null);
+          }
+        }
+        else
+        {
+          setMultiDragInfo(null);
+        }
       }
 
       setActiveId(id);
@@ -1324,15 +1432,67 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       if (!isTabSelected(tabIdStr))
       {
         clearSelection();
+        setMultiDragInfo(null);
       }
-      // If dragged item IS in selection, keep selection (drag all selected)
+      else
+      {
+        // If dragged item IS in selection, keep selection (drag all selected)
+        // Collect first item info for the drag overlay
+        const selectedItems = getSelectedItems();
+        if (selectedItems.length > 1)
+        {
+          // Sort by index to get first visible item
+          const sortedItems = [...selectedItems].sort((a, b) => a.index - b.index);
+          const firstItem = sortedItems[0];
+          const allTabs = [...visibleTabs, ...orphanedTabs];
+
+          let firstItemInfo: MultiDragFirstItem | null = null;
+          if (firstItem.type === 'group')
+          {
+            const groupId = parseInt(firstItem.id.replace('group-', ''), 10);
+            const group = visibleTabGroups.find(g => g.id === groupId);
+            if (group)
+            {
+              const groupTabCount = allTabs.filter(t => (t.groupId ?? -1) === groupId).length;
+              const groupMatchedSpace = spaces.find(s => s.name === group.title);
+              firstItemInfo = {
+                type: 'group',
+                group,
+                matchedSpace: groupMatchedSpace,
+                tabCount: groupTabCount
+              };
+            }
+          }
+          else if (firstItem.type === 'tab')
+          {
+            const tab = allTabs.find(t => String(t.id) === firstItem.id);
+            if (tab)
+            {
+              firstItemInfo = { type: 'tab', tab };
+            }
+          }
+
+          if (firstItemInfo)
+          {
+            setMultiDragInfo({ count: selectedItems.length, firstItem: firstItemInfo });
+          }
+          else
+          {
+            setMultiDragInfo(null);
+          }
+        }
+        else
+        {
+          setMultiDragInfo(null);
+        }
+      }
 
       setActiveId(tabId);
       const tab = visibleTabs.find(t => t.id === tabId) || orphanedTabs.find(t => t.id === tabId);
       setActiveTab(tab || null);
       setActiveGroup(null);
     }
-  }, [visibleTabs, visibleTabGroups, orphanedTabs, setActiveId, isTabSelected, clearSelection]);
+  }, [visibleTabs, visibleTabGroups, orphanedTabs, spaces, setActiveId, isTabSelected, clearSelection, getSelectedItems]);
 
   const handleDragMove = useCallback((event: DragMoveEvent) =>
   {
@@ -1632,6 +1792,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       setActiveId(null);
       setActiveTab(null);
       setActiveGroup(null);
+      setMultiDragInfo(null);
       setDropTargetId(null);
       setDropPosition(null);
       setLocalExternalTarget(null);
@@ -1717,6 +1878,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       setActiveId(null);
       setActiveTab(null);
       setActiveGroup(null);
+      setMultiDragInfo(null);
       setDropTargetId(null);
       setDropPosition(null);
       setLocalExternalTarget(null);
@@ -1736,6 +1898,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       setActiveId(null);
       setActiveTab(null);
       setActiveGroup(null);
+      setMultiDragInfo(null);
       setDropTargetId(null);
       setDropPosition(null);
       setLocalSpaceDropTarget(null);
@@ -1754,6 +1917,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       setActiveId(null);
       setActiveTab(null);
       setActiveGroup(null);
+      setMultiDragInfo(null);
       setDropTargetId(null);
       setDropPosition(null);
       setLocalExternalTarget(null);
@@ -1856,6 +2020,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
         setActiveId(null);
         setActiveTab(null);
         setActiveGroup(null);
+        setMultiDragInfo(null);
         setDropTargetId(null);
         setDropPosition(null);
         return;
@@ -2129,6 +2294,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setActiveId(null);
     setActiveTab(null);
     setActiveGroup(null);
+    setMultiDragInfo(null);
     setDropTargetId(null);
     setDropPosition(null);
     setLocalExternalTarget(null);
@@ -2147,6 +2313,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setActiveId(null);
     setActiveTab(null);
     setActiveGroup(null);
+    setMultiDragInfo(null);
     setDropTargetId(null);
     setDropPosition(null);
     setLocalExternalTarget(null);
@@ -2307,7 +2474,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   key={item.tab.id}
                   tab={item.tab}
                   indentLevel={0}
-                  isBeingDragged={activeId === item.tab.id}
+                  isBeingDragged={activeId === item.tab.id && !multiDragInfo}
                   showDropBefore={isTarget && dropPosition === 'before'}
                   showDropAfter={isTarget && dropPosition === 'after'}
                   isSelected={isTabSelected(tabId)}
@@ -2346,7 +2513,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           key={tab.id}
                           tab={tab}
                           indentLevel={0}
-                          isBeingDragged={activeId === tab.id}
+                          isBeingDragged={activeId === tab.id && !multiDragInfo}
                           showDropBefore={isTabTarget && dropPosition === 'before'}
                           showDropAfter={isTabTarget && dropPosition === 'after'}
                           isSelected={isTabSelected(tabId)}
@@ -2425,7 +2592,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         key={tab.id}
                         tab={tab}
                         indentLevel={1}
-                        isBeingDragged={activeId === tab.id}
+                        isBeingDragged={activeId === tab.id && !multiDragInfo}
                         showDropBefore={isTabTarget && dropPosition === 'before'}
                         showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab}
                         beforeIndentPx={dropPosition === 'before' ? indentPx : undefined}
@@ -2519,7 +2686,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         <DraggableTab
                           tab={tab}
                           indentLevel={1}
-                          isBeingDragged={activeId === tab.id}
+                          isBeingDragged={activeId === tab.id && !multiDragInfo}
                           showDropBefore={false}
                           showDropAfter={false}
                           groupColor={item.color}
@@ -2562,8 +2729,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           </TreeRow>
 
           <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
-            {activeTab && <TabDragOverlay tab={activeTab} />}
-            {activeGroup && <GroupDragOverlay group={activeGroup.group} matchedSpace={spaces.find(s => s.name === activeGroup.group.title)} tabCount={activeGroup.tabCount} />}
+            {multiDragInfo && <MultiTabDragOverlay count={multiDragInfo.count} firstItem={multiDragInfo.firstItem} />}
+            {activeTab && !multiDragInfo && <TabDragOverlay tab={activeTab} />}
+            {activeGroup && !multiDragInfo && <GroupDragOverlay group={activeGroup.group} matchedSpace={spaces.find(s => s.name === activeGroup.group.title)} tabCount={activeGroup.tabCount} />}
           </DragOverlay>
         </DndContext>
 

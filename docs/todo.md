@@ -186,16 +186,26 @@ SpaceBar
 
 - [x] cannot collapse "Orphaned Tabs" group
 
-- [x] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
+- [x] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.  
 
 - [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
 
-- [ ] multiple selection of the same type of rows (bookmarks+folders, tabs): drag/drop, common popup menu (move to folder  or move to space and delete)
+- [-] multiple selection of the same type of rows (bookmarks+folders, tabs): drag/drop, common popup menu (move to folder  or move to space and delete)
 
-- [ ] drag links from browser pane to bookmarks/tabs/spaces. 
+- [ ] support drag links from browser pane to 
+            - bookmarks - create bookmark
+            - tabs - open as new tab (grouped or ungrouped, depending on drop location)
+            - spaces - open as new tab in the target space.
 
-- [ ] in orphaned tabs group, add close tabs before, close tabs after and close other tabs to popeup menu which close those tabs in the group (just like in normal groups).\
+- [ ] Orphaned tabs popup menu, add
+      - [ ] "Move To Space..."
+      - [ ] "Close Tabs Before"  (within the Orphaned tabs list)
+      - [ ] "Close Tabs After"  (within the Orphaned tabs list)
+      - [ ] "Close Other Tabs"  (other tabs in the Orphaned tabs list)
 
 - [ ] make the area that response to group row's expand and collapse bigger, expand the area to outside of the V > icon. the area should fill the whole row.
 
-- [ ] add "Move To Space..." to Orphaned tabs
+
+- [ ] multi-select a folder and its 2 bookmarks, after drop, the 2 bookmkars are at the same level as the folder.
+
+- [ ] multi-select tabs/bookmarks, drag overlay covers up drop location indicator
