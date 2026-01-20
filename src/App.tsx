@@ -9,7 +9,7 @@ import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
 import { WelcomeDialog } from './components/WelcomeDialog';
-import { AudioTabsDialog } from './components/AudioTabsDialog';
+import { AudioTabsDropdown } from './components/AudioTabsDropdown';
 import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
 import { usePinnedSites, PinnedSite } from './hooks/usePinnedSites';
@@ -347,7 +347,8 @@ function App() {
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
   const [showSpaceNavigator, setShowSpaceNavigator] = useState(false);
-  const [lastAudibleTab, setLastAudibleTab] = useState<chrome.tabs.Tab | undefined>(undefined);
+  const [playingTabs, setPlayingTabs] = useState<chrome.tabs.Tab[]>([]);
+  const [lastAudibleTabs, setLastAudibleTabs] = useState<chrome.tabs.Tab[]>([]);
   const [filterText, setFilterText] = useState('');
   const [savedFilters, setSavedFilters] = useChromeLocalStorage<string[]>(
     'sidebar-saved-filters',
@@ -369,6 +370,7 @@ function App() {
   const [showSpaceDeleteDialog, setShowSpaceDeleteDialog] = useState(false);
   const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null!);
+  const audioButtonRef = useRef<HTMLButtonElement>(null!);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const {
     pinnedSites,
@@ -464,34 +466,29 @@ function App() {
     setShowSpaceDeleteDialog(true);
   }, []);
 
-  // Audio dialog handler - query for last audible tab before opening
+  // Audio dialog handler - query for playing and history tabs before opening
   const handleOpenAudioDialog = useCallback(async () => {
-    // Check if we already have audible tabs
-    const audibleTabs = tabs.filter(t => t.audible);
-    if (audibleTabs.length > 0)
-    {
-      setLastAudibleTab(undefined);
-      setShowAudioDialog(true);
-      return;
-    }
-
-    // No audible tabs - query background for last audible tab
     try
     {
       const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' });
-      if (response?.tabId)
-      {
-        const tab = tabs.find(t => t.id === response.tabId);
-        setLastAudibleTab(tab);
-      }
-      else
-      {
-        setLastAudibleTab(undefined);
-      }
+
+      // Map playing tab IDs to tab objects
+      const playing = (response?.playingTabIds || [])
+        .map((id: number) => tabs.find(t => t.id === id))
+        .filter((t: chrome.tabs.Tab | undefined): t is chrome.tabs.Tab => t !== undefined);
+
+      // Map history tab IDs to tab objects
+      const history = (response?.historyTabIds || [])
+        .map((id: number) => tabs.find(t => t.id === id))
+        .filter((t: chrome.tabs.Tab | undefined): t is chrome.tabs.Tab => t !== undefined);
+
+      setPlayingTabs(playing);
+      setLastAudibleTabs(history);
     }
     catch
     {
-      setLastAudibleTab(undefined);
+      setPlayingTabs([]);
+      setLastAudibleTabs([]);
     }
     setShowAudioDialog(true);
   }, [tabs]);
@@ -564,16 +561,17 @@ function App() {
         }}
       />
 
-      <AudioTabsDialog
-        isOpen={showAudioDialog}
-        tabs={tabs.filter(t => t.audible)}
-        lastAudibleTab={lastAudibleTab}
-        onTabSelect={(tabId) =>
-        {
-          activateTab(tabId);
-        }}
-        onClose={() => setShowAudioDialog(false)}
-      />
+      <DropdownMenu.Root
+        open={showAudioDialog}
+        onOpenChange={setShowAudioDialog}
+        anchorRef={audioButtonRef}
+      >
+        <AudioTabsDropdown
+          playingTabs={playingTabs}
+          historyTabs={lastAudibleTabs}
+          onTabSelect={(tabId) => { activateTab(tabId); }}
+        />
+      </DropdownMenu.Root>
 
       {/* Toolbar */}
       <div ref={toolbarRef} className="relative">
@@ -587,6 +585,7 @@ function App() {
           onAudioDialogOpen={handleOpenAudioDialog}
           onMenuToggle={() => setShowMenu(!showMenu)}
           menuButtonRef={buttonRef}
+          audioButtonRef={audioButtonRef}
           filterText={filterText}
           onFilterTextChange={handleFilterTextChange}
           savedFilters={savedFilters}

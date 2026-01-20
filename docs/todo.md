@@ -197,3 +197,5 @@ SpaceBar
 - [ ] in orphaned tabs group, add close tabs before, close tabs after and close other tabs to popeup menu which close those tabs in the group (just like in normal groups).\
 
 - [ ] make the area that response to group row's expand and collapse bigger, expand the area to outside of the V > icon. the area should fill the whole row.
+
+- [ ] add "Move To Space..." to Orphaned tabs

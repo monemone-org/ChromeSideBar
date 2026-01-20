@@ -9,6 +9,7 @@ interface ToolbarProps
   onAudioDialogOpen: () => void;
   onMenuToggle: () => void;
   menuButtonRef: React.RefObject<HTMLButtonElement>;
+  audioButtonRef?: React.RefObject<HTMLButtonElement>;
   // Text filter props
   filterText: string;
   onFilterTextChange: (text: string) => void;
@@ -33,6 +34,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   onAudioDialogOpen,
   onMenuToggle,
   menuButtonRef,
+  audioButtonRef,
   filterText,
   onFilterTextChange,
   savedFilters,
@@ -517,6 +519,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
 
           {/* Audio dialog button */}
           <button
+            ref={audioButtonRef}
             onClick={onAudioDialogOpen}
             title="Show tabs playing audio/video"
             className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}

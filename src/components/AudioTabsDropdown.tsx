@@ -1,30 +1,28 @@
 import { useCallback } from 'react';
 import { Globe, Volume2 } from 'lucide-react';
-import { QuickDismissDialog } from './QuickDismissDialog';
+import * as DropdownMenu from './menu/DropdownMenu';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useTabGroups } from '../hooks/useTabGroups';
+import { useFontSize } from '../contexts/FontSizeContext';
 
-export interface AudioTabsDialogProps
+export interface AudioTabsDropdownProps
 {
-  isOpen: boolean;
-  tabs: chrome.tabs.Tab[];
-  lastAudibleTab?: chrome.tabs.Tab;
+  playingTabs: chrome.tabs.Tab[];
+  historyTabs?: chrome.tabs.Tab[];
   onTabSelect: (tabId: number) => void;
-  onClose: () => void;
 }
 
-export const AudioTabsDialog = ({
-  isOpen,
-  tabs,
-  lastAudibleTab,
-  onTabSelect,
-  onClose
-}: AudioTabsDialogProps) =>
+export const AudioTabsDropdown = ({
+  playingTabs,
+  historyTabs,
+  onTabSelect
+}: AudioTabsDropdownProps) =>
 {
   const { spaces, setActiveSpaceId, activeSpaceId } = useSpacesContext();
   const { getItemKeyForTab } = useBookmarkTabsContext();
   const { tabGroups } = useTabGroups();
+  const fontSize = useFontSize();
 
   // Find space ID for a tab based on its Chrome group title
   const getSpaceForTab = useCallback((tab: chrome.tabs.Tab): string | null =>
@@ -38,7 +36,7 @@ export const AudioTabsDialog = ({
     return space?.id ?? null;
   }, [tabGroups, spaces]);
 
-  const handleSelectTab = (tab: chrome.tabs.Tab) =>
+  const handleSelectTab = useCallback((tab: chrome.tabs.Tab) =>
   {
     if (tab.id === undefined) return;
 
@@ -47,7 +45,6 @@ export const AudioTabsDialog = ({
 
     // Activate the tab
     onTabSelect(tab.id);
-    onClose();
 
     // Switch to the space if needed
     // If tab not in any space (e.g., live bookmark tab), fall back to "All" space
@@ -78,10 +75,10 @@ export const AudioTabsDialog = ({
 
       element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 100);
-  };
+  }, [getSpaceForTab, onTabSelect, activeSpaceId, setActiveSpaceId, getItemKeyForTab]);
 
-  // Render a tab row (shared between audible tabs and last audible tab)
-  const renderTabRow = (tab: chrome.tabs.Tab, showSpeakerIcon: boolean) =>
+  // Render a tab row as dropdown item
+  const renderTabItem = (tab: chrome.tabs.Tab, showSpeakerIcon: boolean) =>
   {
     const icon = tab.favIconUrl ? (
       <img src={tab.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />
@@ -90,35 +87,43 @@ export const AudioTabsDialog = ({
     );
 
     return (
-      <button
+      <DropdownMenu.Item
         key={tab.id}
-        onClick={() => handleSelectTab(tab)}
-        className="w-full px-3 py-2 text-left flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+        onSelect={() => handleSelectTab(tab)}
       >
         {icon}
-        <span className="truncate flex-1">{tab.title || tab.url}</span>
-        {showSpeakerIcon && <Volume2 size={14} className="text-blue-500 flex-shrink-0" />}
-      </button>
+        <span className="truncate flex-1 ml-2">{tab.title || tab.url}</span>
+        {showSpeakerIcon && <Volume2 size={14} className="text-blue-500 flex-shrink-0 ml-2" />}
+      </DropdownMenu.Item>
     );
   };
 
   // Determine what to render
-  const hasAudibleTabs = tabs.length > 0;
-  const hasLastAudibleTab = !hasAudibleTabs && lastAudibleTab;
+  const hasPlayingTabs = playingTabs.length > 0;
+  const hasHistoryTabs = historyTabs && historyTabs.length > 0;
 
   return (
-    <QuickDismissDialog isOpen={isOpen} onClose={onClose} title="Audio Playing">
-      <div className="py-1 max-h-64 overflow-y-auto">
-        {hasAudibleTabs ? (
-          tabs.map((tab) => renderTabRow(tab, true))
-        ) : hasLastAudibleTab ? (
-          renderTabRow(lastAudibleTab, false)
-        ) : (
-          <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
-            No audio playing
+    <DropdownMenu.Content className="min-w-48 max-w-72 max-h-64 overflow-y-auto">
+      {hasPlayingTabs && (
+        playingTabs.map((tab) => renderTabItem(tab, true))
+      )}
+      {hasHistoryTabs && (
+        <>
+          {hasPlayingTabs && <DropdownMenu.Separator />}
+          <div
+            className="px-3 py-1.5 font-medium text-gray-500 dark:text-gray-400"
+            style={{ fontSize: fontSize - 1 }}
+          >
+            Recently played
           </div>
-        )}
-      </div>
-    </QuickDismissDialog>
+          {historyTabs!.map((tab) => renderTabItem(tab, false))}
+        </>
+      )}
+      {!hasPlayingTabs && !hasHistoryTabs && (
+        <div className="px-3 py-4 text-center text-gray-500 dark:text-gray-400">
+          No audio playing
+        </div>
+      )}
+    </DropdownMenu.Content>
   );
 };

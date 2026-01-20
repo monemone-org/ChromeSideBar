@@ -282,6 +282,20 @@ class TabHistoryManager
     });
   }
 
+  getActivationOrder(windowId: number): number[]
+  {
+    const history = this.#history.get(windowId);
+    if (!history || history.stack.length === 0) return [];
+
+    // Return tab IDs from current index backwards (most recent first)
+    const result: number[] = [];
+    for (let i = history.index; i >= 0; i--)
+    {
+      result.push(history.stack[i].tabId);
+    }
+    return result;
+  }
+
   async getHistoryDetails(windowId: number): Promise<{
     before: Array<{ tabId: number; spaceId: string; index: number; title: string; url: string; favIconUrl: string }>;
     after: Array<{ tabId: number; spaceId: string; index: number; title: string; url: string; favIconUrl: string }>;
@@ -426,39 +440,61 @@ class TabGroupTracker
 }
 
 // =============================================================================
-// LastAudibleTracker - Tracks the most recently audible tab
+// LastAudibleTracker - Tracks the most recently audible tabs (in memory)
 // =============================================================================
 
 class LastAudibleTracker
 {
-  static STORAGE_KEY = 'bg_lastAudibleTabId';
+  static STORAGE_KEY = 'bg_lastAudibleTabIds';
+  static MAX_HISTORY_SIZE = 5;
 
-  #lastAudibleTabId: number | null = null;
+  #lastAudibleTabIds: number[] = [];
 
-  getLastAudibleTabId(): number | null
+  getLastAudibleTabIds(): number[]
   {
-    return this.#lastAudibleTabId;
+    return [...this.#lastAudibleTabIds];
   }
 
   setLastAudibleTabId(tabId: number): void
   {
-    this.#lastAudibleTabId = tabId;
-    chrome.storage.session.set({ [LastAudibleTracker.STORAGE_KEY]: tabId });
+    // Remove if already exists (move-to-front deduplication)
+    const existingIndex = this.#lastAudibleTabIds.indexOf(tabId);
+    if (existingIndex !== -1)
+    {
+      this.#lastAudibleTabIds.splice(existingIndex, 1);
+    }
+
+    // Add to front
+    this.#lastAudibleTabIds.unshift(tabId);
+
+    // Trim to max size
+    if (this.#lastAudibleTabIds.length > LastAudibleTracker.MAX_HISTORY_SIZE)
+    {
+      this.#lastAudibleTabIds.length = LastAudibleTracker.MAX_HISTORY_SIZE;
+    }
+
+    this.#save();
   }
 
   clearIfMatches(tabId: number): void
   {
-    if (this.#lastAudibleTabId === tabId)
+    const index = this.#lastAudibleTabIds.indexOf(tabId);
+    if (index !== -1)
     {
-      this.#lastAudibleTabId = null;
-      chrome.storage.session.remove(LastAudibleTracker.STORAGE_KEY);
+      this.#lastAudibleTabIds.splice(index, 1);
+      this.#save();
     }
+  }
+
+  #save(): void
+  {
+    chrome.storage.session.set({ [LastAudibleTracker.STORAGE_KEY]: this.#lastAudibleTabIds });
   }
 
   async load(): Promise<void>
   {
     const result = await chrome.storage.session.get([LastAudibleTracker.STORAGE_KEY]);
-    this.#lastAudibleTabId = result[LastAudibleTracker.STORAGE_KEY] ?? null;
+    this.#lastAudibleTabIds = result[LastAudibleTracker.STORAGE_KEY] ?? [];
   }
 }
 
@@ -731,7 +767,48 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
   }
   else if (message.action === 'get-last-audible-tab')
   {
-    sendResponse({ tabId: lastAudibleTracker.getLastAudibleTabId() });
+    chrome.tabs.query({ currentWindow: true }, (allTabs) =>
+    {
+      const audibleTabIds = new Set(
+        allTabs.filter(t => t.audible && t.id !== undefined).map(t => t.id!)
+      );
+      const lastAudibleIds = lastAudibleTracker.getLastAudibleTabIds();
+
+      // Playing tabs: from lastAudibleIds, filtered to currently audible (keeps play-start order)
+      const playingTabIds = lastAudibleIds.filter(id => audibleTabIds.has(id));
+
+      // Include any audible tabs not yet in history (just started playing)
+      for (const tab of allTabs)
+      {
+        if (tab.audible && tab.id !== undefined && !playingTabIds.includes(tab.id))
+        {
+          playingTabIds.push(tab.id);
+        }
+      }
+
+      // Non-playing tabs from history
+      const historyTabIds = lastAudibleIds.filter(id => !audibleTabIds.has(id));
+
+      // Sort historyTabIds by activation order (need windowId from query)
+      const windowId = allTabs[0]?.windowId;
+      if (windowId !== undefined)
+      {
+        const activationOrder = historyManager.getActivationOrder(windowId);
+        historyTabIds.sort((a, b) =>
+        {
+          const aIndex = activationOrder.indexOf(a);
+          const bIndex = activationOrder.indexOf(b);
+          // Not in history = put at end
+          if (aIndex === -1 && bIndex === -1) return 0;
+          if (aIndex === -1) return 1;
+          if (bIndex === -1) return -1;
+          // Lower index = more recently activated
+          return aIndex - bIndex;
+        });
+      }
+
+      sendResponse({ playingTabIds, historyTabIds });
+    });
     return true;
   }
 });
