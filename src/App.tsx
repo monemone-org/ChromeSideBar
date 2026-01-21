@@ -73,6 +73,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
     <div className="h-full overflow-y-auto overflow-x-hidden p-2">
       <BookmarkTree
         onPin={onPin}
+        onPinMultiple={onPinMultiple}
         hideOtherBookmarks={hideOtherBookmarks}
         externalDropTarget={externalDropTarget}
         bookmarkOpenMode={bookmarkOpenMode}

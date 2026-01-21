@@ -86,6 +86,12 @@ interface DraggableTabProps {
   onSelectionClick?: (e: React.MouseEvent) => void;
   onSelectionContextMenu?: () => void;
   selectionCount?: number;
+  // Multi-selection actions
+  isMultiSelection?: boolean;
+  hasSelectedTabs?: boolean;
+  onAddSelectedToBookmark?: () => void;
+  onMoveSelectedToSpace?: () => void;
+  onMoveSelectedToNewWindow?: () => void;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -118,7 +124,12 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onKeepAsRegularTab,
   onSelectionClick,
   onSelectionContextMenu,
-  selectionCount,
+  selectionCount: _selectionCount,
+  isMultiSelection,
+  hasSelectedTabs,
+  onAddSelectedToBookmark,
+  onMoveSelectedToSpace,
+  onMoveSelectedToNewWindow,
   attributes,
   listeners
 }, ref) => {
@@ -259,6 +270,40 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content>
+          {isMultiSelection ? (
+            // Multi-selection menu
+            <>
+              {hasSelectedTabs && onPin && (
+                <>
+                  <ContextMenu.Item onSelect={() => onPin(tab.url || '', tab.title || tab.url || '', tab.favIconUrl)}>
+                    <Pin size={14} className="mr-2" /> Pin to Sidebar
+                  </ContextMenu.Item>
+                  <ContextMenu.Separator />
+                </>
+              )}
+              {onAddSelectedToBookmark && (
+                <ContextMenu.Item onSelect={onAddSelectedToBookmark}>
+                  <Bookmark size={14} className="mr-2" /> Add to Bookmark...
+                </ContextMenu.Item>
+              )}
+              {onMoveSelectedToSpace && (
+                <ContextMenu.Item onSelect={onMoveSelectedToSpace}>
+                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                </ContextMenu.Item>
+              )}
+              {onMoveSelectedToNewWindow && (
+                <ContextMenu.Item onSelect={onMoveSelectedToNewWindow}>
+                  <ExternalLink size={14} className="mr-2" /> Move to New Window
+                </ContextMenu.Item>
+              )}
+              <ContextMenu.Separator />
+              <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
+                <X size={14} className="mr-2" /> Close
+              </ContextMenu.Item>
+            </>
+          ) : (
+            // Single-item menu
+            <>
           {onKeepAsRegularTab && (
             <>
               <ContextMenu.Item onSelect={() => { if (tab.id) onKeepAsRegularTab(tab.id); }}>
@@ -269,7 +314,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           )}
           {onPin && tab.url && !tab.pinned && (
             <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
-              <Pin size={14} className="mr-2" /> {selectionCount && selectionCount > 1 ? `Pin ${selectionCount} to Sidebar` : 'Pin to Sidebar'}
+              <Pin size={14} className="mr-2" /> Pin to Sidebar
             </ContextMenu.Item>
           )}
           {onDuplicate && tab.url && (
@@ -330,8 +375,10 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             <ContextMenu.Separator />
           )}
           <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
-            <X size={14} className="mr-2" /> {selectionCount && selectionCount > 1 ? `Close ${selectionCount} Tabs` : 'Close'}
+            <X size={14} className="mr-2" /> Close
           </ContextMenu.Item>
+            </>
+          )}
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </>
@@ -406,6 +453,13 @@ interface TabGroupHeaderProps {
   onRename: () => void;
   onNewTab: () => void;
   onExportToBookmarks: () => void;
+  // Multi-selection props
+  isMultiSelection?: boolean;
+  onlyGroupsSelected?: boolean;
+  onSaveGroupsToBookmarks?: () => void;
+  onMoveSelectedToSpace?: () => void;
+  onMoveSelectedToNewWindow?: () => void;
+  onCloseSelected?: () => void;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -430,6 +484,12 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
   onRename,
   onNewTab,
   onExportToBookmarks,
+  isMultiSelection,
+  onlyGroupsSelected,
+  onSaveGroupsToBookmarks,
+  onMoveSelectedToSpace,
+  onMoveSelectedToNewWindow,
+  onCloseSelected,
   attributes,
   listeners
 }, ref) =>
@@ -496,6 +556,35 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content>
+          {isMultiSelection && onlyGroupsSelected ? (
+            // Groups-only multi-selection menu
+            <>
+              {onSaveGroupsToBookmarks && (
+                <ContextMenu.Item onSelect={onSaveGroupsToBookmarks}>
+                  <FolderPlus size={14} className="mr-2" /> Save to Bookmarks
+                </ContextMenu.Item>
+              )}
+              {onSaveGroupsToBookmarks && (onMoveSelectedToSpace || onMoveSelectedToNewWindow) && (
+                <ContextMenu.Separator />
+              )}
+              {onMoveSelectedToSpace && (
+                <ContextMenu.Item onSelect={onMoveSelectedToSpace}>
+                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                </ContextMenu.Item>
+              )}
+              {onMoveSelectedToNewWindow && (
+                <ContextMenu.Item onSelect={onMoveSelectedToNewWindow}>
+                  <ExternalLink size={14} className="mr-2" /> Move to New Window
+                </ContextMenu.Item>
+              )}
+              <ContextMenu.Separator />
+              <ContextMenu.Item danger onSelect={onCloseSelected}>
+                <X size={14} className="mr-2" /> Close
+              </ContextMenu.Item>
+            </>
+          ) : (
+            // Single-group menu
+            <>
           <ContextMenu.Item onSelect={onNewTab}>
             <Plus size={14} className="mr-2" /> New Tab
           </ContextMenu.Item>
@@ -521,6 +610,8 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           <ContextMenu.Item danger onSelect={onCloseGroup}>
             <X size={14} className="mr-2" /> Close All Tabs in Group
           </ContextMenu.Item>
+            </>
+          )}
             </ContextMenu.Content>
           </ContextMenu.Portal>
         </>
@@ -577,13 +668,15 @@ const GroupDragOverlay = ({ group, matchedSpace, tabCount }: { group: chrome.tab
   );
 
   return (
-    <TreeRow
-      depth={0}
-      title={titleComponent}
-      hideIcon
-      hasChildren={true}
-      className="pointer-events-none"
-    />
+    <div className="w-[280px]">
+      <TreeRow
+        depth={0}
+        title={titleComponent}
+        hideIcon
+        hasChildren={true}
+        className="pointer-events-none"
+      />
+    </div>
   );
 };
 
@@ -597,13 +690,15 @@ const TabDragOverlay = ({ tab }: { tab: chrome.tabs.Tab }) =>
   );
 
   return (
-    <TreeRow
-      depth={0}
-      title={tab.title}
-      icon={icon}
-      hasChildren={false}
-      className="pointer-events-none bg-blue-100 dark:bg-blue-900/50 rounded"
-    />
+    <div className="w-[280px]">
+      <TreeRow
+        depth={0}
+        title={tab.title}
+        icon={icon}
+        hasChildren={false}
+        className="pointer-events-none bg-blue-100 dark:bg-blue-900/50 rounded"
+      />
+    </div>
   );
 };
 
@@ -631,7 +726,7 @@ const MultiTabDragOverlay = ({ count, firstItem }: MultiTabDragOverlayProps) =>
   );
 
   return (
-    <div className="relative pointer-events-none">
+    <div className="relative pointer-events-none w-[280px]">
       {/* Stacked background layers (shown in reverse order for proper z-indexing) */}
       {count > 2 && (
         <div
@@ -2224,6 +2319,178 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     setConfirmDeleteDialog({ isOpen: false, tabIds: [] });
   }, [confirmDeleteDialog.tabIds, closeTabs, clearSelection]);
 
+  // Get selection info for multi-selection actions
+  const getTabSelectionInfo = useCallback(() =>
+  {
+    const items = getSelectedItems();
+    const hasTabs = items.some(item => item.type === 'tab');
+    const hasGroups = items.some(item => item.type === 'group');
+    const onlyGroups = hasGroups && !hasTabs;
+
+    // Get selected tab IDs
+    const selectedTabIds = items
+      .filter(item => item.type === 'tab')
+      .map(item => parseInt(item.id, 10))
+      .filter(id => !isNaN(id));
+
+    // Get actual tab objects
+    const selectedTabs = visibleTabs.filter(t => t.id && selectedTabIds.includes(t.id));
+
+    // Get selected group IDs
+    const selectedGroupIds = items
+      .filter(item => item.type === 'group')
+      .map(item => parseInt(item.id.replace('group-', ''), 10))
+      .filter(id => !isNaN(id));
+
+    // Get actual group objects
+    const selectedGroups = visibleTabGroups.filter(g => selectedGroupIds.includes(g.id));
+
+    // Collect all tab IDs including those in selected groups
+    const allTabIds = new Set(selectedTabIds);
+    for (const group of selectedGroups)
+    {
+      visibleTabs.filter(t => t.groupId === group.id).forEach(t => { if (t.id) allTabIds.add(t.id); });
+    }
+
+    return { items, hasTabs, hasGroups, onlyGroups, selectedTabs, selectedGroups, allTabIds: Array.from(allTabIds) };
+  }, [getSelectedItems, visibleTabs, visibleTabGroups]);
+
+  // Multi-selection dialogs
+  const [addToBookmarkMultiDialog, setAddToBookmarkMultiDialog] = useState({ isOpen: false });
+  const [moveToSpaceMultiDialog, setMoveToSpaceMultiDialog] = useState({ isOpen: false });
+  const [saveGroupsToBookmarksDialog, setSaveGroupsToBookmarksDialog] = useState({ isOpen: false });
+
+  // Open add to bookmark dialog for multi-selection
+  const openAddSelectedToBookmarkDialog = useCallback(() =>
+  {
+    setAddToBookmarkMultiDialog({ isOpen: true });
+  }, []);
+
+  // Handle adding selected tabs to bookmark folder
+  const handleAddSelectedToBookmarkFolder = useCallback(async (folderId: string) =>
+  {
+    const { selectedTabs, selectedGroups } = getTabSelectionInfo();
+
+    // Create bookmarks for individual tabs
+    for (const tab of selectedTabs)
+    {
+      if (tab.url && tab.title)
+      {
+        await createBookmark(folderId, tab.title, tab.url);
+      }
+    }
+
+    // Create folders for groups with their tabs
+    for (const group of selectedGroups)
+    {
+      const groupTabs = visibleTabs.filter(t => t.groupId === group.id && t.url);
+      const folderName = group.title || 'Unnamed Group';
+      createFolder(folderId, folderName, async (newFolder) =>
+      {
+        for (const tab of groupTabs)
+        {
+          if (tab.url && tab.title)
+          {
+            await createBookmark(newFolder.id, tab.title, tab.url);
+          }
+        }
+      });
+    }
+
+    clearSelection();
+    setAddToBookmarkMultiDialog({ isOpen: false });
+    showToast('Added to bookmarks');
+  }, [getTabSelectionInfo, visibleTabs, createBookmark, createFolder, clearSelection, showToast]);
+
+  // Open move to space dialog for multi-selection
+  const openMoveSelectedToSpaceDialog = useCallback(() =>
+  {
+    setMoveToSpaceMultiDialog({ isOpen: true });
+  }, []);
+
+  // Handle moving selected tabs/groups to a space
+  const handleMoveSelectedToSpace = useCallback(async (spaceId: string) =>
+  {
+    const { allTabIds } = getTabSelectionInfo();
+    for (const tabId of allTabIds)
+    {
+      await moveTabToSpace(tabId, spaceId);
+    }
+    clearSelection();
+    setMoveToSpaceMultiDialog({ isOpen: false });
+  }, [getTabSelectionInfo, moveTabToSpace, clearSelection]);
+
+  // Move selected tabs/groups to new window
+  const handleMoveSelectedToNewWindow = useCallback(async () =>
+  {
+    const { allTabIds } = getTabSelectionInfo();
+    if (allTabIds.length > 0)
+    {
+      const newWindow = await chrome.windows.create({ tabId: allTabIds[0] });
+      if (newWindow.id && allTabIds.length > 1)
+      {
+        await chrome.tabs.move(allTabIds.slice(1), { windowId: newWindow.id, index: -1 });
+      }
+    }
+    clearSelection();
+  }, [getTabSelectionInfo, clearSelection]);
+
+  // Close selected tabs/groups (without requiring a clicked tab ID)
+  const handleCloseSelectedFromMenu = useCallback(() =>
+  {
+    const { allTabIds } = getTabSelectionInfo();
+    if (allTabIds.length > 1)
+    {
+      setConfirmDeleteDialog({ isOpen: true, tabIds: allTabIds });
+    }
+    else if (allTabIds.length === 1)
+    {
+      closeTab(allTabIds[0]);
+      clearSelection();
+    }
+  }, [getTabSelectionInfo, closeTab, clearSelection]);
+
+  // Open save groups to bookmarks dialog
+  const openSaveGroupsToBookmarksDialog = useCallback(() =>
+  {
+    setSaveGroupsToBookmarksDialog({ isOpen: true });
+  }, []);
+
+  // Handle saving selected groups to bookmarks
+  const handleSaveGroupsToBookmarksFolder = useCallback(async (folderId: string) =>
+  {
+    const { selectedGroups } = getTabSelectionInfo();
+    for (const group of selectedGroups)
+    {
+      const groupTabs = filterBookmarkableTabs(visibleTabs.filter(t => t.groupId === group.id));
+      const folderName = group.title || 'Unnamed Group';
+      createFolder(folderId, folderName, async (newFolder) =>
+      {
+        await createBookmarksInFolder(newFolder.id, groupTabs);
+      });
+    }
+    clearSelection();
+    setSaveGroupsToBookmarksDialog({ isOpen: false });
+    showToast('Groups saved to bookmarks');
+  }, [getTabSelectionInfo, visibleTabs, filterBookmarkableTabs, createFolder, createBookmarksInFolder, clearSelection, showToast]);
+
+  // Check if multi-selection
+  const isMultiSelection = (selectionCount ?? 0) > 1;
+
+  // Check if selection has tabs
+  const hasSelectedTabs = useCallback((): boolean =>
+  {
+    const { hasTabs } = getTabSelectionInfo();
+    return hasTabs;
+  }, [getTabSelectionInfo]);
+
+  // Check if only groups are selected
+  const onlyGroupsSelected = useCallback((): boolean =>
+  {
+    const { onlyGroups } = getTabSelectionInfo();
+    return onlyGroups;
+  }, [getTabSelectionInfo]);
+
   // Build menu content for Tabs section header
   const tabsMenuContent = (
     <>
@@ -2298,6 +2565,11 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                   onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
                   onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
                   selectionCount={selectionCount}
+                  isMultiSelection={isMultiSelection}
+                  hasSelectedTabs={hasSelectedTabs()}
+                  onAddSelectedToBookmark={openAddSelectedToBookmarkDialog}
+                  onMoveSelectedToSpace={useSpaces && spaces.length > 0 ? openMoveSelectedToSpaceDialog : undefined}
+                  onMoveSelectedToNewWindow={handleMoveSelectedToNewWindow}
                 />
               );
             }
@@ -2338,6 +2610,11 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                           onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
                           onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
                           selectionCount={selectionCount}
+                          isMultiSelection={isMultiSelection}
+                          hasSelectedTabs={hasSelectedTabs()}
+                          onAddSelectedToBookmark={openAddSelectedToBookmarkDialog}
+                          onMoveSelectedToSpace={useSpaces && spaces.length > 0 ? openMoveSelectedToSpaceDialog : undefined}
+                          onMoveSelectedToNewWindow={handleMoveSelectedToNewWindow}
                         />
                       );
                     })}
@@ -2383,6 +2660,12 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                     onRename={() => openRenameGroupDialog(item.group)}
                     onNewTab={() => createTabInGroup(item.group.id)}
                     onExportToBookmarks={() => handleExportToBookmarks(item.group, item.tabs)}
+                    isMultiSelection={isMultiSelection}
+                    onlyGroupsSelected={onlyGroupsSelected()}
+                    onSaveGroupsToBookmarks={openSaveGroupsToBookmarksDialog}
+                    onMoveSelectedToSpace={useSpaces && spaces.length > 0 ? openMoveSelectedToSpaceDialog : undefined}
+                    onMoveSelectedToNewWindow={handleMoveSelectedToNewWindow}
+                    onCloseSelected={handleCloseSelectedFromMenu}
                   />
                   {isGroupExpanded && item.tabs.map((tab, index) =>
                   {
@@ -2423,6 +2706,11 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                         onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
                         onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
                         selectionCount={selectionCount}
+                        isMultiSelection={isMultiSelection}
+                        hasSelectedTabs={hasSelectedTabs()}
+                        onAddSelectedToBookmark={openAddSelectedToBookmarkDialog}
+                        onMoveSelectedToSpace={useSpaces && spaces.length > 0 ? openMoveSelectedToSpaceDialog : undefined}
+                        onMoveSelectedToNewWindow={handleMoveSelectedToNewWindow}
                       />
                     );
                   })}
@@ -2619,6 +2907,41 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         itemType="tabs"
         onConfirm={handleConfirmMultiClose}
         onClose={() => setConfirmDeleteDialog({ isOpen: false, tabIds: [] })}
+      />
+
+      {/* Multi-selection dialogs */}
+      <FolderPickerDialog
+        isOpen={addToBookmarkMultiDialog.isOpen}
+        title="Add to Bookmark Folder"
+        onSelect={handleAddSelectedToBookmarkFolder}
+        onClose={() => setAddToBookmarkMultiDialog({ isOpen: false })}
+        defaultFolderId={
+          activeSpace?.bookmarkFolderPath
+            ? findFolderByPath(activeSpace.bookmarkFolderPath)?.id
+            : undefined
+        }
+      />
+
+      <SpaceNavigatorDialog
+        isOpen={moveToSpaceMultiDialog.isOpen}
+        onClose={() => setMoveToSpaceMultiDialog({ isOpen: false })}
+        title="Move to Space"
+        hideAllSpace
+        excludeSpaceId={activeSpace?.id}
+        onSelectSpace={handleMoveSelectedToSpace}
+        showCurrentIndicator={false}
+      />
+
+      <FolderPickerDialog
+        isOpen={saveGroupsToBookmarksDialog.isOpen}
+        title="Save Groups to Bookmark Folder"
+        onSelect={handleSaveGroupsToBookmarksFolder}
+        onClose={() => setSaveGroupsToBookmarksDialog({ isOpen: false })}
+        defaultFolderId={
+          activeSpace?.bookmarkFolderPath
+            ? findFolderByPath(activeSpace.bookmarkFolderPath)?.id
+            : undefined
+        }
       />
 
       <Toast

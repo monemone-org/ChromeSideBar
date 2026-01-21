@@ -152,6 +152,11 @@ interface BookmarkRowProps {
   getSelectionItem?: (id: string, isFolder: boolean) => SelectionItem;
   onChildSelectionClick?: (item: SelectionItem, e: React.MouseEvent) => void;
   onChildSelectionContextMenu?: (item: SelectionItem) => void;
+  // Multi-selection actions
+  onOpenInNewTabs?: (url: string) => void;
+  onOpenInNewWindow?: (url: string) => void;
+  onMoveSelectedBookmarks?: () => void;
+  hasSelectedBookmarks?: boolean;
   // Drag-drop attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -193,6 +198,10 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onSelectionClick,
   onSelectionContextMenu,
   selectionCount,
+  onOpenInNewTabs,
+  onOpenInNewWindow,
+  onMoveSelectedBookmarks,
+  hasSelectedBookmarks,
   attributes,
   listeners
 }, ref) => {
@@ -231,6 +240,15 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   }
 
   const handleRowClick = (e: React.MouseEvent) => {
+    
+    // 2026-01-21 mone: disabled. It is confusing when actually using it
+    // // Cmd+click on only selected bookmark -> open in new tab
+    // if ((e.metaKey || e.ctrlKey) && !e.shiftKey && node.url && isSelected && selectionCount === 1)
+    // {
+    //   chrome.tabs.create({ url: node.url, active: true });
+    //   return;
+    // }
+
     // Always update selection state on click
     onSelectionClick?.(e);
 
@@ -399,6 +417,36 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Content>
+          {selectionCount && selectionCount > 1 ? (
+            // Multi-selection menu
+            <>
+              {hasSelectedBookmarks && onPin && (
+                <>
+                  <ContextMenu.Item onSelect={() => onPin(node.url || '', node.title, node.url ? getFaviconUrl(node.url) : undefined)}>
+                    <Pin size={14} className="mr-2" /> Pin to Sidebar
+                  </ContextMenu.Item>
+                  <ContextMenu.Separator />
+                </>
+              )}
+              <ContextMenu.Item onSelect={() => onOpenInNewTabs?.(node.url || '')}>
+                <ExternalLink size={14} className="mr-2" /> Open in New Tabs
+              </ContextMenu.Item>
+              <ContextMenu.Item onSelect={() => onOpenInNewWindow?.(node.url || '')}>
+                <ExternalLink size={14} className="mr-2" /> Open in New Window
+              </ContextMenu.Item>
+              {onMoveSelectedBookmarks && (
+                <ContextMenu.Item onSelect={onMoveSelectedBookmarks}>
+                  <FolderInput size={14} className="mr-2" /> Move...
+                </ContextMenu.Item>
+              )}
+              <ContextMenu.Separator />
+              <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
+                <Trash size={14} className="mr-2" /> Delete
+              </ContextMenu.Item>
+            </>
+          ) : (
+            // Single-item menu
+            <>
           {isFolder && (
             <>
               <ContextMenu.Item onSelect={() => onCreateFolder(node.id)}>
@@ -432,8 +480,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                   <FolderOpen size={14} className="mr-2" /> Open as Tab Group
                 </ContextMenu.Item>
               )}
-              
-              {/* 2026-01-18 mone: disabled "Move to Space". It is confusing. also we have Move folder... which does 
+
+              {/* 2026-01-18 mone: disabled "Move to Space". It is confusing. also we have Move folder... which does
               almost the same thing.
                 {onMoveToSpace && (
                 <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
@@ -458,17 +506,13 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 <Copy size={14} className="mr-2" /> Duplicate
               </ContextMenu.Item>
               <ContextMenu.Separator />
-              <ContextMenu.Item onSelect={() => {
-                chrome.tabs.create({ url: node.url }, (tab) => {
-                  if (tab?.id) chrome.tabs.ungroup(tab.id);
-                });
-              }}>
+              <ContextMenu.Item onSelect={() => onOpenInNewTabs?.(node.url!)}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Tab
               </ContextMenu.Item>
-              <ContextMenu.Item onSelect={() => chrome.windows.create({ url: node.url })}>
+              <ContextMenu.Item onSelect={() => onOpenInNewWindow?.(node.url!)}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Window
               </ContextMenu.Item>
-              {/* 2026-01-18 mone: disabled "Move to Space". It is confusing. also we have Move folder... which does 
+              {/* 2026-01-18 mone: disabled "Move to Space". It is confusing. also we have Move folder... which does
               almost the same thing.
               {onMoveToSpace && (
                 <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
@@ -489,8 +533,10 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 <Edit size={14} className="mr-2" /> Edit
               </ContextMenu.Item>
               <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
-                <Trash size={14} className="mr-2" /> {selectionCount && selectionCount > 1 ? `Delete ${selectionCount} Items` : 'Delete'}
+                <Trash size={14} className="mr-2" /> Delete
               </ContextMenu.Item>
+            </>
+          )}
             </>
           )}
             </ContextMenu.Content>
@@ -704,6 +750,7 @@ const MultiBookmarkDragOverlay = ({ nodes }: MultiBookmarkDragOverlayProps) =>
 
 interface BookmarkTreeProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
+  onPinMultiple?: (pins: Array<{ url: string; title: string; faviconUrl?: string }>) => void;
   hideOtherBookmarks?: boolean;
   externalDropTarget?: ExternalDropTarget | null;
   bookmarkOpenMode?: BookmarkOpenMode;
@@ -715,7 +762,7 @@ interface BookmarkTreeProps {
   useSpaces?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
@@ -893,6 +940,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     isOpen: boolean;
     bookmarkIds: string[];
   }>({ isOpen: false, bookmarkIds: [] });
+
+  // Move multiple bookmarks dialog
+  const [moveMultiBookmarkDialog, setMoveMultiBookmarkDialog] = useState({
+    isOpen: false
+  });
 
   // Build flat list of visible bookmark items for selection range calculation
   const flatVisibleBookmarkItems = useMemo((): SelectionItem[] =>
@@ -1279,6 +1331,157 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setConfirmDeleteDialog({ isOpen: false, bookmarkIds: [] });
   }, [confirmDeleteDialog.bookmarkIds, clearSelection]);
 
+  // Pin selected bookmarks (or single if not multi-selected)
+  const handlePinSelectedBookmarks = useCallback((
+    clickedUrl: string,
+    clickedTitle: string,
+    clickedFaviconUrl?: string
+  ) =>
+  {
+    if (!onPin) return;
+
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length > 1 && onPinMultiple)
+    {
+      // Multiple selected - pin all bookmarks (not folders)
+      const pins = selectedItems
+        .filter(item => item.type === 'bookmark')
+        .map(item => findNode(item.id))
+        .filter((node): node is chrome.bookmarks.BookmarkTreeNode => !!node && !!node.url)
+        .map(node => ({
+          url: node.url!,
+          title: node.title || node.url!,
+          faviconUrl: getFaviconUrl(node.url!),
+        }));
+      onPinMultiple(pins);
+      clearSelection();
+    }
+    else
+    {
+      onPin(clickedUrl, clickedTitle, clickedFaviconUrl);
+    }
+  }, [onPin, onPinMultiple, getSelectedItems, findNode, clearSelection]);
+
+  // Collect all URLs from selected bookmarks and folders (including folder contents)
+  const collectSelectedBookmarkUrls = useCallback(async (): Promise<string[]> =>
+  {
+    const selectedItems = getSelectedItems();
+    const urls: string[] = [];
+
+    for (const item of selectedItems)
+    {
+      if (item.type === 'bookmark')
+      {
+        const node = findNode(item.id);
+        if (node?.url) urls.push(node.url);
+      }
+      else if (item.type === 'folder')
+      {
+        const folderBookmarks = await getAllBookmarksInFolder(item.id);
+        urls.push(...folderBookmarks.map(b => b.url));
+      }
+    }
+
+    return urls;
+  }, [getSelectedItems, findNode, getAllBookmarksInFolder]);
+
+  // Open selected bookmarks in new tabs (or single if not multi-selected)
+  const handleOpenSelectedInNewTabs = useCallback(async (clickedUrl: string) =>
+  {
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length > 1)
+    {
+      // Multiple selected - open all bookmarks and folder contents
+      const urls = await collectSelectedBookmarkUrls();
+
+      urls.forEach(url =>
+      {
+        chrome.tabs.create({ url }, (tab) =>
+        {
+          if (tab?.id) chrome.tabs.ungroup(tab.id);
+        });
+      });
+      clearSelection();
+    }
+    else
+    {
+      // Single bookmark
+      chrome.tabs.create({ url: clickedUrl }, (tab) =>
+      {
+        if (tab?.id) chrome.tabs.ungroup(tab.id);
+      });
+    }
+  }, [getSelectedItems, collectSelectedBookmarkUrls, clearSelection]);
+
+  // Open selected bookmarks in new window (or single if not multi-selected)
+  const handleOpenSelectedInNewWindow = useCallback(async (clickedUrl: string) =>
+  {
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length > 1)
+    {
+      // Multiple selected - open all bookmarks and folder contents in one new window
+      const urls = await collectSelectedBookmarkUrls();
+
+      if (urls.length > 0)
+      {
+        chrome.windows.create({ url: urls });
+      }
+      clearSelection();
+    }
+    else
+    {
+      // Single bookmark
+      chrome.windows.create({ url: clickedUrl });
+    }
+  }, [getSelectedItems, collectSelectedBookmarkUrls, clearSelection]);
+
+  // Open move dialog for selected bookmarks
+  const openMoveSelectedBookmarksDialog = useCallback(() =>
+  {
+    setMoveMultiBookmarkDialog({ isOpen: true });
+  }, []);
+
+  // Handle moving selected bookmarks to a folder
+  const handleMoveSelectedBookmarksToFolder = useCallback(async (folderId: string) =>
+  {
+    const selectedItems = getSelectedItems();
+
+    // Filter out descendants of selected folders (they move with parent)
+    const selectedFolderIds = selectedItems
+      .filter(item => item.type === 'folder')
+      .map(item => item.id);
+
+    const itemsToMove = selectedItems.filter(item =>
+    {
+      // For both folders and bookmarks, check if any selected folder is an ancestor
+      for (const selectedFolderId of selectedFolderIds)
+      {
+        if (selectedFolderId === item.id) continue;
+        if (isDescendant(selectedFolderId, item.id, bookmarks))
+        {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    // Move items in order
+    for (const item of itemsToMove)
+    {
+      await moveBookmark(item.id, folderId, 'into');
+    }
+
+    clearSelection();
+    setMoveMultiBookmarkDialog({ isOpen: false });
+  }, [getSelectedItems, bookmarks, moveBookmark, clearSelection]);
+
+  // Check if selection has any bookmarks (vs only folders)
+  const hasSelectedBookmarks = useCallback((): boolean =>
+  {
+    const selectedItems = getSelectedItems();
+    return selectedItems.some(item => item.type === 'bookmark');
+  }, [getSelectedItems]);
+
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
     // Calculate overlay offset based on where user clicked in the element
@@ -1527,7 +1730,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
               onSort={sortBookmarks}
               onDuplicate={duplicateBookmark}
               onExpandAll={handleExpandAll}
-              onPin={onPin}
+              onPin={handlePinSelectedBookmarks}
               globalDragActive={!!activeId}
               isMultiDrag={activeSelectedNodes.length > 1}
               activeId={activeId}
@@ -1563,6 +1766,10 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
               }}
               onChildSelectionClick={handleSelectionClick}
               onChildSelectionContextMenu={handleSelectionContextMenu}
+              onOpenInNewTabs={handleOpenSelectedInNewTabs}
+              onOpenInNewWindow={handleOpenSelectedInNewWindow}
+              onMoveSelectedBookmarks={openMoveSelectedBookmarksDialog}
+              hasSelectedBookmarks={hasSelectedBookmarks()}
             />
           );
         })}
@@ -1628,6 +1835,13 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
         title={moveBookmarkDialog.isFolder ? "Move Folder to..." : "Move Bookmark to..."}
         onSelect={handleMoveBookmarkToFolder}
         onClose={closeMoveBookmarkDialog}
+      />
+
+      <FolderPickerDialog
+        isOpen={moveMultiBookmarkDialog.isOpen}
+        title="Move to..."
+        onSelect={handleMoveSelectedBookmarksToFolder}
+        onClose={() => setMoveMultiBookmarkDialog({ isOpen: false })}
       />
 
       <ConfirmDeleteDialog
