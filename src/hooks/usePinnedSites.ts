@@ -107,6 +107,37 @@ export const usePinnedSites = () => {
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
 
+  // Add multiple pins at once (handles favicon fetching for each)
+  const addPins = useCallback(async (
+    pins: Array<{ url: string; title: string; faviconUrl?: string }>
+  ) => {
+    // Fetch all favicons in parallel
+    const newPins: PinnedSite[] = await Promise.all(
+      pins.map(async ({ url, title, faviconUrl }) => {
+        const chromeFaviconUrl = getFaviconUrl(url);
+        let favicon = await fetchFaviconAsBase64(chromeFaviconUrl);
+
+        if (!favicon && faviconUrl)
+        {
+          favicon = await fetchFaviconAsBase64(faviconUrl);
+        }
+
+        return {
+          id: generateId(),
+          url,
+          title,
+          favicon,
+        };
+      })
+    );
+
+    setPinnedSites(current => {
+      const combined = [...current, ...newPins];
+      savePinnedSites(combined);
+      return combined;
+    });
+  }, [savePinnedSites]);
+
   const removePin = useCallback((id: string) => {
     const updatedSites = pinnedSites.filter(s => s.id !== id);
     setPinnedSites(updatedSites);
@@ -212,6 +243,7 @@ export const usePinnedSites = () => {
   return {
     pinnedSites,
     addPin,
+    addPins,
     removePin,
     updatePin,
     resetFavicon,

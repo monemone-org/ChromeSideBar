@@ -35,6 +35,7 @@ import * as DropdownMenu from './components/menu/DropdownMenu';
 interface SidebarContentProps
 {
   onPin: (url: string, title: string, faviconUrl?: string) => void;
+  onPinMultiple: (pins: Array<{ url: string; title: string; faviconUrl?: string }>) => void;
   hideOtherBookmarks: boolean;
   externalDropTarget: ExternalDropTarget | null;
   bookmarkOpenMode: BookmarkOpenMode;
@@ -51,6 +52,7 @@ interface SidebarContentProps
 
 const SidebarContent: React.FC<SidebarContentProps> = ({
   onPin,
+  onPinMultiple,
   hideOtherBookmarks,
   externalDropTarget,
   bookmarkOpenMode,
@@ -83,6 +85,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
       />
       <TabList
         onPin={onPin}
+        onPinMultiple={onPinMultiple}
         sortGroupsFirst={sortGroupsFirst}
         onExternalDropTargetChange={onExternalDropTargetChange}
         resolveBookmarkDropTarget={resolveBookmarkDropTarget}
@@ -375,6 +378,7 @@ function App() {
   const {
     pinnedSites,
     addPin,
+    addPins,
     removePin,
     updatePin,
     resetFavicon,
@@ -671,6 +675,7 @@ function App() {
       {/* Content with 2-finger swipe navigation */}
       <SwipeableContainer
         onPin={addPin}
+        onPinMultiple={addPins}
         hideOtherBookmarks={hideOtherBookmarks}
         externalDropTarget={externalDropTarget}
         bookmarkOpenMode={bookmarkOpenMode}

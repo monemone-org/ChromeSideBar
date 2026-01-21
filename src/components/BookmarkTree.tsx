@@ -1039,6 +1039,17 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const [activeDepth, setActiveDepth] = useState<number>(0);
   const [activeSelectedNodes, setActiveSelectedNodes] = useState<chrome.bookmarks.BookmarkTreeNode[]>([]);
 
+  // Reset all drag state to initial values
+  const resetDragState = useCallback(() =>
+  {
+    setActiveId(null);
+    setActiveNode(null);
+    setActiveDepth(0);
+    setActiveSelectedNodes([]);
+    setDropTargetId(null);
+    setDropPosition(null);
+  }, [setActiveId, setDropTargetId, setDropPosition]);
+
   // Ref to store the computed drag overlay offset (based on cursor position within element at drag start)
   const dragStartOffsetRef = useRef<number>(24);
 
@@ -1403,13 +1414,13 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
 
       const bookmarksToMove = validBookmarks.filter(bookmark =>
       {
-        // Always keep folders
-        if (!bookmark.url) return true;
-
-        // For bookmarks, check if any selected folder is an ancestor
-        // If so, skip this bookmark (it will move with its parent folder)
+        // For both folders and bookmarks, check if any selected folder is an ancestor
+        // If so, skip this item (it will move with its parent folder)
         for (const folderId of selectedFolderIds)
         {
+          // Skip checking against self
+          if (folderId === bookmark.id) continue;
+
           if (isDescendant(folderId, bookmark.id, bookmarks))
           {
             return false;
@@ -1443,13 +1454,8 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     }
 
     // Reset drag state
-    setActiveId(null);
-    setActiveNode(null);
-    setActiveDepth(0);
-    setActiveSelectedNodes([]);
-    setDropTargetId(null);
-    setDropPosition(null);
-  }, [dropTargetId, dropPosition, moveBookmark, expandedState, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, getSelectedItems, clearSelection, bookmarks]);
+    resetDragState();
+  }, [dropTargetId, dropPosition, moveBookmark, expandedState, clearAutoExpandTimer, resetDragState, getSelectedItems, clearSelection, bookmarks]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() => {
@@ -1457,13 +1463,8 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     wasValidDropRef.current = false;
 
     // Reset drag state
-    setActiveId(null);
-    setActiveNode(null);
-    setActiveDepth(0);
-    setActiveSelectedNodes([]);
-    setDropTargetId(null);
-    setDropPosition(null);
-  }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition]);
+    resetDragState();
+  }, [clearAutoExpandTimer, resetDragState]);
 
   const hasVisibleBookmarks = visibleBookmarks.length > 0;
 

@@ -269,7 +269,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           )}
           {onPin && tab.url && !tab.pinned && (
             <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
-              <Pin size={14} className="mr-2" /> Pin to Sidebar
+              <Pin size={14} className="mr-2" /> {selectionCount && selectionCount > 1 ? `Pin ${selectionCount} to Sidebar` : 'Pin to Sidebar'}
             </ContextMenu.Item>
           )}
           {onDuplicate && tab.url && (
@@ -666,6 +666,7 @@ type DisplayItem =
 
 interface TabListProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
+  onPinMultiple?: (pins: Array<{ url: string; title: string; faviconUrl?: string }>) => void;
   sortGroupsFirst?: boolean;
   onExternalDropTargetChange?: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget?: () => ResolveBookmarkDropTarget | null;
@@ -676,7 +677,7 @@ interface TabListProps {
   onSpaceDropTargetChange?: (spaceId: string | null) => void;
 }
 
-export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange }: TabListProps) =>
+export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange }: TabListProps) =>
 {
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
@@ -1504,6 +1505,12 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       ? parseInt(String(active.id).replace('group-', ''), 10)
       : null;
 
+    // Check if selection contains tabs - if so, treat as tab drag behavior
+    // (mixed selection of groups + tabs should behave like tab drag)
+    const selectedItems = getSelectedItems();
+    const hasSelectedTabs = selectedItems.some(item => item.type === 'tab');
+    const treatAsGroupDrag = isDraggingGroupNow && !hasSelectedTabs;
+
     // Find element under pointer
     const elements = document.elementsFromPoint(currentX, currentY);
 
@@ -1532,8 +1539,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       {
         const targetGroupId = parseInt(groupId, 10);
 
-        // If dragging a group, prevent dropping on self
-        if (isDraggingGroupNow && targetGroupId === draggedGroupId)
+        // If dragging a group (without tabs in selection), prevent dropping on self
+        if (treatAsGroupDrag && targetGroupId === draggedGroupId)
         {
           setDropTargetId(null);
           setDropPosition(null);
@@ -1541,9 +1548,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           return;
         }
 
-        if (isDraggingGroupNow)
+        if (treatAsGroupDrag)
         {
-          // When dragging a group over group header: always "before"
+          // When dragging groups-only over group header: always "before"
           // (hovering on header = top half of group area)
           setDropTargetId(`group-${groupId}`);
           setDropPosition('before');
@@ -1599,8 +1606,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       {
         const tabGroupId = parseInt(tabElement.getAttribute('data-group-id') || '-1', 10);
 
-        // If dragging a group, prevent dropping on own tabs
-        if (isDraggingGroupNow && tabGroupId === draggedGroupId)
+        // If dragging groups-only, prevent dropping on own tabs
+        if (treatAsGroupDrag && tabGroupId === draggedGroupId)
         {
           setDropTargetId(null);
           setDropPosition(null);
@@ -1608,8 +1615,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
           return;
         }
 
-        // If dragging a group over another group's tabs, treat the entire group as one unit
-        if (isDraggingGroupNow && tabGroupId !== -1)
+        // If dragging groups-only over another group's tabs, treat the entire group as one unit
+        if (treatAsGroupDrag && tabGroupId !== -1)
         {
           // Find the group's bounding area (header + all tabs)
           const groupHeader = document.querySelector(`[data-group-header-id="${tabGroupId}"]`) as HTMLElement | null;
@@ -1728,7 +1735,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setLocalSpaceDropTarget(null);
     onSpaceDropTargetChange?.(null);
     clearAutoExpandTimer();
-  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange, expandedGroups, localSpaceDropTarget, onSpaceDropTargetChange, isInSpace]);
+  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange, expandedGroups, localSpaceDropTarget, onSpaceDropTargetChange, isInSpace, getSelectedItems]);
 
   const handleDragEnd = useCallback(async (_event: DragEndEvent) =>
   {
@@ -2176,6 +2183,39 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     }
   }, [getSelectedItems, closeTab]);
 
+  // Pin selected tabs to sidebar (or single tab if not in selection)
+  const handlePinSelectedTabs = useCallback((
+    clickedUrl: string,
+    clickedTitle: string,
+    clickedFaviconUrl?: string
+  ) =>
+  {
+    if (!onPin) return;
+
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length > 1 && onPinMultiple)
+    {
+      // Multiple selected - pin all selected tabs that have URLs
+      const selectedTabsToPin = selectedItems
+        .filter(item => item.type === 'tab')
+        .map(item => visibleTabs.find(t => t.id === parseInt(item.id, 10)))
+        .filter((t): t is chrome.tabs.Tab => !!t && !!t.url && !t.pinned);
+
+      const pins = selectedTabsToPin.map(tab => ({
+        url: tab.url!,
+        title: tab.title || tab.url!,
+        faviconUrl: tab.favIconUrl,
+      }));
+      onPinMultiple(pins);
+      clearSelection();
+    }
+    else
+    {
+      // Single tab - pin directly
+      onPin(clickedUrl, clickedTitle, clickedFaviconUrl);
+    }
+  }, [onPin, onPinMultiple, getSelectedItems, visibleTabs, clearSelection]);
+
   // Confirm multi-close
   const handleConfirmMultiClose = useCallback(() =>
   {
@@ -2247,7 +2287,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   onClose={handleCloseSelectedTabs}
                   onActivate={activateTab}
                   onDuplicate={duplicateTab}
-                  onPin={onPin}
+                  onPin={handlePinSelectedTabs}
                   onOpenAddToGroupDialog={!useSpaces ? openAddToGroupDialog : undefined}
                   onOpenMoveToSpaceDialog={useSpaces && spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                   onAddToBookmark={openAddToBookmarkDialog}
@@ -2287,7 +2327,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           onClose={handleCloseSelectedTabs}
                           onActivate={activateTab}
                           onDuplicate={duplicateTab}
-                          onPin={onPin}
+                          onPin={handlePinSelectedTabs}
                           onOpenAddToGroupDialog={!useSpaces ? openAddToGroupDialog : undefined}
                           onOpenMoveToSpaceDialog={useSpaces && spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                           onAddToBookmark={openAddToBookmarkDialog}
@@ -2372,7 +2412,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         onClose={handleCloseSelectedTabs}
                         onActivate={activateTab}
                         onDuplicate={duplicateTab}
-                        onPin={onPin}
+                        onPin={handlePinSelectedTabs}
                         onOpenAddToGroupDialog={!useSpaces ? openAddToGroupDialog : undefined}
                         onOpenMoveToSpaceDialog={useSpaces && spaces.length > 0 ? openMoveToSpaceDialog : undefined}
                         onAddToBookmark={openAddToBookmarkDialog}
