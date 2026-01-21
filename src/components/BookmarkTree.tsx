@@ -117,7 +117,7 @@ interface BookmarkRowProps {
   onExpandAll?: (folderId: string) => void;
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   matchingSpace?: Space;  // Space that uses this folder as its bookmark folder
-  isDragging?: boolean;
+  globalDragActive?: boolean;  // True when any drag is in progress (disables hover borders)
   isMultiDrag?: boolean;
   activeId?: string | null;
   dropTargetId?: string | null;
@@ -171,7 +171,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onExpandAll,
   onPin,
   matchingSpace,
-  isDragging: _isDragging,
+  globalDragActive,
   isMultiDrag,
   activeId,
   dropTargetId,
@@ -381,6 +381,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               isSelected={isSelected}
               isHighlighted={!isSelected && isOpen}
               isDragging={isBeingDragged}
+              disableHoverBorder={globalDragActive}
               dndAttributes={attributes}
               dndListeners={listeners}
               data-bookmark-id={node.id}
@@ -671,14 +672,14 @@ const MultiBookmarkDragOverlay = ({ nodes }: MultiBookmarkDragOverlayProps) =>
       {/* Stacked background layers (shown in reverse order for proper z-indexing) */}
       {visibleNodes.length > 2 && (
         <div
-          className="absolute w-full bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800"
-          style={{ top: 12, left: 12, height: 28 }}
+          className="absolute w-full h-7 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800"
+          style={{ top: 12, left: 12 }}
         />
       )}
       {visibleNodes.length > 1 && (
         <div
-          className="absolute w-full bg-blue-100 dark:bg-blue-900/70 rounded border border-blue-200 dark:border-blue-700"
-          style={{ top: 6, left: 6, height: 28 }}
+          className="absolute w-full h-7 bg-blue-100 dark:bg-blue-900/70 rounded border border-blue-200 dark:border-blue-700"
+          style={{ top: 6, left: 6 }}
         />
       )}
       {/* Front bookmark with content */}
@@ -1038,6 +1039,9 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   const [activeDepth, setActiveDepth] = useState<number>(0);
   const [activeSelectedNodes, setActiveSelectedNodes] = useState<chrome.bookmarks.BookmarkTreeNode[]>([]);
 
+  // Ref to store the computed drag overlay offset (based on cursor position within element at drag start)
+  const dragStartOffsetRef = useRef<number>(24);
+
   // Find a node by ID in the bookmark tree
   const findNode = useCallback((id: string): chrome.bookmarks.BookmarkTreeNode | null => {
     const search = (nodes: chrome.bookmarks.BookmarkTreeNode[]): chrome.bookmarks.BookmarkTreeNode | null => {
@@ -1189,11 +1193,11 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
   }, []);
 
   // Handle moving bookmark/folder to a selected folder
-  const handleMoveBookmarkToFolder = useCallback((folderId: string) =>
+  const handleMoveBookmarkToFolder = useCallback(async (folderId: string) =>
   {
     if (moveBookmarkDialog.bookmarkId)
     {
-      moveBookmark(moveBookmarkDialog.bookmarkId, folderId, 'into');
+      await moveBookmark(moveBookmarkDialog.bookmarkId, folderId, 'into');
     }
     closeMoveBookmarkDialog();
   }, [moveBookmarkDialog.bookmarkId, moveBookmark, closeMoveBookmarkDialog]);
@@ -1266,6 +1270,17 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
 
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
+    // Calculate overlay offset based on where user clicked in the element
+    const activatorEvent = event.activatorEvent as PointerEvent;
+    const rect = event.active.rect.current.initial;
+    if (rect && activatorEvent)
+    {
+      const cursorOffsetInElement = activatorEvent.clientY - rect.top;
+      // Offset = element height - cursor position + small gap (8px)
+      // This keeps overlay consistently below cursor
+      dragStartOffsetRef.current = rect.height - cursorOffsetInElement + 8;
+    }
+
     const id = event.active.id as string;
 
     // If dragged item is NOT in selection, clear selection and reset selected nodes
@@ -1332,9 +1347,19 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
       return;
     }
 
+    // Space boundary validation - prevent drops outside the space
+    // Can't drop 'before' the space root folder (would place outside space)
+    if (spaceFolder && target.bookmarkId === spaceFolder.id && target.position === 'before')
+    {
+      setDropTargetId(null);
+      setDropPosition(null);
+      clearAutoExpandTimer();
+      return;
+    }
+
     setDropTargetId(target.bookmarkId);
     setDropPosition(target.position);
-  }, [bookmarks, resolveBookmarkDropTarget, clearAutoExpandTimer, setDropTargetId, setDropPosition]);
+  }, [bookmarks, resolveBookmarkDropTarget, clearAutoExpandTimer, setDropTargetId, setDropPosition, spaceFolder]);
 
   // Drag end handler
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
@@ -1349,106 +1374,71 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
 
     // Perform the move if we have a valid drop target
     if (isValidDrop) {
-      // Get selected items to determine if this is a multi-drag
+      // Get items to move (always an array, even if just 1 item)
       const selectedItems = getSelectedItems();
-      const selectedIds = selectedItems.map(item => item.id);
+      const selectedIds = new Set(selectedItems.map(item => item.id));
+      const idsToMove = selectedIds.has(sourceId) && selectedIds.size >= 1
+        ? Array.from(selectedIds)
+        : [sourceId];
 
-      // Check if dragged item is in selection (multi-drag scenario)
-      const isMultiDrag = selectedIds.length > 1 && selectedIds.includes(sourceId);
+      // Get bookmark info for items to sort by index
+      const bookmarkInfos = await Promise.all(
+        idsToMove.map(async (id) => {
+          const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) => {
+            chrome.bookmarks.get(id, (res) => resolve(res || []));
+          });
+          return results[0] || null;
+        })
+      );
 
-      if (isMultiDrag)
+      // Filter out nulls and sort by index to maintain relative order
+      const validBookmarks = bookmarkInfos.filter((b): b is chrome.bookmarks.BookmarkTreeNode => b !== null);
+      validBookmarks.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+
+      // Filter out bookmarks that are descendants of selected folders
+      // (moving the folder will automatically move its contents)
+      const selectedFolderIds = validBookmarks
+        .filter(b => !b.url)  // folders have no url
+        .map(b => b.id);
+
+      const bookmarksToMove = validBookmarks.filter(bookmark =>
       {
-        // --- MULTI-BOOKMARK DRAG ---
-        // Calculate target position (parentId and starting index)
-        let targetParentId: string;
-        let baseIndex: number;
+        // Always keep folders
+        if (!bookmark.url) return true;
 
-        if (dropPosition === 'into')
+        // For bookmarks, check if any selected folder is an ancestor
+        // If so, skip this bookmark (it will move with its parent folder)
+        for (const folderId of selectedFolderIds)
         {
-          // Move into folder at the end
-          targetParentId = dropTargetId!;
-          const children = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) => {
-            chrome.bookmarks.getChildren(dropTargetId!, (result) => resolve(result || []));
-          });
-          baseIndex = children.length;
-        }
-        else if (dropPosition === 'intoFirst')
-        {
-          // Move into folder at the beginning
-          targetParentId = dropTargetId!;
-          baseIndex = 0;
-        }
-        else
-        {
-          // Move before/after destination item
-          const dest = await new Promise<chrome.bookmarks.BookmarkTreeNode | null>((resolve) => {
-            chrome.bookmarks.get(dropTargetId!, (results) => {
-              resolve(results && results.length > 0 ? results[0] : null);
-            });
-          });
-          if (!dest || !dest.parentId || dest.index === undefined)
+          if (isDescendant(folderId, bookmark.id, bookmarks))
           {
-            // Invalid target, reset state
-            setActiveId(null);
-            setActiveNode(null);
-            setActiveDepth(0);
-            setActiveSelectedNodes([]);
-            setDropTargetId(null);
-            setDropPosition(null);
-            return;
+            return false;
           }
-          targetParentId = dest.parentId;
-          baseIndex = dropPosition === 'before' ? dest.index : dest.index + 1;
         }
+        return true;
+      });
 
-        // Get bookmark info for selected items to sort by index
-        const bookmarkInfos = await Promise.all(
-          selectedIds.map(async (id) => {
-            const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) => {
-              chrome.bookmarks.get(id, (res) => resolve(res || []));
-            });
-            return results[0] || null;
-          })
-        );
-
-        // Filter out nulls and sort by index (within same parent) or keep original selection order
-        const validBookmarks = bookmarkInfos.filter((b): b is chrome.bookmarks.BookmarkTreeNode => b !== null);
-
-        // Sort by their original index to maintain relative order
-        validBookmarks.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
-
-        // Determine direction: need to check if moving forward or backward
-        // For simplicity, move each bookmark in order, incrementing the index
-        // This works because each move shifts subsequent indices
-        for (let i = 0; i < validBookmarks.length; i++)
-        {
-          const bookmark = validBookmarks[i];
-          await new Promise<void>((resolve) => {
-            chrome.bookmarks.move(bookmark.id, { parentId: targetParentId, index: baseIndex + i }, () => {
-              resolve();
-            });
-          });
-        }
-
-        // Auto-expand folder if dropping into it
-        if ((dropPosition === 'into' || dropPosition === 'intoFirst') && !expandedState[dropTargetId!])
-        {
-          setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
-        }
-
-        // Clear selection after successful multi-drag
-        clearSelection();
-      }
-      else
+      // Move items, chaining with 'after' for subsequent items
+      let lastMoved: chrome.bookmarks.BookmarkTreeNode | null = null;
+      for (const bookmark of bookmarksToMove)
       {
-        // --- SINGLE BOOKMARK DRAG (existing logic) ---
-        moveBookmark(sourceId, dropTargetId!, dropPosition!);
-
-        // Auto-expand folder if dropping into it
-        if ((dropPosition === 'into') && !expandedState[dropTargetId!])
-        {
-          setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
+        if (!lastMoved) {
+          lastMoved = await moveBookmark(bookmark.id, dropTargetId!, dropPosition!);
+        } else {
+          lastMoved = await moveBookmark(bookmark.id, lastMoved.id, 'after');
         }
+      }
+
+      // Auto-expand folder if dropping into it
+      if ((dropPosition === 'into' || dropPosition === 'intoFirst') && !expandedState[dropTargetId!])
+      {
+        setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
+      }
+
+      // Clear selection if more than 1 item was moved
+      if (bookmarksToMove.length > 1)
+      {
+        clearSelection();
       }
     }
 
@@ -1459,7 +1449,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
     setActiveSelectedNodes([]);
     setDropTargetId(null);
     setDropPosition(null);
-  }, [dropTargetId, dropPosition, moveBookmark, expandedState, findNode, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, getSelectedItems, clearSelection]);
+  }, [dropTargetId, dropPosition, moveBookmark, expandedState, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, getSelectedItems, clearSelection, bookmarks]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() => {
@@ -1537,7 +1527,7 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
               onDuplicate={duplicateBookmark}
               onExpandAll={handleExpandAll}
               onPin={onPin}
-              isDragging={!!activeId}
+              globalDragActive={!!activeId}
               isMultiDrag={activeSelectedNodes.length > 1}
               activeId={activeId}
               dropTargetId={dropTargetId}
@@ -1577,7 +1567,13 @@ export const BookmarkTree = ({ onPin, hideOtherBookmarks = false, externalDropTa
         })}
 
         {/* Drag overlay - no animation for valid drops, default animation for cancelled */}
-        <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
+        {/* Offset modifier so overlay appears below cursor, keeping drop indicator visible */}
+        <DragOverlay
+          dropAnimation={wasValidDropRef.current ? null : undefined}
+          modifiers={[
+            ({ transform }) => ({ ...transform, y: transform.y + dragStartOffsetRef.current }),
+          ]}
+        >
           {activeSelectedNodes.length > 1 ? (
             <MultiBookmarkDragOverlay nodes={activeSelectedNodes} />
           ) : activeNode ? (

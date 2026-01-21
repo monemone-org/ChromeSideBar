@@ -22,6 +22,7 @@ export interface TreeRowProps extends Omit<React.HTMLAttributes<HTMLDivElement>,
   isSelected?: boolean;     // Multi-selection highlight (same visual as isActive)
   isHighlighted?: boolean;  // Show ring highlight (e.g. during context menu)
   isDragging?: boolean;
+  disableHoverBorder?: boolean; // Disable hover ring (e.g. during drag operations)
   // Slots for extra content
   leadingIndicator?: React.ReactNode; // Fixed at absolute left edge, before indent (e.g. speaker icon)
   indicators?: React.ReactNode; // Content to the left of the title - CAREFUL: this will shift title
@@ -51,6 +52,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
   isSelected,
   isHighlighted,
   isDragging,
+  disableHoverBorder,
   leadingIndicator,
   indicators,
   actions,
@@ -76,8 +78,9 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
         isSelected && 'bg-blue-200 dark:bg-blue-800/60 text-blue-800 dark:text-blue-50',
         // Active tab style (subtle background)
         isActive && !isSelected && 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100',
-        // Default style (ring hover) - only when neither active nor selected
-        !isActive && !isSelected && `${RING_HIGHLIGHT_HOVER} text-gray-700 dark:text-gray-200`,
+        // Default style (ring hover) - only when neither active nor selected, and hover not disabled
+        !isActive && !isSelected && !disableHoverBorder && `${RING_HIGHLIGHT_HOVER} text-gray-700 dark:text-gray-200`,
+        !isActive && !isSelected && disableHoverBorder && 'text-gray-700 dark:text-gray-200',
         // Highlight ring (e.g. during context menu)
         !isActive && !isSelected && isHighlighted && RING_HIGHLIGHT,
         isDragging && 'opacity-50',

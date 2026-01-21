@@ -37,6 +37,7 @@ import { SectionHeader } from './SectionHeader';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
+import { moveSingleTab, moveTabAfter } from '../utils/tabMove';
 import { DropIndicators } from './DropIndicators';
 import * as ContextMenu from './menu/ContextMenu';
 import { useInView } from '../hooks/useInView';
@@ -61,6 +62,7 @@ interface DraggableTabProps {
   tab: chrome.tabs.Tab;
   indentLevel: number;
   isBeingDragged: boolean;
+  globalDragActive?: boolean;  // True when any drag is in progress (disables hover borders)
   showDropBefore: boolean;
   showDropAfter: boolean;
   beforeIndentPx?: number;
@@ -93,6 +95,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   tab,
   indentLevel,
   isBeingDragged,
+  globalDragActive,
   showDropBefore,
   showDropAfter,
   beforeIndentPx,
@@ -200,7 +203,9 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
         : groupColor
           ? clsx(GROUP_COLORS[groupColor]?.bg, "text-gray-700 dark:text-gray-200")
-          : "hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200"
+          : globalDragActive
+            ? "text-gray-700 dark:text-gray-200"  // No hover ring during drag
+            : "hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200"
   );
 
   return (
@@ -240,12 +245,12 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               data-tab-id={tab.id}
               data-group-id={tab.groupId ?? -1}
             >
-              {/* Border overlay for grouped tabs - shows on hover or context menu */}
-              {groupColor && (
+              {/* Border overlay for grouped tabs - shows on hover or context menu, hidden during drag */}
+              {groupColor && !globalDragActive && (
                 <div className={clsx(
                   "absolute inset-0 rounded-md border-2 pointer-events-none",
                   GROUP_COLORS[groupColor]?.border,
-                  isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  (isOpen && !isSelected) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 )} />
               )}
               <DropIndicators showBefore={showDropBefore} showAfter={showDropAfter} beforeIndentPx={beforeIndentPx} afterIndentPx={afterIndentPx} />
@@ -387,6 +392,7 @@ interface TabGroupHeaderProps {
   isExpanded: boolean;
   isSelected?: boolean;
   isDragging?: boolean;
+  globalDragActive?: boolean;  // True when any drag is in progress (disables hover borders)
   showDropBefore: boolean;
   showDropAfter: boolean;
   showDropInto: boolean;
@@ -410,6 +416,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
   isExpanded,
   isSelected,
   isDragging,
+  globalDragActive,
   showDropBefore,
   showDropAfter,
   showDropInto,
@@ -472,12 +479,12 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
               data-group-header-id={group.id}
               data-is-group-header="true"
             >
-              {/* Hover border overlay - shows on hover or context menu */}
-              {!showDropInto && (
+              {/* Hover border overlay - shows on hover or context menu, hidden during drag */}
+              {!showDropInto && !globalDragActive && (
                 <div className={clsx(
                   "absolute inset-0 rounded-md border-2 pointer-events-none",
                   colorStyle.border,
-                  isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  (isOpen && !isSelected) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 )} />
               )}
               {showDropInto && (
@@ -627,14 +634,14 @@ const MultiTabDragOverlay = ({ count, firstItem }: MultiTabDragOverlayProps) =>
       {/* Stacked background layers (shown in reverse order for proper z-indexing) */}
       {count > 2 && (
         <div
-          className="absolute w-full bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800"
-          style={{ top: 12, left: 12, height: 28 }}
+          className="absolute w-full h-7 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800"
+          style={{ top: 12, left: 12 }}
         />
       )}
       {count > 1 && (
         <div
-          className="absolute w-full bg-blue-100 dark:bg-blue-900/70 rounded border border-blue-200 dark:border-blue-700"
-          style={{ top: 6, left: 6, height: 28 }}
+          className="absolute w-full h-7 bg-blue-100 dark:bg-blue-900/70 rounded border border-blue-200 dark:border-blue-700"
+          style={{ top: 6, left: 6 }}
         />
       )}
       {/* Front item with content */}
@@ -670,7 +677,7 @@ interface TabListProps {
 
 export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange }: TabListProps) =>
 {
-  const { tabs, closeTab, closeTabs, activateTab, moveTab, moveTabs, groupTab, groupTabs, ungroupTab, ungroupTabs, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
+  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
   const { spaces, activeSpace: activeSpaceFromContext } = useSpacesContext();
@@ -1121,11 +1128,29 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     | { type: 'group'; group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number };
   const [multiDragInfo, setMultiDragInfo] = useState<{ count: number; firstItem: MultiDragFirstItem } | null>(null);
 
+  // Ref to store the computed drag overlay offset (based on cursor position within element at drag start)
+  const dragStartOffsetRef = useRef<number>(24);
+
   // External drop target for cross-context drops (tab → bookmark)
   const [localExternalTarget, setLocalExternalTarget] = useState<ExternalDropTarget | null>(null);
 
   // Space drop target for tab → space drops
   const [localSpaceDropTarget, setLocalSpaceDropTarget] = useState<string | null>(null);
+
+  // Helper to clear all DnD state
+  const clearDndState = useCallback(() =>
+  {
+    setActiveId(null);
+    setActiveTab(null);
+    setActiveGroup(null);
+    setMultiDragInfo(null);
+    setDropTargetId(null);
+    setDropPosition(null);
+    setLocalExternalTarget(null);
+    onExternalDropTargetChange?.(null);
+    setLocalSpaceDropTarget(null);
+    onSpaceDropTargetChange?.(null);
+  }, [setActiveId, setDropTargetId, setDropPosition, onExternalDropTargetChange, onSpaceDropTargetChange]);
 
   // Helper to check if we're dragging a group
   const isDraggingGroup = typeof activeId === 'string' && String(activeId).startsWith('group-');
@@ -1351,6 +1376,17 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
   const handleDragStart = useCallback((event: DragStartEvent) =>
   {
+    // Calculate overlay offset based on where user clicked in the element
+    const activatorEvent = event.activatorEvent as PointerEvent;
+    const rect = event.active.rect.current.initial;
+    if (rect && activatorEvent)
+    {
+      const cursorOffsetInElement = activatorEvent.clientY - rect.top;
+      // Offset = element height - cursor position + small gap (8px)
+      // This keeps overlay consistently below cursor
+      dragStartOffsetRef.current = rect.height - cursorOffsetInElement + 8;
+    }
+
     const id = event.active.id;
 
     // Check if dragging a group (ID starts with "group-")
@@ -1369,43 +1405,24 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       else
       {
         // Group is in selection - check for multi-drag
+        // Only count selected tabs (ignore groups in selection)
         const selectedItems = getSelectedItems();
-        if (selectedItems.length > 1)
+        const selectedTabItems = selectedItems.filter(item => item.type === 'tab');
+
+        if (selectedTabItems.length > 0)
         {
-          // Sort by index to get first visible item
-          const sortedItems = [...selectedItems].sort((a, b) => a.index - b.index);
-          const firstItem = sortedItems[0];
+          // Sort by index to get first visible tab
+          const sortedTabItems = [...selectedTabItems].sort((a, b) => a.index - b.index);
+          const firstTabItem = sortedTabItems[0];
           const allTabs = [...visibleTabs, ...orphanedTabs];
 
-          let firstItemInfo: MultiDragFirstItem | null = null;
-          if (firstItem.type === 'group')
+          const tab = allTabs.find(t => String(t.id) === firstTabItem.id);
+          if (tab)
           {
-            const firstGroupId = parseInt(firstItem.id.replace('group-', ''), 10);
-            const firstGroup = visibleTabGroups.find(g => g.id === firstGroupId);
-            if (firstGroup)
-            {
-              const firstGroupTabCount = allTabs.filter(t => (t.groupId ?? -1) === firstGroupId).length;
-              const firstGroupMatchedSpace = spaces.find(s => s.name === firstGroup.title);
-              firstItemInfo = {
-                type: 'group',
-                group: firstGroup,
-                matchedSpace: firstGroupMatchedSpace,
-                tabCount: firstGroupTabCount
-              };
-            }
-          }
-          else if (firstItem.type === 'tab')
-          {
-            const tab = allTabs.find(t => String(t.id) === firstItem.id);
-            if (tab)
-            {
-              firstItemInfo = { type: 'tab', tab };
-            }
-          }
-
-          if (firstItemInfo)
-          {
-            setMultiDragInfo({ count: selectedItems.length, firstItem: firstItemInfo });
+            setMultiDragInfo({
+              count: selectedTabItems.length,
+              firstItem: { type: 'tab', tab }
+            });
           }
           else
           {
@@ -1437,44 +1454,24 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       else
       {
         // If dragged item IS in selection, keep selection (drag all selected)
-        // Collect first item info for the drag overlay
+        // Only count selected tabs (ignore groups in selection)
         const selectedItems = getSelectedItems();
-        if (selectedItems.length > 1)
+        const selectedTabItems = selectedItems.filter(item => item.type === 'tab');
+
+        if (selectedTabItems.length > 1)
         {
-          // Sort by index to get first visible item
-          const sortedItems = [...selectedItems].sort((a, b) => a.index - b.index);
-          const firstItem = sortedItems[0];
+          // Sort by index to get first visible tab
+          const sortedTabItems = [...selectedTabItems].sort((a, b) => a.index - b.index);
+          const firstTabItem = sortedTabItems[0];
           const allTabs = [...visibleTabs, ...orphanedTabs];
 
-          let firstItemInfo: MultiDragFirstItem | null = null;
-          if (firstItem.type === 'group')
+          const tab = allTabs.find(t => String(t.id) === firstTabItem.id);
+          if (tab)
           {
-            const groupId = parseInt(firstItem.id.replace('group-', ''), 10);
-            const group = visibleTabGroups.find(g => g.id === groupId);
-            if (group)
-            {
-              const groupTabCount = allTabs.filter(t => (t.groupId ?? -1) === groupId).length;
-              const groupMatchedSpace = spaces.find(s => s.name === group.title);
-              firstItemInfo = {
-                type: 'group',
-                group,
-                matchedSpace: groupMatchedSpace,
-                tabCount: groupTabCount
-              };
-            }
-          }
-          else if (firstItem.type === 'tab')
-          {
-            const tab = allTabs.find(t => String(t.id) === firstItem.id);
-            if (tab)
-            {
-              firstItemInfo = { type: 'tab', tab };
-            }
-          }
-
-          if (firstItemInfo)
-          {
-            setMultiDragInfo({ count: selectedItems.length, firstItem: firstItemInfo });
+            setMultiDragInfo({
+              count: selectedTabItems.length,
+              firstItem: { type: 'tab', tab }
+            });
           }
           else
           {
@@ -1710,8 +1707,9 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     }
 
     // Check if pointer is in end-of-list drop zone (using sentinel element)
+    // Skip when in a space - dropping here would move tab outside the space group
     const endOfListRect = endOfListRef.current?.getBoundingClientRect();
-    if (endOfListRect && currentY >= endOfListRect.top)
+    if (endOfListRect && currentY >= endOfListRect.top && !isInSpace)
     {
       setDropTargetId('end-of-list');
       setDropPosition('after');
@@ -1729,7 +1727,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     setLocalSpaceDropTarget(null);
     onSpaceDropTargetChange?.(null);
     clearAutoExpandTimer();
-  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange, expandedGroups, localSpaceDropTarget, onSpaceDropTargetChange]);
+  }, [setDropTargetId, setDropPosition, setAutoExpandTimer, clearAutoExpandTimer, onExternalDropTargetChange, expandedGroups, localSpaceDropTarget, onSpaceDropTargetChange, isInSpace]);
 
   const handleDragEnd = useCallback(async (_event: DragEndEvent) =>
   {
@@ -1789,16 +1787,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
       // Clear all state
       wasValidDropRef.current = true;
-      setActiveId(null);
-      setActiveTab(null);
-      setActiveGroup(null);
-      setMultiDragInfo(null);
-      setDropTargetId(null);
-      setDropPosition(null);
-      setLocalExternalTarget(null);
-      onExternalDropTargetChange?.(null);
-      setLocalSpaceDropTarget(null);
-      onSpaceDropTargetChange?.(null);
+      clearDndState();
       return;
     }
 
@@ -1875,16 +1864,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
       // Clear all state
       wasValidDropRef.current = true;
-      setActiveId(null);
-      setActiveTab(null);
-      setActiveGroup(null);
-      setMultiDragInfo(null);
-      setDropTargetId(null);
-      setDropPosition(null);
-      setLocalExternalTarget(null);
-      onExternalDropTargetChange?.(null);
-      setLocalSpaceDropTarget(null);
-      onSpaceDropTargetChange?.(null);
+      clearDndState();
       return;
     }
 
@@ -1895,16 +1875,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
       // Clear all state
       wasValidDropRef.current = true;
-      setActiveId(null);
-      setActiveTab(null);
-      setActiveGroup(null);
-      setMultiDragInfo(null);
-      setDropTargetId(null);
-      setDropPosition(null);
-      setLocalSpaceDropTarget(null);
-      onSpaceDropTargetChange?.(null);
-      setLocalExternalTarget(null);
-      onExternalDropTargetChange?.(null);
+      clearDndState();
       return;
     }
 
@@ -1914,23 +1885,24 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
 
     if (!isValidDrop)
     {
-      setActiveId(null);
-      setActiveTab(null);
-      setActiveGroup(null);
-      setMultiDragInfo(null);
-      setDropTargetId(null);
-      setDropPosition(null);
-      setLocalExternalTarget(null);
-      onExternalDropTargetChange?.(null);
+      clearDndState();
       return;
     }
 
     // Check if we're dragging a group
     const isDraggingGroupNow = typeof activeId === 'string' && String(activeId).startsWith('group-');
 
-    if (isDraggingGroupNow)
+    // Calculate selectedTabIds early to decide between GROUP DRAG vs TAB DRAG
+    const selectedItems = getSelectedItems();
+    const selectedTabIds = selectedItems
+      .filter(item => item.type === 'tab')
+      .map(item => parseInt(item.id, 10))
+      .filter(id => !isNaN(id));
+    const hasSelectedTabs = selectedTabIds.length > 0;
+
+    if (isDraggingGroupNow && !hasSelectedTabs)
     {
-      // --- GROUP DRAG HANDLING ---
+      // --- GROUP DRAG HANDLING (only when no tabs are selected) ---
       const draggedGroupId = parseInt(String(activeId).replace('group-', ''), 10);
       const isGroupHeaderTarget = dropTargetId.startsWith('group-');
 
@@ -2000,29 +1972,23 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     }
     else
     {
-      // --- TAB DRAG HANDLING ---
-      // Get selected items to determine if this is a multi-drag
-      const selectedItems = getSelectedItems();
-      const selectedTabIds = selectedItems
-        .filter(item => item.type === 'tab')
-        .map(item => parseInt(item.id, 10))
-        .filter(id => !isNaN(id));
+      // --- TAB DRAG HANDLING (single tab or multi-tab selection, ignores groups) ---
+      // Note: selectedItems and selectedTabIds are already calculated above
 
       // Check if dragged item is in selection (multi-drag scenario)
-      const isMultiDrag = selectedTabIds.length > 1 && selectedTabIds.includes(activeId as number);
+      // When dragging a group with selected tabs, treat as multi-drag of the selected tabs
+      const isMultiDrag = selectedTabIds.length > 1 ||
+        (isDraggingGroupNow && selectedTabIds.length > 0);
 
       // Check both visibleTabs and orphanedTabs for the source
-      const sourceTab = visibleTabs.find(t => t.id === activeId) || orphanedTabs.find(t => t.id === activeId);
-      const isOrphanedTab = orphanedTabs.some(t => t.id === activeId);
+      // When dragging a group, use the first selected tab as the source reference
+      const sourceTabId = isDraggingGroupNow ? selectedTabIds[0] : activeId;
+      const sourceTab = visibleTabs.find(t => t.id === sourceTabId) || orphanedTabs.find(t => t.id === sourceTabId);
+      const isOrphanedTab = orphanedTabs.some(t => t.id === sourceTabId);
 
       if (!sourceTab)
       {
-        setActiveId(null);
-        setActiveTab(null);
-        setActiveGroup(null);
-        setMultiDragInfo(null);
-        setDropTargetId(null);
-        setDropPosition(null);
+        clearDndState();
         return;
       }
 
@@ -2031,277 +1997,80 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
       if (isMultiDrag)
       {
         // --- MULTI-TAB DRAG ---
-        // Get all selected tabs (filter orphaned tabs from selection for now - they need special handling)
+        // Get all selected tabs
         const selectedTabs = selectedTabIds
           .map(id => visibleTabs.find(t => t.id === id))
           .filter((t): t is chrome.tabs.Tab => t !== undefined);
 
         if (selectedTabs.length === 0)
         {
-          // Fallback to single-tab behavior
           return;
         }
 
-        // Calculate target index and group based on drop target
-        let targetIndex = -1;
-        let targetGroupId = -1; // -1 means ungrouped
+        // Sort tabs by index to maintain relative order
+        const sortedTabs = [...selectedTabs].sort((a, b) => a.index - b.index);
 
-        if (isGroupHeaderTarget)
-        {
-          const groupId = parseInt(dropTargetId.replace('group-', ''));
-          const groupTabsList = visibleTabs.filter(t => (t.groupId ?? -1) === groupId);
+        // First tab uses full moveSingleTab
+        let result = moveSingleTab({
+          tabId: sortedTabs[0].id!,
+          sourceIndex: sortedTabs[0].index,
+          sourceGroupId: sortedTabs[0].groupId ?? -1,
+          dropTargetId,
+          dropPosition,
+          isGroupHeaderTarget,
+          visibleTabs,
+          moveTab,
+          groupTab,
+          ungroupTab
+        });
 
-          if (dropPosition === 'into' || dropPosition === 'intoFirst')
-          {
-            // Move into group
-            targetGroupId = groupId;
-            if (dropPosition === 'intoFirst' && groupTabsList.length > 0)
-            {
-              targetIndex = groupTabsList[0].index;
-            }
-            else if (groupTabsList.length > 0)
-            {
-              targetIndex = groupTabsList[groupTabsList.length - 1].index + 1;
-            }
-          }
-          else if (dropPosition === 'before' && groupTabsList.length > 0)
-          {
-            // Place before group (ungrouped)
-            targetIndex = groupTabsList[0].index;
-            targetGroupId = -1;
-          }
-          else if (dropPosition === 'after' && groupTabsList.length > 0)
-          {
-            // Place after group (ungrouped)
-            targetIndex = groupTabsList[groupTabsList.length - 1].index + 1;
-            targetGroupId = -1;
-          }
-        }
-        else if (dropTargetId === 'end-of-list')
+        // Subsequent tabs chain off the previous result
+        if (result)
         {
-          if (visibleTabs.length > 0)
+          for (let i = 1; i < sortedTabs.length; i++)
           {
-            const lastTab = visibleTabs[visibleTabs.length - 1];
-            targetIndex = lastTab.index + 1;
-          }
-          targetGroupId = -1;
-        }
-        else
-        {
-          // Target is a tab
-          const targetTabId = parseInt(dropTargetId);
-          const targetTab = visibleTabs.find(t => t.id === targetTabId);
-          if (targetTab)
-          {
-            targetGroupId = targetTab.groupId ?? -1;
-            targetIndex = dropPosition === 'before' ? targetTab.index : targetTab.index + 1;
+            const tab = sortedTabs[i];
+            result = moveTabAfter({
+              tabId: tab.id!,
+              sourceIndex: tab.index,
+              sourceGroupId: tab.groupId ?? -1,
+              targetTab: result,
+              moveTab,
+              groupTab,
+              ungroupTab
+            });
           }
         }
 
-        if (targetIndex >= 0)
-        {
-          // Get tab IDs that need ungrouping (those currently in a group but target is ungrouped)
-          const tabsToUngroup = selectedTabs
-            .filter(t => (t.groupId ?? -1) !== -1 && targetGroupId === -1)
-            .map(t => t.id!);
-
-          // Get tab IDs that need grouping (those not in target group)
-          const tabsToGroup = selectedTabs
-            .filter(t => targetGroupId !== -1 && (t.groupId ?? -1) !== targetGroupId)
-            .map(t => t.id!);
-
-          // Ungroup first if needed
-          if (tabsToUngroup.length > 0)
-          {
-            ungroupTabs(tabsToUngroup);
-          }
-
-          // Move all tabs to target position
-          await moveTabs(selectedTabIds, targetIndex);
-
-          // Group if needed
-          if (tabsToGroup.length > 0 && targetGroupId !== -1)
-          {
-            groupTabs(selectedTabIds, targetGroupId);
-          }
-
-          // Clear selection after successful multi-drag
-          clearSelection();
-        }
+        clearSelection();
       }
       else
       {
-        // --- SINGLE TAB DRAG (existing logic) ---
+        // --- SINGLE TAB DRAG ---
         // For orphaned tabs, ungroup first so they leave the LiveBookmarks group
         if (isOrphanedTab)
         {
           ungroupTab(activeId as number);
         }
 
-        const sourceGroupId = isOrphanedTab ? -1 : (sourceTab.groupId ?? -1);
-        const sourceIndex = sourceTab.index; // Chrome's real index
-
-        if (isGroupHeaderTarget)
-        {
-          const targetGroupId = parseInt(dropTargetId.replace('group-', ''));
-
-          if (dropPosition === 'into')
-          {
-            // Move tab into group at the end
-            if (sourceGroupId !== targetGroupId)
-            {
-              groupTab(activeId as number, targetGroupId);
-            }
-
-            // Move to end of group
-            const groupTabsList = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
-            if (groupTabsList.length > 0)
-            {
-              const lastTabIndex = groupTabsList[groupTabsList.length - 1].index;
-              let targetIndex = lastTabIndex + 1;
-
-              // Account for source removal when moving forward
-              if (sourceIndex < targetIndex)
-              {
-                targetIndex--;
-              }
-
-              moveTab(activeId as number, targetIndex);
-            }
-          }
-          else
-          {
-            // 'before', 'after', or 'intoFirst' on group header
-            const groupTabsList = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
-            if (groupTabsList.length > 0)
-            {
-              if (dropPosition === 'before')
-              {
-                // Place before the group (as sibling, outside)
-                let targetIndex = groupTabsList[0].index;
-                // Account for source removal when moving forward
-                if (sourceIndex < targetIndex)
-                {
-                  targetIndex--;
-                }
-                if (sourceGroupId !== -1)
-                {
-                  ungroupTab(activeId as number);
-                }
-                moveTab(activeId as number, targetIndex);
-              }
-              else if (dropPosition === 'intoFirst')
-              {
-                // Insert inside group at index 0 (expanded folder, bottom 25% zone)
-                const firstTabIndex = groupTabsList[0].index;
-                let targetIndex = firstTabIndex;
-                if (sourceIndex < targetIndex)
-                {
-                  targetIndex--;
-                }
-                moveTab(activeId as number, targetIndex);
-                if (sourceGroupId !== targetGroupId)
-                {
-                  groupTab(activeId as number, targetGroupId);
-                }
-              }
-              else
-              {
-                // 'after': sibling after group (after last tab in group)
-                const lastTabIndex = groupTabsList[groupTabsList.length - 1].index;
-                let targetIndex = lastTabIndex + 1;
-                if (sourceIndex < targetIndex)
-                {
-                  targetIndex--;
-                }
-                if (sourceGroupId !== -1)
-                {
-                  ungroupTab(activeId as number);
-                }
-                moveTab(activeId as number, targetIndex);
-              }
-            }
-          }
-        }
-        else if (dropTargetId === 'end-of-list')
-        {
-          // Move tab to very end as ungrouped
-          if (visibleTabs.length > 0)
-          {
-            const lastTab = visibleTabs[visibleTabs.length - 1];
-            let targetIndex = lastTab.index + 1;
-
-            // Account for source removal
-            if (sourceIndex < targetIndex)
-            {
-              targetIndex--;
-            }
-
-            // Ungroup if currently in a group
-            if (sourceGroupId !== -1)
-            {
-              ungroupTab(activeId as number);
-            }
-
-            moveTab(activeId as number, targetIndex);
-          }
-        }
-        else
-        {
-          // Target is a tab
-          const targetTabId = parseInt(dropTargetId);
-          const targetTab = visibleTabs.find(t => t.id === targetTabId);
-
-          if (targetTab)
-          {
-            const targetGroupId = targetTab.groupId ?? -1;
-
-            // Handle group membership change
-            if (targetGroupId !== sourceGroupId)
-            {
-              if (targetGroupId === -1)
-              {
-                // Target is ungrouped - ungroup source
-                if (sourceGroupId !== -1)
-                {
-                  ungroupTab(activeId as number);
-                }
-              }
-              else
-              {
-                // Target is in a group - add source to that group
-                groupTab(activeId as number, targetGroupId);
-              }
-            }
-
-            // Reorder - use Chrome's real index
-            const targetIndex = targetTab.index;
-            let newIndex = dropPosition === 'before' ? targetIndex : targetIndex + 1;
-
-            // When moving forward, account for source removal shifting tabs left
-            if (sourceIndex < newIndex)
-            {
-              newIndex--;
-            }
-
-            moveTab(activeId as number, newIndex);
-          }
-        }
+        moveSingleTab({
+          tabId: activeId as number,
+          sourceIndex: sourceTab.index,
+          sourceGroupId: isOrphanedTab ? -1 : (sourceTab.groupId ?? -1),
+          dropTargetId,
+          dropPosition,
+          isGroupHeaderTarget,
+          visibleTabs,
+          moveTab,
+          groupTab,
+          ungroupTab
+        });
       }
     }
 
     // Reset state
-    setActiveId(null);
-    setActiveTab(null);
-    setActiveGroup(null);
-    setMultiDragInfo(null);
-    setDropTargetId(null);
-    setDropPosition(null);
-    setLocalExternalTarget(null);
-    onExternalDropTargetChange?.(null);
-    setLocalSpaceDropTarget(null);
-    onSpaceDropTargetChange?.(null);
-  }, [activeId, dropTargetId, dropPosition, visibleTabs, orphanedTabs, expandedGroups, groupTab, groupTabs, ungroupTab, ungroupTabs, moveTab, moveTabs, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab, localSpaceDropTarget, onSpaceDropTargetChange, moveTabToSpace, getSelectedItems, clearSelection]);
+    clearDndState();
+  }, [activeId, dropTargetId, dropPosition, visibleTabs, orphanedTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab, localSpaceDropTarget, onSpaceDropTargetChange, moveTabToSpace, getSelectedItems, clearSelection, clearDndState]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
@@ -2310,17 +2079,8 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     wasValidDropRef.current = false;
 
     // Reset drag state
-    setActiveId(null);
-    setActiveTab(null);
-    setActiveGroup(null);
-    setMultiDragInfo(null);
-    setDropTargetId(null);
-    setDropPosition(null);
-    setLocalExternalTarget(null);
-    onExternalDropTargetChange?.(null);
-    setLocalSpaceDropTarget(null);
-    onSpaceDropTargetChange?.(null);
-  }, [clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, onExternalDropTargetChange, onSpaceDropTargetChange]);
+    clearDndState();
+  }, [clearAutoExpandTimer, clearDndState]);
 
   const toggleGroup = (groupId: number | string) =>
   {
@@ -2475,6 +2235,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                   tab={item.tab}
                   indentLevel={0}
                   isBeingDragged={activeId === item.tab.id && !multiDragInfo}
+                  globalDragActive={!!activeId}
                   showDropBefore={isTarget && dropPosition === 'before'}
                   showDropAfter={isTarget && dropPosition === 'after'}
                   isSelected={isTabSelected(tabId)}
@@ -2514,6 +2275,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           tab={tab}
                           indentLevel={0}
                           isBeingDragged={activeId === tab.id && !multiDragInfo}
+                          globalDragActive={!!activeId}
                           showDropBefore={isTabTarget && dropPosition === 'before'}
                           showDropAfter={isTabTarget && dropPosition === 'after'}
                           isSelected={isTabSelected(tabId)}
@@ -2559,6 +2321,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                     tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
                     isSelected={isTabSelected(groupTargetId)}
+                    globalDragActive={!!activeId}
                     showDropBefore={isTarget && dropPosition === 'before'}
                     showDropAfter={showDropAfter}
                     showDropInto={showDropInto}
@@ -2593,6 +2356,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                         tab={tab}
                         indentLevel={1}
                         isBeingDragged={activeId === tab.id && !multiDragInfo}
+                        globalDragActive={!!activeId}
                         showDropBefore={isTabTarget && dropPosition === 'before'}
                         showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab}
                         beforeIndentPx={dropPosition === 'before' ? indentPx : undefined}
@@ -2652,12 +2416,14 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                             )}
                             data-orphaned-group-header="true"
                           >
-                            {/* Hover border overlay */}
-                            <div className={clsx(
-                              "absolute inset-0 rounded-md border-2 pointer-events-none",
-                              colorStyle.border,
-                              isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                            )} />
+                            {/* Hover border overlay - hidden during drag */}
+                            {!activeId && (
+                              <div className={clsx(
+                                "absolute inset-0 rounded-md border-2 pointer-events-none",
+                                colorStyle.border,
+                                isOpen ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                              )} />
+                            )}
                           </TreeRow>
                         </ContextMenu.Trigger>
                         <ContextMenu.Portal>
@@ -2687,6 +2453,7 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
                           tab={tab}
                           indentLevel={1}
                           isBeingDragged={activeId === tab.id && !multiDragInfo}
+                          globalDragActive={!!activeId}
                           showDropBefore={false}
                           showDropAfter={false}
                           groupColor={item.color}
@@ -2728,7 +2495,13 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
             )}
           </TreeRow>
 
-          <DragOverlay dropAnimation={wasValidDropRef.current ? null : undefined}>
+          {/* Offset modifier so overlay appears below cursor, keeping drop indicator visible */}
+          <DragOverlay
+            dropAnimation={wasValidDropRef.current ? null : undefined}
+            modifiers={[
+              ({ transform }) => ({ ...transform, y: transform.y + dragStartOffsetRef.current }),
+            ]}
+          >
             {multiDragInfo && <MultiTabDragOverlay count={multiDragInfo.count} firstItem={multiDragInfo.firstItem} />}
             {activeTab && !multiDragInfo && <TabDragOverlay tab={activeTab} />}
             {activeGroup && !multiDragInfo && <GroupDragOverlay group={activeGroup.group} matchedSpace={spaces.find(s => s.name === activeGroup.group.title)} tabCount={activeGroup.tabCount} />}

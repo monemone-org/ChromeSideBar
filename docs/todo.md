@@ -1,17 +1,55 @@
 # TODO
 
+- Review Code:
+      - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
+
+- [ ] support drag links from browser pane to
+            - bookmarks - create bookmark
+            - tabs - open as new tab (grouped or ungrouped, depending on drop location)
+            - spaces - open as new tab in the target space.
+
+- [ ] support dropping pinned site
+      - to bookmark - create bookmark
+      - to tab - open a new tab
+      - to space bar  - open as new tab in the target space.
+
+- [ ] Orphaned tabs popup menu, add
+      - [ ] "Move To Space..."
+      - [ ] "Close Tabs Before"  (within the Orphaned tabs list)
+      - [ ] "Close Tabs After"  (within the Orphaned tabs list)
+      - [ ] "Close Other Tabs"  (other tabs in the Orphaned tabs list)
+
+- [ ] make the area that response to group row's expand and collapse bigger, expand the area to outside of the V > icon. the area should fill the whole row.
+
+- [ ] Folder popup menu - after add folder, there should be an "Add Bookmark..."
+
+- [ ] Cmd+Click on bookmark doesn't create new tab
+
+## Aborted
+
+- saved filter
+      - [ ] focus doesn't go to the input field
+
+- Spaces:
+      - [ ] popup menu edit spaces: a new dialog that lists all the spacs with name and icon.  users can add, edit , delete and reorder spaces in the dialog
+
+- [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
+
+
+## Done
+
 - [x] display tab row in full width.  when cursor is hover over, show pin and x button over the row label.
 - [x] speaker icon on the very right end of the row
 - [x] display all custom icons
-- [x] drag bookmark item is covering up the drap target indicator 
+- [x] drag bookmark item is covering up the drap target indicator
 
 - [x] remove tab count  in "Active Tab" row. add a "..." menu button which contains these actions
    - sort by domain, then by title
    - close all tabs
-   
-- [x] export/import pinned sites in json 
 
-- [x] Active Tab, "sort by domain" support accending (a-z) and descending (z-a). 
+- [x] export/import pinned sites in json
+
+- [x] Active Tab, "sort by domain" support accending (a-z) and descending (z-a).
 - [x] rename group dialog: text field should have default focus
 
 - [x] Save and cancel buttons in dialog is bigger than system default font. check all UI in all dialogs to use system normal size font.
@@ -32,10 +70,10 @@
 - [x] drag/drop a tab to bookmark folder, should create a new bookmark and move that tab to SideBarForArc and create a bookmark-tab association as a loaded bookmark
 
 - [x] cannot drop tab behind the last group if group is expended.  new a empty dummuy last row??
-    
+
 - [x] pinned site's loaded state background colour is not obvious enough.
 
-- [x] add a line to separate the bookmark and tabs sections. 
+- [x] add a line to separate the bookmark and tabs sections.
     remove "Activee Tabs" and replace with a  `+ New Tab       [...]` row with action button that show the original "Active Rows"'s popup menu to allow sort and close all tabs.
 
 bugs:
@@ -48,10 +86,10 @@ bugs:
       group header row: only top left/right corner has rounding.  the bottom left/right corner - no rounding
       last grouped tab row: only bottom left/right corner has rounding
       all other grouped tab: no rounding corners
-        
+
 - [x] empty row at the end of tabList. so the gear setting button is not mixed up with the last tab row's speaker icon.
 
-- [x] inefficent batch operation 
+- [x] inefficent batch operation
    - delete group causes fetchTabs to be called many times (148)
 
 - [x] when switch from arc style bookmark to traditional style, move all tabs under SideBarForArc group to ungrouped
@@ -59,11 +97,11 @@ bugs:
 - [x] drag group to bookmark folder to create bookmark subfolder
 - [x] change toast message from "Export
 
-- [x] settings: 
+- [x] settings:
       Behaviour:
          Open bookmark:  Arc style | In new tab | In active tab
-             [ explaination of the selected open bookmark style ] 
-                         
+             [ explaination of the selected open bookmark style ]
+
 - [x] while dragging tabs/group over bookmark folders, when hover for 1sec+, the folder doesn't auto expand.
 
 
@@ -71,7 +109,7 @@ bugs:
 
 - [x] when drag/dropping tab ot bookmark and arc style bookmark is on, automatically turn the dragged tab to associated/managed/persistent tab of the newly created bookmark
 
-- [x] add a menu item to tab's popup menu: "Add/Move to Bookmark" (Add for non-arc style bookmark. Move for arc style bookmark) which then prompt select a folder dialog.  then create a bookmark.  If it's in arc style bookmark, turn the tab to the bookmark's arc style persistent tab 
+- [x] add a menu item to tab's popup menu: "Add/Move to Bookmark" (Add for non-arc style bookmark. Move for arc style bookmark) which then prompt select a folder dialog.  then create a bookmark.  If it's in arc style bookmark, turn the tab to the bookmark's arc style persistent tab
 
 - [x] tooltips are clipped
 - [x] tab/bookmark rows have no tooltips
@@ -81,7 +119,6 @@ bugs:
 - saved filter
       - [x] recent filter is not saved. there should be a debounce to start search. that search string is remembered in memory.  the string should be saved in recent. if user edit the search string without deleting all charactors, then edit that recent search string without adding another new one to the recent list.
       - [x] add a [reset] filter button to toolbar that clear the search string , filter with open tab and filter with speaker.
-      - [ ] focus doesn't go to the input field
 
 - [x] arc style "live" bookmark row title should be updated to match the live bookmark tab's current page
   title. When live bookmark tab is closed, restore the row title back to the name of the bookmark.
@@ -98,9 +135,9 @@ bugs:
       - pinned sites
       - arc-style live bookmarks
       - arc-style space
-      only show the 1st time the extension is run.    
+      only show the 1st time the extension is run.
 
-- [x] 2 finger swipe left/right on side panel to change space changes 2 spaces forward/backward each time            
+- [x] 2 finger swipe left/right on side panel to change space changes 2 spaces forward/backward each time
 
 SpaceBar
 - [x] add button + at the end of the space bar , need to clean up its style
@@ -110,7 +147,6 @@ SpaceBar
 
 - Spaces:
       - [x] popup menu action: Close All Tabs In Space
-      - [ ] popup menu edit spaces: a new dialog that lists all the spacs with name and icon.  users can add, edit , delete and reorder spaces in the dialog
       - [x] import/export, phase 6 in the plan
 
 - [x] live bookmark tab and live pinned site tab, after moving to new window, it should be considered closed in this window. so no [x] button or speaker button should be presented
@@ -147,9 +183,9 @@ SpaceBar
 
 - [x] tab popup menu: "move to bookmark" - change to always do "Add to bookmark" instead. position the menu item after "Add to Group"
 
-- [x] settings dialog, options to disable Space. 
+- [x] settings dialog, options to disable Space.
       1. hide space bar
-      
+
 - [x] tab popup menu: "move to space" after moving tab to space, should active that space and bring that tab in that space visible in the side panel
 
 - [x] during drag drop, when hover over a folder node, it can expand and collapse the node if the cursor hovers over the node for some period of time. change that behaviour to only expand but not collapse.
@@ -160,10 +196,9 @@ SpaceBar
 
 - Review Code:
       - [x] Review code for O(n²) or less efficient logic.
-      - [x] Refactor reusable or self-contained code into separate components. Remove duplicated code. 
+      - [x] Refactor reusable or self-contained code into separate components. Remove duplicated code.
       - [x] Security review
-      - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
-      
+
 - [x] in audio filter dialog, when clicking anywhere else in the panel should dismiss the audio filter dialog
   so is "Navigate to Space" dialog
 
@@ -186,26 +221,14 @@ SpaceBar
 
 - [x] cannot collapse "Orphaned Tabs" group
 
-- [x] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.  
+- [x] Persist the bookmark folders collapse/expand states in storage, so when chrome is reloaded or space is activated again, the folder states remain the same.
 
-- [ ] if useSpace==YES, in All Space's tabList, show all the tabs not belong to any space first. thens group the rest of tabs by their Space.  Render the Space row with the space icon, use the space colour as the label background colour.
+- [x] multiple selection of the same type of rows (bookmarks+folders, tabs): drag/drop, common popup menu (move to folder  or move to space and delete)
 
-- [-] multiple selection of the same type of rows (bookmarks+folders, tabs): drag/drop, common popup menu (move to folder  or move to space and delete)
+- [x] multi-select a folder and its 2 bookmarks, after drop, the 2 bookmkars are at the same level as the folder.
 
-- [ ] support drag links from browser pane to 
-            - bookmarks - create bookmark
-            - tabs - open as new tab (grouped or ungrouped, depending on drop location)
-            - spaces - open as new tab in the target space.
+- [x] multi-select tabs/bookmarks, drag overlay covers up drop location indicator
 
-- [ ] Orphaned tabs popup menu, add
-      - [ ] "Move To Space..."
-      - [ ] "Close Tabs Before"  (within the Orphaned tabs list)
-      - [ ] "Close Tabs After"  (within the Orphaned tabs list)
-      - [ ] "Close Other Tabs"  (other tabs in the Orphaned tabs list)
-
-- [ ] make the area that response to group row's expand and collapse bigger, expand the area to outside of the V > icon. the area should fill the whole row.
-
-
-- [ ] multi-select a folder and its 2 bookmarks, after drop, the 2 bookmkars are at the same level as the folder.
-
-- [ ] multi-select tabs/bookmarks, drag overlay covers up drop location indicator
+- Dropping inside a Space (non-All space)
+      - [x] Dropping before root folder should not be allowed
+      - [x] Dropping after last tab in space group should not be moved out of the group.  it should be moved to after the last tab inside the same group. Or we can simply make  "+ New Tab" row at the end of the Space's tab list not droppable.

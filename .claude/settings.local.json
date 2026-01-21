@@ -11,7 +11,8 @@
       "Skill(git-commit-msg)",
       "WebFetch(domain:developer.chrome.com)",
       "Bash(echo:*)",
-      "Bash(pbcopy)"
+      "Bash(pbcopy)",
+      "Bash(git show:*)"
     ]
   }
 }

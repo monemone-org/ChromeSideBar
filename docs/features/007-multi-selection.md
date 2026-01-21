@@ -135,3 +135,124 @@ Correct approach - move from back to front:
 - `src/components/TreeRow.tsx` - selected visual style
 - `src/contexts/BookmarkTabsContext.tsx` - pattern to follow for SelectionContext
 - `src/hooks/useDragDrop.ts` - pattern to follow for useSelection
+
+---
+
+## Test Cases
+
+### Selection UX
+
+| Pass | Test | Expected |
+|:----:|------|----------|
+| [ ] | Click single tab | Selects only that tab, clears any previous selection |
+| [ ] | Click single bookmark | Selects only that bookmark, clears any previous selection |
+| [ ] | Cmd/Ctrl+click to add | Adds item to existing selection |
+| [ ] | Cmd/Ctrl+click selected item | Deselects that item, keeps others selected |
+| [ ] | Shift+click expands forward | Selects range from first selected to clicked item |
+| [ ] | Shift+click expands backward | Selects range from clicked item to last selected |
+| [ ] | Shift+click with gap | Fills in all items between min and max indices |
+| [ ] | Select tab + group mixed | Both tab and group are selected together |
+| [ ] | Select bookmark + folder mixed | Both bookmark and folder are selected together |
+| [ ] | Tab and bookmark selections independent | Selecting tabs doesn't affect bookmark selection and vice versa |
+
+### Multi-Drag
+
+| Pass | Test | Expected |
+|:----:|------|----------|
+| [ ] | Drag single selected tab | Moves just that tab |
+| [ ] | Drag one of multiple selected tabs | Moves all selected tabs |
+| [ ] | Drag unselected tab while others selected | Clears selection, drags only the unselected tab |
+| [ ] | Multi-drag tabs forward | Items maintain relative order after move |
+| [ ] | Multi-drag tabs backward | Items maintain relative order after move |
+| [ ] | Multi-drag bookmarks forward | Items maintain relative order after move |
+| [ ] | Multi-drag bookmarks backward | Items maintain relative order after move |
+| [ ] | Drag selected groups into another group | Moves all tabs from source groups into target group |
+| [ ] | Drag selected folders into another folder | Creates nested folders correctly |
+| [ ] | Drag overlay shows count | Shows "N items" badge during multi-drag |
+
+
+drag single bookmark
+- into folder
+- intoFirst folder
+- before
+- after 
+
+drag multiple bookmarks
+- into folder
+- intoFirst
+- before
+- after 
+
+drag a mix of folder + its bookmark children + decendents
+- into folder
+- intoFirst
+- before
+- after 
+
+drag a mix of folder, folder, other bookmarks
+- into folder
+- intoFirst
+- before
+- after 
+
+
+drag single tabs
+- into group
+- intoFirst group
+- before
+- after 
+
+drag multi-tabs from one group
+- into group
+- intoFirst group
+- before
+- after 
+
+drag multi-tabs across multi-groups
+- into group
+- intoFirst group
+- before
+- after 
+
+
+
+
+### Context Menu
+
+| Pass | Test | Expected |
+|:----:|------|----------|
+| [ ] | Right-click on selected item | Shows context menu, keeps selection |
+| [ ] | Right-click on unselected item | Selects that item, shows context menu |
+| [ ] | "Pin To Sidebar" on multiple tabs | Pins all selected tabs |
+| [ ] | "Pin To Sidebar" on multiple bookmarks | Pins all selected bookmarks |
+| [ ] | "Open In New Tab" on multiple bookmarks | Opens all in new tabs |
+| [ ] | "Open In New Window" on multiple bookmarks | Opens all in new window |
+| [ ] | "Move Bookmark..." on multiple bookmarks | Opens move dialog, moves all selected |
+| [ ] | "Delete" on multiple bookmarks | Shows confirmation, deletes all |
+| [ ] | "Add To Bookmark..." on multiple tabs | Opens dialog, bookmarks all selected |
+| [ ] | "Move To Space..." on multiple tabs | Opens dialog, moves all selected |
+| [ ] | "Move To New Window" on multiple tabs | Moves all selected to new window |
+| [ ] | "Close" on multiple tabs | Shows confirmation, closes all |
+
+### Selection Clearing
+
+| Pass | Test | Expected |
+|:----:|------|----------|
+| [ ] | Press Escape with tabs selected | Clears tab selection |
+| [ ] | Press Escape with bookmarks selected | Clears bookmark selection |
+| [ ] | Click empty area in tab list | Clears tab selection |
+| [ ] | Click empty area in bookmark tree | Clears bookmark selection |
+| [ ] | Successful drag completion | Clears selection |
+| [ ] | Successful delete completion | Clears selection |
+| [ ] | Scroll while items selected | Selection persists |
+| [ ] | Open context menu | Selection persists |
+
+### Edge Cases
+
+| Pass | Test | Expected |
+|:----:|------|----------|
+| [ ] | Select all tabs then close all | Confirmation dialog, all closed, selection cleared |
+| [ ] | Select items across collapsed/expanded groups | Only visible items can be selected |
+| [ ] | Drag to invalid drop target | No changes, selection preserved |
+| [ ] | Cancel delete confirmation | Selection preserved, nothing deleted |
+| [ ] | Select then switch sidebar sections | Selection preserved per section |

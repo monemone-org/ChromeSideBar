@@ -141,42 +141,63 @@ export const useBookmarks = () => {
     });
   }, [handleError]);
 
-  const moveBookmark = useCallback((
+  const moveBookmark = useCallback(async (
     sourceId: string,
     destinationId: string,
     position: 'before' | 'after' | 'into' | 'intoFirst'
-  ) => {
+  ): Promise<chrome.bookmarks.BookmarkTreeNode | null> => {
     if (position === 'into') {
       // Move into folder at the end
-      chrome.bookmarks.getChildren(destinationId, (children) => {
-        if (handleError('get children')) return;
-        const index = children ? children.length : 0;
-        chrome.bookmarks.move(sourceId, { parentId: destinationId, index }, () => {
+      const children = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) => {
+        chrome.bookmarks.getChildren(destinationId, (result) => {
+          if (handleError('get children')) {
+            resolve([]);
+            return;
+          }
+          resolve(result || []);
+        });
+      });
+      const index = children.length;
+      return new Promise((resolve) => {
+        chrome.bookmarks.move(sourceId, { parentId: destinationId, index }, (result) => {
           handleError('move');
+          resolve(result || null);
         });
       });
     } else if (position === 'intoFirst') {
       // Move into folder at the beginning (for expanded folders, bottom 25% zone)
-      chrome.bookmarks.move(sourceId, { parentId: destinationId, index: 0 }, () => {
-        handleError('move');
+      return new Promise((resolve) => {
+        chrome.bookmarks.move(sourceId, { parentId: destinationId, index: 0 }, (result) => {
+          handleError('move');
+          resolve(result || null);
+        });
       });
     } else {
       // Move before/after destination item
-      chrome.bookmarks.get(destinationId, (results) => {
-        if (handleError('get destination') || !results || results.length === 0) return;
+      const dest = await new Promise<chrome.bookmarks.BookmarkTreeNode | null>((resolve) => {
+        chrome.bookmarks.get(destinationId, (results) => {
+          if (handleError('get destination') || !results || results.length === 0) {
+            resolve(null);
+            return;
+          }
+          resolve(results[0]);
+        });
+      });
 
-        const dest = results[0];
-        if (!dest.parentId || dest.index === undefined) return;
+      if (!dest || !dest.parentId || dest.index === undefined) {
+        return null;
+      }
 
-        let targetIndex = dest.index;
+      let targetIndex = dest.index;
+      if (position === 'after') {
+        targetIndex += 1;
+      }
 
-        if (position === 'after') {
-          targetIndex += 1;
-        }
-
-        // Chrome's move API handles same-parent index adjustment internally
-        chrome.bookmarks.move(sourceId, { parentId: dest.parentId, index: targetIndex }, () => {
+      // Chrome's move API handles same-parent index adjustment internally
+      return new Promise((resolve) => {
+        chrome.bookmarks.move(sourceId, { parentId: dest.parentId!, index: targetIndex }, (result) => {
           handleError('move');
+          resolve(result || null);
         });
       });
     }
