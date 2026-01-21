@@ -2258,6 +2258,36 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     closeTabs(tabIds);
   }, [visibleTabs, closeTabs]);
 
+  // Orphaned-specific close functions (scoped to orphanedTabs array only)
+  const closeOrphanedTabsBefore = useCallback((tabId: number) =>
+  {
+    const index = orphanedTabs.findIndex(t => t.id === tabId);
+    if (index <= 0) return;
+    const tabIds = orphanedTabs.slice(0, index)
+      .map(t => t.id)
+      .filter((id): id is number => id !== undefined);
+    closeTabs(tabIds);
+  }, [orphanedTabs, closeTabs]);
+
+  const closeOrphanedTabsAfter = useCallback((tabId: number) =>
+  {
+    const index = orphanedTabs.findIndex(t => t.id === tabId);
+    if (index < 0 || index >= orphanedTabs.length - 1) return;
+    const tabIds = orphanedTabs.slice(index + 1)
+      .map(t => t.id)
+      .filter((id): id is number => id !== undefined);
+    closeTabs(tabIds);
+  }, [orphanedTabs, closeTabs]);
+
+  const closeOrphanedOthers = useCallback((tabId: number) =>
+  {
+    const tabIds = orphanedTabs
+      .filter(t => t.id !== tabId)
+      .map(t => t.id)
+      .filter((id): id is number => id !== undefined);
+    closeTabs(tabIds);
+  }, [orphanedTabs, closeTabs]);
+
   // Close selected tabs (or single tab if not in selection)
   const handleCloseSelectedTabs = useCallback((clickedTabId: number) =>
   {
@@ -2792,12 +2822,19 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                           groupColor={item.color}
                           isLastInGroup={isLastTab}
                           isSelected={isTabSelected(tabId)}
-                          onClose={closeTab}
+                          onClose={handleCloseSelectedTabs}
                           onActivate={activateTab}
                           onKeepAsRegularTab={(tabId) => ungroupTab(tabId)}
                           onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
                           onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
                           selectionCount={selectionCount}
+                          isMultiSelection={isMultiSelection}
+                          hasSelectedTabs={hasSelectedTabs()}
+                          onMoveSelectedToSpace={useSpaces && spaces.length > 0 ? openMoveSelectedToSpaceDialog : undefined}
+                          onOpenMoveToSpaceDialog={useSpaces && spaces.length > 0 ? openMoveToSpaceDialog : undefined}
+                          onCloseTabsBefore={closeOrphanedTabsBefore}
+                          onCloseTabsAfter={closeOrphanedTabsAfter}
+                          onCloseOthers={closeOrphanedOthers}
                         />
                       </div>
                     );
