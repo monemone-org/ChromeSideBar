@@ -38,6 +38,7 @@ import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
 import { moveSingleTab, moveTabAfter } from '../utils/tabMove';
+import { moveSingleGroup, moveGroupAfter } from '../utils/groupMove';
 import { DropIndicators } from './DropIndicators';
 import * as ContextMenu from './menu/ContextMenu';
 import { useInView } from '../hooks/useInView';
@@ -1904,70 +1905,74 @@ export const TabList = ({ onPin, sortGroupsFirst = true, onExternalDropTargetCha
     {
       // --- GROUP DRAG HANDLING (only when no tabs are selected) ---
       const draggedGroupId = parseInt(String(activeId).replace('group-', ''), 10);
-      const isGroupHeaderTarget = dropTargetId.startsWith('group-');
 
-      let targetIndex = -1;
+      // Check for multi-group selection
+      const selectedGroupIds = selectedItems
+        .filter(item => item.type === 'group')
+        .map(item => parseInt(item.id.replace('group-', ''), 10))
+        .filter(id => !isNaN(id));
 
-      if (dropTargetId === 'end-of-list')
+      const isMultiGroupDrag = selectedGroupIds.length > 1 &&
+        selectedGroupIds.includes(draggedGroupId);
+
+      if (isMultiGroupDrag)
       {
-        // Move group to very end
-        if (visibleTabs.length > 0)
-        {
-          const lastTab = visibleTabs[visibleTabs.length - 1];
-          targetIndex = lastTab.index + 1;
-        }
-      }
-      else if (isGroupHeaderTarget)
-      {
-        // Dropping relative to another group
-        const targetGroupId = parseInt(dropTargetId.replace('group-', ''), 10);
-        const targetGroupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === targetGroupId);
+        // --- MULTI-GROUP DRAG ---
+        // Sort groups by first tab index to maintain relative order
+        const sortedGroups = selectedGroupIds
+          .map(gid =>
+          {
+            const tabs = visibleTabs.filter(t => (t.groupId ?? -1) === gid);
+            return {
+              groupId: gid,
+              firstIndex: tabs[0]?.index ?? 0,
+              tabCount: tabs.length
+            };
+          })
+          .sort((a, b) => a.firstIndex - b.firstIndex);
 
-        if (targetGroupTabs.length > 0)
+        // First group uses full moveSingleGroup
+        let result = moveSingleGroup({
+          groupId: sortedGroups[0].groupId,
+          sourceFirstIndex: sortedGroups[0].firstIndex,
+          sourceTabCount: sortedGroups[0].tabCount,
+          dropTargetId,
+          dropPosition,
+          visibleTabs,
+          moveGroup
+        });
+
+        // Subsequent groups chain off previous result
+        if (result)
         {
-          if (dropPosition === 'before')
+          for (let i = 1; i < sortedGroups.length; i++)
           {
-            // Move before target group's first tab - use Chrome's real index
-            targetIndex = targetGroupTabs[0].index;
-          }
-          else
-          {
-            // 'after': Move after target group's last tab - use Chrome's real index
-            const lastTab = targetGroupTabs[targetGroupTabs.length - 1];
-            targetIndex = lastTab.index + 1;
+            const group = sortedGroups[i];
+            result = moveGroupAfter({
+              groupId: group.groupId,
+              sourceFirstIndex: group.firstIndex,
+              sourceTabCount: group.tabCount,
+              targetIndex: result.index,
+              moveGroup
+            });
           }
         }
+
+        clearSelection();
       }
       else
       {
-        // Dropping relative to a tab
-        const targetTabId = parseInt(dropTargetId, 10);
-        const targetTab = visibleTabs.find(t => t.id === targetTabId);
-
-        if (targetTab)
-        {
-          // Use Chrome's real index
-          targetIndex = targetTab.index;
-          if (dropPosition === 'after')
-          {
-            targetIndex += 1;
-          }
-        }
-      }
-
-      if (targetIndex >= 0)
-      {
-        // Account for source group tabs being removed when moving down
+        // --- SINGLE GROUP DRAG ---
         const sourceGroupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === draggedGroupId);
-        const sourceFirstIndex = sourceGroupTabs.length > 0 ? sourceGroupTabs[0].index : -1;
-
-        // If source is before target (moving down), subtract source tab count
-        if (sourceFirstIndex !== -1 && sourceFirstIndex < targetIndex)
-        {
-          targetIndex -= sourceGroupTabs.length;
-        }
-
-        moveGroup(draggedGroupId, targetIndex);
+        moveSingleGroup({
+          groupId: draggedGroupId,
+          sourceFirstIndex: sourceGroupTabs[0]?.index ?? 0,
+          sourceTabCount: sourceGroupTabs.length,
+          dropTargetId,
+          dropPosition,
+          visibleTabs,
+          moveGroup
+        });
       }
     }
     else
