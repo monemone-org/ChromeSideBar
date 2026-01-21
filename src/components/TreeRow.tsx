@@ -105,7 +105,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
 
       {/* Chevron Slot - Fixed Width */}
       <div
-        className="flex items-center justify-center shrink-0"
+        className="flex items-center justify-center shrink-0 h-full"
         style={{ width: LAYOUT.CHEVRON_WIDTH }}
       >
         {hasChildren && (
@@ -113,7 +113,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
             type="button"
             aria-label={isExpanded ? "Collapse" : "Expand"}
             aria-expanded={isExpanded}
-            className="p-0 border-0 bg-transparent cursor-pointer hover:text-gray-900 dark:hover:text-white"
+            className="w-full h-full flex items-center justify-center border-0 bg-transparent cursor-pointer hover:text-gray-900 dark:hover:text-white"
             onClick={(e) => {
               e.stopPropagation();
               onToggle?.(e);
