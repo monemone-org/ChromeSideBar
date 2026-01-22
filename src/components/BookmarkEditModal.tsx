@@ -57,7 +57,7 @@ export const BookmarkEditModal = ({
   const handleSubmit = (e: React.FormEvent) =>
   {
     e.preventDefault();
-    if (isCreateMode && onCreate)
+    if (isCreateMode && onCreate && createInParentId)
     {
       onCreate(createInParentId, title, url);
     }
@@ -96,6 +96,8 @@ export const BookmarkEditModal = ({
               className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              required={isCreateMode}
+              placeholder={isCreateMode ? 'https://example.com' : undefined}
             />
           </div>
         )}

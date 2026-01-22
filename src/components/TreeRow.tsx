@@ -145,20 +145,20 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       )}
 
       {/* Title */}
-      <div className={clsx("flex-1 truncate min-w-0 mr-2", isActive && "font-semibold")}>
+      <div className={clsx("flex-1 truncate min-w-0", isActive && "font-semibold")}>
         {title}
       </div>
 
       {/* Badges (Right of Title, visible always) */}
       {badges && (
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 ml-2">
           {badges}
         </div>
       )}
 
-      {/* Actions (Right aligned, hover only usually) */}
+      {/* Actions (Absolute positioned, overlays on right side) */}
       {actions && (
-        <div className="flex items-center shrink-0 ml-1">
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center pl-2">
           {actions}
         </div>
       )}

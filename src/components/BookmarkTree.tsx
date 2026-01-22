@@ -337,13 +337,13 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   );
 
   const actions = (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center">
        {/* Pin button - only on hover */}
        {!isFolder && onPin && node.url && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
-          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
+          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
           title="Pin"
           aria-label="Pin bookmark"
         >
@@ -355,7 +355,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onCloseBookmark(node.id); }}
-          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900"
+          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900"
           title="Close tab"
           aria-label="Close tab"
         >
@@ -367,7 +367,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onRemove(node.id); }}
-          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
+          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
           title="Delete bookmark"
           aria-label="Delete bookmark"
         >

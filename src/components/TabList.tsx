@@ -142,7 +142,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   );
 
   const actions = (
-    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-900 rounded">
+    <div className="flex items-center opacity-0 group-hover:opacity-100 bg-white dark:bg-gray-900 rounded">
       {onPin && tab.url && !tab.pinned && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
@@ -151,7 +151,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             e.stopPropagation();
             onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl);
           }}
-          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
+          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
           title="Pin"
           aria-label="Pin tab"
         >
@@ -166,7 +166,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             e.stopPropagation();
             if (tab.id) onKeepAsRegularTab(tab.id);
           }}
-          className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
+          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
           title="Keep as Regular Tab"
           aria-label="Keep as regular tab"
         >
@@ -180,7 +180,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           e.stopPropagation();
           if (tab.id) onClose(tab.id);
         }}
-        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
+        className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
         aria-label="Close tab"
       >
         <X size={14} className="text-gray-700 dark:text-gray-200" />
