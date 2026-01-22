@@ -117,7 +117,12 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
   - Customize with icons and colors
   - Drag to reorder spaces
   - Spaces included in import/export
-- Audio tabs dialog: Click the audible filter to see all tabs playing sound with mute controls
+- Audio tabs dropdown:
+  - Click the audible filter to see tabs recently playing video/audio
+- Multi-selection for tabs and bookmarks
+- Space UI improvements:
+  - Space color applied to sidebar title header
+  - Space indicators shown on linked folders in folder picker
 - Fixed used tab history being lost when Chrome suspends the background service worker
 - Welcome dialog guides first-time users through key features
 

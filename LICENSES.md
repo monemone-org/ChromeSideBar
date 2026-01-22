@@ -8,31 +8,7 @@ This project includes the following third-party dependencies:
 - License: MIT
 - https://github.com/facebook/react
 
-## React DOM
-
-- Copyright (c) Meta Platforms, Inc. and affiliates
-- License: MIT
-- https://github.com/facebook/react
-
-## @dnd-kit/core
-
-- Copyright (c) Claudéric Demers
-- License: MIT
-- https://github.com/clauderic/dnd-kit
-
-## @dnd-kit/sortable
-
-- Copyright (c) Claudéric Demers
-- License: MIT
-- https://github.com/clauderic/dnd-kit
-
-## @dnd-kit/modifiers
-
-- Copyright (c) Claudéric Demers
-- License: MIT
-- https://github.com/clauderic/dnd-kit
-
-## @dnd-kit/utilities
+## dnd-kit
 
 - Copyright (c) Claudéric Demers
 - License: MIT
