@@ -556,38 +556,12 @@ Manual test cases to verify core functionality of the Chrome Sidebar extension.
 
 ---
 
-## 11. Orphaned Tabs (LiveBookmarks)
+## 11. Orphaned Tabs
 
-### 11.1 Orphaned Tabs Group
+### 11.1 Orphaned Tab Handling
 | Scenario | Expected Result |
 |----------|-----------------|
-| Chrome restarts with persistent tabs | Orphaned tabs appear in grey "Orphaned Tabs" group |
-| LiveBookmarks group appearance | Greyed out, collapsed by default |
-| Click orphaned tab | Tab activates |
-| Expand/collapse group | Chevron toggles, group expands/collapses |
-
-### 11.2 Orphaned Tab Actions
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Right-click orphaned tab | Context menu with special options |
-| 2 | Click "Close" | Tab closes, removed from group |
-| 3 | Click "Keep as Regular Tab" | Tab moves to regular tabs |
-| 4 | Select multiple orphaned tabs, "Keep as Regular Tabs" | All become regular tabs |
-
-### 11.3 Orphaned Tab Close Options
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Right-click orphaned tab in middle | Context menu appears |
-| 2 | Click "Close Tabs Before" | All orphaned tabs above close |
-| 3 | Click "Close Tabs After" | All orphaned tabs below close |
-| 4 | Click "Close Others" | All other orphaned tabs close |
-
-### 11.4 LiveBookmarks Group Restrictions
-| Scenario | Expected Result |
-|----------|-----------------|
-| Drag tab into LiveBookmarks group | Not allowed |
-| Drag orphaned tab out of group | Becomes regular tab |
-| View specific space | LiveBookmarks group hidden |
+| Chrome restarts with persistent tabs | Orphaned tabs appear as normal ungrouped tabs (not in special group) |
 
 ---
 

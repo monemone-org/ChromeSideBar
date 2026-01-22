@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "exportedAt": "2025-01-21T00:00:00.000Z",
+  "pinnedSites": [
+    {
+      "id": "pin_test_001",
+      "url": "https://www.google.com",
+      "title": "Google",
+      "favicon": "https://www.google.com/favicon.ico"
+    },
+    {
+      "id": "pin_test_002",
+      "url": "https://github.com",
+      "title": "GitHub",
+      "favicon": "https://github.com/favicon.ico"
+    },
+    {
+      "id": "pin_test_003",
+      "url": "https://www.youtube.com",
+      "title": "YouTube",
+      "favicon": "https://www.youtube.com/favicon.ico"
+    },
+    {
+      "id": "pin_test_004",
+      "url": "https://mail.google.com",
+      "title": "Gmail",
+      "customIconName": "Mail",
+      "iconColor": "#ef4444"
+    },
+    {
+      "id": "pin_test_005",
+      "url": "https://calendar.google.com",
+      "title": "Calendar",
+      "customIconName": "Calendar",
+      "iconColor": "#3b82f6"
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space_test_work",
+      "name": "Work",
+      "icon": "Briefcase",
+      "color": "blue",
+      "bookmarkFolderPath": "Bookmarks Bar/Work"
+    },
+    {
+      "id": "space_test_personal",
+      "name": "Personal",
+      "icon": "Home",
+      "color": "green",
+      "bookmarkFolderPath": "Bookmarks Bar/Personal"
+    },
+    {
+      "id": "space_test_research",
+      "name": "Research",
+      "icon": "Search",
+      "color": "purple",
+      "bookmarkFolderPath": "Bookmarks Bar/Research"
+    }
+  ],
+  "tabGroups": []
+}
