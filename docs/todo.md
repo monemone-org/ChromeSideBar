@@ -1,31 +1,71 @@
 # TODO
 
-- Review Code:
-      - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
 
-- [ ] support drag links from browser pane to
-            - bookmarks - create bookmark
-            - tabs - open as new tab (grouped or ungrouped, depending on drop location)
-            - spaces - open as new tab in the target space.
+## In-Progress
 
-- [ ] support dropping pinned site
-      - to bookmark - create bookmark
-      - to tab - open a new tab
-      - to space bar  - open as new tab in the target space.
-
-- [ ] Orphaned tabs popup menu, add
+- [x] Orphaned tabs popup menu, add
       - [ ] "Move To Space..."
       - [ ] "Close Tabs Before"  (within the Orphaned tabs list)
       - [ ] "Close Tabs After"  (within the Orphaned tabs list)
       - [ ] "Close Other Tabs"  (other tabs in the Orphaned tabs list)
 
-- [ ] make the area that response to group row's expand and collapse bigger, expand the area to outside of the V > icon. the area should fill the whole row.
+- [x] make the area that response to group row's expand and collapse bigger, expand the area to outside of the V > icon. the area should fill the whole row.
 
-- [ ] Folder popup menu - after add folder, there should be an "Add Bookmark..."
+- Folder popup menu
+      - [x] after "New Folder" menu item, there should be an "New Bookmark"
 
-- [ ] Cmd+Click on bookmark doesn't create new tab
+## Pending
+
+- Review Code:
+   - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
+
+- [ ] Support drag links from browser pane to
+            - bookmark  - drop before/after bookmark
+                        - create new bookmark 
+            - folder - drop into/intoFirst folder
+                    - create new bookmark 
+            - group - drop into/intoFirst group
+                    - open as new tab grouped
+            - tab - drop before/after tab
+                  - open as new tab 
+            - end of list - drop 
+                          - open as new tab 
+            - space bar into space bar buttons 
+                  - open as new tab in the target space.
+            - pinned site area
+                  - before/after pinned site 
+                  - create new pinned site
+             
+
+- [ ] Support dropping pinned site
+            - bookmark  - drop before/after bookmark
+                        - create new bookmark 
+            - folder - drop into/intoFirst folder
+                    - create new bookmark 
+            - group - drop into/intoFirst group
+                    - open as new tab grouped
+            - tab - drop before/after tab
+                  - open as new tab 
+            - end of list - drop 
+                          - open as new tab 
+            - space bar into space bar buttons 
+                  - open as new tab in the target space.
+            - pinned site area
+                  - before/after pinned site 
+                  - create new pinned site
+
+- [ ] Folder popup menu
+       - [ ] add "Close Live Bookmarks" to the end of the popup menu which closes live bookmarks under the selected folder.
+
 
 ## Aborted
+
+- [aborted] Cmd+Click on bookmark doesn't create new tab. 
+      - it is disabled now because Cmd+Click is now a multi-select gesture. Use popup menu to Open In New Taa
+      - ccompromised solution: open a new tab if the bookmark is selected and the bookmark is
+  the only selection. So instead of unselecting the only selection in bookmarktree, it will
+  open it as a new tab
+
 
 - saved filter
       - [ ] focus doesn't go to the input field

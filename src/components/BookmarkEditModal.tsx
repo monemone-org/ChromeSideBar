@@ -5,44 +5,77 @@ export interface BookmarkEditModalProps
 {
   isOpen: boolean;
   node: chrome.bookmarks.BookmarkTreeNode | null;
+  createInParentId?: string | null;  // If set, create mode; else edit mode
   onSave: (id: string, title: string, url?: string) => void;
+  onCreate?: (parentId: string, title: string, url: string) => void;
   onClose: () => void;
 }
 
-export const BookmarkEditModal = ({ isOpen, node, onSave, onClose }: BookmarkEditModalProps) =>
+export const BookmarkEditModal = ({
+  isOpen,
+  node,
+  createInParentId,
+  onSave,
+  onCreate,
+  onClose
+}: BookmarkEditModalProps) =>
 {
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const isCreateMode = !!createInParentId;
+
   // Reset state and focus input when dialog opens
   useEffect(() =>
   {
-    if (isOpen && node)
+    if (isOpen)
     {
-      setTitle(node.title);
-      setUrl(node.url || '');
+      if (isCreateMode)
+      {
+        // Create mode: start with empty fields
+        setTitle('');
+        setUrl('');
+      }
+      else if (node)
+      {
+        // Edit mode: populate from existing node
+        setTitle(node.title);
+        setUrl(node.url || '');
+      }
       // Focus after a short delay to ensure portal is mounted
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [isOpen, node]);
+  }, [isOpen, node, isCreateMode]);
 
-  if (!node) return null;
+  // In edit mode, require node; in create mode, require parentId
+  if (!isCreateMode && !node) return null;
+  if (isCreateMode && !createInParentId) return null;
 
-  const isFolder = !node.url;
+  const isFolder = !isCreateMode && node && !node.url;
 
   const handleSubmit = (e: React.FormEvent) =>
   {
     e.preventDefault();
-    onSave(node.id, title, isFolder ? undefined : url);
+    if (isCreateMode && onCreate)
+    {
+      onCreate(createInParentId, title, url);
+    }
+    else if (node)
+    {
+      onSave(node.id, title, isFolder ? undefined : url);
+    }
     onClose();
   };
+
+  const dialogTitle = isCreateMode ? 'New Bookmark' : `Edit ${isFolder ? 'Folder' : 'Bookmark'}`;
+  const submitButtonText = isCreateMode ? 'Create' : 'Save';
 
   return (
     <Dialog
       isOpen={isOpen}
       onClose={onClose}
-      title={`Edit ${isFolder ? 'Folder' : 'Bookmark'}`}
+      title={dialogTitle}
       maxWidth="max-w-sm"
     >
       <form onSubmit={handleSubmit} className="p-4 space-y-3">
@@ -56,7 +89,7 @@ export const BookmarkEditModal = ({ isOpen, node, onSave, onClose }: BookmarkEdi
           />
         </div>
 
-        {!isFolder && (
+        {(isCreateMode || !isFolder) && (
           <div>
             <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">URL</label>
             <input
@@ -79,7 +112,7 @@ export const BookmarkEditModal = ({ isOpen, node, onSave, onClose }: BookmarkEdi
             type="submit"
             className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
           >
-            Save
+            {submitButtonText}
           </button>
         </div>
       </form>

@@ -27,6 +27,7 @@ import {
   Trash,
   Edit,
   FolderPlus,
+  FilePlus,
   FolderOpen,
   FolderInput,
   ArrowDownAZ,
@@ -112,6 +113,7 @@ interface BookmarkRowProps {
   onRemove: (id: string) => void;
   onEdit: (node: chrome.bookmarks.BookmarkTreeNode) => void;
   onCreateFolder: (parentId: string) => void;
+  onCreateBookmark: (parentId: string) => void;
   onSort: (folderId: string, sortBy: SortOption) => void;
   onDuplicate: (id: string) => void;
   onExpandAll?: (folderId: string) => void;
@@ -171,6 +173,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onRemove,
   onEdit,
   onCreateFolder,
+  onCreateBookmark,
   onSort,
   onDuplicate,
   onExpandAll,
@@ -451,6 +454,9 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             <>
               <ContextMenu.Item onSelect={() => onCreateFolder(node.id)}>
                 <FolderPlus size={14} className="mr-2" /> New Folder
+              </ContextMenu.Item>
+              <ContextMenu.Item onSelect={() => onCreateBookmark(node.id)}>
+                <FilePlus size={14} className="mr-2" /> New Bookmark
               </ContextMenu.Item>
               {onExpandAll && (
                 <ContextMenu.Item onSelect={() => onExpandAll(node.id)}>
@@ -763,7 +769,7 @@ interface BookmarkTreeProps {
 }
 
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
-  const { bookmarks, removeBookmark, updateBookmark, createFolder, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
+  const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
 
@@ -924,6 +930,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const [expandedStateLoaded, setExpandedStateLoaded] = useState(false);
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
+  const [creatingBookmarkParentId, setCreatingBookmarkParentId] = useState<string | null>(null);
   const [showSpaceFolderPicker, setShowSpaceFolderPicker] = useState(false);
   const [moveToSpaceDialog, setMoveToSpaceDialog] = useState<{
     isOpen: boolean;
@@ -1221,6 +1228,10 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
 
   const handleCreateFolder = (parentId: string) => {
     setCreatingFolderParentId(parentId);
+  };
+
+  const handleCreateBookmark = (parentId: string) => {
+    setCreatingBookmarkParentId(parentId);
   };
 
   // Handle folder selection for updating space's bookmark folder
@@ -1727,6 +1738,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onRemove={handleDeleteSelectedBookmarks}
               onEdit={setEditingNode}
               onCreateFolder={handleCreateFolder}
+              onCreateBookmark={handleCreateBookmark}
               onSort={sortBookmarks}
               onDuplicate={duplicateBookmark}
               onExpandAll={handleExpandAll}
@@ -1796,10 +1808,27 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       )}
 
       <BookmarkEditModal
-        isOpen={editingNode !== null}
+        isOpen={editingNode !== null || creatingBookmarkParentId !== null}
         node={editingNode}
+        createInParentId={creatingBookmarkParentId}
         onSave={updateBookmark}
-        onClose={() => setEditingNode(null)}
+        onCreate={async (parentId, title, url) => {
+          const newNode = await createBookmark(parentId, title, url);
+          if (newNode)
+          {
+            // Auto-expand parent folder to show the new bookmark
+            setExpandedState(prev => ({ ...prev, [parentId]: true }));
+            // Scroll to the new bookmark after DOM updates
+            setTimeout(() => {
+              const element = document.querySelector(`[data-bookmark-id="${newNode.id}"]`);
+              element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 100);
+          }
+        }}
+        onClose={() => {
+          setEditingNode(null);
+          setCreatingBookmarkParentId(null);
+        }}
       />
 
       <BookmarkCreateFolderModal

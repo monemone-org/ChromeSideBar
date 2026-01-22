@@ -92,6 +92,7 @@ interface DraggableTabProps {
   onAddSelectedToBookmark?: () => void;
   onMoveSelectedToSpace?: () => void;
   onMoveSelectedToNewWindow?: () => void;
+  onKeepSelectedAsRegularTabs?: () => void;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -130,6 +131,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onAddSelectedToBookmark,
   onMoveSelectedToSpace,
   onMoveSelectedToNewWindow,
+  onKeepSelectedAsRegularTabs,
   attributes,
   listeners
 }, ref) => {
@@ -273,6 +275,14 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           {isMultiSelection ? (
             // Multi-selection menu
             <>
+              {onKeepSelectedAsRegularTabs && (
+                <>
+                  <ContextMenu.Item onSelect={onKeepSelectedAsRegularTabs}>
+                    <Unlink size={14} className="mr-2" /> Keep as Regular Tabs
+                  </ContextMenu.Item>
+                  <ContextMenu.Separator />
+                </>
+              )}
               {hasSelectedTabs && onPin && (
                 <>
                   <ContextMenu.Item onSelect={() => onPin(tab.url || '', tab.title || tab.url || '', tab.favIconUrl)}>
@@ -2521,6 +2531,30 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     return onlyGroups;
   }, [getTabSelectionInfo]);
 
+  // Check if all selected tabs are orphaned tabs
+  const allSelectedAreOrphaned = useCallback((): boolean =>
+  {
+    const { selectedTabs, hasGroups } = getTabSelectionInfo();
+    if (hasGroups || selectedTabs.length === 0) return false;
+    const orphanedTabIds = new Set(orphanedTabs.map(t => t.id));
+    return selectedTabs.every(t => t.id && orphanedTabIds.has(t.id));
+  }, [getTabSelectionInfo, orphanedTabs]);
+
+  // Handle "Keep as Regular Tabs" for multi-selected orphaned tabs
+  const handleKeepSelectedAsRegularTabs = useCallback(async () =>
+  {
+    const { selectedTabs } = getTabSelectionInfo();
+    const orphanedTabIds = new Set(orphanedTabs.map(t => t.id));
+    const tabIdsToUngroup = selectedTabs
+      .filter(t => t.id && orphanedTabIds.has(t.id))
+      .map(t => t.id) as number[];
+    if (tabIdsToUngroup.length > 0)
+    {
+      await chrome.tabs.ungroup(tabIdsToUngroup);
+    }
+    clearSelection();
+  }, [getTabSelectionInfo, orphanedTabs, clearSelection]);
+
   // Build menu content for Tabs section header
   const tabsMenuContent = (
     <>
@@ -2835,6 +2869,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                           onCloseTabsBefore={closeOrphanedTabsBefore}
                           onCloseTabsAfter={closeOrphanedTabsAfter}
                           onCloseOthers={closeOrphanedOthers}
+                          onKeepSelectedAsRegularTabs={isMultiSelection && allSelectedAreOrphaned() ? handleKeepSelectedAsRegularTabs : undefined}
                         />
                       </div>
                     );
