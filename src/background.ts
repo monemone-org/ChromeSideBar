@@ -542,13 +542,76 @@ const historyManager = new TabHistoryManager(spaceStateManager);
 const groupTracker = new TabGroupTracker();
 const lastAudibleTracker = new LastAudibleTracker();
 
-// Load persisted state
+// =============================================================================
+// Orphaned Tab Cleanup
+// =============================================================================
+
+// On startup, ungroup orphaned tabs (tabs in LiveBookmarks but not managed)
+// This handles Chrome restart where session storage is cleared
+async function cleanupOrphanedTabs(): Promise<void>
+{
+  try
+  {
+    const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+
+    for (const window of windows)
+    {
+      if (!window.id) continue;
+
+      // Get managed tab IDs from session storage
+      const storageKey = `tabAssociations_${window.id}`;
+      const result = await chrome.storage.session.get([storageKey]);
+      const associations: Record<string, number> = result[storageKey] || {};
+      const managedTabIds = new Set(Object.values(associations));
+
+      // Find LiveBookmarks group in this window
+      const groups = await chrome.tabGroups.query({
+        windowId: window.id,
+        title: LIVEBOOKMARKS_GROUP_NAME
+      });
+
+      if (groups.length === 0) continue;
+
+      const liveBookmarksGroupId = groups[0].id;
+
+      // Get tabs in LiveBookmarks group
+      const tabs = await chrome.tabs.query({
+        windowId: window.id,
+        groupId: liveBookmarksGroupId
+      });
+
+      // Find orphaned tabs (in group but not managed)
+      const orphanedTabIds = tabs
+        .map(t => t.id)
+        .filter((id): id is number => id !== undefined && !managedTabIds.has(id));
+
+      // Ungroup orphaned tabs
+      if (orphanedTabIds.length > 0)
+      {
+        if (import.meta.env.DEV)
+        {
+          console.log(`[cleanupOrphanedTabs] window=${window.id}: ungrouping ${orphanedTabIds.length} orphaned tabs`);
+        }
+        await chrome.tabs.ungroup(orphanedTabIds);
+      }
+    }
+  }
+  catch (error)
+  {
+    if (import.meta.env.DEV) console.error('[cleanupOrphanedTabs] Error:', error);
+  }
+}
+
+// Load persisted state then cleanup orphaned tabs
 Promise.all([
   spaceStateManager.load(),
   historyManager.load(),
   groupTracker.load(),
   lastAudibleTracker.load()
-]);
+]).then(() =>
+{
+  cleanupOrphanedTabs();
+});
 
 // =============================================================================
 // Event Listeners
@@ -683,7 +746,7 @@ chrome.tabs.onCreated.addListener(async (tab) =>
         const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
         if (!activeSpaceId || activeSpaceId === 'all')
         {
-          // Ungroup the tab (make it orphaned)
+          // Ungroup the tab (make it a regular tab)
           await chrome.tabs.ungroup(tab.id);
           return;
         }
