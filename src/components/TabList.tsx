@@ -32,7 +32,7 @@ import { AddToGroupDialog } from './AddToGroupDialog';
 import { ChangeGroupColorDialog } from './ChangeGroupColorDialog';
 import { ExportConflictDialog, ExportConflictMode } from './ExportConflictDialog';
 import { RenameGroupDialog } from './RenameGroupDialog';
-import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink, Unlink } from 'lucide-react';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
@@ -82,7 +82,6 @@ interface DraggableTabProps {
   onCloseTabsBefore?: (tabId: number) => void;
   onCloseTabsAfter?: (tabId: number) => void;
   onCloseOthers?: (tabId: number) => void;
-  onKeepAsRegularTab?: (id: number) => void;
   onSelectionClick?: (e: React.MouseEvent) => void;
   onSelectionContextMenu?: () => void;
   selectionCount?: number;
@@ -92,7 +91,6 @@ interface DraggableTabProps {
   onAddSelectedToBookmark?: () => void;
   onMoveSelectedToSpace?: () => void;
   onMoveSelectedToNewWindow?: () => void;
-  onKeepSelectedAsRegularTabs?: () => void;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -122,7 +120,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onCloseTabsBefore,
   onCloseTabsAfter,
   onCloseOthers,
-  onKeepAsRegularTab,
   onSelectionClick,
   onSelectionContextMenu,
   selectionCount: _selectionCount,
@@ -131,7 +128,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onAddSelectedToBookmark,
   onMoveSelectedToSpace,
   onMoveSelectedToNewWindow,
-  onKeepSelectedAsRegularTabs,
   attributes,
   listeners
 }, ref) => {
@@ -156,21 +152,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           aria-label="Pin tab"
         >
           <Pin size={14} className="text-gray-700 dark:text-gray-200" />
-        </button>
-      )}
-      {onKeepAsRegularTab && (
-        <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) =>
-          {
-            e.stopPropagation();
-            if (tab.id) onKeepAsRegularTab(tab.id);
-          }}
-          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 active:bg-gray-300 dark:active:bg-gray-500 rounded"
-          title="Keep as Regular Tab"
-          aria-label="Keep as regular tab"
-        >
-          <Unlink size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       )}
       <button
@@ -275,14 +256,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           {isMultiSelection ? (
             // Multi-selection menu
             <>
-              {onKeepSelectedAsRegularTabs && (
-                <>
-                  <ContextMenu.Item onSelect={onKeepSelectedAsRegularTabs}>
-                    <Unlink size={14} className="mr-2" /> Keep as Regular Tabs
-                  </ContextMenu.Item>
-                  <ContextMenu.Separator />
-                </>
-              )}
               {hasSelectedTabs && onPin && (
                 <>
                   <ContextMenu.Item onSelect={() => onPin(tab.url || '', tab.title || tab.url || '', tab.favIconUrl)}>
@@ -314,14 +287,6 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           ) : (
             // Single-item menu
             <>
-          {onKeepAsRegularTab && (
-            <>
-              <ContextMenu.Item onSelect={() => { if (tab.id) onKeepAsRegularTab(tab.id); }}>
-                <Unlink size={14} className="mr-2" /> Keep as Regular Tab
-              </ContextMenu.Item>
-              <ContextMenu.Separator />
-            </>
-          )}
           {onPin && tab.url && !tab.pinned && (
             <ContextMenu.Item onSelect={() => onPin(tab.url!, tab.title || tab.url!, tab.favIconUrl)}>
               <Pin size={14} className="mr-2" /> Pin to Sidebar
