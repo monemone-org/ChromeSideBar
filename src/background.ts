@@ -684,42 +684,82 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) =>
   }
 });
 
-// Helper to add a tab to the active space's Chrome group
-async function addTabToActiveSpaceGroup(tab: chrome.tabs.Tab): Promise<boolean>
+// Queue for batching tab grouping to prevent race conditions
+interface TabGroupingRequest
 {
-  if (!tab.id || !tab.windowId) return false;
+  tabId: number;
+  windowId: number;
+  activeSpaceId: string;  // Captured at queue time
+}
+const groupingQueue: TabGroupingRequest[] = [];
+let isProcessingGroupingQueue = false;
 
+// Queue a tab for grouping - prevents race condition when multiple tabs created rapidly
+function queueTabForGrouping(tab: chrome.tabs.Tab): void
+{
+  if (!tab.id || !tab.windowId) return;
+
+  // Capture active space at queue time (not processing time)
   const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
-  if (!activeSpaceId || activeSpaceId === 'all') return false;
+  if (!activeSpaceId || activeSpaceId === 'all') return;
+
+  groupingQueue.push({ tabId: tab.id, windowId: tab.windowId, activeSpaceId });
+  processGroupingQueue();
+}
+
+// Process queued tabs sequentially - prevents race condition
+async function processGroupingQueue(): Promise<void>
+{
+  if (isProcessingGroupingQueue) return;  // Already processing, items will be picked up
+  isProcessingGroupingQueue = true;
 
   try
   {
+    while (groupingQueue.length > 0)
+    {
+      const request = groupingQueue.shift()!;
+      await processGroupingRequest(request);
+    }
+  }
+  finally
+  {
+    isProcessingGroupingQueue = false;
+  }
+}
+
+// Process a single grouping request
+async function processGroupingRequest(request: TabGroupingRequest): Promise<void>
+{
+  const { tabId, windowId, activeSpaceId } = request;
+
+  try
+  {
+    // Verify tab still exists and is ungrouped
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return;
+
     const space = await getSpaceById(activeSpaceId);
-    if (!space) return false;
+    if (!space) return;
 
     // Find existing Chrome group with Space's name
-    const existingGroupId = await findGroupByName(tab.windowId, space.name);
+    const existingGroupId = await findGroupByName(windowId, space.name);
 
     if (existingGroupId)
     {
-      // Add to existing group
-      await chrome.tabs.group({ tabIds: [tab.id], groupId: existingGroupId });
+      await chrome.tabs.group({ tabIds: [tabId], groupId: existingGroupId });
     }
     else
     {
-      // Create new group with this tab
-      const newGroupId = await chrome.tabs.group({ tabIds: [tab.id] });
+      const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
       await chrome.tabGroups.update(newGroupId, {
         title: space.name,
         color: space.color,
       });
     }
-    return true;
   }
   catch (error)
   {
-    if (import.meta.env.DEV) console.error('[addTabToActiveSpaceGroup] Failed:', error);
-    return false;
+    if (import.meta.env.DEV) console.error('[processGroupingRequest] Failed:', error);
   }
 }
 
@@ -751,7 +791,7 @@ chrome.tabs.onCreated.addListener(async (tab) =>
           return;
         }
 
-        addTabToActiveSpaceGroup(tab)
+        queueTabForGrouping(tab);
         return;
       }
     }
@@ -765,7 +805,7 @@ chrome.tabs.onCreated.addListener(async (tab) =>
   }
 
   // Ungrouped tab - add to active space's group
-  await addTabToActiveSpaceGroup(tab);
+  queueTabForGrouping(tab);
 });
 
 // =============================================================================

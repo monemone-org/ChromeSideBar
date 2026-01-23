@@ -1425,20 +1425,22 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
 
       urls.forEach(url =>
       {
-        chrome.tabs.create({ url }, (tab) =>
-        {
-          if (tab?.id) chrome.tabs.ungroup(tab.id);
-        });
+        chrome.tabs.create({ url });
+        // chrome.tabs.create({ url }, (tab) =>
+        // {
+        //   if (tab?.id) chrome.tabs.ungroup(tab.id);
+        // });
       });
       clearSelection();
     }
     else
     {
       // Single bookmark
-      chrome.tabs.create({ url: clickedUrl }, (tab) =>
-      {
-        if (tab?.id) chrome.tabs.ungroup(tab.id);
-      });
+      chrome.tabs.create({ url: clickedUrl });
+      // chrome.tabs.create({ url: clickedUrl }, (tab) =>
+      // {
+      //   //if (tab?.id) chrome.tabs.ungroup(tab.id);
+      // });
     }
   }, [getSelectedItems, collectSelectedBookmarkUrls, clearSelection]);
 
