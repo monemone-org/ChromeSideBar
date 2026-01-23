@@ -37,7 +37,8 @@ import {
   X,
   Volume2,
   Copy,
-  ExternalLink
+  ExternalLink,
+  SquareArrowOutUpRight
 } from 'lucide-react';
 import { getRandomGroupColor, GROUP_COLORS } from '../utils/groupColors';
 import clsx from 'clsx';
@@ -263,11 +264,9 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     }
 
     // Plain click: perform action for bookmarks (folders only expand/collapse via chevron)
-    if (node.url) {
-      if (bookmarkOpenMode === 'arc' && onOpenBookmark) {
-        // Arc-style: open as managed tab in SideBarForArc group
-        onOpenBookmark(node.id, node.url);
-      } else if (bookmarkOpenMode === 'activeTab') {
+    // Arc mode: clicking only selects, use Open button to open tabs
+    if (node.url && bookmarkOpenMode !== 'arc') {
+      if (bookmarkOpenMode === 'activeTab') {
         // Replace current tab with bookmark
         chrome.tabs.update({ url: node.url });
       } else {
@@ -339,8 +338,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
 
   const actions = (
     <div className="flex items-center">
-       {/* Pin button - only on hover */}
-       {!isFolder && onPin && node.url && (
+      {/* Pin button - visible on hover */}
+      {!isFolder && onPin && node.url && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onPin(node.url!, node.title, getFaviconUrl(node.url!)); }}
@@ -349,6 +348,18 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           aria-label="Pin bookmark"
         >
           <Pin size={14} className="text-gray-700 dark:text-gray-200" />
+        </button>
+      )}
+      {/* Open button - visible on hover when bookmark is not loaded (Arc-style only) */}
+      {!isFolder && bookmarkOpenMode === 'arc' && !isLoaded && onOpenBookmark && node.url && (
+        <button
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); onOpenBookmark(node.id, node.url!); }}
+          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
+          title="Open tab"
+          aria-label="Open tab"
+        >
+          <SquareArrowOutUpRight size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       )}
       {/* Close button - always visible when tab is loaded (Arc-style only) */}
@@ -361,18 +372,6 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
           aria-label="Close tab"
         >
           <X size={14} className="text-gray-700 dark:text-gray-200" />
-        </button>
-      )}
-      {/* Delete button - visible on hover when tab is NOT loaded (or non-Arc style) */}
-      {!isFolder && !isSpecialFolder && (bookmarkOpenMode !== 'arc' || !isLoaded) && (
-        <button
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); onRemove(node.id); }}
-          className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
-          title="Delete bookmark"
-          aria-label="Delete bookmark"
-        >
-          <Trash size={14} className="text-gray-700 dark:text-gray-200" />
         </button>
       )}
     </div>
@@ -398,6 +397,11 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               isExpanded={expandedState[node.id]}
               onToggle={() => toggleFolder(node.id, !expandedState[node.id])}
               onClick={handleRowClick}
+              onDoubleClick={() => {
+                if (node.url && bookmarkOpenMode === 'arc' && onOpenBookmark) {
+                  onOpenBookmark(node.id, node.url);
+                }
+              }}
               onContextMenu={() => onSelectionContextMenu?.()}
               isActive={bookmarkOpenMode === 'arc' && isActive}
               isSelected={isSelected}
