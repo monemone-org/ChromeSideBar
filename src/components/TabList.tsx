@@ -990,7 +990,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     if (!tab || !tab.url || !tab.title) return;
 
     // Create bookmark in the selected folder
-    const newBookmark = await createBookmark(folderId, tab.title, tab.url);
+    const { node: newBookmark } = await createBookmark(folderId, tab.title, tab.url);
 
     // If Arc style is enabled, associate the tab with the new bookmark
     if (arcStyleEnabled && newBookmark && tab.id)
@@ -1892,7 +1892,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         {
           const tab = bookmarkableTabs[i];
           const bookmarkIndex = index !== undefined ? index + i : undefined;
-          const newBookmark = await createBookmark(parentId, tab.title!, tab.url!, bookmarkIndex);
+          const { node: newBookmark } = await createBookmark(parentId, tab.title!, tab.url!, bookmarkIndex);
 
           // If Arc style is enabled, associate the tab with the new bookmark
           // This makes it a managed/persistent tab (hidden from Tabs section)

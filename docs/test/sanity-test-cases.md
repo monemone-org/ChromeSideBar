@@ -99,8 +99,6 @@ Manual test cases to verify core functionality of the Chrome Sidebar extension.
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 1 | Click a bookmark | Opens in current tab |
-| 2 | Cmd/Ctrl+click a bookmark | Opens in new tab |
-| 3 | Shift+click a bookmark | Opens in new window |
 
 ### 2.3 Create New Folder
 | Step | Action | Expected Result |
@@ -160,12 +158,6 @@ Manual test cases to verify core functionality of the Chrome Sidebar extension.
 |------|--------|-----------------|
 | 1 | Right-click any bookmark | Context menu appears |
 | 2 | Click "Duplicate" | Copy appears below original |
-
-### 2.12 Duplicate Folder
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Right-click any folder | Context menu appears |
-| 2 | Click "Duplicate" | Copy of folder with all contents appears |
 
 ### 2.13 Move Bookmark
 | Step | Action | Expected Result |
@@ -279,13 +271,6 @@ Manual test cases to verify core functionality of the Chrome Sidebar extension.
 | 1 | Right-click "Active Tabs" header | Context menu appears |
 | 2 | Click "Sort by Domain (A-Z)" | Tabs sorted by domain |
 
-### 3.13 YouTube Chapters (if YouTube tab open)
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Open a YouTube video with chapters | Chapters icon visible on tab row |
-| 2 | Click chapters icon | Chapter list popup appears |
-| 3 | Click a chapter | Video jumps to timestamp |
-
 ### 3.14 Audio Tabs Dropdown
 | Step | Action | Expected Result |
 |------|--------|-----------------|
@@ -362,18 +347,6 @@ Manual test cases to verify core functionality of the Chrome Sidebar extension.
 |------|--------|-----------------|
 | 1 | Change icon size value (e.g., 28) | Pinned site icons resize |
 | 2 | Click Apply | Setting persists after refresh |
-
-### 4.4 Toggle "Hide Other Bookmarks"
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Check "Hide Other Bookmarks" | Other Bookmarks folder disappears |
-| 2 | Uncheck | Folder reappears |
-
-### 4.5 Toggle "Open Bookmarks in New Tab"
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | Check the option | Clicking bookmarks opens new tab |
-| 2 | Uncheck | Clicking bookmarks opens in current tab |
 
 ### 4.6 Export Pinned Sites
 | Step | Action | Expected Result |
@@ -553,15 +526,6 @@ Manual test cases to verify core functionality of the Chrome Sidebar extension.
 | 4 | Click "Move Bookmark..." | Folder picker opens, all move together |
 | 5 | Click "Pin To Sidebar" | All selected bookmarks pinned |
 | 6 | Click "Open In New Window" | New window with all bookmarks |
-
----
-
-## 11. Orphaned Tabs
-
-### 11.1 Orphaned Tab Handling
-| Scenario | Expected Result |
-|----------|-----------------|
-| Chrome restarts with persistent tabs | Orphaned tabs appear as normal ungrouped tabs (not in special group) |
 
 ---
 

@@ -1859,7 +1859,11 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         createInParentId={creatingBookmarkParentId}
         onSave={updateBookmark}
         onCreate={async (parentId, title, url) => {
-          const newNode = await createBookmark(parentId, title, url);
+          const { node: newNode, error } = await createBookmark(parentId, title, url);
+          if (error)
+          {
+            return error;  // Return error to modal for display
+          }
           if (newNode)
           {
             // Auto-expand parent folder to show the new bookmark
@@ -1870,6 +1874,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }, 100);
           }
+          return null;  // Success
         }}
         onClose={() => {
           setEditingNode(null);

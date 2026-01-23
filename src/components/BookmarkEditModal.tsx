@@ -7,7 +7,7 @@ export interface BookmarkEditModalProps
   node: chrome.bookmarks.BookmarkTreeNode | null;
   createInParentId?: string | null;  // If set, create mode; else edit mode
   onSave: (id: string, title: string, url?: string) => void;
-  onCreate?: (parentId: string, title: string, url: string) => void;
+  onCreate?: (parentId: string, title: string, url: string) => Promise<string | null>;  // Returns error message or null on success
   onClose: () => void;
 }
 
@@ -22,6 +22,7 @@ export const BookmarkEditModal = ({
 {
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const isCreateMode = !!createInParentId;
@@ -31,6 +32,7 @@ export const BookmarkEditModal = ({
   {
     if (isOpen)
     {
+      setError(null);  // Clear any previous error
       if (isCreateMode)
       {
         // Create mode: start with empty fields
@@ -54,16 +56,32 @@ export const BookmarkEditModal = ({
 
   const isFolder = !isCreateMode && node && !node.url;
 
-  const handleSubmit = (e: React.FormEvent) =>
+  // Normalize URL by adding https:// if no protocol is specified
+  const normalizeUrl = (inputUrl: string): string =>
+  {
+    const trimmed = inputUrl.trim();
+    if (!trimmed) return trimmed;
+    // Check if URL already has a protocol
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) return trimmed;
+    return `https://${trimmed}`;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) =>
   {
     e.preventDefault();
+    const normalizedUrl = normalizeUrl(url);
     if (isCreateMode && onCreate && createInParentId)
     {
-      onCreate(createInParentId, title, url);
+      const errorMsg = await onCreate(createInParentId, title, normalizedUrl);
+      if (errorMsg)
+      {
+        setError(errorMsg);
+        return;  // Keep dialog open so user can fix the issue
+      }
     }
     else if (node)
     {
-      onSave(node.id, title, isFolder ? undefined : url);
+      onSave(node.id, title, isFolder ? undefined : normalizedUrl);
     }
     onClose();
   };
@@ -95,10 +113,13 @@ export const BookmarkEditModal = ({
             <input
               className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => { setUrl(e.target.value); setError(null); }}
               required={isCreateMode}
               placeholder={isCreateMode ? 'https://example.com' : undefined}
             />
+            {error && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p>
+            )}
           </div>
         )}
 

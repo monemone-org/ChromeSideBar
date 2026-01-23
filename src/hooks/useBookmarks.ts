@@ -225,12 +225,13 @@ export const useBookmarks = () => {
   }, [handleError]);
 
   // Create a single bookmark (with URL) at optional index position
+  // Returns { node, error } - error is the Chrome API error message if creation failed
   const createBookmark = useCallback((
     parentId: string,
     title: string,
     url: string,
     index?: number
-  ): Promise<chrome.bookmarks.BookmarkTreeNode | null> =>
+  ): Promise<{ node: chrome.bookmarks.BookmarkTreeNode | null; error: string | null }> =>
   {
     return new Promise((resolve) =>
     {
@@ -241,12 +242,15 @@ export const useBookmarks = () => {
       }
       chrome.bookmarks.create(createArg, (node) =>
       {
-        if (handleError('create bookmark'))
+        const lastError = chrome.runtime.lastError;
+        if (lastError)
         {
-          resolve(null);
+          // Log the error but also return it for caller to handle
+          handleError('create bookmark');
+          resolve({ node: null, error: lastError.message || 'Unknown error' });
           return;
         }
-        resolve(node || null);
+        resolve({ node: node || null, error: null });
       });
     });
   }, [handleError]);
@@ -368,10 +372,10 @@ export const useBookmarks = () => {
   // Duplicate a bookmark (not folder) right after the original
   const duplicateBookmark = useCallback(async (bookmarkId: string): Promise<void> =>
   {
-    const node = await getBookmark(bookmarkId);
-    if (!node || !node.url || !node.parentId || node.index === undefined) return;
+    const original = await getBookmark(bookmarkId);
+    if (!original || !original.url || !original.parentId || original.index === undefined) return;
 
-    await createBookmark(node.parentId, node.title, node.url, node.index + 1);
+    await createBookmark(original.parentId, original.title, original.url, original.index + 1);
   }, [getBookmark, createBookmark]);
 
   // Find a folder by its path (e.g., "Bookmarks Bar/Home")
