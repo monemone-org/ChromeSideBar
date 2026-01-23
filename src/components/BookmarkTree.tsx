@@ -72,7 +72,8 @@ const OTHER_BOOKMARKS_ID = '2';
 const MOBILE_BOOKMARKS_ID = '3';
 
 // Storage key for persisting folder expand/collapse state
-const getExpandedStateKey = (windowId: number) => `bookmarkExpandedState_${windowId}`;
+const getExpandedStateKey = (windowId: number, spaceId: string) =>
+  `bookmarkExpandedState_${windowId}_${spaceId}`;
 
 // Special folder IDs that cannot be edited/deleted
 const SPECIAL_FOLDER_IDS = [BOOKMARKS_BAR_ID, OTHER_BOOKMARKS_ID, MOBILE_BOOKMARKS_ID];
@@ -1045,7 +1046,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   {
     if (!windowId) return;
 
-    const storageKey = getExpandedStateKey(windowId);
+    const spaceId = activeSpace?.id || 'all';
+    const storageKey = getExpandedStateKey(windowId, spaceId);
     chrome.storage.session.get(storageKey, (result) =>
     {
       if (result[storageKey])
@@ -1054,21 +1056,22 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       }
       setExpandedStateLoaded(true);
     });
-  }, [windowId]);
+  }, [windowId, activeSpace?.id]);
 
   // Save expanded state to session storage on change (debounced)
   useEffect(() =>
   {
     if (!windowId || !expandedStateLoaded) return;
 
+    const spaceId = activeSpace?.id || 'all';
     const timeoutId = setTimeout(() =>
     {
-      const storageKey = getExpandedStateKey(windowId);
+      const storageKey = getExpandedStateKey(windowId, spaceId);
       chrome.storage.session.set({ [storageKey]: expandedState });
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [expandedState, windowId, expandedStateLoaded]);
+  }, [expandedState, windowId, expandedStateLoaded, activeSpace?.id]);
 
   // Auto-expand space folder when it changes (wait for loaded state)
   useEffect(() =>

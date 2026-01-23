@@ -60,6 +60,8 @@ import clsx from 'clsx';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getIcon } from '../utils/spaceIcons';
 
+const getTabGroupExpandedStateKey = (windowId: number) => `tabGroupExpandedState_${windowId}`;
+
 interface DraggableTabProps {
   tab: chrome.tabs.Tab;
   indentLevel: number;
@@ -757,7 +759,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
-  const { spaces, activeSpace: activeSpaceFromContext } = useSpacesContext();
+  const { spaces, activeSpace: activeSpaceFromContext, windowId } = useSpacesContext();
 
   // Use prop if provided, otherwise use context
   const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
@@ -823,6 +825,37 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   }, [visibleTabs, closeTabs]);
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [expandedGroupsLoaded, setExpandedGroupsLoaded] = useState(false);
+
+  // Load expanded state from session storage on mount
+  useEffect(() =>
+  {
+    if (!windowId) return;
+
+    const storageKey = getTabGroupExpandedStateKey(windowId);
+    chrome.storage.session.get(storageKey, (result) =>
+    {
+      if (result[storageKey])
+      {
+        setExpandedGroups(result[storageKey]);
+      }
+      setExpandedGroupsLoaded(true);
+    });
+  }, [windowId]);
+
+  // Save expanded state to session storage on change (debounced)
+  useEffect(() =>
+  {
+    if (!windowId || !expandedGroupsLoaded) return;
+
+    const timeoutId = setTimeout(() =>
+    {
+      const storageKey = getTabGroupExpandedStateKey(windowId);
+      chrome.storage.session.set({ [storageKey]: expandedGroups });
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [expandedGroups, windowId, expandedGroupsLoaded]);
 
   // External URL drop state (for web page link drops)
   const tabListContainerRef = useRef<HTMLDivElement>(null);
@@ -1290,6 +1323,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   // Initialize all groups as expanded when they first appear
   useEffect(() =>
   {
+    if (!expandedGroupsLoaded) return;
+
     setExpandedGroups((prev) =>
     {
       let hasChanges = false;
@@ -1304,7 +1339,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       });
       return hasChanges ? newState : prev;
     });
-  }, [visibleTabGroups]);
+  }, [visibleTabGroups, expandedGroupsLoaded]);
 
   // Ref for end-of-list drop zone detection
   const endOfListRef = useRef<HTMLDivElement>(null);
