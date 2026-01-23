@@ -130,7 +130,12 @@ async function importTabGroups(tabGroups: TabGroupBackup[]): Promise<void> {
 
     // Group the tabs
     if (createdTabIds.length > 0) {
-      const groupId = await chrome.tabs.group({ tabIds: createdTabIds });
+      // Get windowId from first created tab
+      const firstTab = await chrome.tabs.get(createdTabIds[0]);
+      const groupId = await chrome.tabs.group({
+        tabIds: createdTabIds,
+        createProperties: { windowId: firstTab.windowId }
+      });
       await chrome.tabGroups.update(groupId, {
         title: group.title,
         color: group.color,

@@ -15,6 +15,7 @@ import {
 import { PinnedIcon } from './PinnedIcon';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
+import { useSpacesContext } from '../contexts/SpacesContext';
 import { BookmarkOpenMode } from './SettingsDialog';
 import { matchesFilter } from '../utils/searchParser';
 
@@ -49,6 +50,7 @@ export const PinnedBar = ({
   filterText = '',
 }: PinnedBarProps) => {
   const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned } = useBookmarkTabsContext();
+  const { windowId } = useSpacesContext();
 
   // Move pinned tab to a new window
   const movePinnedToNewWindow = (pinnedId: string) =>
@@ -117,7 +119,7 @@ export const PinnedBar = ({
                   ? (s) => openPinnedTab(s.id, s.url)
                   : bookmarkOpenMode === 'activeTab'
                     ? (s) => chrome.tabs.update({ url: s.url })
-                    : (s) => chrome.tabs.create({ url: s.url, active: true })
+                    : (s) => chrome.tabs.create({ url: s.url, active: true, windowId: windowId ?? undefined })
               }
               onClose={bookmarkOpenMode === 'arc' ? closePinnedTab : undefined}
               onMoveToNewWindow={bookmarkOpenMode === 'arc' ? movePinnedToNewWindow : undefined}
@@ -125,6 +127,7 @@ export const PinnedBar = ({
               isActive={bookmarkOpenMode === 'arc' ? isPinnedActive(site.id) : false}
               isAudible={bookmarkOpenMode === 'arc' ? isPinnedAudible(site.id) : false}
               iconSize={iconSize}
+              windowId={windowId ?? undefined}
             />
           ))}
         </SortableContext>

@@ -249,7 +249,11 @@ Open these tabs for testing:
 - [x] Click gear icon → Settings opens `[4.1]`
 - [x] Change font size to 18 → text resizes immediately `[4.2]`
 - [x] Change pinned icon size to 32 → icons resize `[4.3]`
-- [x] Change bookmark open mode (Active Tab / New Tab / Arc Style) → verify each mode's behavior `[4.10]`
+-     Change bookmark open mode → verify each mode's behavior `[4.10]`
+        - [x] Active Tab 
+        - [x] New Tab 
+        - [x] Arc Style - single click open live tab: ON, single click to open tab
+        - [x] Arc Style - single click open live tab: OFF, double click to open tab
 - [x] Toggle "Sort Groups First" → groups move above/below ungrouped tabs `[4.8]`
 - [x] Toggle "Use Spaces" off → space bar disappears → toggle on → space bar reappears `[4.9]`
 - [x] Click "Export" → JSON file downloads → verify valid JSON `[4.6]`
@@ -323,13 +327,16 @@ Open these tabs for testing:
 
 **UI state persistence**
 - [x] Expand some folders, close sidebar, reopen → folder expand states preserved `[9.4]`
-- [ ] Collapse some tab groups, reload sidebar → group expand states preserved `[9.4]`
+- [x] Create 2 spaces using the same folder. Expand folders in 1 space -> 2nd space shoud have its own expand states.
+- [x] Collapse some tab groups, close sidebar, reopen → group expand states preserved `[9.4]`
 
 **Cross-window sync**
 - [x] Open a second Chrome window with sidebar
 - [x] Pin a site in window 1 → verify it appears in window 2's sidebar `[9.5]`
 - [x] Delete a bookmark in window 1 → verify removed from window 2 `[9.5]`
 - [x] Create a space in window 1 → verify it appears in window 2's space bar `[9.5]`
+- [x] Open a tab in Space A in window 1 -> tab in Group A in window 1. 
+      Then open anoather tab in Space A in window 2 -> tab in Group A in window 2. 
 
 ---
 

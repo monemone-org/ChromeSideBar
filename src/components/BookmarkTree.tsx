@@ -166,6 +166,8 @@ interface BookmarkRowProps {
   // Drag-drop attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
+  // Window ID for tab creation
+  windowId?: number;
 }
 
 // Forward ref to attach to the main div
@@ -211,7 +213,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onMoveSelectedBookmarks,
   hasSelectedBookmarks,
   attributes,
-  listeners
+  listeners,
+  windowId
 }, ref) => {
   const isFolder = !node.url;
   const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
@@ -277,7 +280,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
       else
       {
         // newTab: open in new active tab
-        chrome.tabs.create({ url: node.url, active: true });
+        chrome.tabs.create({ url: node.url, active: true, windowId: windowId ?? undefined });
       }
     }
   };
@@ -365,7 +368,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             if (e.metaKey || e.ctrlKey)
             {
               // Cmd/Ctrl+click: open in new tab
-              chrome.tabs.create({ url: node.url!, active: true });
+              chrome.tabs.create({ url: node.url!, active: true, windowId });
             }
             else if (e.shiftKey)
             {
@@ -845,13 +848,16 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     const createdTabIds: number[] = [];
     for (const bookmark of bookmarksList)
     {
-      const tab = await chrome.tabs.create({ url: bookmark.url, active: false });
+      const tab = await chrome.tabs.create({ url: bookmark.url, active: false, windowId: windowId ?? undefined });
       if (tab.id) createdTabIds.push(tab.id);
     }
 
     if (createdTabIds.length > 0)
     {
-      const groupId = await chrome.tabs.group({ tabIds: createdTabIds });
+      const groupId = await chrome.tabs.group({
+        tabIds: createdTabIds,
+        createProperties: windowId ? { windowId } : undefined
+      });
       await chrome.tabGroups.update(groupId, {
         title: folderName,
         color: getRandomGroupColor()
@@ -860,7 +866,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       await chrome.tabs.update(createdTabIds[0], { active: true });
       onShowToast?.(`Opened ${createdTabIds.length} tabs as "${folderName}"`);
     }
-  }, [getAllBookmarksInFolder, onShowToast]);
+  }, [getAllBookmarksInFolder, onShowToast, windowId]);
 
   // Open all bookmarks in folder as separate tabs (no grouping)
   const handleOpenAllTabs = useCallback(async (folderId: string) =>
@@ -873,10 +879,10 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     }
     for (const bookmark of bookmarksList)
     {
-      await chrome.tabs.create({ url: bookmark.url, active: false });
+      await chrome.tabs.create({ url: bookmark.url, active: false, windowId: windowId ?? undefined });
     }
     onShowToast?.(`Opened ${bookmarksList.length} tabs`);
-  }, [getAllBookmarksInFolder, onShowToast]);
+  }, [getAllBookmarksInFolder, onShowToast, windowId]);
 
   // Open all bookmarks in a new window
   const handleOpenAllTabsInNewWindow = useCallback(async (folderId: string) =>
@@ -1455,7 +1461,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
 
       urls.forEach(url =>
       {
-        chrome.tabs.create({ url });
+        chrome.tabs.create({ url, windowId: windowId ?? undefined });
         // chrome.tabs.create({ url }, (tab) =>
         // {
         //   if (tab?.id) chrome.tabs.ungroup(tab.id);
@@ -1466,13 +1472,13 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     else
     {
       // Single bookmark
-      chrome.tabs.create({ url: clickedUrl });
+      chrome.tabs.create({ url: clickedUrl, windowId: windowId ?? undefined });
       // chrome.tabs.create({ url: clickedUrl }, (tab) =>
       // {
       //   //if (tab?.id) chrome.tabs.ungroup(tab.id);
       // });
     }
-  }, [getSelectedItems, collectSelectedBookmarkUrls, clearSelection]);
+  }, [getSelectedItems, collectSelectedBookmarkUrls, clearSelection, windowId]);
 
   // Open selected bookmarks in new window (or single if not multi-selected)
   const handleOpenSelectedInNewWindow = useCallback(async (clickedUrl: string) =>
@@ -1834,6 +1840,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onOpenInNewWindow={handleOpenSelectedInNewWindow}
               onMoveSelectedBookmarks={openMoveSelectedBookmarksDialog}
               hasSelectedBookmarks={hasSelectedBookmarks()}
+              windowId={windowId ?? undefined}
             />
           );
         })}

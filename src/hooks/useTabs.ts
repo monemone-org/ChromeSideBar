@@ -27,7 +27,7 @@ const compareDomainTitle = (a: chrome.tabs.Tab, b: chrome.tabs.Tab): number =>
 // Module-level flag shared across all hook instances
 let isBatchOperation = false;
 
-export const useTabs = () => {
+export const useTabs = (windowId?: number) => {
   const [tabs, setTabs] = useState<chrome.tabs.Tab[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -271,7 +271,10 @@ export const useTabs = () => {
           const info = groupInfoMap.get(origGroupId);
           await new Promise<void>((resolve) =>
           {
-            chrome.tabs.group({ tabIds }, (newGroupId) =>
+            chrome.tabs.group({
+              tabIds,
+              createProperties: windowId ? { windowId } : undefined
+            }, (newGroupId) =>
             {
               if (handleError('regroup'))
               {
@@ -320,20 +323,20 @@ export const useTabs = () => {
   const closeAllTabs = useCallback(() => {
     const tabIds = tabs.map(t => t.id!);
     // Create a new blank tab first, then close others
-    chrome.tabs.create({ active: true }, () => {
+    chrome.tabs.create({ active: true, windowId }, () => {
       chrome.tabs.remove(tabIds, () => {
         handleError('close all');
       });
     });
-  }, [tabs, handleError]);
+  }, [tabs, handleError, windowId]);
 
   const createTab = useCallback(() =>
   {
-    chrome.tabs.create({ active: true }, () =>
+    chrome.tabs.create({ active: true, windowId }, () =>
     {
       handleError('create tab');
     });
-  }, [handleError]);
+  }, [handleError, windowId]);
 
   const groupTab = useCallback((tabId: number, groupId: number) => {
     chrome.tabs.group({ tabIds: [tabId], groupId }, () => {
@@ -363,11 +366,15 @@ export const useTabs = () => {
     });
   }, [handleError]);
 
-  const createGroupWithTab = useCallback((tabId: number,
-                                          title: string,
-                                          color?: chrome.tabGroups.ColorEnum) =>
+  const createGroupWithTab = useCallback(async (tabId: number,
+                                                title: string,
+                                                color?: chrome.tabGroups.ColorEnum) =>
   {
-    chrome.tabs.group({ tabIds: [tabId] }, (groupId) =>
+    const tab = await chrome.tabs.get(tabId);
+    chrome.tabs.group({
+      tabIds: [tabId],
+      createProperties: { windowId: tab.windowId }
+    }, (groupId) =>
     {
       if (!handleError('create group'))
       {
@@ -381,7 +388,7 @@ export const useTabs = () => {
 
   const createTabInGroup = useCallback((groupId: number) =>
   {
-    chrome.tabs.create({ active: true }, (tab) =>
+    chrome.tabs.create({ active: true, windowId }, (tab) =>
     {
       if (!handleError('create tab'))
       {
@@ -391,7 +398,7 @@ export const useTabs = () => {
         });
       }
     });
-  }, [handleError]);
+  }, [handleError, windowId]);
 
   const duplicateTab = useCallback((tabId: number) =>
   {
@@ -399,7 +406,7 @@ export const useTabs = () => {
     {
       if (handleError('get tab') || !tab.url) return;
 
-      chrome.tabs.create({ url: tab.url, active: true }, (newTab) =>
+      chrome.tabs.create({ url: tab.url, active: true, windowId }, (newTab) =>
       {
         if (handleError('create tab') || !newTab.id) return;
 
@@ -427,7 +434,7 @@ export const useTabs = () => {
         }
       });
     });
-  }, [handleError]);
+  }, [handleError, windowId]);
 
   const sortGroupTabs = useCallback(async (groupId: number, direction: 'asc' | 'desc' = 'asc') =>
   {

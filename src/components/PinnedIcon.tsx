@@ -29,6 +29,7 @@ interface PinnedIconProps
   isActive?: boolean;
   isAudible?: boolean;
   iconSize: number;
+  windowId?: number;
 }
 
 export const PinnedIcon = ({
@@ -44,6 +45,7 @@ export const PinnedIcon = ({
   isActive,
   isAudible,
   iconSize,
+  windowId,
 }: PinnedIconProps) =>
 {
   const [showEditModal, setShowEditModal] = useState(false);
@@ -119,7 +121,7 @@ export const PinnedIcon = ({
     else if (e.metaKey || e.ctrlKey)
     {
       // Cmd+click (Mac) or Ctrl+click (Windows/Linux): open in new tab (ungrouped)
-      chrome.tabs.create({ url: site.url }, (tab) =>
+      chrome.tabs.create({ url: site.url, windowId }, (tab) =>
       {
         if (tab?.id)
         {
@@ -295,7 +297,7 @@ export const PinnedIcon = ({
             )}
             <ContextMenu.Item onSelect={() =>
             {
-              chrome.tabs.create({ url: site.url }, (tab) =>
+              chrome.tabs.create({ url: site.url, windowId }, (tab) =>
               {
                 if (tab?.id)
                 {

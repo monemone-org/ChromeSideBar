@@ -756,10 +756,10 @@ interface TabListProps {
 
 export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange }: TabListProps) =>
 {
-  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs();
+  const { spaces, activeSpace: activeSpaceFromContext, windowId } = useSpacesContext();
+  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs(windowId ?? undefined);
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
-  const { spaces, activeSpace: activeSpaceFromContext, windowId } = useSpacesContext();
 
   // Use prop if provided, otherwise use context
   const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
@@ -928,12 +928,11 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       const space = spaces.find(s => s.id === spaceId);
       if (!space) return;
 
-      // Get current window
-      const currentWindow = await chrome.windows.getCurrent();
-      if (!currentWindow.id) return;
+      // Use sidebar's window ID, not the currently focused window
+      if (!windowId) return;
 
       // Find existing Chrome group with Space's name
-      const groups = await chrome.tabGroups.query({ windowId: currentWindow.id, title: space.name });
+      const groups = await chrome.tabGroups.query({ windowId, title: space.name });
 
       if (groups.length > 0)
       {
@@ -943,7 +942,11 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       else
       {
         // Create new group with this tab
-        const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
+        const tab = await chrome.tabs.get(tabId);
+        const newGroupId = await chrome.tabs.group({
+          tabIds: [tabId],
+          createProperties: { windowId: tab.windowId }
+        });
         await chrome.tabGroups.update(newGroupId, {
           title: space.name,
           color: space.color,
@@ -956,7 +959,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     {
       if (import.meta.env.DEV) console.error('[moveTabToSpace] Failed:', error);
     }
-  }, [spaces, showToast]);
+  }, [spaces, showToast, windowId]);
 
   // Handler for dialog-based move to space
   const handleMoveToSpace = useCallback(async (spaceId: string) =>
@@ -1277,6 +1280,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         url,
         index,
         active: false,
+        windowId: windowId ?? undefined,
       });
 
       // Add to group if specified

@@ -750,7 +750,10 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
     }
     else
     {
-      const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
+      const newGroupId = await chrome.tabs.group({
+        tabIds: [tabId],
+        createProperties: { windowId }
+      });
       await chrome.tabGroups.update(newGroupId, {
         title: space.name,
         color: space.color,
@@ -931,7 +934,7 @@ chrome.commands.onCommand.addListener((command) =>
       const activeTab = tabs[0];
       const groupId = activeTab.groupId;
 
-      chrome.tabs.create({ active: true }, (newTab) =>
+      chrome.tabs.create({ active: true, windowId: activeTab.windowId }, (newTab) =>
       {
         if (groupId && groupId !== -1 && newTab.id)
         {

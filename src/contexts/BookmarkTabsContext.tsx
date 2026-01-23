@@ -35,7 +35,10 @@ const addTabToLiveBookmarksGroup = async (tabId: number): Promise<void> =>
   else
   {
     // Create new group
-    const newGroupId = await chrome.tabs.group({ tabIds: [tabId] });
+    const newGroupId = await chrome.tabs.group({
+      tabIds: [tabId],
+      createProperties: { windowId }
+    });
     await chrome.tabGroups.update(newGroupId, {
       title: LIVEBOOKMARKS_GROUP_NAME,
       color: 'grey',
@@ -406,7 +409,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     {
       try
       {
-        chrome.tabs.create({ url, active: true }, async (tab) =>
+        chrome.tabs.create({ url, active: true, windowId: currentWindowId ?? undefined }, async (tab) =>
         {
           if (handleError('create') || !tab.id)
           {
@@ -459,7 +462,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         resolve(undefined);
       }
     });
-  }, [handleError, storeAssociation]);
+  }, [handleError, storeAssociation, currentWindowId]);
 
   // Open a tab for an item (bookmark or pinned site)
   // Returns the tab ID (existing or newly created), or undefined if failed
