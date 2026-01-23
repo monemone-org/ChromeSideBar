@@ -39,6 +39,7 @@ interface SidebarContentProps
   hideOtherBookmarks: boolean;
   externalDropTarget: ExternalDropTarget | null;
   bookmarkOpenMode: BookmarkOpenMode;
+  arcSingleClickOpensTab: boolean;
   onResolverReady: (fn: ResolveBookmarkDropTarget) => void;
   filterLiveTabs: boolean;
   filterText: string;
@@ -56,6 +57,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   hideOtherBookmarks,
   externalDropTarget,
   bookmarkOpenMode,
+  arcSingleClickOpensTab,
   onResolverReady,
   filterLiveTabs,
   filterText,
@@ -77,6 +79,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         hideOtherBookmarks={hideOtherBookmarks}
         externalDropTarget={externalDropTarget}
         bookmarkOpenMode={bookmarkOpenMode}
+        arcSingleClickOpensTab={arcSingleClickOpensTab}
         onResolverReady={onResolverReady}
         filterLiveTabs={filterLiveTabs}
         filterText={filterText}
@@ -332,6 +335,11 @@ function App() {
     true,
     { parse: (v) => v === 'true', serialize: (v) => v.toString() }
   );
+  const [arcSingleClickOpensTab, setArcSingleClickOpensTab] = useChromeLocalStorage(
+    'sidebar-arc-single-click-opens-tab',
+    true,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  );
   const [showFilterArea, setShowFilterArea] = useLocalStorage(
     'sidebar-show-filter-area',
     false,
@@ -398,6 +406,7 @@ function App() {
     setPinnedIconSize(newSettings.pinnedIconSize);
     setBookmarkOpenMode(newSettings.bookmarkOpenMode);
     setSpacesEnabled(newSettings.useSpaces);
+    setArcSingleClickOpensTab(newSettings.arcSingleClickOpensTab);
     setShowSettings(false);
   };
 
@@ -534,6 +543,7 @@ function App() {
           pinnedIconSize,
           bookmarkOpenMode,
           useSpaces: spacesEnabled,
+          arcSingleClickOpensTab,
         }}
         onApply={handleApplySettings}
       />
@@ -680,6 +690,7 @@ function App() {
         hideOtherBookmarks={hideOtherBookmarks}
         externalDropTarget={externalDropTarget}
         bookmarkOpenMode={bookmarkOpenMode}
+        arcSingleClickOpensTab={arcSingleClickOpensTab}
         onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }}
         filterLiveTabs={filterLiveTabs}
         filterText={filterText}

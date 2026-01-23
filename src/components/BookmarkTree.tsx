@@ -129,6 +129,7 @@ interface BookmarkRowProps {
   dropPosition?: DropPosition;
   // Bookmark opening behavior
   bookmarkOpenMode?: BookmarkOpenMode;
+  arcSingleClickOpensTab?: boolean;
   isLoaded?: boolean;
   isAudible?: boolean;
   isActive?: boolean;
@@ -188,6 +189,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   dropTargetId,
   dropPosition,
   bookmarkOpenMode = 'arc',
+  arcSingleClickOpensTab = true,
   isLoaded,
   isAudible,
   isActive,
@@ -257,8 +259,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     }
 
     // Plain click: perform action for bookmarks (folders only expand/collapse via chevron)
-    // Arc mode: if bookmark has a live tab, activate it
-    if (node.url && bookmarkOpenMode === 'arc' && isLoaded && onOpenBookmark)
+    // Arc mode: open/activate bookmark on single click if setting enabled
+    if (node.url && bookmarkOpenMode === 'arc' && onOpenBookmark && arcSingleClickOpensTab)
     {
       onOpenBookmark(node.id, node.url);
       return;
@@ -786,6 +788,7 @@ interface BookmarkTreeProps {
   hideOtherBookmarks?: boolean;
   externalDropTarget?: ExternalDropTarget | null;
   bookmarkOpenMode?: BookmarkOpenMode;
+  arcSingleClickOpensTab?: boolean;
   onResolverReady?: (resolver: ResolveBookmarkDropTarget) => void;
   filterLiveTabs?: boolean;
   filterText?: string;
@@ -794,7 +797,7 @@ interface BookmarkTreeProps {
   useSpaces?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
@@ -1797,6 +1800,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               dropTargetId={dropTargetId}
               dropPosition={dropPosition}
               bookmarkOpenMode={bookmarkOpenMode}
+              arcSingleClickOpensTab={arcSingleClickOpensTab}
               isLoaded={isBookmarkLoaded(node.id)}
               isAudible={isBookmarkAudible(node.id)}
               isActive={isBookmarkActive(node.id)}

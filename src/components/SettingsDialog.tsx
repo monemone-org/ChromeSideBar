@@ -11,6 +11,7 @@ export interface SettingsValues {
   pinnedIconSize: number;
   bookmarkOpenMode: BookmarkOpenMode;
   useSpaces: boolean;
+  arcSingleClickOpensTab: boolean;
 }
 
 interface SettingsDialogProps {
@@ -33,6 +34,7 @@ export function SettingsDialog({
   const [tempPinnedIconSize, setTempPinnedIconSize] = useState(settings.pinnedIconSize);
   const [tempBookmarkOpenMode, setTempBookmarkOpenMode] = useState(settings.bookmarkOpenMode);
   const [tempUseSpaces, setTempUseSpaces] = useState(settings.useSpaces);
+  const [tempArcSingleClickOpensTab, setTempArcSingleClickOpensTab] = useState(settings.arcSingleClickOpensTab);
 
   // Test results state (dev mode only)
   const [testResults, setTestResults] = useState<{ passed: number; failed: number; results: Array<{ name: string; passed: boolean; error?: string }> } | null>(null);
@@ -59,6 +61,7 @@ export function SettingsDialog({
       setTempHideOtherBookmarks(settings.hideOtherBookmarks);
       setTempBookmarkOpenMode(settings.bookmarkOpenMode);
       setTempUseSpaces(settings.useSpaces);
+      setTempArcSingleClickOpensTab(settings.arcSingleClickOpensTab);
     }
     wasOpen.current = isOpen;
   }, [isOpen, settings]);
@@ -83,6 +86,7 @@ export function SettingsDialog({
       pinnedIconSize: tempPinnedIconSize,
       bookmarkOpenMode: tempBookmarkOpenMode,
       useSpaces: tempUseSpaces,
+      arcSingleClickOpensTab: tempArcSingleClickOpensTab,
     });
   };
 
@@ -178,6 +182,17 @@ export function SettingsDialog({
                   {tempBookmarkOpenMode === 'activeTab' && 'Replaces the current tab with the bookmark'}
                 </p>
               </div>
+              {tempBookmarkOpenMode === 'arc' && (
+                <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tempArcSingleClickOpensTab}
+                    onChange={(e) => setTempArcSingleClickOpensTab(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  Single click opens live tab
+                </label>
+              )}
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                 <input
                   type="checkbox"
