@@ -621,7 +621,7 @@ const DraggableGroupHeader = ({ group, tabCount, ...props }: DraggableGroupHeade
 };
 
 // Drag overlay content for groups
-const GroupDragOverlay = ({ group, matchedSpace, tabCount }: { group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number }) =>
+const GroupDragOverlay = ({ group, matchedSpace, tabCount, badges }: { group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number; badges?: React.ReactNode }) =>
 {
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
 
@@ -651,13 +651,14 @@ const GroupDragOverlay = ({ group, matchedSpace, tabCount }: { group: chrome.tab
         hideIcon
         hasChildren={true}
         className="pointer-events-none"
+        badges={badges}
       />
     </div>
   );
 };
 
 // Drag overlay content - matches tab row layout with transparent background
-const TabDragOverlay = ({ tab }: { tab: chrome.tabs.Tab }) =>
+const TabDragOverlay = ({ tab, badges }: { tab: chrome.tabs.Tab; badges?: React.ReactNode }) =>
 {
   const icon = tab.favIconUrl ? (
     <img src={tab.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />
@@ -673,6 +674,7 @@ const TabDragOverlay = ({ tab }: { tab: chrome.tabs.Tab }) =>
         icon={icon}
         hasChildren={false}
         className="pointer-events-none bg-blue-100 dark:bg-blue-900/50 rounded"
+        badges={badges}
       />
     </div>
   );
@@ -690,15 +692,23 @@ interface MultiTabDragOverlayProps {
 
 const MultiTabDragOverlay = ({ count, firstItem }: MultiTabDragOverlayProps) =>
 {
+  // Badge element to pass to overlay components
+  const badges = (
+    <span className="text-xs font-medium text-blue-600 dark:text-blue-300 bg-blue-200 dark:bg-blue-800 px-1.5 py-0.5 rounded-full">
+      {count} items
+    </span>
+  );
+
   // Render the appropriate overlay component based on first item type
   const overlayContent = firstItem.type === 'group' ? (
     <GroupDragOverlay
       group={firstItem.group}
       matchedSpace={firstItem.matchedSpace}
       tabCount={firstItem.tabCount}
+      badges={badges}
     />
   ) : (
-    <TabDragOverlay tab={firstItem.tab} />
+    <TabDragOverlay tab={firstItem.tab} badges={badges} />
   );
 
   return (
@@ -717,13 +727,8 @@ const MultiTabDragOverlay = ({ count, firstItem }: MultiTabDragOverlayProps) =>
         />
       )}
       {/* Front item with content */}
-      <div className="relative bg-blue-100 dark:bg-blue-900/50 rounded border border-blue-300 dark:border-blue-600 flex items-center">
-        <div className="flex-1">
-          {overlayContent}
-        </div>
-        <span className="text-xs font-medium text-blue-600 dark:text-blue-300 bg-blue-200 dark:bg-blue-800 px-1.5 py-0.5 rounded-full mr-2">
-          {count} items
-        </span>
+      <div className="relative bg-blue-100 dark:bg-blue-900/50 rounded border border-blue-300 dark:border-blue-600">
+        {overlayContent}
       </div>
     </div>
   );
