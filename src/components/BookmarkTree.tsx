@@ -245,14 +245,6 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   }
 
   const handleRowClick = (e: React.MouseEvent) => {
-    
-    // 2026-01-21 mone: disabled. It is confusing when actually using it
-    // // Cmd+click on only selected bookmark -> open in new tab
-    // if ((e.metaKey || e.ctrlKey) && !e.shiftKey && node.url && isSelected && selectionCount === 1)
-    // {
-    //   chrome.tabs.create({ url: node.url, active: true });
-    //   return;
-    // }
 
     // Always update selection state on click
     onSelectionClick?.(e);
@@ -264,12 +256,23 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     }
 
     // Plain click: perform action for bookmarks (folders only expand/collapse via chevron)
-    // Arc mode: clicking only selects, use Open button to open tabs
-    if (node.url && bookmarkOpenMode !== 'arc') {
-      if (bookmarkOpenMode === 'activeTab') {
+    // Arc mode: if bookmark has a live tab, activate it
+    if (node.url && bookmarkOpenMode === 'arc' && isLoaded && onOpenBookmark)
+    {
+      onOpenBookmark(node.id, node.url);
+      return;
+    }
+
+    // Non-Arc modes: open bookmark based on setting
+    if (node.url && bookmarkOpenMode !== 'arc')
+    {
+      if (bookmarkOpenMode === 'activeTab')
+      {
         // Replace current tab with bookmark
         chrome.tabs.update({ url: node.url });
-      } else {
+      }
+      else
+      {
         // newTab: open in new active tab
         chrome.tabs.create({ url: node.url, active: true });
       }
@@ -354,7 +357,24 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
       {!isFolder && bookmarkOpenMode === 'arc' && !isLoaded && onOpenBookmark && node.url && (
         <button
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); onOpenBookmark(node.id, node.url!); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (e.metaKey || e.ctrlKey)
+            {
+              // Cmd/Ctrl+click: open in new tab
+              chrome.tabs.create({ url: node.url!, active: true });
+            }
+            else if (e.shiftKey)
+            {
+              // Shift+click: open in new window
+              chrome.windows.create({ url: node.url! });
+            }
+            else
+            {
+              // Default: open via Arc-style handler
+              onOpenBookmark(node.id, node.url!);
+            }
+          }}
           className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded bg-white dark:bg-gray-900 opacity-0 group-hover:opacity-100"
           title="Open tab"
           aria-label="Open tab"
