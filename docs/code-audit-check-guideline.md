@@ -20,6 +20,7 @@ Area names for reports:
 - `error-handling`
 - `async-concurrency`
 - `testing`
+- `coding-guidelines`
 
 Example: `code-audit-security-report-2026-01-19.md`
 
@@ -196,3 +197,9 @@ Example: `code-audit-security-report-2026-01-19.md`
 - [ ] Integration tests for cross-context messaging
   - Background <-> sidebar communication
   - Content script <-> background messaging
+
+## 8. Coding Guidelines Compliance
+
+- [ ] Review code against project-specific patterns in `docs/coding-guideline.md`
+  - Chrome Extension API patterns (windowId, service worker state, race conditions, etc.)
+  - UI patterns (dropdown dismiss, drag-drop expand behavior)

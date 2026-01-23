@@ -2031,12 +2031,21 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       return;
     }
 
-    // Handle space drop (tab → space) - moves tab to space's Chrome group
+    // Handle space drop (tab → space) - moves tab(s) to space's Chrome group
     if (localSpaceDropTarget && activeId && typeof activeId === 'number')
     {
-      await moveTabToSpace(activeId, localSpaceDropTarget);
+      // Check if dragged tab is part of a multi-selection
+      const { allTabIds } = getTabSelectionInfo();
+      const tabsToMove = allTabIds.length > 0 && allTabIds.includes(activeId)
+        ? allTabIds
+        : [activeId];
 
-      // Clear all state
+      for (const tabId of tabsToMove)
+      {
+        await moveTabToSpace(tabId, localSpaceDropTarget);
+      }
+
+      clearSelection();
       wasValidDropRef.current = true;
       clearDndState();
       return;
@@ -2176,7 +2185,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         const sortedTabs = [...selectedTabs].sort((a, b) => a.index - b.index);
 
         // First tab uses full moveSingleTab
-        let result = moveSingleTab({
+        let result = await moveSingleTab({
           tabId: sortedTabs[0].id!,
           sourceIndex: sortedTabs[0].index,
           sourceGroupId: sortedTabs[0].groupId ?? -1,
@@ -2195,7 +2204,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
           for (let i = 1; i < sortedTabs.length; i++)
           {
             const tab = sortedTabs[i];
-            result = moveTabAfter({
+            result = await moveTabAfter({
               tabId: tab.id!,
               sourceIndex: tab.index,
               sourceGroupId: tab.groupId ?? -1,
@@ -2212,7 +2221,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       else
       {
         // --- SINGLE TAB DRAG ---
-        moveSingleTab({
+        await moveSingleTab({
           tabId: activeId as number,
           sourceIndex: sourceTab.index,
           sourceGroupId: sourceTab.groupId ?? -1,

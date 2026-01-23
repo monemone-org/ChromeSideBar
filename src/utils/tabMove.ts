@@ -12,13 +12,13 @@ export interface MoveTabAfterParams
   sourceIndex: number;
   sourceGroupId: number;
   targetTab: { index: number; groupId: number };
-  moveTab: (tabId: number, index: number) => void;
-  groupTab: (tabId: number, groupId: number) => void;
-  ungroupTab: (tabId: number) => void;
+  moveTab: (tabId: number, index: number) => Promise<void>;
+  groupTab: (tabId: number, groupId: number) => Promise<void>;
+  ungroupTab: (tabId: number) => Promise<void>;
 }
 
 // Move a tab after a target tab (handles group membership and index adjustment)
-export const moveTabAfter = (params: MoveTabAfterParams): MoveResult =>
+export const moveTabAfter = async (params: MoveTabAfterParams): Promise<MoveResult> =>
 {
   const {
     tabId,
@@ -32,19 +32,19 @@ export const moveTabAfter = (params: MoveTabAfterParams): MoveResult =>
 
   const targetGroupId = targetTab.groupId;
 
-  // Handle group membership change
+  // Handle group membership change first, then move
   if (targetGroupId !== sourceGroupId)
   {
     if (targetGroupId === -1)
     {
       if (sourceGroupId !== -1)
       {
-        ungroupTab(tabId);
+        await ungroupTab(tabId);
       }
     }
     else
     {
-      groupTab(tabId, targetGroupId);
+      await groupTab(tabId, targetGroupId);
     }
   }
 
@@ -54,7 +54,7 @@ export const moveTabAfter = (params: MoveTabAfterParams): MoveResult =>
   {
     targetIndex--;
   }
-  moveTab(tabId, targetIndex);
+  await moveTab(tabId, targetIndex);
 
   return { index: targetIndex, groupId: targetGroupId };
 };
@@ -68,15 +68,15 @@ export interface MoveSingleTabParams
   dropPosition: DropPosition;
   isGroupHeaderTarget: boolean;
   visibleTabs: chrome.tabs.Tab[];
-  moveTab: (tabId: number, index: number) => void;
-  groupTab: (tabId: number, groupId: number) => void;
-  ungroupTab: (tabId: number) => void;
+  moveTab: (tabId: number, index: number) => Promise<void>;
+  groupTab: (tabId: number, groupId: number) => Promise<void>;
+  ungroupTab: (tabId: number) => Promise<void>;
 }
 
 // Move a single tab to a target location
 // Handles group membership and index adjustment
 // Returns null if the move could not be performed
-export const moveSingleTab = (params: MoveSingleTabParams): MoveResult | null =>
+export const moveSingleTab = async (params: MoveSingleTabParams): Promise<MoveResult | null> =>
 {
   const {
     tabId,
@@ -107,11 +107,11 @@ export const moveSingleTab = (params: MoveSingleTabParams): MoveResult | null =>
       // Move tab into group at the end
       if (sourceGroupId !== targetGroupId)
       {
-        groupTab(tabId, targetGroupId);
+        await groupTab(tabId, targetGroupId);
       }
       const lastTabIndex = groupTabsList[groupTabsList.length - 1].index;
       const finalIndex = adjustForSourceRemoval(lastTabIndex + 1);
-      moveTab(tabId, finalIndex);
+      await moveTab(tabId, finalIndex);
       return { index: finalIndex, groupId: targetGroupId };
     }
     else if (dropPosition === 'before')
@@ -119,20 +119,20 @@ export const moveSingleTab = (params: MoveSingleTabParams): MoveResult | null =>
       // Place before the group (as sibling, outside)
       if (sourceGroupId !== -1)
       {
-        ungroupTab(tabId);
+        await ungroupTab(tabId);
       }
       const finalIndex = adjustForSourceRemoval(groupTabsList[0].index);
-      moveTab(tabId, finalIndex);
+      await moveTab(tabId, finalIndex);
       return { index: finalIndex, groupId: -1 };
     }
     else if (dropPosition === 'intoFirst')
     {
       // Insert inside group at index 0
       const finalIndex = adjustForSourceRemoval(groupTabsList[0].index);
-      moveTab(tabId, finalIndex);
+      await moveTab(tabId, finalIndex);
       if (sourceGroupId !== targetGroupId)
       {
-        groupTab(tabId, targetGroupId);
+        await groupTab(tabId, targetGroupId);
       }
       return { index: finalIndex, groupId: targetGroupId };
     }
@@ -141,11 +141,11 @@ export const moveSingleTab = (params: MoveSingleTabParams): MoveResult | null =>
       // 'after': sibling after group
       if (sourceGroupId !== -1)
       {
-        ungroupTab(tabId);
+        await ungroupTab(tabId);
       }
       const lastTabIndex = groupTabsList[groupTabsList.length - 1].index;
       const finalIndex = adjustForSourceRemoval(lastTabIndex + 1);
-      moveTab(tabId, finalIndex);
+      await moveTab(tabId, finalIndex);
       return { index: finalIndex, groupId: -1 };
     }
   }
@@ -156,10 +156,10 @@ export const moveSingleTab = (params: MoveSingleTabParams): MoveResult | null =>
     const lastTab = visibleTabs[visibleTabs.length - 1];
     if (sourceGroupId !== -1)
     {
-      ungroupTab(tabId);
+      await ungroupTab(tabId);
     }
     const finalIndex = adjustForSourceRemoval(lastTab.index + 1);
-    moveTab(tabId, finalIndex);
+    await moveTab(tabId, finalIndex);
     return { index: finalIndex, groupId: -1 };
   }
   else
@@ -171,26 +171,26 @@ export const moveSingleTab = (params: MoveSingleTabParams): MoveResult | null =>
 
     const targetGroupId = targetTab.groupId ?? -1;
 
-    // Handle group membership change
+    // Handle group membership change first, then move
     if (targetGroupId !== sourceGroupId)
     {
       if (targetGroupId === -1)
       {
         if (sourceGroupId !== -1)
         {
-          ungroupTab(tabId);
+          await ungroupTab(tabId);
         }
       }
       else
       {
-        groupTab(tabId, targetGroupId);
+        await groupTab(tabId, targetGroupId);
       }
     }
 
     // Reorder
     const baseIndex = dropPosition === 'before' ? targetTab.index : targetTab.index + 1;
     const finalIndex = adjustForSourceRemoval(baseIndex);
-    moveTab(tabId, finalIndex);
+    await moveTab(tabId, finalIndex);
     return { index: finalIndex, groupId: targetGroupId };
   }
 };
