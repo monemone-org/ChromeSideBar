@@ -3,21 +3,11 @@
 
 ## In-Progress
 
-- [x] Orphaned tabs popup menu, add
-      - [ ] "Move To Space..."
-      - [ ] "Close Tabs Before"  (within the Orphaned tabs list)
-      - [ ] "Close Tabs After"  (within the Orphaned tabs list)
-      - [ ] "Close Other Tabs"  (other tabs in the Orphaned tabs list)
-
-- [x] make the area that response to group row's expand and collapse bigger, expand the area to outside of the V > icon. the area should fill the whole row.
-
-- Folder popup menu
-      - [x] after "New Folder" menu item, there should be an "New Bookmark"
-
-## Pending
-
 - Review Code:
    - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
+
+
+## Pending
 
 - [ ] Support drag links from browser pane to
             - bookmark  - drop before/after bookmark
@@ -272,3 +262,11 @@ SpaceBar
 - Dropping inside a Space (non-All space)
       - [x] Dropping before root folder should not be allowed
       - [x] Dropping after last tab in space group should not be moved out of the group.  it should be moved to after the last tab inside the same group. Or we can simply make  "+ New Tab" row at the end of the Space's tab list not droppable.
+
+- [x] Removed Orphaned tabs. It is confusing
+
+- [x] make the area that response to group row's expand and collapse bigger, expand the area to outside of the V > icon. the area should fill the whole row.
+
+- Folder popup menu
+      - [x] after "New Folder" menu item, there should be an "New Bookmark"
+
