@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog } from './Dialog';
 import { Pin, BookOpen, LayoutGrid, Sparkles } from 'lucide-react';
 
@@ -65,6 +65,15 @@ const pages: PageContent[] = [
 export function WelcomeDialog({ isOpen, onClose }: WelcomeDialogProps)
 {
   const [currentPage, setCurrentPage] = useState(0);
+
+  // Reset to first page when dialog opens
+  useEffect(() =>
+  {
+    if (isOpen)
+    {
+      setCurrentPage(0);
+    }
+  }, [isOpen]);
 
   const handleNext = () =>
   {
