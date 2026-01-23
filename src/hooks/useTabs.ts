@@ -24,8 +24,8 @@ const compareDomainTitle = (a: chrome.tabs.Tab, b: chrome.tabs.Tab): number =>
   return (a.title || '').localeCompare(b.title || '');
 };
 
-// Module-level flag shared across all hook instances
-let isBatchOperation = false;
+// Module-level Set tracking windowIds with active batch operations
+const batchOperationWindows = new Set<number>();
 
 export const useTabs = (windowId?: number) => {
   const [tabs, setTabs] = useState<chrome.tabs.Tab[]>([]);
@@ -62,7 +62,7 @@ export const useTabs = (windowId?: number) => {
     // Debounce to coalesce rapid events (e.g., tab creation fires multiple events)
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const handleUpdate = () => {
-      if (isBatchOperation) return;
+      if (windowId && batchOperationWindows.has(windowId)) return;
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         fetchTabs();
@@ -86,13 +86,13 @@ export const useTabs = (windowId?: number) => {
   // Close multiple tabs with batch mode to suppress individual onRemoved events
   const closeTabs = useCallback((tabIds: number[]) => {
     if (tabIds.length === 0) return;
-    isBatchOperation = true;
+    if (windowId) batchOperationWindows.add(windowId);
     chrome.tabs.remove(tabIds, () => {
       handleError('close tabs');
-      isBatchOperation = false;
+      if (windowId) batchOperationWindows.delete(windowId);
       fetchTabs();
     });
-  }, [handleError, fetchTabs]);
+  }, [handleError, fetchTabs, windowId]);
 
   const activateTab = useCallback((tabId: number) => {
     chrome.tabs.update(tabId, { active: true }, () => {
@@ -173,7 +173,7 @@ export const useTabs = (windowId?: number) => {
     const allGroupedTabIds = groupOrder.flatMap(gid => tabsByGroup.get(gid)!);
 
     // Batch mode: suppress listener-triggered refetches during sort operations
-    isBatchOperation = true;
+    if (windowId) batchOperationWindows.add(windowId);
     try
     {
       if (allGroupedTabIds.length > 0)
@@ -252,10 +252,10 @@ export const useTabs = (windowId?: number) => {
     }
     finally
     {
-      isBatchOperation = false;
+      if (windowId) batchOperationWindows.delete(windowId);
       fetchTabs();
     }
-  }, [tabs, handleError, fetchTabs]);
+  }, [tabs, handleError, fetchTabs, windowId]);
 
   const closeAllTabs = useCallback(() => {
     const tabIds = tabs.map(t => t.id!);
@@ -380,7 +380,7 @@ export const useTabs = (windowId?: number) => {
     });
 
     // Batch mode: suppress listener-triggered refetches during moves
-    isBatchOperation = true;
+    if (windowId) batchOperationWindows.add(windowId);
     try
     {
       // Move each tab to its new position within the group
@@ -398,10 +398,10 @@ export const useTabs = (windowId?: number) => {
     }
     finally
     {
-      isBatchOperation = false;
+      if (windowId) batchOperationWindows.delete(windowId);
       fetchTabs();
     }
-  }, [tabs, handleError, fetchTabs]);
+  }, [tabs, handleError, fetchTabs, windowId]);
 
   return {
     tabs,
