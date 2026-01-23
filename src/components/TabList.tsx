@@ -1830,8 +1830,27 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     // Handle external drop (tab → bookmark) first
     if (localExternalTarget && activeId && typeof activeId === 'number')
     {
-      const tab = visibleTabs.find(t => t.id === activeId);
-      if (tab && tab.url && tab.title)
+      // Check if we're dragging multiple selected tabs
+      const selectedItems = getSelectedItems();
+      const selectedTabIds = selectedItems
+        .filter(item => item.type === 'tab')
+        .map(item => parseInt(item.id, 10))
+        .filter(id => !isNaN(id));
+
+      // Determine which tabs to create bookmarks for
+      const isMultiDrag = selectedTabIds.length > 1 && selectedTabIds.includes(activeId);
+      const tabsToBookmark = isMultiDrag
+        ? selectedTabIds
+            .map(id => visibleTabs.find(t => t.id === id))
+            .filter((t): t is chrome.tabs.Tab => t !== undefined)
+            .sort((a, b) => a.index - b.index)  // Maintain relative order
+        : [visibleTabs.find(t => t.id === activeId)].filter((t): t is chrome.tabs.Tab => t !== undefined);
+
+      // Filter for bookmarkable tabs (have valid URL/title)
+      const bookmarkableTabs = filterBookmarkableTabs(tabsToBookmark)
+        .filter(tab => tab.title);
+
+      if (bookmarkableTabs.length > 0)
       {
         const { bookmarkId: targetBookmarkId, position, isFolder } = localExternalTarget;
 
@@ -1868,14 +1887,25 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
           }
         }
 
-        // Create bookmark at the calculated position
-        const newBookmark = await createBookmark(parentId, tab.title, tab.url, index);
-
-        // If Arc style is enabled, associate the tab with the new bookmark
-        // This makes it a managed/persistent tab (hidden from Tabs section)
-        if (arcStyleEnabled && newBookmark && tab.id)
+        // Create bookmarks for each tab
+        for (let i = 0; i < bookmarkableTabs.length; i++)
         {
-          await associateExistingTab(tab.id, newBookmark.id);
+          const tab = bookmarkableTabs[i];
+          const bookmarkIndex = index !== undefined ? index + i : undefined;
+          const newBookmark = await createBookmark(parentId, tab.title!, tab.url!, bookmarkIndex);
+
+          // If Arc style is enabled, associate the tab with the new bookmark
+          // This makes it a managed/persistent tab (hidden from Tabs section)
+          if (arcStyleEnabled && newBookmark && tab.id)
+          {
+            await associateExistingTab(tab.id, newBookmark.id);
+          }
+        }
+
+        // Clear selection after multi-drag
+        if (isMultiDrag)
+        {
+          clearSelection();
         }
       }
 
@@ -2160,7 +2190,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
     // Reset state
     clearDndState();
-  }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab, localSpaceDropTarget, onSpaceDropTargetChange, moveTabToSpace, getSelectedItems, clearSelection, clearDndState]);
+  }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab, localSpaceDropTarget, onSpaceDropTargetChange, moveTabToSpace, getSelectedItems, clearSelection, clearDndState, filterBookmarkableTabs]);
 
   // Drag cancel handler (e.g., Escape key)
   const handleDragCancel = useCallback(() =>
