@@ -12,7 +12,8 @@
       "WebFetch(domain:developer.chrome.com)",
       "Bash(echo:*)",
       "Bash(pbcopy)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

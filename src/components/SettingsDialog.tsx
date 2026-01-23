@@ -185,7 +185,7 @@ export function SettingsDialog({
                   onChange={(e) => setTempUseSpaces(e.target.checked)}
                   className="rounded border-gray-300 dark:border-gray-600"
                 />
-                Use Spaces
+                Hide Spaces
               </label>
               <p className="text-gray-500 dark:text-gray-400 ml-5">
                 Organize tabs and bookmarks into focused workspaces

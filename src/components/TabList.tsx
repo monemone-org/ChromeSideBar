@@ -6,6 +6,7 @@ import { useSpacesContext, Space } from '../contexts/SpacesContext';
 import { SelectionItem } from '../contexts/SelectionContext';
 import { useSelection } from '../hooks/useSelection';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
+import { useExternalUrlDropForTabs, TabDropTarget } from '../hooks/useExternalUrlDropForTabs';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SPEAKER_ICON_SIZE, LIVEBOOKMARKS_GROUP_NAME } from '../constants';
 
@@ -818,6 +819,10 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
+  // External URL drop state (for web page link drops)
+  const tabListContainerRef = useRef<HTMLDivElement>(null);
+  const [externalUrlDropTarget, setExternalUrlDropTarget] = useState<TabDropTarget | null>(null);
+
   // Add to Group dialog state
   const [addToGroupDialog, setAddToGroupDialog] = useState<{
     isOpen: boolean;
@@ -1166,6 +1171,98 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
   // Space drop target for tab → space drops
   const [localSpaceDropTarget, setLocalSpaceDropTarget] = useState<string | null>(null);
+
+  // Handle external URL drop - create a new tab
+  const handleExternalUrlDrop = useCallback(async (
+    url: string,
+    _title: string,
+    target: TabDropTarget | null
+  ) =>
+  {
+    if (import.meta.env.DEV)
+    {
+      console.log('[TabList] Creating tab from external URL drop:', { url, target });
+    }
+
+    try
+    {
+      // Determine where to create the tab
+      let index: number | undefined;
+      let groupId: number | undefined;
+
+      if (target)
+      {
+        if (target.isGroup)
+        {
+          // Dropping on a group - add to that group
+          groupId = target.groupId;
+          if (target.position === 'into' || target.position === 'intoFirst')
+          {
+            // Find first tab in the group for position
+            const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === groupId);
+            if (target.position === 'intoFirst' && groupTabs.length > 0)
+            {
+              index = groupTabs[0].index;
+            }
+            else if (groupTabs.length > 0)
+            {
+              // Add at end of group
+              index = groupTabs[groupTabs.length - 1].index + 1;
+            }
+          }
+        }
+        else
+        {
+          // Dropping on a tab
+          const targetTab = visibleTabs.find(t => String(t.id) === target.targetId);
+          if (targetTab)
+          {
+            if (target.position === 'before')
+            {
+              index = targetTab.index;
+            }
+            else if (target.position === 'after')
+            {
+              index = targetTab.index + 1;
+            }
+            // If target tab is in a group, add to that group
+            if (targetTab.groupId && targetTab.groupId > 0)
+            {
+              groupId = targetTab.groupId;
+            }
+          }
+        }
+      }
+
+      // Create the tab
+      const newTab = await chrome.tabs.create({
+        url,
+        index,
+        active: false,
+      });
+
+      // Add to group if specified
+      if (newTab.id && groupId)
+      {
+        await chrome.tabs.group({ tabIds: [newTab.id], groupId });
+      }
+
+      showToast('Tab created from dropped link');
+    }
+    catch (err)
+    {
+      console.error('[TabList] Failed to create tab from dropped URL:', err);
+    }
+  }, [visibleTabs, showToast]);
+
+  // Set up external URL drop handling (web page links)
+  useExternalUrlDropForTabs({
+    containerRef: tabListContainerRef,
+    onDropTargetChange: setExternalUrlDropTarget,
+    onDrop: handleExternalUrlDrop,
+    expandedGroups,
+    setExpandedGroups,
+  });
 
   // Helper to clear all DnD state
   const clearDndState = useCallback(() =>
@@ -2402,6 +2499,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       />
 
       {/* Tabs list */}
+      <div ref={tabListContainerRef}>
       <DndContext
           sensors={sensors}
           autoScroll={{
@@ -2420,6 +2518,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
             {
               const tabId = String(item.tab.id);
               const isTarget = dropTargetId === tabId;
+              const isExternalTarget = externalUrlDropTarget?.targetId === tabId;
               const itemIndex = flatVisibleItems.findIndex(i => i.id === tabId);
               const selectionItem: SelectionItem = { id: tabId, type: 'tab', index: itemIndex };
               return (
@@ -2428,9 +2527,9 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                   tab={item.tab}
                   indentLevel={0}
                   isBeingDragged={activeId === item.tab.id && !multiDragInfo}
-                  globalDragActive={!!activeId}
-                  showDropBefore={isTarget && dropPosition === 'before'}
-                  showDropAfter={isTarget && dropPosition === 'after'}
+                  globalDragActive={!!activeId || !!externalUrlDropTarget}
+                  showDropBefore={(isTarget && dropPosition === 'before') || (isExternalTarget && externalUrlDropTarget?.position === 'before')}
+                  showDropAfter={(isTarget && dropPosition === 'after') || (isExternalTarget && externalUrlDropTarget?.position === 'after')}
                   isSelected={isTabSelected(tabId)}
                   onClose={handleCloseSelectedTabs}
                   onActivate={activateTab}
@@ -2465,6 +2564,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                     {
                       const tabId = String(tab.id);
                       const isTabTarget = dropTargetId === tabId;
+                      const isExternalTabTarget = externalUrlDropTarget?.targetId === tabId;
                       const itemIndex = flatVisibleItems.findIndex(i => i.id === tabId);
                       const selectionItem: SelectionItem = { id: tabId, type: 'tab', index: itemIndex };
                       return (
@@ -2473,9 +2573,9 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                           tab={tab}
                           indentLevel={0}
                           isBeingDragged={activeId === tab.id && !multiDragInfo}
-                          globalDragActive={!!activeId}
-                          showDropBefore={isTabTarget && dropPosition === 'before'}
-                          showDropAfter={isTabTarget && dropPosition === 'after'}
+                          globalDragActive={!!activeId || !!externalUrlDropTarget}
+                          showDropBefore={(isTabTarget && dropPosition === 'before') || (isExternalTabTarget && externalUrlDropTarget?.position === 'before')}
+                          showDropAfter={(isTabTarget && dropPosition === 'after') || (isExternalTabTarget && externalUrlDropTarget?.position === 'after')}
                           isSelected={isTabSelected(tabId)}
                           onClose={handleCloseSelectedTabs}
                           onActivate={activateTab}
@@ -2507,12 +2607,14 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
               const isGroupExpanded = expandedGroups[item.group.id];
               const groupTargetId = `group-${item.group.id}`;
               const isTarget = dropTargetId === groupTargetId;
+              const isExternalGroupTarget = externalUrlDropTarget?.targetId === groupTargetId;
               // When dragging a group, never show 'into' indicator (groups can't nest)
-              const showDropInto = !isDraggingGroup && isTarget && dropPosition === 'into';
+              const showDropInto = (!isDraggingGroup && isTarget && dropPosition === 'into') || (isExternalGroupTarget && externalUrlDropTarget?.position === 'into');
               // When dragging a group with 'after', show indicator on last tab instead of header
               const isGroupAfterTarget = isDraggingGroup && isTarget && dropPosition === 'after';
               // Show 'after' indicator for both 'after' and 'intoFirst' positions
-              const showDropAfter = !isDraggingGroup && isTarget && (dropPosition === 'after' || dropPosition === 'intoFirst');
+              const showDropAfter = (!isDraggingGroup && isTarget && (dropPosition === 'after' || dropPosition === 'intoFirst')) ||
+                (isExternalGroupTarget && (externalUrlDropTarget?.position === 'after' || externalUrlDropTarget?.position === 'intoFirst'));
               // Selection item for group header
               const groupItemIndex = flatVisibleItems.findIndex(i => i.id === groupTargetId);
               const groupSelectionItem: SelectionItem = { id: groupTargetId, type: 'group', index: groupItemIndex };
@@ -2524,12 +2626,13 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                     tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
                     isSelected={isTabSelected(groupTargetId)}
-                    globalDragActive={!!activeId}
-                    showDropBefore={isTarget && dropPosition === 'before'}
+                    globalDragActive={!!activeId || !!externalUrlDropTarget}
+                    showDropBefore={(isTarget && dropPosition === 'before') || (isExternalGroupTarget && externalUrlDropTarget?.position === 'before')}
                     showDropAfter={showDropAfter}
                     showDropInto={showDropInto}
                     afterDropIndentPx={
-                      isTarget && dropPosition === 'intoFirst' && !isDraggingGroup
+                      ((isTarget && dropPosition === 'intoFirst' && !isDraggingGroup) ||
+                       (isExternalGroupTarget && externalUrlDropTarget?.position === 'intoFirst'))
                         ? getIndentPadding(1)
                         : undefined
                     }
@@ -2552,24 +2655,27 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                   {
                     const tabId = String(tab.id);
                     const isTabTarget = dropTargetId === tabId;
+                    const isExternalTabTarget = externalUrlDropTarget?.targetId === tabId;
                     const isLastTab = index === item.tabs.length - 1;
                     // When dragging a group with 'after', show indicator on last tab
                     const showGroupAfterOnLastTab = isLastTab && isGroupAfterTarget;
                     // Indent lines for tabs in group since drop stays within group
-                    const indentPx = isTabTarget ? getIndentPadding(1) : undefined;
+                    const indentPx = (isTabTarget || isExternalTabTarget) ? getIndentPadding(1) : undefined;
                     const itemIndex = flatVisibleItems.findIndex(i => i.id === tabId);
                     const selectionItem: SelectionItem = { id: tabId, type: 'tab', index: itemIndex };
+                    // Check position for indent calculation
+                    const effectivePosition = isExternalTabTarget ? externalUrlDropTarget?.position : dropPosition;
                     return (
                       <DraggableTab
                         key={tab.id}
                         tab={tab}
                         indentLevel={1}
                         isBeingDragged={activeId === tab.id && !multiDragInfo}
-                        globalDragActive={!!activeId}
-                        showDropBefore={isTabTarget && dropPosition === 'before'}
-                        showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab}
-                        beforeIndentPx={dropPosition === 'before' ? indentPx : undefined}
-                        afterIndentPx={dropPosition === 'after' ? indentPx : undefined}
+                        globalDragActive={!!activeId || !!externalUrlDropTarget}
+                        showDropBefore={(isTabTarget && dropPosition === 'before') || (isExternalTabTarget && externalUrlDropTarget?.position === 'before')}
+                        showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab || (isExternalTabTarget && externalUrlDropTarget?.position === 'after')}
+                        beforeIndentPx={effectivePosition === 'before' ? indentPx : undefined}
+                        afterIndentPx={effectivePosition === 'after' ? indentPx : undefined}
                         groupColor={item.group.color}
                         isLastInGroup={isLastTab}
                         isSelected={isTabSelected(tabId)}
@@ -2629,6 +2735,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
             {activeGroup && !multiDragInfo && <GroupDragOverlay group={activeGroup.group} matchedSpace={spaces.find(s => s.name === activeGroup.group.title)} tabCount={activeGroup.tabCount} />}
           </DragOverlay>
         </DndContext>
+      </div>
 
       <AddToGroupDialog
         isOpen={addToGroupDialog.isOpen}

@@ -57,15 +57,15 @@ Open these tabs for testing:
 ### Phase 1: Pinned Sites (5 min)
 
 **Verify imported pinned sites**
-- [ ] Check: 5 pinned sites visible (Google, GitHub, YouTube, Gmail with red icon, Calendar with blue icon)
-- [ ] Click Google pin → should activate or open Google tab `[1.3]`
-- [ ] Cmd+click GitHub pin → should open new tab `[1.7]`
-- [ ] Shift+click YouTube pin → should open new window (close it after) `[1.3]`
+- [x] Check: 5 pinned sites visible (Google, GitHub, YouTube, Gmail with red icon, Calendar with blue icon)
+- [x] Click Google pin → should activate or open Google tab `[1.3]`
+- [x] Cmd+click GitHub pin → should open new tab `[1.7]`
+- [x] Shift+click YouTube pin → should open new window (close it after) `[1.3]`
 
 **Test pinned site actions**
-- [ ] Right-click Gmail (red Mail icon) → click "Reset Favicon" → icon should change to Gmail's default favicon `[1.8]`
-- [ ] Right-click any pin → click "Edit" → change color → Save → verify icon color changed `[1.5]`
-- [ ] Right-click Google pin → click "Duplicate" → should see two Google pins `[1.9]`
+- [x] Right-click Gmail (red Mail icon) → click "Reset Favicon" → icon should change to Gmail's default favicon `[1.8]`
+- [x] Right-click any pin → click "Edit" → change color → Save → verify icon color changed `[1.5]`
+- [x] Right-click Google pin → click "Duplicate" → should see two Google pins `[1.9]`
 - [ ] Right-click the duplicate → click "Unpin" → should be removed `[1.6]`
 - [ ] Right-click a pinned site with tab loaded → click "Move to New Window" → tab moves to new window `[1.10]`
 - [ ] Drag GitHub pin to a different position → verify order persists after refresh `[1.4]`

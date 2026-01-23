@@ -8,6 +8,7 @@ import { FolderPickerDialog } from './FolderPickerDialog';
 import { SpaceNavigatorDialog } from './SpaceNavigatorDialog';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { useDragDrop } from '../hooks/useDragDrop';
+import { useExternalLinkDrop } from '../hooks/useExternalLinkDrop';
 import { getIndentPadding } from '../utils/indent';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
@@ -439,7 +440,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               </ContextMenu.Item>
               {onMoveSelectedBookmarks && (
                 <ContextMenu.Item onSelect={onMoveSelectedBookmarks}>
-                  <FolderInput size={14} className="mr-2" /> Move...
+                  <FolderInput size={14} className="mr-2" /> Move Bookmarks...
                 </ContextMenu.Item>
               )}
               <ContextMenu.Separator />
@@ -769,7 +770,7 @@ interface BookmarkTreeProps {
 }
 
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
-  const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath } = useBookmarks();
+  const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
 
@@ -952,6 +953,10 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const [moveMultiBookmarkDialog, setMoveMultiBookmarkDialog] = useState({
     isOpen: false
   });
+
+  // External link drop state (for web page link drops)
+  const bookmarkContainerRef = useRef<HTMLDivElement>(null);
+  const [webLinkDropTarget, setWebLinkDropTarget] = useState<ExternalDropTarget | null>(null);
 
   // Build flat list of visible bookmark items for selection range calculation
   const flatVisibleBookmarkItems = useMemo((): SelectionItem[] =>
@@ -1185,6 +1190,19 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   {
     onResolverReady?.(resolveBookmarkDropTarget);
   }, [onResolverReady, resolveBookmarkDropTarget]);
+
+  // Set up external link drop handling (web page links)
+  useExternalLinkDrop({
+    containerRef: bookmarkContainerRef,
+    resolveBookmarkDropTarget,
+    onDropTargetChange: setWebLinkDropTarget,
+    getBookmark,
+    expandedState,
+    setExpandedState,
+  });
+
+  // Merge external drop targets: tab drops (from parent) OR web link drops (from this hook)
+  const effectiveExternalDropTarget = externalDropTarget || webLinkDropTarget;
 
   // Configure sensors with 8px activation constraint
   const sensors = useSensors(
@@ -1708,6 +1726,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
 
   return (
     <>
+      <div ref={bookmarkContainerRef}>
       <DndContext
         sensors={sensors}
         autoScroll={{
@@ -1766,7 +1785,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onMoveToSpace={useSpaces ? openMoveToSpaceDialog : undefined}
               onMoveBookmark={openMoveBookmarkDialog}
               getMatchingSpace={getMatchingSpace}
-              externalDropTarget={externalDropTarget}
+              externalDropTarget={effectiveExternalDropTarget}
               onSelectionClick={(e) => handleSelectionClick(selectionItem, e)}
               onSelectionContextMenu={() => handleSelectionContextMenu(selectionItem)}
               selectionCount={selectionCount}
@@ -1801,6 +1820,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
           ) : null}
         </DragOverlay>
       </DndContext>
+      </div>
 
       {/* Separator - only show when there are visible bookmarks */}
       {hasVisibleBookmarks && (
