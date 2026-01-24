@@ -68,7 +68,8 @@ export const usePinnedSites = () => {
   useEffect(() => {
     loadPinnedSites();
 
-    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) => {
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) => {
+      if (areaName !== 'local') return;
       if (changes[STORAGE_KEY]) {
         setPinnedSites(changes[STORAGE_KEY].newValue || []);
       }

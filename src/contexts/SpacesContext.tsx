@@ -179,8 +179,9 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   {
     loadSpaces();
 
-    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }) =>
+    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) =>
     {
+      if (areaName !== 'local') return;
       if (changes[SPACES_STORAGE_KEY])
       {
         const newSpaces = changes[SPACES_STORAGE_KEY].newValue || [];
