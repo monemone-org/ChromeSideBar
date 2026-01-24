@@ -49,7 +49,7 @@ export function ImportDialog({
   const [dialogState, setDialogState] = useState<DialogState>('selecting');
   const [parsedData, setParsedData] = useState<ParsedData | null>(null);
   const [importPinnedSitesFlag, setImportPinnedSitesFlag] = useState(true);
-  const [pinnedSitesMode, setPinnedSitesMode] = useState<PinnedSitesImportMode>('replace');
+  const [pinnedSitesMode, setPinnedSitesMode] = useState<PinnedSitesImportMode>('append');
   const [importBookmarksFlag, setImportBookmarksFlag] = useState(true);
   const [bookmarkMode, setBookmarkMode] = useState<BookmarkImportMode>('folder');
   const [importTabGroups, setImportTabGroups] = useState(true);
@@ -153,7 +153,7 @@ export function ImportDialog({
 
         // Reset flags based on what's available
         setImportPinnedSitesFlag(hasPinnedSites);
-        setPinnedSitesMode('replace');
+        setPinnedSitesMode('append');
         setImportBookmarksFlag(hasBookmarks);
         setBookmarkMode('folder');
         setImportTabGroups(hasTabGroups);
@@ -366,6 +366,16 @@ export function ImportDialog({
                     <div className="space-y-2">
                       <p className="text-gray-700 dark:text-gray-300">Bookmarks</p>
                       <div className="ml-2 space-y-2">
+                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="bookmarkModeSingle"
+                            checked={bookmarkMode === 'replace'}
+                            onChange={() => setBookmarkMode('replace')}
+                            disabled={dialogState === 'importing'}
+                          />
+                          Replace all bookmarks
+                        </label>
                         <div>
                           <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
                             <input
@@ -381,16 +391,6 @@ export function ImportDialog({
                             Creates a subfolder with imported bookmarks
                           </p>
                         </div>
-                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="bookmarkModeSingle"
-                            checked={bookmarkMode === 'replace'}
-                            onChange={() => setBookmarkMode('replace')}
-                            disabled={dialogState === 'importing'}
-                          />
-                          Replace all bookmarks
-                        </label>
                       </div>
                     </div>
                   )}
@@ -488,6 +488,16 @@ export function ImportDialog({
                           </label>
                           {importBookmarksFlag && (
                             <div className="ml-5 mt-1 space-y-2">
+                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  name="bookmarkMode"
+                                  checked={bookmarkMode === 'replace'}
+                                  onChange={() => setBookmarkMode('replace')}
+                                  disabled={dialogState === 'importing'}
+                                />
+                                Replace all bookmarks
+                              </label>
                               <div>
                                 <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
                                   <input
@@ -503,16 +513,6 @@ export function ImportDialog({
                                   Creates a subfolder with imported bookmarks
                                 </p>
                               </div>
-                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="bookmarkMode"
-                                  checked={bookmarkMode === 'replace'}
-                                  onChange={() => setBookmarkMode('replace')}
-                                  disabled={dialogState === 'importing'}
-                                />
-                                Replace all bookmarks
-                              </label>
                             </div>
                           )}
                         </div>
