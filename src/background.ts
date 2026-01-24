@@ -108,17 +108,39 @@ class TabHistoryManager
   static MAX_SIZE = 25;
 
   #history = new Map<number, TabHistory>();  // windowId -> history
-  #isNavigating = false;  // flag to skip history tracking during navigation
   #spaceStateManager: SpaceWindowStateManager;
+
+  // Navigation state tracking (per-window)
+  // - Prevents history tracking when we programmatically activate a tab via navigate()
+  // - Uses incrementing IDs to handle rapid navigation: if user triggers nav A then B quickly,
+  //   only B's callback executes (A's callback sees stale navId and returns early)
+  // - Per-window so navigation in window A doesn't affect history tracking in window B
+  #navigatingWindows = new Map<number, number>();  // windowId -> navId
 
   constructor(spaceStateManager: SpaceWindowStateManager)
   {
     this.#spaceStateManager = spaceStateManager;
   }
 
-  get isNavigating(): boolean
+  isNavigating(windowId: number): boolean
   {
-    return this.#isNavigating;
+    return this.#navigatingWindows.has(windowId);
+  }
+
+  // Mark window as navigating. Returns navId to pass to unsetNavigating().
+  setNavigating(windowId: number): number
+  {
+    const navId = (this.#navigatingWindows.get(windowId) ?? 0) + 1;
+    this.#navigatingWindows.set(windowId, navId);
+    return navId;
+  }
+
+  // Clear navigation state if navId still matches. Returns false if a newer navigation superseded this one.
+  unsetNavigating(windowId: number, navId: number): boolean
+  {
+    if (this.#navigatingWindows.get(windowId) !== navId) return false;
+    this.#navigatingWindows.delete(windowId);
+    return true;
   }
 
   getHistory(windowId: number): TabHistory | undefined
@@ -234,13 +256,13 @@ class TabHistoryManager
       this.dump(windowId, `NAVIGATE ${dirLabel} to tabId=${entry.tabId}, spaceId=${entry.spaceId}`);
     }
 
-    if (import.meta.env.DEV) console.log(`[TabHistory] navigate: setting isNavigating=true`);
-    this.#isNavigating = true;
+    const navId = this.setNavigating(windowId);
+    //if (import.meta.env.DEV) console.log(`[TabHistory] navigate: windowId=${windowId}, navId=${navId}`);
 
     chrome.tabs.update(entry.tabId, { active: true }, () =>
     {
-      if (import.meta.env.DEV) console.log(`[TabHistory] navigate callback: setting isNavigating=false`);
-      this.#isNavigating = false;
+      if (!this.unsetNavigating(windowId, navId)) return;
+      //if (import.meta.env.DEV) console.log(`[TabHistory] navigate callback: cleared windowId=${windowId}`);
 
       // Notify sidepanel to switch to the space
       if (entry.spaceId)
@@ -265,10 +287,11 @@ class TabHistoryManager
 
     if (import.meta.env.DEV) this.dump(windowId, `NAVIGATE to index=${index}, tabId=${entry.tabId}, spaceId=${entry.spaceId}`);
 
-    this.#isNavigating = true;
+    const navId = this.setNavigating(windowId);
+
     chrome.tabs.update(entry.tabId, { active: true }, () =>
     {
-      this.#isNavigating = false;
+      if (!this.unsetNavigating(windowId, navId)) return;
 
       // Notify sidepanel to switch to the space
       if (entry.spaceId)
@@ -620,10 +643,10 @@ Promise.all([
 // Update tracked group when active tab changes + track history + switch to tab's Space
 chrome.tabs.onActivated.addListener(async (activeInfo) =>
 {
-  //if (import.meta.env.DEV) console.log(`[TabHistory] onActivated: tabId=${activeInfo.tabId}, isNavigating=${historyManager.isNavigating}`);
+  //if (import.meta.env.DEV) console.log(`[TabHistory] onActivated: tabId=${activeInfo.tabId}, isNavigating=${historyManager.isNavigating(activeInfo.windowId)}`);
 
   // Track tab history (skip if this activation was triggered by navigation)
-  if (!historyManager.isNavigating)
+  if (!historyManager.isNavigating(activeInfo.windowId))
   {
     historyManager.push(activeInfo.windowId, activeInfo.tabId);
   }
