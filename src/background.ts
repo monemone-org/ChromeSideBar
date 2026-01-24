@@ -1,5 +1,5 @@
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
-import { LIVEBOOKMARKS_GROUP_NAME } from './constants';
+import { isManagedTab } from './utils/tabAssociations';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -565,76 +565,13 @@ const historyManager = new TabHistoryManager(spaceStateManager);
 const groupTracker = new TabGroupTracker();
 const lastAudibleTracker = new LastAudibleTracker();
 
-// =============================================================================
-// Orphaned Tab Cleanup
-// =============================================================================
-
-// On startup, ungroup orphaned tabs (tabs in LiveBookmarks but not managed)
-// This handles Chrome restart where session storage is cleared
-async function cleanupOrphanedTabs(): Promise<void>
-{
-  try
-  {
-    const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
-
-    for (const window of windows)
-    {
-      if (!window.id) continue;
-
-      // Get managed tab IDs from session storage
-      const storageKey = `tabAssociations_${window.id}`;
-      const result = await chrome.storage.session.get([storageKey]);
-      const associations: Record<string, number> = result[storageKey] || {};
-      const managedTabIds = new Set(Object.values(associations));
-
-      // Find LiveBookmarks group in this window
-      const groups = await chrome.tabGroups.query({
-        windowId: window.id,
-        title: LIVEBOOKMARKS_GROUP_NAME
-      });
-
-      if (groups.length === 0) continue;
-
-      const liveBookmarksGroupId = groups[0].id;
-
-      // Get tabs in LiveBookmarks group
-      const tabs = await chrome.tabs.query({
-        windowId: window.id,
-        groupId: liveBookmarksGroupId
-      });
-
-      // Find orphaned tabs (in group but not managed)
-      const orphanedTabIds = tabs
-        .map(t => t.id)
-        .filter((id): id is number => id !== undefined && !managedTabIds.has(id));
-
-      // Ungroup orphaned tabs
-      if (orphanedTabIds.length > 0)
-      {
-        if (import.meta.env.DEV)
-        {
-          console.log(`[cleanupOrphanedTabs] window=${window.id}: ungrouping ${orphanedTabIds.length} orphaned tabs`);
-        }
-        await chrome.tabs.ungroup(orphanedTabIds);
-      }
-    }
-  }
-  catch (error)
-  {
-    if (import.meta.env.DEV) console.error('[cleanupOrphanedTabs] Error:', error);
-  }
-}
-
-// Load persisted state then cleanup orphaned tabs
+// Load persisted state
 Promise.all([
   spaceStateManager.load(),
   historyManager.load(),
   groupTracker.load(),
   lastAudibleTracker.load()
-]).then(() =>
-{
-  cleanupOrphanedTabs();
-});
+]);
 
 // =============================================================================
 // Event Listeners
@@ -755,6 +692,22 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
 {
   const { tabId, windowId, activeSpaceId } = request;
 
+  // Check if this is a managed tab (LiveBookmark/pinned site)
+  if (await isManagedTab(windowId, tabId))
+  {
+    // Ungroup if currently in a group
+    try
+    {
+      const tab = await chrome.tabs.get(tabId);
+      if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
+      {
+        await chrome.tabs.ungroup(tabId);
+      }
+    }
+    catch { /* Tab may be closed */ }
+    return;
+  }
+
   try
   {
     // Verify tab still exists and is ungrouped
@@ -790,47 +743,18 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
 }
 
 // Add new tabs to active Space's Chrome group
-// Special handling: tabs opened from LiveBookmarks inherit that group, so move them
-chrome.tabs.onCreated.addListener(async (tab) =>
+chrome.tabs.onCreated.addListener((tab) =>
 {
   if (!tab.id || !tab.windowId) return;
 
-  // Check if tab is in LiveBookmarks group - needs special handling
+  // Tab is already in a group - leave it alone
   if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
   {
-    try
-    {
-      const group = await chrome.tabGroups.get(tab.groupId);
-      if (group.title === LIVEBOOKMARKS_GROUP_NAME)
-      {
-        // Only move if opened from a tab that's also in LiveBookmarks group
-        if (!tab.openerTabId) return;
-
-        const openerTab = await chrome.tabs.get(tab.openerTabId);
-        if (openerTab.groupId !== tab.groupId) return;
-
-        const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
-        if (!activeSpaceId || activeSpaceId === 'all')
-        {
-          // Ungroup the tab (make it a regular tab)
-          await chrome.tabs.ungroup(tab.id);
-          return;
-        }
-
-        queueTabForGrouping(tab);
-        return;
-      }
-    }
-    catch
-    {
-      // Group or opener tab might not exist, continue
-    }
-
-    // Tab is in a non-LiveBookmarks group - leave it alone
     return;
   }
 
-  // Ungrouped tab - add to active space's group
+  // Ungrouped tab - queue for grouping
+  // (processGroupingRequest will check if it's a managed tab and ungroup if needed)
   queueTabForGrouping(tab);
 });
 
@@ -857,6 +781,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
     if (message.windowId && message.spaceId)
     {
       spaceStateManager.setActiveSpace(message.windowId, message.spaceId);
+    }
+    return;
+  }
+
+  // Re-queue a tab for grouping check (used by sidebar after storing association)
+  if (message.action === 'queue-tab-for-grouping')
+  {
+    if (message.tabId && message.windowId)
+    {
+      queueTabForGrouping({ id: message.tabId, windowId: message.windowId } as chrome.tabs.Tab);
     }
     return;
   }

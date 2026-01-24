@@ -8,7 +8,7 @@ import { useSelection } from '../hooks/useSelection';
 import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useExternalUrlDropForTabs, TabDropTarget } from '../hooks/useExternalUrlDropForTabs';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { SPEAKER_ICON_SIZE, LIVEBOOKMARKS_GROUP_NAME } from '../constants';
+import { SPEAKER_ICON_SIZE } from '../constants';
 
 // External drop target type for tab → bookmark drops
 export interface ExternalDropTarget
@@ -1383,23 +1383,13 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
   // Build display items: groups and ungrouped tabs in natural browser order
   // Uses visibleTabs and visibleTabGroups to exclude SideBarForArc group
-  // Also excludes LiveBookmarks group (managed tabs are shown via bookmarks)
+  // Managed tabs (LiveBookmarks) are filtered via getManagedTabIds() in useTabs hook
   const displayItems = useMemo<DisplayItem[]>(() =>
   {
-    // Find LiveBookmarks group to exclude from normal display
-    const liveBookmarksGroup = visibleTabGroups.find(
-      g => g.title === LIVEBOOKMARKS_GROUP_NAME
-    );
-    const liveBookmarksGroupId = liveBookmarksGroup?.id;
-
     const groupMap = new Map<number, chrome.tabGroups.TabGroup>();
     visibleTabGroups.forEach((g) =>
     {
-      // Skip LiveBookmarks group
-      if (g.id !== liveBookmarksGroupId)
-      {
-        groupMap.set(g.id, g);
-      }
+      groupMap.set(g.id, g);
     });
 
     const tabsByGroup = new Map<number, chrome.tabs.Tab[]>();
@@ -1407,8 +1397,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     visibleTabs.forEach((tab) =>
     {
       const groupId = tab.groupId ?? -1;
-      // Skip tabs in LiveBookmarks group
-      if (groupId !== -1 && groupId !== liveBookmarksGroupId)
+      if (groupId !== -1)
       {
         if (!tabsByGroup.has(groupId))
         {
@@ -1424,12 +1413,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     visibleTabs.forEach((tab, index) =>
     {
       const groupId = tab.groupId ?? -1;
-
-      // Skip tabs in LiveBookmarks group
-      if (groupId === liveBookmarksGroupId)
-      {
-        return;
-      }
 
       if (groupId === -1)
       {

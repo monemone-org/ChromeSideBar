@@ -1,45 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
-import { LIVEBOOKMARKS_GROUP_NAME } from '../constants';
-
-// Helper to create window-scoped storage key
-const getStorageKey = (windowId: number) => `tabAssociations_${windowId}`;
+import {
+  getTabAssociations,
+  storeTabAssociation,
+  removeTabAssociation as removeStoredAssociation,
+  setTabAssociations,
+} from '../utils/tabAssociations';
 
 // Helper to create item keys
 const makeBookmarkKey = (bookmarkId: string) => `bookmark-${bookmarkId}`;
 const makePinnedKey = (pinnedId: string) => `pinned-${pinnedId}`;
-
-// Add a tab to the LiveBookmarks group (create group if needed)
-const addTabToLiveBookmarksGroup = async (tabId: number): Promise<void> =>
-{
-  const tab = await chrome.tabs.get(tabId);
-  const windowId = tab.windowId;
-
-  // Find existing LiveBookmarks group in this window
-  const groups = await chrome.tabGroups.query({
-    windowId,
-    title: LIVEBOOKMARKS_GROUP_NAME
-  });
-
-  if (groups.length > 0)
-  {
-    // Add to existing group
-    await chrome.tabs.group({ tabIds: [tabId], groupId: groups[0].id });
-  }
-  else
-  {
-    // Create new group
-    const newGroupId = await chrome.tabs.group({
-      tabIds: [tabId],
-      createProperties: { windowId }
-    });
-    await chrome.tabGroups.update(newGroupId, {
-      title: LIVEBOOKMARKS_GROUP_NAME,
-      color: 'grey',
-      collapsed: true
-    });
-  }
-};
 
 interface BookmarkTabsContextValue
 {
@@ -128,13 +98,10 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     if (isRebuilding.current) return;
     isRebuilding.current = true;
 
-    const storageKey = getStorageKey(windowId);
-
     try
     {
       // Get stored associations from session storage
-      const result = await chrome.storage.session.get(storageKey);
-      const associations: Record<number, string> = result[storageKey] || {};
+      const associations = await getTabAssociations(windowId);
 
       const newItemToTab = new Map<string, number>();
       const newTabToItem = new Map<number, string>();
@@ -181,7 +148,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
       }
 
       // Update storage with cleaned associations
-      await chrome.storage.session.set({ [storageKey]: associations });
+      await setTabAssociations(windowId, associations);
 
       setItemToTab(newItemToTab);
       setTabToItem(newTabToItem);
@@ -209,7 +176,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   }, [currentWindowId, rebuildAssociations]);
 
   // Helper to remove association for a tab
-  const removeTabAssociation = useCallback((tabId: number, storageKey: string) =>
+  const removeLocalTabAssociation = useCallback((tabId: number, windowId: number) =>
   {
     setTabToItem((prev) =>
     {
@@ -232,12 +199,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         });
 
         // Clean up from session storage
-        chrome.storage.session.get(storageKey, (result) =>
-        {
-          const associations: Record<number, string> = result[storageKey] || {};
-          delete associations[tabId];
-          chrome.storage.session.set({ [storageKey]: associations });
-        });
+        removeStoredAssociation(windowId, tabId);
 
         const newMap = new Map(prev);
         newMap.delete(tabId);
@@ -252,11 +214,9 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   {
     if (currentWindowId === null) return;
 
-    const storageKey = getStorageKey(currentWindowId);
-
     const handleTabRemoved = (tabId: number) =>
     {
-      removeTabAssociation(tabId, storageKey);
+      removeLocalTabAssociation(tabId, currentWindowId);
     };
 
     chrome.tabs?.onRemoved?.addListener(handleTabRemoved);
@@ -265,7 +225,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     {
       chrome.tabs?.onRemoved?.removeListener(handleTabRemoved);
     };
-  }, [currentWindowId, removeTabAssociation]);
+  }, [currentWindowId, removeLocalTabAssociation]);
 
   // Listen for tab detached (moved to another window)
   // When a tab is detached from this window, treat it as closed in this window
@@ -273,14 +233,12 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   {
     if (currentWindowId === null) return;
 
-    const storageKey = getStorageKey(currentWindowId);
-
     const handleTabDetached = (tabId: number, detachInfo: chrome.tabs.TabDetachInfo) =>
     {
       // Only remove if detached from our window
       if (detachInfo.oldWindowId === currentWindowId)
       {
-        removeTabAssociation(tabId, storageKey);
+        removeLocalTabAssociation(tabId, currentWindowId);
       }
     };
 
@@ -290,7 +248,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     {
       chrome.tabs?.onDetached?.removeListener(handleTabDetached);
     };
-  }, [currentWindowId, removeTabAssociation]);
+  }, [currentWindowId, removeLocalTabAssociation]);
 
   // Listen for tab audible and title changes
   useEffect(() =>
@@ -371,85 +329,61 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     };
   }, []);
 
-  // Store association in session storage
-  const storeAssociation = useCallback((tabId: number, itemKey: string): Promise<void> =>
+  // Store association in session storage (wrapper around shared utility)
+  const storeAssociation = useCallback(async (tabId: number, itemKey: string): Promise<void> =>
   {
     if (currentWindowId === null)
     {
-      return Promise.resolve();
+      return;
     }
-
-    const storageKey = getStorageKey(currentWindowId);
-
-    return new Promise((resolve) =>
-    {
-      chrome.storage.session.get(storageKey, (result) =>
-      {
-        const associations: Record<number, string> = result[storageKey] || {};
-        associations[tabId] = itemKey;
-        chrome.storage.session.set({ [storageKey]: associations }, () =>
-        {
-          resolve();
-        });
-      });
-    });
+    await storeTabAssociation(currentWindowId, tabId, itemKey);
   }, [currentWindowId]);
 
   // Create a new tab for an item (no grouping)
   // Returns the created tab ID, or undefined if creation failed
   const createItemTab = useCallback(async (itemKey: string, url: string): Promise<number | undefined> =>
   {
-    return new Promise(async (resolve) =>
+    return new Promise((resolve) =>
     {
-      try
+      chrome.tabs.create({ url, active: true, windowId: currentWindowId ?? undefined }, async (tab) =>
       {
-        chrome.tabs.create({ url, active: true, windowId: currentWindowId ?? undefined }, async (tab) =>
+        if (handleError('create') || !tab.id)
         {
-          if (handleError('create') || !tab.id)
-          {
-            resolve(undefined);
-            return;
-          }
+          resolve(undefined);
+          return;
+        }
 
-          const tabId = tab.id;
+        const tabId = tab.id;
+        const windowId = currentWindowId ?? tab.windowId;
 
-          // Add the tab to LiveBookmarks group after a short delay
-          setTimeout(async () =>
-          {
-            try
-            {
-              await addTabToLiveBookmarksGroup(tabId);
-            }
-            catch
-            {
-              // Tab might be closed, ignore
-            }
-          }, 200);
+        // Store association
+        await storeAssociation(tabId, itemKey);
 
-          // Store association
-          await storeAssociation(tabId, itemKey);
-
-          setItemToTab((prev) =>
-          {
-            const newMap = new Map(prev);
-            newMap.set(itemKey, tabId);
-            return newMap;
-          });
-          setTabToItem((prev) =>
-          {
-            const newMap = new Map(prev);
-            newMap.set(tabId, itemKey);
-            return newMap;
-          });
-
-          resolve(tabId);
+        setItemToTab((prev) =>
+        {
+          const newMap = new Map(prev);
+          newMap.set(itemKey, tabId);
+          return newMap;
         });
-      }
-      catch (err)
-      {
-        console.error('Failed to create item tab:', err);
-        resolve(undefined);
-      }
+        setTabToItem((prev) =>
+        {
+          const newMap = new Map(prev);
+          newMap.set(tabId, itemKey);
+          return newMap;
+        });
+
+        // Tell background to re-check this tab (will ungroup if it was grouped)
+        if (windowId)
+        {
+          chrome.runtime.sendMessage({
+            action: 'queue-tab-for-grouping',
+            tabId,
+            windowId
+          });
+        }
+
+        resolve(tabId);
+      });
     });
   }, [handleError, storeAssociation, currentWindowId]);
 
