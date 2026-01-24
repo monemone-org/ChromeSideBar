@@ -11,10 +11,10 @@ Identifies performance issues including algorithmic complexity, unnecessary re-r
 | Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
 |------------|---------|-------------|----------|-------------|-----------|
 | Fixed | 1 | O(n) array search inside loop - space tab query | High | Maybe | |
-| Open | 2 | Repeated array searches in visibleTabs | High | Maybe | |
-| Open | 3 | Context value recreation - SpacesContext | Medium | Yes | |
-| Open | 4 | Context value recreation - BookmarkTabsContext | Medium | Yes | |
-| Open | 5 | Context value recreation - SelectionContext | Medium | Yes | |
+| Invalid | 2 | Repeated array searches in visibleTabs | High | Maybe | Already uses Set |
+| Fixed | 3 | Context value recreation - SpacesContext | Medium | Yes | |
+| Fixed | 4 | Context value recreation - BookmarkTabsContext | Medium | Yes | |
+| Fixed | 5 | Context value recreation - SelectionContext | Medium | Yes | |
 | Open | 6 | New object creation in useCallback dependency | Medium | No | |
 | Open | 7 | Multiple state updates in handleInputChange | Medium | No | |
 | Open | 8 | Synchronous localStorage read in useState | Medium | No | |
@@ -76,41 +76,21 @@ Leave as-is since `playingTabIds` is typically very small (0-3 tabs).
 
 ## Issue #2: Repeated Array Searches in visibleTabs Computation
 
-### Problem
+**Status: Invalid**
+
+### Problem (as reported)
 The `visibleTabs` computation involves multiple `.find()` calls inside a `.filter()` loop when checking managed IDs and filter text.
 
-### Cause
-**File:** `src/components/TabList.tsx` (lines 750-800)
+### Analysis
+This issue is **invalid**. The code already uses optimal O(1) lookups:
 
-The filter callback is called for every tab, and each call may do array searches.
-
-### Suggested Fixes
-
-#### Option A: Convert to Set for managed IDs
 ```typescript
-const managedIdsSet = new Set(getManagedTabIds());
-const visibleTabs = tabs.filter(tab =>
-  managedIdsSet.has(tab.id) && matchesFilter(tab)
-);
+// src/components/TabList.tsx (lines 774-775)
+const managedTabIds = getManagedTabIds();  // Returns Set<number>
+let filtered = tabs.filter(tab => !managedTabIds.has(tab.id!));  // Set.has() is O(1)
 ```
 
-**Why it works**: Set.has() is O(1) vs array methods which are O(n).
-
-**Pros/Cons**:
-- Pros: Better performance with many tabs
-- Cons: Need to ensure Set is rebuilt when managed IDs change
-
-#### Option B: Memoize the lookup structures
-Use useMemo to cache the Set/Map structures, rebuilding only when dependencies change.
-
-**Why it works**: Avoids rebuilding lookup structures on every render.
-
-**Pros/Cons**:
-- Pros: Optimal performance
-- Cons: More complex dependency tracking
-
-### Recommendation
-**Maybe fix.** Option A would improve performance for large tab counts. However, `visibleTabs` computation runs infrequently (on filter or tab changes), and typical tab counts are <100. Profile first to confirm this is actually a bottleneck before optimizing.
+`getManagedTabIds()` already returns a `Set<number>` (defined in `BookmarkTabsContext.tsx:552`), and the filter uses `Set.has()` which is O(1). No fix needed.
 
 ---
 

@@ -582,7 +582,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Context value
   // ---------------------------------------------------------------------------
 
-  const value: SpacesContextValue = {
+  const value = useMemo<SpacesContextValue>(() => ({
     spaces,
     allSpaces,
     activeSpace,
@@ -600,7 +600,25 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     switchToSpace,
     getTabsForSpace,
     closeAllTabsInSpace,
-  };
+  }), [
+    spaces,
+    allSpaces,
+    activeSpace,
+    isInitialized,
+    windowId,
+    createSpace,
+    updateSpace,
+    deleteSpace,
+    moveSpace,
+    getSpaceById,
+    replaceSpaces,
+    appendSpaces,
+    windowState.activeSpaceId,
+    setActiveSpaceId,
+    switchToSpace,
+    getTabsForSpace,
+    closeAllTabsInSpace,
+  ]);
 
   return (
     <SpacesContext.Provider value={value}>

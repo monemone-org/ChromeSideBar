@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo, ReactNode } from 'react';
 
 export type SelectionSection = 'tabs' | 'bookmarks';
 
@@ -179,7 +179,7 @@ export const SelectionProvider = ({ children }: SelectionProviderProps) =>
     return () => document.removeEventListener('keydown', handler);
   }, [clearAll]);
 
-  const value: SelectionContextValue = {
+  const value = useMemo<SelectionContextValue>(() => ({
     tabSelection,
     setTabSelection,
     clearTabSelection,
@@ -196,7 +196,24 @@ export const SelectionProvider = ({ children }: SelectionProviderProps) =>
     clearAll,
     getTabSelectionCount,
     getBookmarkSelectionCount,
-  };
+  }), [
+    tabSelection,
+    setTabSelection,
+    clearTabSelection,
+    tabAnchor,
+    setTabAnchor,
+    bookmarkSelection,
+    setBookmarkSelection,
+    clearBookmarkSelection,
+    bookmarkAnchor,
+    setBookmarkAnchor,
+    isTabSelected,
+    isBookmarkSelected,
+    clearOtherSection,
+    clearAll,
+    getTabSelectionCount,
+    getBookmarkSelectionCount,
+  ]);
 
   return (
     <SelectionContext.Provider value={value}>

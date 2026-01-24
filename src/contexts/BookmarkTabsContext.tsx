@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
 import {
   getTabAssociations,
@@ -561,7 +561,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   }, [tabToItem]);
 
 
-  const value: BookmarkTabsContextValue = {
+  const value = useMemo<BookmarkTabsContextValue>(() => ({
     openBookmarkTab,
     closeBookmarkTab,
     isBookmarkLoaded,
@@ -582,7 +582,28 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     getItemKeyForTab,
     isInitialized,
     error,
-  };
+  }), [
+    openBookmarkTab,
+    closeBookmarkTab,
+    isBookmarkLoaded,
+    isBookmarkAudible,
+    isBookmarkActive,
+    getTabIdForBookmark,
+    getBookmarkLiveTitle,
+    associateExistingTab,
+    openPinnedTab,
+    closePinnedTab,
+    isPinnedLoaded,
+    isPinnedAudible,
+    isPinnedActive,
+    getTabIdForPinned,
+    getPinnedLiveTitle,
+    getActiveItemKey,
+    getManagedTabIds,
+    getItemKeyForTab,
+    isInitialized,
+    error,
+  ]);
 
   return (
     <BookmarkTabsContext.Provider value={value}>
