@@ -120,14 +120,8 @@ export const PinnedIcon = ({
     }
     else if (e.metaKey || e.ctrlKey)
     {
-      // Cmd+click (Mac) or Ctrl+click (Windows/Linux): open in new tab (ungrouped)
-      chrome.tabs.create({ url: site.url, windowId }, (tab) =>
-      {
-        if (tab?.id)
-        {
-          chrome.tabs.ungroup(tab.id);
-        }
-      });
+      // Cmd+click (Mac) or Ctrl+click (Windows/Linux): open in new tab
+      chrome.tabs.create({ url: site.url, windowId });
     }
     else
     {

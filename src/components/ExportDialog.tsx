@@ -49,6 +49,7 @@ export function ExportDialog({
   const [exportTabGroups, setExportTabGroups] = useState(true);
   const [exportSpaces, setExportSpaces] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset options when dialog opens
   useEffect(() => {
@@ -57,6 +58,7 @@ export function ExportDialog({
       setExportBookmarks(true);
       setExportTabGroups(true);
       setExportSpaces(true);
+      setError(null);
     }
   }, [isOpen]);
 
@@ -130,10 +132,10 @@ export function ExportDialog({
       a.download = `sidebar-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-
       onClose();
     } catch (err) {
       console.error('Export failed:', err);
+      setError('Export failed. Please try again.');
     } finally {
       setIsExporting(false);
     }
@@ -202,6 +204,11 @@ export function ExportDialog({
             />
             Spaces ({spaces.length})
           </label>
+
+          {/* Error message */}
+          {error && (
+            <p className="text-red-500 text-sm">{error}</p>
+          )}
 
           {/* Export / Cancel buttons */}
           <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end gap-2">
