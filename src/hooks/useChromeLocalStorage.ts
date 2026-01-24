@@ -56,7 +56,13 @@ export function useChromeLocalStorage<T>(
           {
             const parsed = parse(localValue);
             setValue(parsed);
-            chrome.storage.local.set({ [key]: localValue });
+            chrome.storage.local.set({ [key]: localValue }).catch(error =>
+            {
+              if (import.meta.env.DEV)
+              {
+                console.error(`useChromeLocalStorage: Failed to migrate "${key}":`, error);
+              }
+            });
             localStorage.removeItem(key);
             if (import.meta.env.DEV)
             {
@@ -70,6 +76,13 @@ export function useChromeLocalStorage<T>(
         }
         // else: no value anywhere, keep initialValue
       }
+    }).catch(error =>
+    {
+      if (import.meta.env.DEV)
+      {
+        console.error(`useChromeLocalStorage: Failed to get "${key}":`, error);
+      }
+      // Keep initialValue on error (already the default state)
     });
 
     return () => { mounted = false; };
@@ -105,7 +118,13 @@ export function useChromeLocalStorage<T>(
   const setStoredValue = useCallback((newValue: T) =>
   {
     setValue(newValue);
-    chrome.storage.local.set({ [key]: serialize(newValue) });
+    chrome.storage.local.set({ [key]: serialize(newValue) }).catch(error =>
+    {
+      if (import.meta.env.DEV)
+      {
+        console.error(`useChromeLocalStorage: Failed to set "${key}":`, error);
+      }
+    });
   }, [key, serialize]);
 
   return [value, setStoredValue];
