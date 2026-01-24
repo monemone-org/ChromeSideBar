@@ -9,12 +9,6 @@ const getStorageKey = (windowId: number) => `tabAssociations_${windowId}`;
 const makeBookmarkKey = (bookmarkId: string) => `bookmark-${bookmarkId}`;
 const makePinnedKey = (pinnedId: string) => `pinned-${pinnedId}`;
 
-// Global set to track tabs being created for bookmarks/pinned sites
-// Used to prevent auto-grouping by spaces
-const pendingManagedTabs = new Set<number>();
-
-export const isPendingManagedTab = (tabId: number): boolean => pendingManagedTabs.has(tabId);
-
 // Add a tab to the LiveBookmarks group (create group if needed)
 const addTabToLiveBookmarksGroup = async (tabId: number): Promise<void> =>
 {
@@ -419,14 +413,9 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
           const tabId = tab.id;
 
-          // Mark as pending managed tab to prevent auto-grouping by spaces
-          pendingManagedTabs.add(tabId);
-
-          // Clean up after a delay (onCreated listener should have checked by then)
-          // Add the tab to LiveBookmarks group
+          // Add the tab to LiveBookmarks group after a short delay
           setTimeout(async () =>
           {
-            pendingManagedTabs.delete(tabId);
             try
             {
               await addTabToLiveBookmarksGroup(tabId);
