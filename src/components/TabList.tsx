@@ -801,10 +801,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
   // Get all tab groups in current window
   // Spaces link to Chrome groups by matching Space.name to group.title
-  const visibleTabGroups = useMemo(() =>
-  {
-    return tabGroups;
-  }, [tabGroups]);
+  const visibleTabGroups = tabGroups;
 
   // Create new tab - background.ts will auto-add to active space
   const handleNewTab = useCallback(async () =>

@@ -10,19 +10,19 @@ Assesses automated test coverage, identifies critical paths lacking tests, and r
 
 | Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
 |------------|---------|-------------|----------|-------------|-----------|
-| Open | 1 | Background script untested | High | Yes | |
-| Open | 2 | useTabs hook untested | Medium | Yes | |
-| Open | 3 | useBookmarks hook untested | Medium | Yes | |
-| Open | 4 | useTabGroups hook untested | Medium | Maybe | |
-| Open | 5 | usePinnedSites hook untested | Medium | Maybe | |
-| Open | 6 | SpacesContext untested | Medium | Yes | |
-| Open | 7 | BookmarkTabsContext untested | Medium | Yes | |
-| Open | 8 | tabMove.ts utility untested | Medium | Yes | |
-| Open | 9 | groupMove.ts utility untested | Medium | Yes | |
-| Open | 10 | dragDrop.ts utility untested | Medium | Maybe | |
-| Open | 11 | backupRestore.ts utility untested | Medium | Yes | |
-| Open | 12 | Cross-context messaging untested | High | Yes | |
-| Open | 13 | Multi-window scenarios untested | High | Yes | |
+|  | 1 | Background script untested | High | Yes | |
+|  | 2 | useTabs hook untested | Medium | Yes | |
+|  | 3 | useBookmarks hook untested | Medium | Yes | |
+|  | 4 | useTabGroups hook untested | Medium | Maybe | |
+|  | 5 | usePinnedSites hook untested | Medium | Maybe | |
+|  | 6 | SpacesContext untested | Medium | Yes | |
+|  | 7 | BookmarkTabsContext untested | Medium | Yes | |
+|  | 8 | tabMove.ts utility untested | Medium | Yes | |
+|  | 9 | groupMove.ts utility untested | Medium | Yes | |
+|  | 10 | dragDrop.ts utility untested | Medium | Maybe | |
+|  | 11 | backupRestore.ts utility untested | Medium | Yes | |
+|  | 12 | Cross-context messaging untested | High | Yes | |
+|  | 13 | Multi-window scenarios untested | High | Yes | |
 
 ---
 

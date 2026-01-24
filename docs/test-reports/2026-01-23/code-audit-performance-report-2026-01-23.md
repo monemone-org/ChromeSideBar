@@ -8,23 +8,23 @@ Identifies performance issues including algorithmic complexity, unnecessary re-r
 
 ## Summary Table
 
-| Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
-|------------|---------|-------------|----------|-------------|-----------|
-| Fixed | 1 | O(n) array search inside loop - space tab query | High | Maybe | |
-| Invalid | 2 | Repeated array searches in visibleTabs | High | Maybe | Already uses Set |
-| Fixed | 3 | Context value recreation - SpacesContext | Medium | Yes | |
-| Fixed | 4 | Context value recreation - BookmarkTabsContext | Medium | Yes | |
-| Fixed | 5 | Context value recreation - SelectionContext | Medium | Yes | |
-| Open | 6 | New object creation in useCallback dependency | Medium | No | |
-| Open | 7 | Multiple state updates in handleInputChange | Medium | No | |
-| Open | 8 | Synchronous localStorage read in useState | Medium | No | |
-| Open | 9 | Debug logging effects running in production | Medium | Maybe | |
-| Open | 10 | Sequential await in loop for tab operations | Medium | No | |
-| Open | 11 | Redundant useMemo for visibleTabGroups | Low | Yes | |
-| Open | 12 | Large dependency array in displayItems useMemo | Low | No | |
-| Open | 13 | Event listeners without cleanup check | Low | No | |
-| Open | 14 | URL parsing in every filter call | Low | No | |
-| Open | 15 | Large AST traversal for complex search queries | Low | No | |
+| Fix Status     | Issue # | Description                                     | Priority | Recommended | Dev Notes        |
+| -------------- | ------- | ----------------------------------------------- | -------- | ----------- | ---------------- |
+| Fixed          | 1       | O(n) array search inside loop - space tab query | High     | Maybe       |                  |
+| Invalid        | 2       | Repeated array searches in visibleTabs          | High     | Maybe       | Already uses Set |
+| Fixed          | 3       | Context value recreation - SpacesContext        | Medium   | Yes         |                  |
+| Fixed          | 4       | Context value recreation - BookmarkTabsContext  | Medium   | Yes         |                  |
+| Fixed          | 5       | Context value recreation - SelectionContext     | Medium   | Yes         |                  |
+| Won't be fixed | 6       | New object creation in useCallback dependency   | Medium   | No          |                  |
+| Won't be fixed | 7       | Multiple state updates in handleInputChange     | Medium   | No          |                  |
+| Won't be fixed | 8       | Synchronous localStorage read in useState       | Medium   | No          |                  |
+| Fixed          | 9       | Debug logging effects running in production     | Medium   | Maybe       |                  |
+| Won't be fixed | 10      | Sequential await in loop for tab operations     | Medium   | No          |                  |
+| Fixed          | 11      | Redundant useMemo for visibleTabGroups          | Low      | Yes         |                  |
+| Won't be fixed | 12      | Large dependency array in displayItems useMemo  | Low      | No          |                  |
+| Won't be fixed | 13      | Event listeners without cleanup check           | Low      | No          |                  |
+| Won't be fixed | 14      | URL parsing in every filter call                | Low      | No          |                  |
+| Won't be fixed | 15      | Large AST traversal for complex search queries  | Low      | No          |                  |
 
 ---
 

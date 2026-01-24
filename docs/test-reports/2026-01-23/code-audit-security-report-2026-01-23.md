@@ -10,14 +10,14 @@ Examines the ChromeSideBar extension for security vulnerabilities including XSS,
 
 | Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
 |------------|---------|-------------|----------|-------------|-----------|
-| Open | 1 | Missing message sender validation | Medium | Yes | |
-| Open | 2 | Unvalidated data from backup import | Medium | Yes | |
-| Open | 3 | URL validation inconsistency (normalizeUrl) | Medium | Yes | |
-| Open | 4 | External fetch without response validation | Low | Maybe | |
-| Open | 5 | Chrome storage data not validated on load | Low | Maybe | |
-| Open | 6 | External URL drop accepts all HTTP/HTTPS | Low | No | Positive finding |
-| Open | 7 | Tab creation without URL validation | Low | Maybe | |
-| Open | 8 | Type coercion in message handlers | Low | No | |
+|  | 1 | Missing message sender validation | Medium | Yes | |
+|  | 2 | Unvalidated data from backup import | Medium | Yes | |
+|  | 3 | URL validation inconsistency (normalizeUrl) | Medium | Yes | |
+|  | 4 | External fetch without response validation | Low | Maybe | |
+|  | 5 | Chrome storage data not validated on load | Low | Maybe | |
+|  | 6 | External URL drop accepts all HTTP/HTTPS | Low | No | Positive finding |
+|  | 7 | Tab creation without URL validation | Low | Maybe | |
+|  | 8 | Type coercion in message handlers | Low | No | |
 
 ---
 

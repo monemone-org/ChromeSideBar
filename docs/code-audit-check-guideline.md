@@ -34,11 +34,11 @@ A table listing all issues found:
 
 | Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
 |---------|-------------|----------|-------------|------------|-------------|
-| Open/Fixed/Won't Fix | 1 | Brief issue description | High/Medium/Low | Yes/No | Developer notes |
+| " "/Fixed/Won't Fix | 1 | Brief issue description | High/Medium/Low | Yes/No | Developer notes |
 
 - **Priority**: High (causes bugs/security issues), Medium (performance/maintainability), Low (code style/minor)
 - **Recommended**: Whether the fix is recommended for immediate action
-- **Fix Status**: Track resolution progress
+- **Fix Status**: Track resolution progress.  Use a blank space " " for Open status
 
 ### 3. Issue Details
 For each issue, include:

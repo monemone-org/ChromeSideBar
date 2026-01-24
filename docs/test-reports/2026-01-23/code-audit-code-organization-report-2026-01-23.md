@@ -10,17 +10,17 @@ Identifies code organization issues including large files, duplicated code, miss
 
 | Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
 |------------|---------|-------------|----------|-------------|-----------|
-| Open | 1 | TabList.tsx - 2,923 lines | High | Maybe | |
-| Open | 2 | BookmarkTree.tsx - 1,949 lines | High | Maybe | |
-| Open | 3 | Duplicated getFaviconUrl function | High | Yes | |
-| Open | 4 | Duplicated isValidUrl function | High | Yes | |
-| Open | 5 | Similar auto-expand timer logic | High | Maybe | |
-| Open | 6 | Repeated escape key handling | Medium | Yes | |
-| Open | 7 | Timeout constants (magic numbers) | Medium | Maybe | |
-| Open | 8 | Auto-expand delay (magic numbers) | Medium | Maybe | |
-| Open | 9 | TypeScript any usage | Low | No | |
-| Open | 10 | Dialogs not using shared Dialog component | Low | No | |
-| Open | 11 | LocalStorage key strings | Low | No | |
+|  | 1 | TabList.tsx - 2,923 lines | High | Maybe | |
+|  | 2 | BookmarkTree.tsx - 1,949 lines | High | Maybe | |
+|  | 3 | Duplicated getFaviconUrl function | High | Yes | |
+|  | 4 | Duplicated isValidUrl function | High | Yes | |
+|  | 5 | Similar auto-expand timer logic | High | Maybe | |
+|  | 6 | Repeated escape key handling | Medium | Yes | |
+|  | 7 | Timeout constants (magic numbers) | Medium | Maybe | |
+|  | 8 | Auto-expand delay (magic numbers) | Medium | Maybe | |
+|  | 9 | TypeScript any usage | Low | No | |
+|  | 10 | Dialogs not using shared Dialog component | Low | No | |
+|  | 11 | LocalStorage key strings | Low | No | |
 
 ---
 

@@ -8,25 +8,25 @@ Examines error handling patterns, loading states, empty states, graceful degrada
 
 ## Summary Table
 
-| Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
-|------------|---------|-------------|----------|-------------|-----------|
-| Open | 1 | Export fails silently | High | Yes | |
-| Open | 2 | Generic import error message | Medium | Maybe | |
-| Open | 3 | Unused context error state | Medium | Maybe | |
-| Open | 4 | No bookmark loading indicator | High | Yes | |
-| Open | 5 | No space initialization indicator | Medium | Maybe | |
-| Open | 6 | Icon fetch no timeout | Medium | Maybe | |
-| Open | 7 | No chrome.tabs fallback message | High | Yes | |
-| Open | 8 | No chrome.bookmarks fallback message | High | Yes | |
-| Open | 9 | Hook errors ignored in App | High | Yes | |
-| Open | 10 | No offline detection for icons | High | Yes | |
-| Open | 11 | Favicon fetch no timeout | Medium | Maybe | |
-| Open | 12 | No empty tabs in space message | High | Yes | |
-| Open | 13 | No empty pins hint | Medium | Maybe | |
-| Open | 14 | No empty filter results message | Medium | Maybe | |
-| Open | 15 | No auto-create missing folder option | Medium | Maybe | |
-| Open | 16 | No import retry button | Medium | Maybe | |
-| Open | 17 | No manual refresh mechanism | High | Yes | |
+| Fix Status | Issue # | Description                          | Priority | Recommended | Dev Notes |
+| ---------- | ------- | ------------------------------------ | -------- | ----------- | --------- |
+|            | 1       | Export fails silently                | High     | Yes         |           |
+|            | 2       | Generic import error message         | Medium   | Maybe       |           |
+|            | 3       | Unused context error state           | Medium   | Maybe       |           |
+|            | 4       | No bookmark loading indicator        | High     | Yes         |           |
+|            | 5       | No space initialization indicator    | Medium   | Maybe       |           |
+|            | 6       | Icon fetch no timeout                | Medium   | Maybe       |           |
+|            | 7       | No chrome.tabs fallback message      | High     | Yes         |           |
+|            | 8       | No chrome.bookmarks fallback message | High     | Yes         |           |
+|            | 9       | Hook errors ignored in App           | High     | Yes         |           |
+|            | 10      | No offline detection for icons       | High     | Yes         |           |
+|            | 11      | Favicon fetch no timeout             | Medium   | Maybe       |           |
+|            | 12      | No empty tabs in space message       | High     | Yes         |           |
+|            | 13      | No empty pins hint                   | Medium   | Maybe       |           |
+|            | 14      | No empty filter results message      | Medium   | Maybe       |           |
+|            | 15      | No auto-create missing folder option | Medium   | Maybe       |           |
+|            | 16      | No import retry button               | Medium   | Maybe       |           |
+|            | 17      | No manual refresh mechanism          | High     | Yes         |           |
 
 ---
 

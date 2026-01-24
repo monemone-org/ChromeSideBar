@@ -18,10 +18,10 @@ Identifies race conditions, stale closures, async operation ordering issues, and
 | Fixed          | 6       | Timeout-based cleanup race condition          | Medium   | Maybe       |                                                                                                       |
 | Won't be fixed | 7       | Stale tab references during sort              | Medium   | Maybe       | Unlikely                                                                                              |
 | Fixed          | 8       | Missing storage area filter                   | Medium   | Yes         |                                                                                                       |
-| Open           | 9       | Fixed timeout for DOM updates                 | Low      | No          |                                                                                                       |
+|                | 9       | Fixed timeout for DOM updates                 | Low      | No          |                                                                                                       |
 | Won't be fixed | 10      | Potential IntersectionObserver leak           | Low      | No          | Not an issue                                                                                          |
-| Open           | 11      | Missing AbortController                       | Low      | No          |                                                                                                       |
-| Open           | 12      | Global cooldown (intentional)                 | Low      | No          |                                                                                                       |
+|                | 11      | Missing AbortController                       | Low      | No          |                                                                                                       |
+|                | 12      | Global cooldown (intentional)                 | Low      | No          |                                                                                                       |
 | Won't be fixed | 13      | One-by-one tab queries during rebuild         | Low      | No          | Don't think there will be that many live bookmark tabs. Querying all tabs can be a larger collection. |
 
 ---
