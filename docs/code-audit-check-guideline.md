@@ -7,10 +7,8 @@ Guidelines for reviewing code quality during development.
 Launch a **separate agent for each audit area** below. Each agent should:
 
 1. Perform the checks for its assigned area
-2. Create a report file with options of suggested fix under `docs/test-reports/` with naming convention:
-   ```
-   code-audit-{area}-report-{YYYY-MM-DD}.md
-   ```
+2. Create a report file under `docs/test-reports/{YYYY-MM-DD}/` where `{YYYY-MM-DD}` is the report creation date
+3. Use naming convention: `code-audit-{area}-report-{YYYY-MM-DD}.md`
 
 Area names for reports:
 - `performance`
@@ -23,6 +21,63 @@ Area names for reports:
 - `coding-guidelines`
 
 Example: `code-audit-security-report-2026-01-19.md`
+
+## Report Format
+
+Each report should contain:
+
+### 1. Purpose Statement
+A brief description (1-2 sentences) of what this audit covers.
+
+### 2. Summary Table
+A table listing all issues found:
+
+| Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
+|---------|-------------|----------|-------------|------------|-------------|
+| Open/Fixed/Won't Fix | 1 | Brief issue description | High/Medium/Low | Yes/No | Developer notes |
+
+- **Priority**: High (causes bugs/security issues), Medium (performance/maintainability), Low (code style/minor)
+- **Recommended**: Whether the fix is recommended for immediate action
+- **Fix Status**: Track resolution progress
+
+### 3. Issue Details
+For each issue, include:
+
+```markdown
+## Issue #N: [Title]
+
+### Problem
+What's wrong and what negative effect it causes.
+
+### Cause
+How/where the problem occurs in the code.
+
+### Suggested Fixes
+
+#### Option A: [Name]
+Proposed solution with code snippets if applicable.
+
+**Why it works**: Brief explanation of how this addresses the root cause.
+
+**Pros/Cons**:
+- Pros: Benefits of this approach
+- Cons: Any tradeoffs or risks
+
+#### Option B: [Name]
+Alternative solution...
+
+**Why it works**: ...
+
+**Pros/Cons**:
+- Pros: ...
+- Cons: ...
+
+### Recommendation
+Which option is recommended and why. Should include:
+- The recommended option (e.g., "Option A")
+- Why it's recommended or why no fix is needed
+- For issues marked "No" in Recommended column, explain why fixing isn't worth it (e.g., low impact, edge case unlikely, already handled elsewhere)
+```
 
 ## 1. Performance
 

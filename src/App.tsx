@@ -486,15 +486,20 @@ function App() {
     {
       const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' });
 
-      // Map playing tab IDs to tab objects
-      const playing = (response?.playingTabIds || [])
-        .map((id: number) => tabs.find(t => t.id === id))
-        .filter((t: chrome.tabs.Tab | undefined): t is chrome.tabs.Tab => t !== undefined);
+      // Convert ID arrays to Sets for O(1) lookup
+      const playingIdSet = new Set(response?.playingTabIds || []);
+      const historyIdSet = new Set(response?.historyTabIds || []);
+      const playing: chrome.tabs.Tab[] = [];
+      const history: chrome.tabs.Tab[] = [];
 
-      // Map history tab IDs to tab objects
-      const history = (response?.historyTabIds || [])
-        .map((id: number) => tabs.find(t => t.id === id))
-        .filter((t: chrome.tabs.Tab | undefined): t is chrome.tabs.Tab => t !== undefined);
+      for (const tab of tabs)
+      {
+        if (tab.id !== undefined)
+        {
+          if (playingIdSet.has(tab.id)) playing.push(tab);
+          if (historyIdSet.has(tab.id)) history.push(tab);
+        }
+      }
 
       setPlayingTabs(playing);
       setLastAudibleTabs(history);
