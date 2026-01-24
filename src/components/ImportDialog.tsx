@@ -58,6 +58,7 @@ export function ImportDialog({
   const [spacesMode, setSpacesMode] = useState<SpacesImportMode>('append');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   // Track mount state for async operations
   useEffect(() => {
@@ -90,6 +91,7 @@ export function ImportDialog({
     setParsedData(null);
     setImportResult(null);
     setError(null);
+    setErrorDetails(null);
     setDialogState('selecting');
     onClose();
   };
@@ -198,6 +200,7 @@ export function ImportDialog({
     } catch (err) {
       console.error('Import failed:', err);
       setError('Import failed. Please try again.');
+      setErrorDetails(err instanceof Error ? err.message : String(err));
       setDialogState('preview');
     }
   };
@@ -248,6 +251,16 @@ export function ImportDialog({
               {error && (
                 <>
                   <p className="text-red-500">{error}</p>
+                  {errorDetails && (
+                    <details className="mt-2">
+                      <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                        Show details
+                      </summary>
+                      <pre className="mt-1 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-all bg-gray-100 dark:bg-gray-900 p-2 rounded">
+                        {errorDetails}
+                      </pre>
+                    </details>
+                  )}
                   <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end">
                     <button
                       onClick={handleClose}
