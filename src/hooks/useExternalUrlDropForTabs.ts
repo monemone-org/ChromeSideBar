@@ -155,10 +155,10 @@ export const useExternalUrlDropForTabs = ({
     const container = containerRef.current;
     if (!container) return;
 
-    if (import.meta.env.DEV)
-    {
-      console.log('[useExternalUrlDropForTabs] Setting up native drag event listeners');
-    }
+    // if (import.meta.env.DEV)
+    // {
+    //   console.log('[useExternalUrlDropForTabs] Setting up native drag event listeners');
+    // }
 
     const handleDragOver = (e: DragEvent) =>
     {

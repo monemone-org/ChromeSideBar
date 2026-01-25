@@ -163,6 +163,8 @@ interface BookmarkRowProps {
   onOpenInNewWindow?: (url: string) => void;
   onMoveSelectedBookmarks?: () => void;
   hasSelectedBookmarks?: boolean;
+  allSelectedAreLive?: boolean;
+  onCloseSelectedBookmarks?: () => void;
   // Drag-drop attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -212,6 +214,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onOpenInNewWindow,
   onMoveSelectedBookmarks,
   hasSelectedBookmarks,
+  allSelectedAreLive,
+  onCloseSelectedBookmarks,
   attributes,
   listeners,
   windowId
@@ -474,9 +478,15 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 </ContextMenu.Item>
               )}
               <ContextMenu.Separator />
-              <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
-                <Trash size={14} className="mr-2" /> Delete
-              </ContextMenu.Item>
+              {allSelectedAreLive ? (
+                <ContextMenu.Item onSelect={onCloseSelectedBookmarks}>
+                  <X size={14} className="mr-2" /> Close {selectionCount} Bookmarks
+                </ContextMenu.Item>
+              ) : (
+                <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
+                  <Trash size={14} className="mr-2" /> Delete {selectionCount} Bookmarks
+                </ContextMenu.Item>
+              )}
             </>
           ) : (
             // Single-item menu
@@ -1549,6 +1559,34 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     return selectedItems.some(item => item.type === 'bookmark');
   }, [getSelectedItems]);
 
+  // Check if ALL selected items are "live" bookmarks (have open tabs)
+  const areAllSelectedBookmarksLive = useCallback((): boolean =>
+  {
+    const selectedItems = getSelectedItems();
+    if (selectedItems.length === 0) return false;
+
+    // Only check bookmark items (not folders), and they must all be loaded
+    const bookmarkItems = selectedItems.filter(item => item.type === 'bookmark');
+    if (bookmarkItems.length === 0) return false;
+    if (bookmarkItems.length !== selectedItems.length) return false; // Has folders
+
+    return bookmarkItems.every(item => isBookmarkLoaded(item.id));
+  }, [getSelectedItems, isBookmarkLoaded]);
+
+  // Close tabs for all selected bookmarks
+  const handleCloseSelectedBookmarks = useCallback(() =>
+  {
+    const selectedItems = getSelectedItems();
+    for (const item of selectedItems)
+    {
+      if (item.type === 'bookmark')
+      {
+        closeBookmarkTab(item.id);
+      }
+    }
+    clearSelection();
+  }, [getSelectedItems, closeBookmarkTab, clearSelection]);
+
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
     // Calculate overlay offset based on where user clicked in the element
@@ -1646,85 +1684,89 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     clearAutoExpandTimer();
 
-    const { active } = event;
-    const sourceId = active.id as string;
+    try {
+      const { active } = event;
+      const sourceId = active.id as string;
 
-    // Track if this is a valid drop (for animation decision)
-    const isValidDrop = !!(dropTargetId && dropPosition);
-    wasValidDropRef.current = isValidDrop;
+      // Track if this is a valid drop (for animation decision)
+      const isValidDrop = !!(dropTargetId && dropPosition);
+      wasValidDropRef.current = isValidDrop;
 
-    // Perform the move if we have a valid drop target
-    if (isValidDrop) {
-      // Get items to move (always an array, even if just 1 item)
-      const selectedItems = getSelectedItems();
-      const selectedIds = new Set(selectedItems.map(item => item.id));
-      const idsToMove = selectedIds.has(sourceId) && selectedIds.size >= 1
-        ? Array.from(selectedIds)
-        : [sourceId];
+      // Perform the move if we have a valid drop target
+      if (isValidDrop) {
+        // Get items to move (always an array, even if just 1 item)
+        const selectedItems = getSelectedItems();
+        const selectedIds = new Set(selectedItems.map(item => item.id));
+        const idsToMove = selectedIds.has(sourceId) && selectedIds.size >= 1
+          ? Array.from(selectedIds)
+          : [sourceId];
 
-      // Get bookmark info for items to sort by index
-      const bookmarkInfos = await Promise.all(
-        idsToMove.map(async (id) => {
-          const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) => {
-            chrome.bookmarks.get(id, (res) => resolve(res || []));
-          });
-          return results[0] || null;
-        })
-      );
+        // Get bookmark info for items to sort by index
+        const bookmarkInfos = await Promise.all(
+          idsToMove.map(async (id) => {
+            const results = await new Promise<chrome.bookmarks.BookmarkTreeNode[]>((resolve) => {
+              chrome.bookmarks.get(id, (res) => resolve(res || []));
+            });
+            return results[0] || null;
+          })
+        );
 
-      // Filter out nulls and sort by index to maintain relative order
-      const validBookmarks = bookmarkInfos.filter((b): b is chrome.bookmarks.BookmarkTreeNode => b !== null);
-      validBookmarks.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+        // Filter out nulls and sort by index to maintain relative order
+        const validBookmarks = bookmarkInfos.filter((b): b is chrome.bookmarks.BookmarkTreeNode => b !== null);
+        validBookmarks.sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
 
-      // Filter out bookmarks that are descendants of selected folders
-      // (moving the folder will automatically move its contents)
-      const selectedFolderIds = validBookmarks
-        .filter(b => !b.url)  // folders have no url
-        .map(b => b.id);
+        // Filter out bookmarks that are descendants of selected folders
+        // (moving the folder will automatically move its contents)
+        const selectedFolderIds = validBookmarks
+          .filter(b => !b.url)  // folders have no url
+          .map(b => b.id);
 
-      const bookmarksToMove = validBookmarks.filter(bookmark =>
-      {
-        // For both folders and bookmarks, check if any selected folder is an ancestor
-        // If so, skip this item (it will move with its parent folder)
-        for (const folderId of selectedFolderIds)
+        const bookmarksToMove = validBookmarks.filter(bookmark =>
         {
-          // Skip checking against self
-          if (folderId === bookmark.id) continue;
-
-          if (isDescendant(folderId, bookmark.id, bookmarks))
+          // For both folders and bookmarks, check if any selected folder is an ancestor
+          // If so, skip this item (it will move with its parent folder)
+          for (const folderId of selectedFolderIds)
           {
-            return false;
+            // Skip checking against self
+            if (folderId === bookmark.id) continue;
+
+            if (isDescendant(folderId, bookmark.id, bookmarks))
+            {
+              return false;
+            }
+          }
+          return true;
+        });
+
+        // Move items, chaining with 'after' for subsequent items
+        let lastMoved: chrome.bookmarks.BookmarkTreeNode | null = null;
+        for (const bookmark of bookmarksToMove)
+        {
+          if (!lastMoved) {
+            lastMoved = await moveBookmark(bookmark.id, dropTargetId!, dropPosition!);
+          } else {
+            lastMoved = await moveBookmark(bookmark.id, lastMoved.id, 'after');
           }
         }
-        return true;
-      });
 
-      // Move items, chaining with 'after' for subsequent items
-      let lastMoved: chrome.bookmarks.BookmarkTreeNode | null = null;
-      for (const bookmark of bookmarksToMove)
-      {
-        if (!lastMoved) {
-          lastMoved = await moveBookmark(bookmark.id, dropTargetId!, dropPosition!);
-        } else {
-          lastMoved = await moveBookmark(bookmark.id, lastMoved.id, 'after');
+        // Auto-expand folder if dropping into it
+        if ((dropPosition === 'into' || dropPosition === 'intoFirst') && !expandedState[dropTargetId!])
+        {
+          setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
+        }
+
+        // Clear selection if more than 1 item was moved
+        if (bookmarksToMove.length > 1)
+        {
+          clearSelection();
         }
       }
-
-      // Auto-expand folder if dropping into it
-      if ((dropPosition === 'into' || dropPosition === 'intoFirst') && !expandedState[dropTargetId!])
-      {
-        setExpandedState(prev => ({ ...prev, [dropTargetId!]: true }));
-      }
-
-      // Clear selection if more than 1 item was moved
-      if (bookmarksToMove.length > 1)
-      {
-        clearSelection();
-      }
+    } catch (error) {
+      console.error('Bookmark drag operation failed:', error);
+    } finally {
+      // Always reset drag state, even on error
+      resetDragState();
     }
-
-    // Reset drag state
-    resetDragState();
   }, [dropTargetId, dropPosition, moveBookmark, expandedState, clearAutoExpandTimer, resetDragState, getSelectedItems, clearSelection, bookmarks]);
 
   // Drag cancel handler (e.g., Escape key)
@@ -1840,6 +1882,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onOpenInNewWindow={handleOpenSelectedInNewWindow}
               onMoveSelectedBookmarks={openMoveSelectedBookmarksDialog}
               hasSelectedBookmarks={hasSelectedBookmarks()}
+              allSelectedAreLive={areAllSelectedBookmarksLive()}
+              onCloseSelectedBookmarks={handleCloseSelectedBookmarks}
               windowId={windowId ?? undefined}
             />
           );

@@ -393,6 +393,11 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Notify background
     if (windowId)
     {
+      console.log('[SpaceContext] chrome.runtime.sendMessage: SET_ACTIVE_SPACE', {
+        windowId,
+        spaceId
+      });
+
       chrome.runtime.sendMessage({
         action: SpaceMessageAction.SET_ACTIVE_SPACE,
         windowId,

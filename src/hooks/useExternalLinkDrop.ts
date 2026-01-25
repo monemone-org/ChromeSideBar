@@ -145,10 +145,10 @@ export const useExternalLinkDrop = ({
     const container = containerRef.current;
     if (!container) return;
 
-    if (import.meta.env.DEV)
-    {
-      console.log('[useExternalLinkDrop] Setting up native drag event listeners on:', container);
-    }
+    // if (import.meta.env.DEV)
+    // {
+    //   console.log('[useExternalLinkDrop] Setting up native drag event listeners on:', container);
+    // }
 
     const handleDragOver = (e: DragEvent) =>
     {

@@ -14,7 +14,7 @@ import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
 import { usePinnedSites, PinnedSite } from './hooks/usePinnedSites';
 import { useTabs } from './hooks/useTabs';
-import { useBookmarks } from './hooks/useBookmarks';
+import { useBookmarks, refreshAllBookmarks } from './hooks/useBookmarks';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { useChromeLocalStorage } from './hooks/useChromeLocalStorage';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation';
@@ -397,7 +397,7 @@ function App() {
     appendPinnedSites,
   } = usePinnedSites();
   const { bookmarks } = useBookmarks();
-  const { tabs, activateTab } = useTabs();
+  const { tabs, activateTab, refreshTabs } = useTabs();
 
   const handleApplySettings = (newSettings: SettingsValues) => {
     setFontSize(newSettings.fontSize);
@@ -528,6 +528,26 @@ function App() {
     chrome.commands.onCommand.addListener(handleCommand);
     return () => chrome.commands.onCommand.removeListener(handleCommand);
   }, []);
+
+  // Refresh data when sidepanel becomes visible
+  useEffect(() =>
+  {
+    const handleVisibilityChange = () =>
+    {
+      if (document.visibilityState === 'visible')
+      {
+        if (import.meta.env.DEV)
+        {
+          console.log('Sidepanel visible - refreshing data');
+        }
+        refreshTabs();
+        refreshAllBookmarks();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [refreshTabs]);
 
   return (
     <FontSizeContext.Provider value={fontSize}>

@@ -421,6 +421,7 @@ export const useTabs = (windowId?: number) => {
     sortTabs,
     sortGroupTabs,
     closeAllTabs,
+    refreshTabs: fetchTabs,
     error
   };
 };

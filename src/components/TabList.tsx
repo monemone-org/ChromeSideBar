@@ -125,7 +125,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onCloseOthers,
   onSelectionClick,
   onSelectionContextMenu,
-  selectionCount: _selectionCount,
+  selectionCount,
   isMultiSelection,
   hasSelectedTabs,
   onAddSelectedToBookmark,
@@ -284,7 +284,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               )}
               <ContextMenu.Separator />
               <ContextMenu.Item danger onSelect={() => { if (tab.id) onClose(tab.id); }}>
-                <X size={14} className="mr-2" /> Close
+                <X size={14} className="mr-2" /> Close {selectionCount} Tabs
               </ContextMenu.Item>
             </>
           ) : (
@@ -1846,9 +1846,10 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   {
     clearAutoExpandTimer();
 
-    // Handle external drop (tab → bookmark) first
-    if (localExternalTarget && activeId && typeof activeId === 'number')
-    {
+    try {
+      // Handle external drop (tab → bookmark) first
+      if (localExternalTarget && activeId && typeof activeId === 'number')
+      {
       // Check if we're dragging multiple selected tabs
       const selectedItems = getSelectedItems();
       const selectedTabIds = selectedItems
@@ -1928,9 +1929,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         }
       }
 
-      // Clear all state
+      // Mark as valid drop (finally block handles cleanup)
       wasValidDropRef.current = true;
-      clearDndState();
       return;
     }
 
@@ -2005,9 +2005,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         });
       }
 
-      // Clear all state
+      // Mark as valid drop (finally block handles cleanup)
       wasValidDropRef.current = true;
-      clearDndState();
       return;
     }
 
@@ -2027,7 +2026,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
       clearSelection();
       wasValidDropRef.current = true;
-      clearDndState();
       return;
     }
 
@@ -2037,7 +2035,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
     if (!isValidDrop)
     {
-      clearDndState();
       return;
     }
 
@@ -2142,7 +2139,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
       if (!sourceTab)
       {
-        clearDndState();
         return;
       }
 
@@ -2215,9 +2211,12 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         });
       }
     }
-
-    // Reset state
-    clearDndState();
+    } catch (error) {
+      console.error('Tab drag operation failed:', error);
+    } finally {
+      // Always reset state, even on error
+      clearDndState();
+    }
   }, [activeId, dropTargetId, dropPosition, visibleTabs, expandedGroups, groupTab, ungroupTab, moveTab, moveGroup, clearAutoExpandTimer, setActiveId, setDropTargetId, setDropPosition, localExternalTarget, onExternalDropTargetChange, createBookmark, getBookmark, getChildren, arcStyleEnabled, associateExistingTab, localSpaceDropTarget, onSpaceDropTargetChange, moveTabToSpace, getSelectedItems, clearSelection, clearDndState, filterBookmarkableTabs]);
 
   // Drag cancel handler (e.g., Escape key)

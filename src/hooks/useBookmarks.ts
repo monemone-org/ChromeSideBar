@@ -14,6 +14,8 @@ const refreshAll = () => {
   refreshCallbacks.forEach(cb => cb());
 };
 
+export { refreshAll as refreshAllBookmarks };
+
 export const useBookmarks = () => {
   const [bookmarks, setBookmarks] = useState<chrome.bookmarks.BookmarkTreeNode[]>([]);
   const [error, setError] = useState<string | null>(null);
