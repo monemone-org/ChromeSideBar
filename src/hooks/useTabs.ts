@@ -44,6 +44,9 @@ export const useTabs = (windowId?: number) => {
         }
       });
     }
+    else {
+      setError('Unable to access browser tabs');
+    }
   }, [handleError]);
 
   useEffect(() => {

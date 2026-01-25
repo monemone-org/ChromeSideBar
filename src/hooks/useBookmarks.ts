@@ -33,6 +33,9 @@ export const useBookmarks = () => {
         }
       });
     }
+    else {
+      setError('Unable to access browser bookmarks');
+    }
   }, [handleError]);
 
   useEffect(() => {

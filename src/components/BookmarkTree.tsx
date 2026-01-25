@@ -801,7 +801,7 @@ interface BookmarkTreeProps {
 }
 
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
-  const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark } = useBookmarks();
+  const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
 
@@ -1845,6 +1845,15 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
           );
         })}
 
+        {/* Empty filter results message */}
+        {hasFilters && !hasVisibleBookmarks && (
+          <div className="p-4 text-gray-500 dark:text-gray-400 text-center">
+            {filterText.trim()
+              ? `No bookmarks match "${filterText}"`
+              : 'No loaded tabs found'}
+          </div>
+        )}
+
         {/* Drag overlay - no animation for valid drops, default animation for cancelled */}
         {/* Offset modifier so overlay appears below cursor, keeping drop indicator visible */}
         <DragOverlay
@@ -1861,6 +1870,11 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         </DragOverlay>
       </DndContext>
       </div>
+
+      {/* Error message */}
+      {error && (
+        <p className="text-red-500 text-sm px-2 py-1 text-center">{error}</p>
+      )}
 
       {/* Separator - only show when there are visible bookmarks */}
       {hasVisibleBookmarks && (

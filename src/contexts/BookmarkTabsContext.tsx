@@ -157,7 +157,6 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     catch (err)
     {
       console.error('Failed to rebuild associations:', err);
-      setError('Failed to rebuild associations');
       setIsInitialized(true);
     }
     finally

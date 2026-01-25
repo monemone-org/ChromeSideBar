@@ -77,26 +77,29 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
   const [iconSearch, setIconSearch] = useState('');
   const [allIconNames, setAllIconNames] = useState<string[]>([]);
   const [iconsLoading, setIconsLoading] = useState(false);
+  const [iconsError, setIconsError] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
 
   // Load icons on mount
   useEffect(() =>
   {
-    if (allIconNames.length === 0 && !iconsLoading)
+    if (allIconNames.length === 0 && !iconsLoading && !iconsError)
     {
       setIconsLoading(true);
       getIconNames()
-        .then((names) =>
+        .then((result) =>
         {
-          setAllIconNames(names);
+          setAllIconNames(result.icons);
+          setIconsError(result.error);
           setIconsLoading(false);
         })
         .catch(() =>
         {
+          setIconsError('Failed to load icons');
           setIconsLoading(false);
         });
     }
-  }, [allIconNames.length, iconsLoading]);
+  }, [allIconNames.length, iconsLoading, iconsError]);
 
   // Filter icons based on search
   const filteredIcons = useMemo(() =>
@@ -208,6 +211,10 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
             <div className="flex items-center justify-center h-16 text-gray-400 text-[0.85em]">
               Loading icons...
             </div>
+          ) : iconsError ? (
+            <div className="flex items-center justify-center h-16 text-gray-400 text-[0.85em]">
+              {iconsError}
+            </div>
           ) : (
             <div style={{ height: totalContentHeight, position: 'relative' }}>
               {visibleIcons.map(({ name, index }) =>
@@ -241,9 +248,11 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
             </div>
           )}
         </div>
-        <p className="text-[0.85em] text-gray-400 mt-1">
-          {filteredIcons.length} icons
-        </p>
+        {!iconsError && (
+          <p className="text-[0.85em] text-gray-400 mt-1">
+            {filteredIcons.length} icons
+          </p>
+        )}
       </div>
 
       {/* Color section */}

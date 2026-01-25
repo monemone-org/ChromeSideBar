@@ -20,9 +20,22 @@ export function getIconUrl(name: string): string
   return `${ICONIFY_API_BASE}/lucide/${kebabName}.svg`;
 }
 
-// Fetch icon names from Iconify API
-export async function fetchIconNames(): Promise<string[]>
+// Result type for icon fetching
+export interface IconFetchResult
 {
+  icons: string[];
+  error: string | null;
+}
+
+// Fetch icon names from Iconify API
+export async function fetchIconNames(): Promise<IconFetchResult>
+{
+  // Check offline status first
+  if (!navigator.onLine)
+  {
+    return { icons: [], error: 'You appear to be offline' };
+  }
+
   try
   {
     const response = await fetch(ICONIFY_COLLECTION_API);
@@ -44,12 +57,12 @@ export async function fetchIconNames(): Promise<string[]>
       }
     }
     names.sort();
-    return names;
+    return { icons: names, error: null };
   }
   catch (error)
   {
     console.warn('Failed to fetch icon names:', error);
-    return [];
+    return { icons: [], error: 'Failed to load icons' };
   }
 }
 
@@ -75,14 +88,15 @@ export async function iconToDataUrl(
 }
 
 // Shared icon cache for multiple components
-let cachedIconNames: string[] | null = null;
-let iconLoadPromise: Promise<string[]> | null = null;
+let cachedResult: IconFetchResult | null = null;
+let iconLoadPromise: Promise<IconFetchResult> | null = null;
 
-export async function getIconNames(): Promise<string[]>
+export async function getIconNames(): Promise<IconFetchResult>
 {
-  if (cachedIconNames)
+  // Return cached result only if successful (has icons)
+  if (cachedResult && cachedResult.icons.length > 0)
   {
-    return cachedIconNames;
+    return cachedResult;
   }
 
   if (iconLoadPromise)
@@ -90,10 +104,15 @@ export async function getIconNames(): Promise<string[]>
     return iconLoadPromise;
   }
 
-  iconLoadPromise = fetchIconNames().then((names) =>
+  iconLoadPromise = fetchIconNames().then((result) =>
   {
-    cachedIconNames = names;
-    return names;
+    // Only cache successful results
+    if (result.icons.length > 0)
+    {
+      cachedResult = result;
+    }
+    iconLoadPromise = null;
+    return result;
   });
 
   return iconLoadPromise;

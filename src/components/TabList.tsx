@@ -757,7 +757,7 @@ interface TabListProps {
 export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExternalDropTargetChange, resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange }: TabListProps) =>
 {
   const { spaces, activeSpace: activeSpaceFromContext, windowId } = useSpacesContext();
-  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs } = useTabs(windowId ?? undefined);
+  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, error } = useTabs(windowId ?? undefined);
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
   const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
 
@@ -2785,6 +2785,12 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
               />
             )}
           </TreeRow>
+
+          {/* Error message */}
+          {error && (
+            <p className="text-red-500 text-sm px-2 py-1 text-center">{error}</p>
+          )}
+
 
           {/* Offset modifier so overlay appears below cursor, keeping drop indicator visible */}
           <DragOverlay
