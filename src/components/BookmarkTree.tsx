@@ -39,7 +39,8 @@ import {
   Volume2,
   Copy,
   ExternalLink,
-  SquareArrowOutUpRight
+  SquareArrowOutUpRight,
+  SquareStack
 } from 'lucide-react';
 import { getRandomGroupColor, GROUP_COLORS } from '../utils/groupColors';
 import clsx from 'clsx';
@@ -196,7 +197,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onOpenAsTabGroup,
   onOpenAllTabs,
   onOpenAllTabsInNewWindow,
-  onMoveToSpace: _onMoveToSpace,
+  onMoveToSpace,
   onMoveBookmark,
   externalDropTarget,
   onSelectionClick,
@@ -520,16 +521,14 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 </ContextMenu.Item>
               )}
 
-              {/* 2026-01-18 mone: disabled "Move to Space". It is confusing. also we have Move folder... which does
-              almost the same thing.
-                {onMoveToSpace && (
-                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
-                  <SquareStack size={14} className="mr-2" /> Move to Space...
-                </ContextMenu.Item>
-              )} */}
               {onMoveBookmark && !isSpecialFolder && (
                 <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, true)}>
                   <FolderInput size={14} className="mr-2" /> Move Folder...
+                </ContextMenu.Item>
+              )}
+              {onMoveToSpace && !isSpecialFolder && (
+                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
+                  <SquareStack size={14} className="mr-2" /> Move to Space...
                 </ContextMenu.Item>
               )}
             </>
@@ -551,16 +550,14 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onOpenInNewWindow?.(node.url!)}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Window
               </ContextMenu.Item>
-              {/* 2026-01-18 mone: disabled "Move to Space". It is confusing. also we have Move folder... which does
-              almost the same thing.
-              {onMoveToSpace && (
-                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
-                  <SquareStack size={14} className="mr-2" /> Move to Space...
-                </ContextMenu.Item>
-              )} */}
               {onMoveBookmark && (
                 <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, false)}>
                   <FolderInput size={14} className="mr-2" /> Move Bookmark...
+                </ContextMenu.Item>
+              )}
+              {onMoveToSpace && (
+                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
+                  <SquareStack size={14} className="mr-2" /> Move to Space...
                 </ContextMenu.Item>
               )}
             </>
