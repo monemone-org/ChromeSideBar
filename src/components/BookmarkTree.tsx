@@ -1104,7 +1104,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     });
   }, [spaceFolder?.id, expandedStateLoaded]);
 
-  // Auto-scroll to active bookmark when it changes
+  // Auto-expand and scroll to active bookmark when it changes
   const prevActiveItemKeyRef = useRef<string | null>(null);
   useEffect(() =>
   {
@@ -1114,8 +1114,45 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     {
       prevActiveItemKeyRef.current = activeItemKey;
       const bookmarkId = activeItemKey.replace('bookmark-', '');
-      // Scroll after DOM updates
-      scrollToBookmark(bookmarkId, 50);
+
+      // Walk up parentId chain to collect ancestor folder IDs, then expand and scroll
+      (async () =>
+      {
+        const ancestorIds: string[] = [];
+        let currentId: string | undefined = bookmarkId;
+
+        while (currentId)
+        {
+          try
+          {
+            const results: chrome.bookmarks.BookmarkTreeNode[] = await chrome.bookmarks.get(currentId as string);
+            const node = results[0];
+            if (!node?.parentId || node.parentId === '0') break;
+            currentId = node.parentId;
+            ancestorIds.push(node.parentId);
+          }
+          catch
+          {
+            break;
+          }
+        }
+
+        // Expand any collapsed ancestor folders
+        if (ancestorIds.length > 0)
+        {
+          setExpandedState(prev =>
+          {
+            const allExpanded = ancestorIds.every(id => prev[id]);
+            if (allExpanded) return prev;
+            const next = { ...prev };
+            for (const id of ancestorIds) { next[id] = true; }
+            return next;
+          });
+        }
+
+        // Scroll after DOM updates from expansion
+        scrollToBookmark(bookmarkId, 150);
+      })();
     }
     else if (!activeItemKey?.startsWith('bookmark-'))
     {
