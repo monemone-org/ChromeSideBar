@@ -118,7 +118,7 @@ const FolderItem = ({
           icon={folderIcon}
           hasChildren={hasChildren || isCreatingHere}
           isExpanded={isExpanded || isCreatingHere}
-          isActive={isSelected}
+          isSelected={isSelected}
           onClick={() => onSelect(node.id)}
           onToggle={() => onToggle(node.id)}
         />
