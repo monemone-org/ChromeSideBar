@@ -77,7 +77,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
         // Selection style (brighter blue background)
         isSelected && 'bg-blue-200 dark:bg-blue-800/60 text-blue-800 dark:text-blue-50',
         // Active tab style (border ring, visually distinct from selection)
-        isActive && !isSelected && 'ring-2 ring-inset ring-blue-400 dark:ring-blue-600 text-gray-700 dark:text-gray-200',
+        isActive && !isSelected && 'text-gray-700 dark:text-gray-200',
         // Default style (ring hover) - only when neither active nor selected, and hover not disabled
         !isActive && !isSelected && !disableHoverBorder && `${RING_HIGHLIGHT_HOVER} text-gray-700 dark:text-gray-200`,
         !isActive && !isSelected && disableHoverBorder && 'text-gray-700 dark:text-gray-200',
@@ -93,6 +93,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
     >
       {/* Drop Indicators & Overlays */}
       {children}
+
 
       {/* Leading Indicator - Fixed at absolute left edge (e.g. speaker icon) */}
       {leadingIndicator && (
@@ -145,7 +146,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       )}
 
       {/* Title */}
-      <div className={clsx("flex-1 truncate min-w-0", isActive && "font-semibold")}>
+      <div className={clsx("flex-1 truncate min-w-0", isActive && "font-semibold underline underline-offset-2")}>
         {title}
       </div>
 
