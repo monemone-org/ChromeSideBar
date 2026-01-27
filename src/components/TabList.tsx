@@ -1380,7 +1380,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
   // Build display items: groups and ungrouped tabs in natural browser order
   // Uses visibleTabs and visibleTabGroups to exclude SideBarForArc group
-  // Managed tabs (LiveBookmarks) are filtered via getManagedTabIds() in useTabs hook
+  // Managed tabs (bookmarks) are filtered via getManagedTabIds() in useTabs hook
   const displayItems = useMemo<DisplayItem[]>(() =>
   {
     const groupMap = new Map<number, chrome.tabGroups.TabGroup>();

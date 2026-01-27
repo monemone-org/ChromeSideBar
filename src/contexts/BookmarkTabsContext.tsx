@@ -14,7 +14,7 @@ const makePinnedKey = (pinnedId: string) => `pinned-${pinnedId}`;
 interface BookmarkTabsContextValue
 {
   // Bookmark functions
-  openBookmarkTab: (bookmarkId: string, url: string) => Promise<number | undefined>;
+  openBookmarkTab: (bookmarkId: string, url: string, spaceId?: string) => Promise<number | undefined>;
   closeBookmarkTab: (bookmarkId: string) => void;
   isBookmarkLoaded: (bookmarkId: string) => boolean;
   isBookmarkAudible: (bookmarkId: string) => boolean;
@@ -340,7 +340,11 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
   // Create a new tab for an item (no grouping)
   // Returns the created tab ID, or undefined if creation failed
-  const createItemTab = useCallback(async (itemKey: string, url: string): Promise<number | undefined> =>
+  const createItemTab = useCallback(async (
+    itemKey: string,
+    url: string,
+    spaceId?: string
+  ): Promise<number | undefined> =>
   {
     return new Promise((resolve) =>
     {
@@ -371,6 +375,17 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           return newMap;
         });
 
+        // Register space with background for bookmark tabs
+        if (spaceId && windowId)
+        {
+          chrome.runtime.sendMessage({
+            action: 'register-tab-space',
+            windowId,
+            tabId,
+            spaceId
+          });
+        }
+
         // Tell background to re-check this tab (will ungroup if it was grouped)
         if (windowId)
         {
@@ -388,7 +403,11 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
   // Open a tab for an item (bookmark or pinned site)
   // Returns the tab ID (existing or newly created), or undefined if failed
-  const openItemTab = useCallback(async (itemKey: string, url: string): Promise<number | undefined> =>
+  const openItemTab = useCallback(async (
+    itemKey: string,
+    url: string,
+    spaceId?: string
+  ): Promise<number | undefined> =>
   {
     const existingTabId = itemToTab.get(itemKey);
 
@@ -400,7 +419,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         {
           if (chrome.runtime.lastError || !tab)
           {
-            createItemTab(itemKey, url).then(resolve);
+            createItemTab(itemKey, url, spaceId).then(resolve);
           }
           else
           {
@@ -415,7 +434,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     }
     else
     {
-      return createItemTab(itemKey, url);
+      return createItemTab(itemKey, url, spaceId);
     }
   }, [itemToTab, createItemTab, handleError]);
 
@@ -439,9 +458,13 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   }, [itemToTab]);
 
   // --- Bookmark-specific wrappers ---
-  const openBookmarkTab = useCallback(async (bookmarkId: string, url: string): Promise<number | undefined> =>
+  const openBookmarkTab = useCallback(async (
+    bookmarkId: string,
+    url: string,
+    spaceId?: string
+  ): Promise<number | undefined> =>
   {
-    return openItemTab(makeBookmarkKey(bookmarkId), url);
+    return openItemTab(makeBookmarkKey(bookmarkId), url, spaceId);
   }, [openItemTab]);
 
   const closeBookmarkTab = useCallback((bookmarkId: string): void =>

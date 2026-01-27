@@ -10,7 +10,7 @@
  *
  * Communication flow:
  *   sidebar → background: GET_WINDOW_STATE, SET_ACTIVE_SPACE
- *   background → sidebar: STATE_CHANGED, HISTORY_TAB_ACTIVATED
+ *   background → sidebar: STATE_CHANGED
  */
 export const SpaceMessageAction = {
   // ─────────────────────────────────────────────────────────────────────────
@@ -49,16 +49,6 @@ export const SpaceMessageAction = {
    * Payload: { windowId: number, state: SpaceWindowState }
    */
   STATE_CHANGED: 'state-changed',
-
-  /**
-   * background.ts → SpacesContext.tsx
-   *
-   * Sent when history navigation (back/forward) activates a tab that belongs
-   * to a different space. Triggers the sidebar to switch to that space.
-   *
-   * Payload: { spaceId: string, tabId: number }
-   */
-  HISTORY_TAB_ACTIVATED: 'history-tab-activated',
 } as const;
 
 // Type for the action values

@@ -237,7 +237,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() =>
   {
     const handleMessage = (
-      message: { action: string; windowId?: number; state?: SpaceWindowState; spaceId?: string },
+      message: { action: string; windowId?: number; state?: SpaceWindowState },
       _sender: chrome.runtime.MessageSender,
       _sendResponse: (response?: unknown) => void
     ) =>
@@ -248,16 +248,6 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           message.state)
       {
         setWindowState(message.state);
-      }
-
-      // Switch active space when history navigation activates a tab in different space
-      if (message.action === SpaceMessageAction.HISTORY_TAB_ACTIVATED && message.spaceId && windowId)
-      {
-        chrome.runtime.sendMessage({
-          action: SpaceMessageAction.SET_ACTIVE_SPACE,
-          windowId,
-          spaceId: message.spaceId
-        });
       }
     };
 

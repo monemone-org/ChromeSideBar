@@ -397,7 +397,7 @@ function App() {
     appendPinnedSites,
   } = usePinnedSites();
   const { bookmarks } = useBookmarks();
-  const { tabs, activateTab, refreshTabs } = useTabs();
+  const { tabs, refreshTabs } = useTabs();
 
   const handleApplySettings = (newSettings: SettingsValues) => {
     setFontSize(newSettings.fontSize);
@@ -609,7 +609,6 @@ function App() {
         <AudioTabsDropdown
           playingTabs={playingTabs}
           historyTabs={lastAudibleTabs}
-          onTabSelect={(tabId) => { activateTab(tabId); }}
         />
       </DropdownMenu.Root>
 

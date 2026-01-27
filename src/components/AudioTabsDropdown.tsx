@@ -1,58 +1,35 @@
 import { useCallback } from 'react';
 import { Globe, Volume2 } from 'lucide-react';
 import * as DropdownMenu from './menu/DropdownMenu';
-import { useSpacesContext } from '../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
-import { useTabGroups } from '../hooks/useTabGroups';
 import { useFontSize } from '../contexts/FontSizeContext';
 
 export interface AudioTabsDropdownProps
 {
   playingTabs: chrome.tabs.Tab[];
   historyTabs?: chrome.tabs.Tab[];
-  onTabSelect: (tabId: number) => void;
 }
 
 export const AudioTabsDropdown = ({
   playingTabs,
-  historyTabs,
-  onTabSelect
+  historyTabs
 }: AudioTabsDropdownProps) =>
 {
-  const { spaces, setActiveSpaceId, activeSpaceId } = useSpacesContext();
   const { getItemKeyForTab } = useBookmarkTabsContext();
-  const { tabGroups } = useTabGroups();
   const fontSize = useFontSize();
 
-  // Find space ID for a tab based on its Chrome group title
-  const getSpaceForTab = useCallback((tab: chrome.tabs.Tab): string | null =>
-  {
-    if (!tab.groupId || tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return null;
-
-    const group = tabGroups.find(g => g.id === tab.groupId);
-    if (!group || !group.title) return null;
-
-    const space = spaces.find(s => s.name === group.title);
-    return space?.id ?? null;
-  }, [tabGroups, spaces]);
-
-  const handleSelectTab = useCallback((tab: chrome.tabs.Tab) =>
+  const handleSelectTab = useCallback(async (tab: chrome.tabs.Tab) =>
   {
     if (tab.id === undefined) return;
 
-    // Find which space the tab belongs to (via Chrome group title)
-    const spaceId = getSpaceForTab(tab);
-
-    // Activate the tab
-    onTabSelect(tab.id);
-
-    // Switch to the space if needed
-    // If tab not in any space (e.g., live bookmark tab), fall back to "All" space
-    const targetSpaceId = spaceId || 'all';
-    if (targetSpaceId !== activeSpaceId)
-    {
-      setActiveSpaceId(targetSpaceId);
-    }
+    // Use the new unified message to activate tab and switch space atomically
+    // This handles: tab activation, space lookup, space switching, and history
+    // The background will send STATE_CHANGED message to update SpacesContext automatically
+    await chrome.runtime.sendMessage({
+      action: 'set-active-tab-and-space',
+      tabId: tab.id,
+      skipHistory: false
+    });
 
     // Scroll to the tab/bookmark after space switch renders
     setTimeout(() =>
@@ -75,7 +52,7 @@ export const AudioTabsDropdown = ({
 
       element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 100);
-  }, [getSpaceForTab, onTabSelect, activeSpaceId, setActiveSpaceId, getItemKeyForTab]);
+  }, [getItemKeyForTab]);
 
   // Render a tab row as dropdown item
   const renderTabItem = (tab: chrome.tabs.Tab, showSpeakerIcon: boolean) =>

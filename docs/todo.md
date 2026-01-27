@@ -9,6 +9,39 @@
 
 ## Pending
 
+- bookmarktree doesn't auto-expand to show the bookmark row when a bookmark tab becomes active.
+
+- autoscrolling duplicated
+
+There are many copies of code to scroll to a bookmark row in bookmarktree and tab row in tablist.
+
+      const element = document.querySelector(`[data-bookmark-id="${newNode.id}"]`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      	in AudioTabsDropdown, BookmarkTree
+
+        const element = document.querySelector(`[data-tab-id="${activeTab.id}"]`);
+        element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        in AudioTabsDropdown and TabList
+
+       can we consolidate them into 2 reusable function?
+
+       are we autoscrolling for tab history navigation?
+
+
+- TabHistoryManager to SpacesContext to background.ts
+
+why are we sending HISTORY_TAB_ACTIVATED from TabHistoryManager to SpacesContext, then send SET_ACTIVE_SPACE back to background.ts?
+why don't we just spaceStateManager.setActiveSpace(message.windowId, message.spaceId); directly in TabHistoryManager?
+
+       are we autoscrolling for tab history navigation?
+
+- getSpaceForTab duplicated in background.ts an audiodropdown
+duplicated in both background.ts and audiodropdown
+
+- after changing active tab in history , selection should reset
+
+- when right click on a single selected live bookmark , show "Close" instead of "Delete"
+
 - [ ] Support drag links from browser pane to
             - bookmark  - drop before/after bookmark
                         - create new bookmark 

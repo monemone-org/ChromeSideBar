@@ -93,7 +93,6 @@ class SpaceWindowStateManager
 interface HistoryEntry
 {
   tabId: number;
-  spaceId: string;
 }
 
 interface TabHistory
@@ -108,7 +107,6 @@ class TabHistoryManager
   static MAX_SIZE = 25;
 
   #history = new Map<number, TabHistory>();  // windowId -> history
-  #spaceStateManager: SpaceWindowStateManager;
 
   // Navigation state tracking (per-window)
   // - Prevents history tracking when we programmatically activate a tab via navigate()
@@ -116,11 +114,6 @@ class TabHistoryManager
   //   only B's callback executes (A's callback sees stale navId and returns early)
   // - Per-window so navigation in window A doesn't affect history tracking in window B
   #navigatingWindows = new Map<number, number>();  // windowId -> navId
-
-  constructor(spaceStateManager: SpaceWindowStateManager)
-  {
-    this.#spaceStateManager = spaceStateManager;
-  }
 
   isNavigating(windowId: number): boolean
   {
@@ -132,13 +125,23 @@ class TabHistoryManager
   {
     const navId = (this.#navigatingWindows.get(windowId) ?? 0) + 1;
     this.#navigatingWindows.set(windowId, navId);
+    if (import.meta.env.DEV)
+    {
+      console.log(`[TabHistory] setNavigating: windowId=${windowId}, navId=${navId}`);
+    }
     return navId;
   }
 
   // Clear navigation state if navId still matches. Returns false if a newer navigation superseded this one.
   unsetNavigating(windowId: number, navId: number): boolean
   {
-    if (this.#navigatingWindows.get(windowId) !== navId) return false;
+    const currentNavId = this.#navigatingWindows.get(windowId);
+    const matches = currentNavId === navId;
+    if (import.meta.env.DEV)
+    {
+      console.log(`[TabHistory] unsetNavigating: windowId=${windowId}, navId=${navId}, currentNavId=${currentNavId}, cleared=${matches}`);
+    }
+    if (!matches) return false;
     this.#navigatingWindows.delete(windowId);
     return true;
   }
@@ -167,13 +170,12 @@ class TabHistoryManager
   push(windowId: number, tabId: number): void
   {
     const history = this.getOrCreateHistory(windowId);
-    const spaceId = this.#spaceStateManager.getActiveSpace(windowId);
 
-    // skip if same as current entry (same tab AND same space)
+    // skip if same as current entry (same tab)
     if (history.index >= 0)
     {
       const current = history.stack[history.index];
-      if (current.tabId === tabId && current.spaceId === spaceId)
+      if (current.tabId === tabId)
       {
         return;
       }
@@ -191,7 +193,7 @@ class TabHistoryManager
     }
 
     // insert new entry after current position
-    history.stack.splice(history.index + 1, 0, { tabId, spaceId });
+    history.stack.splice(history.index + 1, 0, { tabId });
     history.index++;
 
     // trim to keep ±MAX_SIZE around current index
@@ -211,7 +213,7 @@ class TabHistoryManager
     }
 
     this.save();
-    if (import.meta.env.DEV) this.dump(windowId, `PUSH tabId=${tabId}, spaceId=${spaceId}`);
+    if (import.meta.env.DEV) this.dump(windowId, `PUSH tabId=${tabId}`);
   }
 
   remove(windowId: number, tabId: number): void
@@ -238,7 +240,7 @@ class TabHistoryManager
     if (import.meta.env.DEV) this.dump(windowId, `REMOVE tabId=${tabId}`);
   }
 
-  navigate(windowId: number, direction: number): void
+  async navigate(windowId: number, direction: number): Promise<void>
   {
     const history = this.#history.get(windowId);
     if (!history || history.stack.length === 0) return;
@@ -253,30 +255,24 @@ class TabHistoryManager
     if (import.meta.env.DEV)
     {
       const dirLabel = direction === -1 ? "BACK" : "FORWARD";
-      this.dump(windowId, `NAVIGATE ${dirLabel} to tabId=${entry.tabId}, spaceId=${entry.spaceId}`);
+      this.dump(windowId, `NAVIGATE ${dirLabel} to tabId=${entry.tabId}`);
     }
 
     const navId = this.setNavigating(windowId);
-    //if (import.meta.env.DEV) console.log(`[TabHistory] navigate: windowId=${windowId}, navId=${navId}`);
 
-    chrome.tabs.update(entry.tabId, { active: true }, () =>
+    // Use unified function to activate tab and switch space
+    // Skip history since we're navigating within existing history
+    const result = await setActiveTabAndSpace(entry.tabId);
+
+    if (!this.unsetNavigating(windowId, navId)) return;
+
+    if (import.meta.env.DEV && result.success)
     {
-      if (!this.unsetNavigating(windowId, navId)) return;
-      //if (import.meta.env.DEV) console.log(`[TabHistory] navigate callback: cleared windowId=${windowId}`);
-
-      // Notify sidepanel to switch to the space
-      if (entry.spaceId)
-      {
-        chrome.runtime.sendMessage({
-          action: SpaceMessageAction.HISTORY_TAB_ACTIVATED,
-          tabId: entry.tabId,
-          spaceId: entry.spaceId
-        });
-      }
-    });
+      console.log(`[TabHistory] Navigate completed: result=${result}`);
+    }
   }
 
-  navigateToIndex(windowId: number, index: number): void
+  async navigateToIndex(windowId: number, index: number): Promise<void>
   {
     const history = this.#history.get(windowId);
     if (!history || index < 0 || index >= history.stack.length) return;
@@ -285,24 +281,23 @@ class TabHistoryManager
     const entry = history.stack[index];
     this.save();
 
-    if (import.meta.env.DEV) this.dump(windowId, `NAVIGATE to index=${index}, tabId=${entry.tabId}, spaceId=${entry.spaceId}`);
+    if (import.meta.env.DEV)
+    {
+      this.dump(windowId, `NAVIGATE to index=${index}, tabId=${entry.tabId}`);
+    }
 
     const navId = this.setNavigating(windowId);
 
-    chrome.tabs.update(entry.tabId, { active: true }, () =>
-    {
-      if (!this.unsetNavigating(windowId, navId)) return;
+    // Use unified function to activate tab and switch space
+    // Skip history since we're navigating within existing history
+    const result = await setActiveTabAndSpace(entry.tabId);
 
-      // Notify sidepanel to switch to the space
-      if (entry.spaceId)
-      {
-        chrome.runtime.sendMessage({
-          action: SpaceMessageAction.HISTORY_TAB_ACTIVATED,
-          tabId: entry.tabId,
-          spaceId: entry.spaceId
-        });
-      }
-    });
+    if (!this.unsetNavigating(windowId, navId)) return;
+
+    if (import.meta.env.DEV && result.success)
+    {
+      console.log(`[TabHistory] NavigateToIndex completed: result=${result}`);
+    }
   }
 
   getActivationOrder(windowId: number): number[]
@@ -340,9 +335,11 @@ class TabHistoryManager
       try
       {
         const tab = await chrome.tabs.get(entry.tabId);
+        // Lookup space dynamically at query time (fallback to 'all' for pinned tabs)
+        const spaceId = await getSpaceForTab(windowId, entry.tabId) ?? 'all';
         const item = {
           tabId: entry.tabId,
-          spaceId: entry.spaceId,
+          spaceId,
           index: i,
           title: tab.title || '(no title)',
           url: tab.url || tab.pendingUrl || '',
@@ -522,6 +519,62 @@ class LastAudibleTracker
 }
 
 // =============================================================================
+// TabSpaceRegistry - Tracks home space for tabs opened from bookmarks
+// =============================================================================
+
+class TabSpaceRegistry
+{
+  static STORAGE_KEY = 'bg_tabSpaces';
+
+  // Map<windowId, Map<tabId, spaceId>>
+  #registry: Map<number, Map<number, string>> = new Map();
+
+  register(windowId: number, tabId: number, spaceId: string): void
+  {
+    if (!this.#registry.has(windowId))
+    {
+      this.#registry.set(windowId, new Map());
+    }
+    this.#registry.get(windowId)!.set(tabId, spaceId);
+    this.save();
+  }
+
+  getSpace(windowId: number, tabId: number): string | undefined
+  {
+    return this.#registry.get(windowId)?.get(tabId);
+  }
+
+  unregister(windowId: number, tabId: number): void
+  {
+    this.#registry.get(windowId)?.delete(tabId);
+    this.save();
+  }
+
+  private save(): void
+  {
+    const data: Array<[number, Array<[number, string]>]> = [];
+    for (const [windowId, tabMap] of this.#registry)
+    {
+      data.push([windowId, Array.from(tabMap.entries())]);
+    }
+    chrome.storage.session.set({ [TabSpaceRegistry.STORAGE_KEY]: data });
+  }
+
+  async load(): Promise<void>
+  {
+    const result = await chrome.storage.session.get([TabSpaceRegistry.STORAGE_KEY]);
+    const data = result[TabSpaceRegistry.STORAGE_KEY];
+    if (data)
+    {
+      for (const [windowId, entries] of data)
+      {
+        this.#registry.set(windowId, new Map(entries));
+      }
+    }
+  }
+}
+
+// =============================================================================
 // Space-Group Helper Functions
 // =============================================================================
 
@@ -556,21 +609,84 @@ async function findSpaceByName(name: string | undefined): Promise<Space | undefi
   return spaces.find(s => s.name === name);
 }
 
+// Forward declaration - will be initialized below
+let tabSpaceRegistry: TabSpaceRegistry;
+
+// Get space ID for a tab at navigation time
+// Priority: Tab registry > pending > Chrome group > 'all' for ungrouped
+// Returns undefined for pinned tabs (don't switch space)
+async function getSpaceForTab(windowId: number, tabId: number): Promise<string | undefined>
+{
+  // 1. Check tab registry
+  const registeredSpace = tabSpaceRegistry.getSpace(windowId, tabId);
+  if (registeredSpace) return registeredSpace;
+
+  try
+  {
+    const tab = await chrome.tabs.get(tabId);
+
+    // 4. Check Chrome group
+    if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
+    {
+      const group = await chrome.tabGroups.get(tab.groupId);
+      const space = await findSpaceByName(group.title);
+      if (space) return space.id;
+    }
+  }
+  catch { /* Tab may not exist */ }
+
+  // 5. Ungrouped normal tab → 'all'
+  return undefined;
+}
+
+/**
+ * Activates a tab and switches to its space.
+ *
+ * @param tabId - The tab to activate
+ * @param skipHistory - If true, don't add to tab history
+ * @returns Object with success status, spaceId, and optional error
+ */
+async function setActiveTabAndSpace(
+  tabId: number
+): Promise<{ success: boolean; error?: string }>
+{
+  try
+  {
+    // Activate the tab
+    // Our chrome.tabs.onActivatelistener will bring up its active space
+    // and add to history.
+    const tab = await chrome.tabs.update(tabId, { active: true });
+
+    if (!tab.windowId)
+    {
+      return { success: false, error: 'Tab has no window' };
+    }
+
+    return { success: true };
+  }
+  catch (error)
+  {
+    return { success: false, error: String(error) };
+  }
+}
+
 // =============================================================================
 // Initialize trackers
 // =============================================================================
 
 const spaceStateManager = new SpaceWindowStateManager();
-const historyManager = new TabHistoryManager(spaceStateManager);
+const historyManager = new TabHistoryManager();
 const groupTracker = new TabGroupTracker();
 const lastAudibleTracker = new LastAudibleTracker();
+tabSpaceRegistry = new TabSpaceRegistry();
 
 // Load persisted state
 Promise.all([
   spaceStateManager.load(),
   historyManager.load(),
   groupTracker.load(),
-  lastAudibleTracker.load()
+  lastAudibleTracker.load(),
+  tabSpaceRegistry.load()
 ]);
 
 // =============================================================================
@@ -580,38 +696,34 @@ Promise.all([
 // Update tracked group when active tab changes + track history + switch to tab's Space
 chrome.tabs.onActivated.addListener(async (activeInfo) =>
 {
-  //if (import.meta.env.DEV) console.log(`[TabHistory] onActivated: tabId=${activeInfo.tabId}, isNavigating=${historyManager.isNavigating(activeInfo.windowId)}`);
+  const isNavigating = historyManager.isNavigating(activeInfo.windowId);
+
+  if (import.meta.env.DEV)
+  {
+    console.log(`[onActivated] START tabId=${activeInfo.tabId}, isNavigating=${isNavigating}`);
+  }
 
   // Track tab history (skip if this activation was triggered by navigation)
-  if (!historyManager.isNavigating(activeInfo.windowId))
+  if (!isNavigating)
   {
     historyManager.push(activeInfo.windowId, activeInfo.tabId);
   }
 
-  // Switch sidebar to tab's Space based on its Chrome group
-  // Skip if currently in "All" space (user wants to stay in overview mode)
-  if (spaceStateManager.getActiveSpace(activeInfo.windowId) !== 'all')
+  // Lookup destination space for sidebar switch
+  const destinationSpaceId = await getSpaceForTab(activeInfo.windowId, activeInfo.tabId);
+
+  if (import.meta.env.DEV)
   {
-    try
+    console.log(`[onActivated] destinationSpaceId=${destinationSpaceId}`);
+  }
+
+  // Switch sidebar to tab's Space (unless in "All" space or pinned tab)
+  if (destinationSpaceId && spaceStateManager.getActiveSpace(activeInfo.windowId) !== 'all')
+  {
+    const currentSpaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
+    if (currentSpaceId !== destinationSpaceId)
     {
-      const tab = await chrome.tabs.get(activeInfo.tabId);
-      if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
-      {
-        const group = await chrome.tabGroups.get(tab.groupId);
-        const space = await findSpaceByName(group.title);
-        if (space)
-        {
-          const currentSpaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
-          if (currentSpaceId !== space.id)
-          {
-            spaceStateManager.setActiveSpace(activeInfo.windowId, space.id);
-          }
-        }
-      }
-    }
-    catch
-    {
-      // Tab or group may have been closed
+      spaceStateManager.setActiveSpace(activeInfo.windowId, destinationSpaceId);
     }
   }
 
@@ -628,11 +740,12 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
   }
 });
 
-// Clean up history and last audible tracker when tab is closed
+// Clean up history, last audible tracker, and tab registry when tab is closed
 chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
 {
   historyManager.remove(removeInfo.windowId, tabId);
   lastAudibleTracker.clearIfMatches(tabId);
+  tabSpaceRegistry.unregister(removeInfo.windowId, tabId);
 });
 
 // Track when a tab stops being audible
@@ -692,7 +805,7 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
 {
   const { tabId, windowId, activeSpaceId } = request;
 
-  // Check if this is a managed tab (LiveBookmark/pinned site)
+  // Check if this is a managed tab (bookmark/pinned site)
   if (await isManagedTab(windowId, tabId))
   {
     // Ungroup if currently in a group
@@ -755,6 +868,11 @@ chrome.tabs.onCreated.addListener((tab) =>
 
   // Ungrouped tab - queue for grouping
   // (processGroupingRequest will check if it's a managed tab and ungroup if needed)
+  // Mone: we need to change tab's active space group in background.ts and not in Tablist, 
+  //       useTab or BookmarkTabContext because we need this to work even when the SideBar
+  //       is hidden.
+  //       e.g. user is in Space A. user hide side bar. user use Cmd+T to create new tab.
+  //            new tab should be also under Space A.
   queueTabForGrouping(tab);
 });
 
@@ -828,6 +946,19 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
       historyManager.navigateToIndex(tabs[0].windowId, message.index);
     });
   }
+  else if (message.action === 'register-tab-space')
+  {
+    tabSpaceRegistry.register(message.windowId, message.tabId, message.spaceId);
+    return;
+  }
+  else if (message.action === 'set-active-tab-and-space')
+  {
+    if (message.tabId !== undefined)
+    {
+      setActiveTabAndSpace(message.tabId).then(sendResponse);
+      return true;  // async response
+    }
+  }
   else if (message.action === 'get-last-audible-tab')
   {
     chrome.tabs.query({ currentWindow: true }, (allTabs) =>
@@ -882,25 +1013,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 
 chrome.commands.onCommand.addListener((command) =>
 {
-  if (command === "new-tab-in-group")
-  {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
-    {
-      if (tabs.length === 0) return;
-
-      const activeTab = tabs[0];
-      const groupId = activeTab.groupId;
-
-      chrome.tabs.create({ active: true, windowId: activeTab.windowId }, (newTab) =>
-      {
-        if (groupId && groupId !== -1 && newTab.id)
-        {
-          chrome.tabs.group({ tabIds: [newTab.id], groupId });
-        }
-      });
-    });
-  }
-  else if (command === "prev-used-tab" || command === "next-used-tab")
+  if (command === "prev-used-tab" || command === "next-used-tab")
   {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
     {

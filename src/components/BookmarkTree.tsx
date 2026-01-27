@@ -1858,7 +1858,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               checkIsAudible={isBookmarkAudible}
               checkIsActive={isBookmarkActive}
               getLiveTitle={getBookmarkLiveTitle}
-              onOpenBookmark={openBookmarkTab}
+              onOpenBookmark={(bookmarkId, url) => openBookmarkTab(bookmarkId, url, activeSpace?.id)}
               onCloseBookmark={closeBookmarkTab}
               onOpenAsTabGroup={!useSpaces ? handleOpenAsTabGroup : undefined}
               onOpenAllTabs={handleOpenAllTabs}
