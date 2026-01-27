@@ -51,6 +51,10 @@ interface SidebarContentProps
   onSpaceDropTargetChange?: (spaceId: string | null) => void;
 }
 
+// Storage key for scroll position per space per window
+const getScrollTopKey = (windowId: number, spaceId: string) =>
+  `scrollTop_${windowId}_${spaceId}`;
+
 const SidebarContent: React.FC<SidebarContentProps> = ({
   onPin,
   onPinMultiple,
@@ -69,10 +73,90 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   onSpaceDropTargetChange,
 }) =>
 {
-  const { activeSpace } = useSpacesContext();
+  const { activeSpace, activeSpaceId, windowId, getSpaceSwitchSource } = useSpacesContext();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastScrollTopRef = useRef(0);
+  const prevSpaceIdRef = useRef(activeSpaceId);
+  const suppressAutoScrollRef = useRef(false);
+  const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Debounced onScroll handler — saves scroll position to session storage
+  const handleScroll = useCallback(() =>
+  {
+    if (scrollContainerRef.current)
+    {
+      lastScrollTopRef.current = scrollContainerRef.current.scrollTop;
+    }
+    if (scrollSaveTimerRef.current)
+    {
+      clearTimeout(scrollSaveTimerRef.current);
+    }
+    scrollSaveTimerRef.current = setTimeout(() =>
+    {
+      if (!windowId) return;
+      const spaceId = prevSpaceIdRef.current;
+      const key = getScrollTopKey(windowId, spaceId);
+      chrome.storage.session.set({ [key]: lastScrollTopRef.current });
+    }, 300);
+  }, [windowId]);
+
+  // Save/restore scroll position on space change
+  useEffect(() =>
+  {
+    if (!windowId) return;
+    if (activeSpaceId === prevSpaceIdRef.current) return;
+
+    const prevSpaceId = prevSpaceIdRef.current;
+    const switchSource = getSpaceSwitchSource();
+
+    // Save current scroll position for the previous space
+    const saveKey = getScrollTopKey(windowId, prevSpaceId);
+    chrome.storage.session.set({ [saveKey]: lastScrollTopRef.current });
+
+    prevSpaceIdRef.current = activeSpaceId;
+
+    // For user-initiated switches, try to restore saved scroll position
+    if (switchSource === 'user')
+    {
+      const restoreKey = getScrollTopKey(windowId, activeSpaceId);
+      chrome.storage.session.get([restoreKey], (result) =>
+      {
+        const savedScrollTop = result[restoreKey];
+        if (savedScrollTop !== undefined && scrollContainerRef.current)
+        {
+          suppressAutoScrollRef.current = true;
+          setTimeout(() =>
+          {
+            if (scrollContainerRef.current)
+            {
+              scrollContainerRef.current.scrollTop = savedScrollTop;
+            }
+            // Clear suppress flag after auto-scroll would have fired
+            setTimeout(() => { suppressAutoScrollRef.current = false; }, 300);
+          }, 50);
+        }
+      });
+    }
+  }, [activeSpaceId, windowId, getSpaceSwitchSource]);
+
+  // Cleanup scroll save timer on unmount
+  useEffect(() =>
+  {
+    return () =>
+    {
+      if (scrollSaveTimerRef.current)
+      {
+        clearTimeout(scrollSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
-    <div className="h-full overflow-y-auto overflow-x-hidden p-2">
+    <div
+      ref={scrollContainerRef}
+      className="h-full overflow-y-auto overflow-x-hidden p-2"
+      onScroll={handleScroll}
+    >
       <BookmarkTree
         onPin={onPin}
         onPinMultiple={onPinMultiple}
@@ -86,6 +170,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         activeSpace={activeSpace}
         onShowToast={onShowToast}
         useSpaces={useSpaces}
+        suppressAutoScrollRef={suppressAutoScrollRef}
       />
       <TabList
         onPin={onPin}

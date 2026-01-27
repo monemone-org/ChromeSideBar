@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useBookmarkTabsContext } from './BookmarkTabsContext';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from '../utils/spaceMessages';
@@ -101,6 +101,9 @@ interface SpacesContextValue
 
   // Tab query (uses Chrome tab groups)
   getTabsForSpace: (spaceId: string) => Promise<chrome.tabs.Tab[]>;
+
+  // Space switch source (read-once: returns value and resets to 'navigation')
+  getSpaceSwitchSource: () => 'user' | 'navigation';
 
   // Actions
   closeAllTabsInSpace: (space: Space) => Promise<void>;
@@ -370,6 +373,18 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [spaces, saveSpaces]);
 
   // ---------------------------------------------------------------------------
+  // Space switch source tracking
+  // ---------------------------------------------------------------------------
+  const spaceSwitchSourceRef = useRef<'user' | 'navigation'>('navigation');
+
+  const getSpaceSwitchSource = useCallback((): 'user' | 'navigation' =>
+  {
+    const source = spaceSwitchSourceRef.current;
+    spaceSwitchSourceRef.current = 'navigation';
+    return source;
+  }, []);
+
+  // ---------------------------------------------------------------------------
   // Per-window state operations (send messages to background, state updates via STATE_CHANGED)
   // ---------------------------------------------------------------------------
 
@@ -377,6 +392,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Use for: history navigation, spaces disabled, create/delete space
   const setActiveSpaceId = useCallback((spaceId: string) =>
   {
+    spaceSwitchSourceRef.current = 'navigation';
     // Update local state immediately for responsive UI
     setWindowState(prev => ({ ...prev, activeSpaceId: spaceId }));
 
@@ -401,6 +417,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Use for: user clicks space bar, swipe gestures, space navigator
   const switchToSpace = useCallback((spaceId: string) =>
   {
+    spaceSwitchSourceRef.current = 'user';
     // Update local state immediately for responsive UI
     setWindowState(prev => ({ ...prev, activeSpaceId: spaceId }));
 
@@ -594,6 +611,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveSpaceId,
     switchToSpace,
     getTabsForSpace,
+    getSpaceSwitchSource,
     closeAllTabsInSpace,
   }), [
     spaces,
@@ -612,6 +630,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setActiveSpaceId,
     switchToSpace,
     getTabsForSpace,
+    getSpaceSwitchSource,
     closeAllTabsInSpace,
   ]);
 

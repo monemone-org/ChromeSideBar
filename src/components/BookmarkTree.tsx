@@ -803,9 +803,10 @@ interface BookmarkTreeProps {
   activeSpace?: Space | null;
   onShowToast?: (message: string) => void;
   useSpaces?: boolean;
+  suppressAutoScrollRef?: React.RefObject<boolean>;
 }
 
-export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
@@ -1147,8 +1148,11 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
           });
         }
 
-        // Scroll after DOM updates from expansion
-        scrollToBookmark(bookmarkId, 150);
+        // Scroll after DOM updates from expansion (skip if scroll position is being restored)
+        if (!suppressAutoScrollRef?.current)
+        {
+          scrollToBookmark(bookmarkId, 150);
+        }
       })();
     }
     else if (!activeItemKey?.startsWith('bookmark-'))
