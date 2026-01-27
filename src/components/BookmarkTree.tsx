@@ -56,16 +56,7 @@ import {
   DraggableAttributes,
 } from '@dnd-kit/core';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
-
-// Get favicon URL using Chrome's internal favicon cache
-const getFaviconUrl = (url: string): string => {
-  try {
-    // Use Chrome's _favicon API (requires "favicon" permission in manifest)
-    return `chrome-extension://${chrome.runtime.id}/_favicon/?pageUrl=${encodeURIComponent(url)}&size=32`;
-  } catch {
-    return '';
-  }
-};
+import { getFaviconUrl } from '../utils/favicon';
 
 // Standard Chrome bookmark folder IDs
 const BOOKMARKS_BAR_ID = '1';

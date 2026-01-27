@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, RefObject } from 'react';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
+import { isValidUrl } from '../utils/url';
 
 // Drop target info for external URL drops on tabs
 export interface TabDropTarget
@@ -295,18 +296,3 @@ export const useExternalUrlDropForTabs = ({
   ]);
 };
 
-/**
- * Check if a string is a valid URL
- */
-function isValidUrl(text: string): boolean
-{
-  try
-  {
-    const url = new URL(text);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  }
-  catch
-  {
-    return false;
-  }
-}

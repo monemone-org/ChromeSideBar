@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback, RefObject } from 'react';
 import { ExternalDropTarget, ResolveBookmarkDropTarget } from '../components/TabList';
+import { isValidUrl } from '../utils/url';
 
 interface UseExternalLinkDropOptions
 {
@@ -309,18 +310,3 @@ export const useExternalLinkDrop = ({
   ]);
 };
 
-/**
- * Check if a string is a valid URL
- */
-function isValidUrl(text: string): boolean
-{
-  try
-  {
-    const url = new URL(text);
-    return url.protocol === 'http:' || url.protocol === 'https:';
-  }
-  catch
-  {
-    return false;
-  }
-}
