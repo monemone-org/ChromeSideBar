@@ -4,13 +4,15 @@
 ## In-Progress
 
 
+
 ## Pending
+
+- [ ] add popup menu item to Live bookmark in space to "Move To Tabs" which deassociate the livebookmark as regular tab in the space
+
+- [ ] store last active space in local storage and restore when extension is reloaded, so it doesn't always land on "All"
 
 - Review Code:
    - [ ] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
-
-
-- bookmarktree doesn't auto-expand to show the bookmark row when a bookmark tab becomes active, therefore the bookmark row is not selected.
 
 - [ ] Support drag links from browser pane to
             - bookmark  - drop before/after bookmark
@@ -286,3 +288,7 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 ```
 
 - [x] when right click on a single selected live bookmark , show "Close" instead of "Delete"
+
+- [x] bookmarktree doesn't auto-expand to show the bookmark row when a bookmark tab becomes active, therefore the bookmark row is not selected.
+
+

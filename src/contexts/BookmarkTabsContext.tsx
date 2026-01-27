@@ -386,7 +386,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           });
         }
 
-        // Tell background to re-check this tab (will ungroup if it was grouped)
+        // Tell background to re-check this tab (will group into space if active)
         if (windowId)
         {
           chrome.runtime.sendMessage({

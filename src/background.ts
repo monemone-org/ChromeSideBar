@@ -1,5 +1,5 @@
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
-import { isManagedTab } from './utils/tabAssociations';
+import { isPinnedManagedTab } from './utils/tabAssociations';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -805,8 +805,8 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
 {
   const { tabId, windowId, activeSpaceId } = request;
 
-  // Check if this is a managed tab (bookmark/pinned site)
-  if (await isManagedTab(windowId, tabId))
+  // Check if this is a pinned-site managed tab (keep ungrouped)
+  if (await isPinnedManagedTab(windowId, tabId))
   {
     // Ungroup if currently in a group
     try

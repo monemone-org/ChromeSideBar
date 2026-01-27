@@ -19,6 +19,14 @@ export async function isManagedTab(windowId: number, tabId: number): Promise<boo
   return tabId in associations;
 }
 
+// Check if a tab is a pinned-site managed tab
+export async function isPinnedManagedTab(windowId: number, tabId: number): Promise<boolean>
+{
+  const associations = await getTabAssociations(windowId);
+  const itemKey = associations[tabId];
+  return itemKey !== undefined && itemKey.startsWith('pinned-');
+}
+
 // Store an association
 export async function storeTabAssociation(
   windowId: number,
