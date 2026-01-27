@@ -1,7 +1,7 @@
 ---
 created: 2026-01-26
 after-version: 1.0.189
-status: draft
+status: completed
 ---
 
 # Fix: Switch to Correct Space on Tab Activation

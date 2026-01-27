@@ -187,24 +187,19 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
     </div>
   );
 
-  // Computed class for coloring - restore original rounding for background
-  // Priority: selected > active > default
+  // Computed class for coloring
+  // Grouped tabs: all styling via className (bg + text)
+  // Ungrouped tabs: TreeRow handles active ring, selection bg, hover ring, text colors
   const rowClassName = clsx(
     groupColor ? (isLastInGroup ? "rounded-b-lg rounded-t-none" : "rounded-none") : "",
     tab.active && "font-semibold",
-    isSelected && groupColor
-      ? clsx(GROUP_COLORS[groupColor]?.bgSelected, "text-gray-900 dark:text-gray-100")
-      : tab.active
-        ? groupColor
+    groupColor && (
+      isSelected
+        ? clsx(GROUP_COLORS[groupColor]?.bgSelected, "text-gray-900 dark:text-gray-100")
+        : tab.active
           ? clsx(GROUP_COLORS[groupColor]?.bgStrong, "text-gray-900 dark:text-gray-100")
-          : isSelected
-            ? undefined  // TreeRow handles selected+active ungrouped tabs
-            : "bg-blue-100 dark:bg-blue-900/40 text-blue-900 dark:text-blue-100"
-        : groupColor
-          ? clsx(GROUP_COLORS[groupColor]?.bg, "text-gray-700 dark:text-gray-200")
-          : globalDragActive
-            ? "text-gray-700 dark:text-gray-200"  // No hover ring during drag
-            : "hover:ring-2 hover:ring-inset hover:ring-gray-300 dark:hover:ring-gray-600 text-gray-700 dark:text-gray-200"
+          : clsx(GROUP_COLORS[groupColor]?.bg, "text-gray-700 dark:text-gray-200")
+    )
   );
 
   return (
@@ -219,7 +214,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               tooltip={tab.url ? `${tab.title}\n${tab.url}` : undefined}
               icon={icon}
               hasChildren={false}
-              isActive={false} // Disable default active style, we handle it via className
+              isActive={tab.active && !groupColor} // Ungrouped: TreeRow shows ring; Grouped: handled via className
               isSelected={isSelected && !groupColor}  // Don't show selection highlight for grouped tabs (they have their own color)
               isHighlighted={!groupColor && !isSelected && isOpen}
               isDragging={isBeingDragged}

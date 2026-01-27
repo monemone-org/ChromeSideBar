@@ -76,8 +76,8 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
         'group flex items-center h-7 rounded-md cursor-default select-none transition-colors relative pr-2 outline-none',
         // Selection style (brighter blue background)
         isSelected && 'bg-blue-200 dark:bg-blue-800/60 text-blue-800 dark:text-blue-50',
-        // Active tab style (subtle background)
-        isActive && !isSelected && 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-100',
+        // Active tab style (border ring, visually distinct from selection)
+        isActive && !isSelected && 'ring-2 ring-inset ring-blue-400 dark:ring-blue-600 text-gray-700 dark:text-gray-200',
         // Default style (ring hover) - only when neither active nor selected, and hover not disabled
         !isActive && !isSelected && !disableHoverBorder && `${RING_HIGHLIGHT_HOVER} text-gray-700 dark:text-gray-200`,
         !isActive && !isSelected && disableHoverBorder && 'text-gray-700 dark:text-gray-200',

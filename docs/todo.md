@@ -3,11 +3,12 @@
 
 ## In-Progress
 
-- Review Code:
-   - [-] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
-
 
 ## Pending
+
+- Review Code:
+   - [ ] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
+
 
 - bookmarktree doesn't auto-expand to show the bookmark row when a bookmark tab becomes active, therefore the bookmark row is not selected.
 

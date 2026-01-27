@@ -8,19 +8,19 @@ Identifies code organization issues including large files, duplicated code, miss
 
 ## Summary Table
 
-| Fix Status | Issue # | Description | Priority | Recommended | Dev Notes |
-|------------|---------|-------------|----------|-------------|-----------|
-|  | 1 | TabList.tsx - 2,923 lines | High | Maybe | |
-|  | 2 | BookmarkTree.tsx - 1,949 lines | High | Maybe | |
-|  | 3 | Duplicated getFaviconUrl function | High | Yes | |
-|  | 4 | Duplicated isValidUrl function | High | Yes | |
-|  | 5 | Similar auto-expand timer logic | High | Maybe | |
-|  | 6 | Repeated escape key handling | Medium | Yes | |
-|  | 7 | Timeout constants (magic numbers) | Medium | Maybe | |
-|  | 8 | Auto-expand delay (magic numbers) | Medium | Maybe | |
-|  | 9 | TypeScript any usage | Low | No | |
-|  | 10 | Dialogs not using shared Dialog component | Low | No | |
-|  | 11 | LocalStorage key strings | Low | No | |
+| Fix Status  | Issue # | Description                               | Priority | Recommended | Dev Notes |
+| ----------- | ------- | ----------------------------------------- | -------- | ----------- | --------- |
+|             | 1       | TabList.tsx - 2,923 lines                 | High     | Maybe       |           |
+|             | 2       | BookmarkTree.tsx - 1,949 lines            | High     | Maybe       |           |
+| fixed       | 3       | Duplicated getFaviconUrl function         | High     | Yes         |           |
+| fixed       | 4       | Duplicated isValidUrl function            | High     | Yes         |           |
+|             | 5       | Similar auto-expand timer logic           | High     | Maybe       |           |
+|             | 6       | Repeated escape key handling              | Medium   | Yes         |           |
+|             | 7       | Timeout constants (magic numbers)         | Medium   | Maybe       |           |
+|             | 8       | Auto-expand delay (magic numbers)         | Medium   | Maybe       |           |
+|             | 9       | TypeScript any usage                      | Low      | No          |           |
+|             | 10      | Dialogs not using shared Dialog component | Low      | No          |           |
+|             | 11      | LocalStorage key strings                  | Low      | No          |           |
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 created: 2026-01-26
 after-version: 1.1.025
-status: draft
+status: aborted
 ---
 
 # Unfocused Selection Styling
