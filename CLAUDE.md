@@ -59,6 +59,10 @@ Only enable logging in debug build:
 - `docs/features/` - Feature specs
 - `docs/state-reference.md` - Extension state reference
 
+### Feature ID
+
+`docs/features/next-id.txt` tracks the next available feature ID number. When creating a new feature doc, use the ID from this file as the doc's number prefix (e.g., `026-my-feature.md`), then increment the value in `next-id.txt`.
+
 ### Feature Docs Format
 
 All feature docs in `docs/features/` must have YAML front matter:
