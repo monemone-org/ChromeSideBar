@@ -9,6 +9,8 @@ interface DialogProps {
   title: string;
   children: ReactNode;
   maxWidth?: string;
+  footer?: ReactNode;
+  zIndex?: number;
 }
 
 export const Dialog = ({
@@ -16,7 +18,9 @@ export const Dialog = ({
   onClose,
   title,
   children,
-  maxWidth = 'max-w-xs'
+  maxWidth = 'max-w-xs',
+  footer,
+  zIndex = 50,
 }: DialogProps) =>
 {
   const fontSize = useFontSize();
@@ -40,8 +44,8 @@ export const Dialog = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto"
-      style={{ fontSize: `${fontSize}px` }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 overflow-y-auto"
+      style={{ fontSize: `${fontSize}px`, zIndex }}
     >
       <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full ${maxWidth} border border-gray-200 dark:border-gray-700 max-h-[calc(100vh-2rem)] flex flex-col my-auto`}>
         <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -59,6 +63,11 @@ export const Dialog = ({
         <div className="overflow-y-auto flex-1">
           {children}
         </div>
+        {footer && (
+          <div className="flex-shrink-0">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, FlaskConical } from 'lucide-react';
+import { FlaskConical } from 'lucide-react';
 import { runSearchParserTests } from '../utils/searchParser.test';
+import { Dialog } from './Dialog';
 
 export type BookmarkOpenMode = 'arc' | 'newTab' | 'activeTab';
 
@@ -66,18 +67,6 @@ export function SettingsDialog({
     wasOpen.current = isOpen;
   }, [isOpen, settings]);
 
-  // Escape key handler
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   const handleApply = () => {
     onApply({
       fontSize: tempFontSize,
@@ -104,23 +93,26 @@ export function SettingsDialog({
     }
   };
 
-  if (!isOpen) {
-    return null;
-  }
+  const footerButtons = (
+    <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex justify-end gap-2">
+      <button
+        onClick={onClose}
+        className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={handleApply}
+        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+      >
+        Apply
+      </button>
+    </div>
+  );
 
   return (
-    <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-56 border border-gray-200 dark:border-gray-700 max-h-[calc(100vh-2rem)] flex flex-col my-auto">
-        <div className="flex justify-between items-center p-3 pb-0 flex-shrink-0">
-          <h2 className="font-bold">
-            Settings
-          </h2>
-          <button onClick={onClose} aria-label="Close settings" className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto flex-1 p-3 space-y-3">
+    <Dialog isOpen={isOpen} onClose={onClose} title="Settings" maxWidth="max-w-xs" footer={footerButtons}>
+      <div className="p-3 space-y-3">
           {/* Font Size */}
           <div>
             <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
@@ -267,24 +259,7 @@ export function SettingsDialog({
             </div>
           )}
 
-        </div>
-
-        {/* Apply / Cancel buttons - fixed at bottom */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex justify-end gap-2 flex-shrink-0">
-          <button
-            onClick={onClose}
-            className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleApply}
-            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Apply
-          </button>
-        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

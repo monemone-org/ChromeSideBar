@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, CheckCircle } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
+import { Dialog } from './Dialog';
 import {
   isFullBackup,
   importFullBackup,
@@ -74,18 +75,6 @@ export function ImportDialog({
       fileInputRef.current?.click();
     }
   }, [isOpen, dialogState]);
-
-  // Escape key handler
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen]);
 
   const handleClose = () => {
     setParsedData(null);
@@ -207,9 +196,54 @@ export function ImportDialog({
 
   const nothingSelected = !importPinnedSitesFlag && !importBookmarksFlag && !importTabGroups && !importSpacesFlag;
 
-  if (!isOpen) {
+  // Build footer buttons based on dialog state
+  const footerContent = (() => {
+    if (error) {
+      return (
+        <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex justify-end">
+          <button
+            onClick={handleClose}
+            className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+          >
+            Close
+          </button>
+        </div>
+      );
+    }
+    if (dialogState === 'success') {
+      return (
+        <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex justify-end">
+          <button
+            onClick={handleClose}
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Done
+          </button>
+        </div>
+      );
+    }
+    if ((dialogState === 'preview' || dialogState === 'importing') && parsedData && !error) {
+      return (
+        <div className="border-t border-gray-200 dark:border-gray-700 p-3 flex justify-end gap-2">
+          <button
+            onClick={handleClose}
+            disabled={dialogState === 'importing'}
+            className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleConfirmImport}
+            disabled={dialogState === 'importing' || nothingSelected}
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+          >
+            {dialogState === 'importing' ? 'Importing...' : 'Import'}
+          </button>
+        </div>
+      );
+    }
     return null;
-  }
+  })();
 
   return (
     <>
@@ -231,411 +265,368 @@ export function ImportDialog({
       />
 
       {/* Dialog - shown after file is selected */}
-      {dialogState !== 'selecting' && (
-        <div className="absolute inset-0 z-[60] bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-64 border border-gray-200 dark:border-gray-700 max-h-[calc(100vh-2rem)] flex flex-col my-auto">
-            <div className="flex justify-between items-center p-3 pb-0 flex-shrink-0">
-              <h2 className="font-bold">
-                {dialogState === 'success' ? 'Import Complete' : 'Import Backup'}
-              </h2>
-              <button
-                onClick={handleClose}
-                className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-              >
-                <X size={16} />
-              </button>
-            </div>
+      <Dialog
+        isOpen={isOpen && dialogState !== 'selecting'}
+        onClose={handleClose}
+        title={dialogState === 'success' ? 'Import Complete' : 'Import Backup'}
+        maxWidth="max-w-xs"
+        zIndex={60}
+        footer={footerContent}
+      >
+        <div className="p-3 space-y-3">
+          {/* Error state */}
+          {error && (
+            <>
+              <p className="text-red-500">{error}</p>
+              {errorDetails && (
+                <details className="mt-2">
+                  <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+                    Show details
+                  </summary>
+                  <pre className="mt-1 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-all bg-gray-100 dark:bg-gray-900 p-2 rounded">
+                    {errorDetails}
+                  </pre>
+                </details>
+              )}
+            </>
+          )}
 
-            <div className="overflow-y-auto flex-1 p-3 space-y-3">
-              {/* Error state */}
-              {error && (
-                <>
-                  <p className="text-red-500">{error}</p>
-                  {errorDetails && (
-                    <details className="mt-2">
-                      <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
-                        Show details
-                      </summary>
-                      <pre className="mt-1 text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-all bg-gray-100 dark:bg-gray-900 p-2 rounded">
-                        {errorDetails}
-                      </pre>
-                    </details>
-                  )}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end">
-                    <button
-                      onClick={handleClose}
-                      className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
-                    >
-                      Close
-                    </button>
+          {/* Success state */}
+          {dialogState === 'success' && importResult && (
+            <>
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <CheckCircle size={20} />
+                <span>Successfully imported:</span>
+              </div>
+              <ul className="text-gray-600 dark:text-gray-400 ml-7 space-y-1">
+                {importResult.pinnedSitesCount > 0 && (
+                  <li>{importResult.pinnedSitesCount} pinned sites</li>
+                )}
+                {importResult.bookmarksCount > 0 && (
+                  <li>{importResult.bookmarksCount} bookmarks</li>
+                )}
+                {importResult.tabGroupsCount > 0 && (
+                  <li>{importResult.tabGroupsCount} tabs and groups</li>
+                )}
+                {importResult.spacesCount > 0 && (
+                  <li>{importResult.spacesCount} spaces</li>
+                )}
+              </ul>
+            </>
+          )}
+
+          {/* Preview/Options state */}
+          {(dialogState === 'preview' || dialogState === 'importing') && parsedData && !error && (
+            <>
+              {/* Backup info */}
+              <p className="text-gray-600 dark:text-gray-400">
+                Exported: {new Date(parsedData.backup.exportedAt).toLocaleDateString()}
+              </p>
+
+              {/* Single data type - Pinned sites only */}
+              {parsedData.dataTypeCount === 1 && parsedData.hasPinnedSites && (
+                <div className="space-y-2">
+                  <p className="text-gray-700 dark:text-gray-300">
+                    {parsedData.backup.pinnedSites?.length} pinned sites
+                  </p>
+                  <div className="ml-2 space-y-1">
+                    <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pinnedSitesModeSingle"
+                        checked={pinnedSitesMode === 'replace'}
+                        onChange={() => setPinnedSitesMode('replace')}
+                        disabled={dialogState === 'importing'}
+                      />
+                      Replace existing pinned sites
+                    </label>
+                    <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="pinnedSitesModeSingle"
+                        checked={pinnedSitesMode === 'append'}
+                        onChange={() => setPinnedSitesMode('append')}
+                        disabled={dialogState === 'importing'}
+                      />
+                      Append to existing
+                    </label>
                   </div>
-                </>
+                </div>
               )}
 
-              {/* Success state */}
-              {dialogState === 'success' && importResult && (
-                <>
-                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                    <CheckCircle size={20} />
-                    <span>Successfully imported:</span>
+              {/* Single data type - Tabs/groups only */}
+              {parsedData.dataTypeCount === 1 && parsedData.hasTabGroups && (
+                <div className="space-y-2">
+                  <p className="text-gray-700 dark:text-gray-300">
+                    {parsedData.backup.tabGroups?.length} tabs and groups
+                  </p>
+                  <div className="ml-2 space-y-1">
+                    <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="tabGroupsModeSingle"
+                        checked={tabGroupsMode === 'replace'}
+                        onChange={() => setTabGroupsMode('replace')}
+                        disabled={dialogState === 'importing'}
+                      />
+                      Replace all tabs
+                    </label>
+                    <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="tabGroupsModeSingle"
+                        checked={tabGroupsMode === 'append'}
+                        onChange={() => setTabGroupsMode('append')}
+                        disabled={dialogState === 'importing'}
+                      />
+                      Append to existing
+                    </label>
                   </div>
-                  <ul className="text-gray-600 dark:text-gray-400 ml-7 space-y-1">
-                    {importResult.pinnedSitesCount > 0 && (
-                      <li>{importResult.pinnedSitesCount} pinned sites</li>
-                    )}
-                    {importResult.bookmarksCount > 0 && (
-                      <li>{importResult.bookmarksCount} bookmarks</li>
-                    )}
-                    {importResult.tabGroupsCount > 0 && (
-                      <li>{importResult.tabGroupsCount} tabs and groups</li>
-                    )}
-                    {importResult.spacesCount > 0 && (
-                      <li>{importResult.spacesCount} spaces</li>
-                    )}
-                  </ul>
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end">
-                    <button
-                      onClick={handleClose}
-                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </>
+                </div>
               )}
 
-              {/* Preview/Options state */}
-              {(dialogState === 'preview' || dialogState === 'importing') && parsedData && !error && (
+              {/* Bookmarks only - show mode selection */}
+              {parsedData.dataTypeCount === 1 && parsedData.hasBookmarks && (
+                <div className="space-y-2">
+                  <p className="text-gray-700 dark:text-gray-300">Bookmarks</p>
+                  <div className="ml-2 space-y-2">
+                    <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="bookmarkModeSingle"
+                        checked={bookmarkMode === 'replace'}
+                        onChange={() => setBookmarkMode('replace')}
+                        disabled={dialogState === 'importing'}
+                      />
+                      Replace all bookmarks
+                    </label>
+                    <div>
+                      <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="bookmarkModeSingle"
+                          checked={bookmarkMode === 'folder'}
+                          onChange={() => setBookmarkMode('folder')}
+                          disabled={dialogState === 'importing'}
+                        />
+                        Import to Other Bookmarks
+                      </label>
+                      <p className="text-gray-500 dark:text-gray-500 ml-5 text-xs">
+                        Creates a subfolder with imported bookmarks
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Single data type - Spaces only */}
+              {parsedData.dataTypeCount === 1 && parsedData.hasSpaces && (
+                <div className="space-y-2">
+                  <p className="text-gray-700 dark:text-gray-300">
+                    {parsedData.backup.spaces?.length} spaces
+                  </p>
+                  <div className="ml-2 space-y-1">
+                    <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="spacesModeSingle"
+                        checked={spacesMode === 'replace'}
+                        onChange={() => setSpacesMode('replace')}
+                        disabled={dialogState === 'importing'}
+                      />
+                      Replace all spaces
+                    </label>
+                    <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="spacesModeSingle"
+                        checked={spacesMode === 'append'}
+                        onChange={() => setSpacesMode('append')}
+                        disabled={dialogState === 'importing'}
+                      />
+                      Append to existing
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Multiple data types - show checkboxes */}
+              {parsedData.dataTypeCount > 1 && (
                 <>
-                  {/* Backup info */}
-                  <p className="text-gray-600 dark:text-gray-400">
-                    Exported: {new Date(parsedData.backup.exportedAt).toLocaleDateString()}
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Select data to import:
                   </p>
 
-                  {/* Single data type - Pinned sites only */}
-                  {parsedData.dataTypeCount === 1 && parsedData.hasPinnedSites && (
-                    <div className="space-y-2">
-                      <p className="text-gray-700 dark:text-gray-300">
-                        {parsedData.backup.pinnedSites?.length} pinned sites
-                      </p>
-                      <div className="ml-2 space-y-1">
-                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="pinnedSitesModeSingle"
-                            checked={pinnedSitesMode === 'replace'}
-                            onChange={() => setPinnedSitesMode('replace')}
-                            disabled={dialogState === 'importing'}
-                          />
-                          Replace existing pinned sites
-                        </label>
-                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="pinnedSitesModeSingle"
-                            checked={pinnedSitesMode === 'append'}
-                            onChange={() => setPinnedSitesMode('append')}
-                            disabled={dialogState === 'importing'}
-                          />
-                          Append to existing
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Single data type - Tabs/groups only */}
-                  {parsedData.dataTypeCount === 1 && parsedData.hasTabGroups && (
-                    <div className="space-y-2">
-                      <p className="text-gray-700 dark:text-gray-300">
-                        {parsedData.backup.tabGroups?.length} tabs and groups
-                      </p>
-                      <div className="ml-2 space-y-1">
-                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="tabGroupsModeSingle"
-                            checked={tabGroupsMode === 'replace'}
-                            onChange={() => setTabGroupsMode('replace')}
-                            disabled={dialogState === 'importing'}
-                          />
-                          Replace all tabs
-                        </label>
-                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="tabGroupsModeSingle"
-                            checked={tabGroupsMode === 'append'}
-                            onChange={() => setTabGroupsMode('append')}
-                            disabled={dialogState === 'importing'}
-                          />
-                          Append to existing
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bookmarks only - show mode selection */}
-                  {parsedData.dataTypeCount === 1 && parsedData.hasBookmarks && (
-                    <div className="space-y-2">
-                      <p className="text-gray-700 dark:text-gray-300">Bookmarks</p>
-                      <div className="ml-2 space-y-2">
-                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="bookmarkModeSingle"
-                            checked={bookmarkMode === 'replace'}
-                            onChange={() => setBookmarkMode('replace')}
-                            disabled={dialogState === 'importing'}
-                          />
-                          Replace all bookmarks
-                        </label>
-                        <div>
+                  {/* Pinned sites import */}
+                  {parsedData.hasPinnedSites && (
+                    <div>
+                      <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={importPinnedSitesFlag}
+                          onChange={(e) => setImportPinnedSitesFlag(e.target.checked)}
+                          className="rounded border-gray-300 dark:border-gray-600"
+                          disabled={dialogState === 'importing'}
+                        />
+                        Pinned sites ({parsedData.backup.pinnedSites?.length})
+                      </label>
+                      {importPinnedSitesFlag && (
+                        <div className="ml-5 mt-1 space-y-1">
                           <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
                             <input
                               type="radio"
-                              name="bookmarkModeSingle"
-                              checked={bookmarkMode === 'folder'}
-                              onChange={() => setBookmarkMode('folder')}
+                              name="pinnedSitesMode"
+                              checked={pinnedSitesMode === 'replace'}
+                              onChange={() => setPinnedSitesMode('replace')}
                               disabled={dialogState === 'importing'}
                             />
-                            Import to Other Bookmarks
+                            Replace existing
                           </label>
-                          <p className="text-gray-500 dark:text-gray-500 ml-5 text-xs">
-                            Creates a subfolder with imported bookmarks
-                          </p>
+                          <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="pinnedSitesMode"
+                              checked={pinnedSitesMode === 'append'}
+                              onChange={() => setPinnedSitesMode('append')}
+                              disabled={dialogState === 'importing'}
+                            />
+                            Append to existing
+                          </label>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Single data type - Spaces only */}
-                  {parsedData.dataTypeCount === 1 && parsedData.hasSpaces && (
-                    <div className="space-y-2">
-                      <p className="text-gray-700 dark:text-gray-300">
-                        {parsedData.backup.spaces?.length} spaces
-                      </p>
-                      <div className="ml-2 space-y-1">
-                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="spacesModeSingle"
-                            checked={spacesMode === 'replace'}
-                            onChange={() => setSpacesMode('replace')}
-                            disabled={dialogState === 'importing'}
-                          />
-                          Replace all spaces
-                        </label>
-                        <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="spacesModeSingle"
-                            checked={spacesMode === 'append'}
-                            onChange={() => setSpacesMode('append')}
-                            disabled={dialogState === 'importing'}
-                          />
-                          Append to existing
-                        </label>
-                      </div>
+                  {/* Bookmarks import */}
+                  {parsedData.hasBookmarks && (
+                    <div>
+                      <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={importBookmarksFlag}
+                          onChange={(e) => setImportBookmarksFlag(e.target.checked)}
+                          className="rounded border-gray-300 dark:border-gray-600"
+                          disabled={dialogState === 'importing'}
+                        />
+                        Bookmarks
+                      </label>
+                      {importBookmarksFlag && (
+                        <div className="ml-5 mt-1 space-y-2">
+                          <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="bookmarkMode"
+                              checked={bookmarkMode === 'replace'}
+                              onChange={() => setBookmarkMode('replace')}
+                              disabled={dialogState === 'importing'}
+                            />
+                            Replace all bookmarks
+                          </label>
+                          <div>
+                            <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="bookmarkMode"
+                                checked={bookmarkMode === 'folder'}
+                                onChange={() => setBookmarkMode('folder')}
+                                disabled={dialogState === 'importing'}
+                              />
+                              Import to Other Bookmarks
+                            </label>
+                            <p className="text-gray-500 dark:text-gray-500 ml-5 text-xs">
+                              Creates a subfolder with imported bookmarks
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  {/* Multiple data types - show checkboxes */}
-                  {parsedData.dataTypeCount > 1 && (
-                    <>
-                      <p className="text-gray-500 dark:text-gray-400">
-                        Select data to import:
-                      </p>
-
-                      {/* Pinned sites import */}
-                      {parsedData.hasPinnedSites && (
-                        <div>
-                          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                  {/* Tabs and groups import */}
+                  {parsedData.hasTabGroups && (
+                    <div>
+                      <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={importTabGroups}
+                          onChange={(e) => setImportTabGroups(e.target.checked)}
+                          className="rounded border-gray-300 dark:border-gray-600"
+                          disabled={dialogState === 'importing'}
+                        />
+                        Tabs and groups ({parsedData.backup.tabGroups?.length})
+                      </label>
+                      {importTabGroups && (
+                        <div className="ml-5 mt-1 space-y-1">
+                          <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
                             <input
-                              type="checkbox"
-                              checked={importPinnedSitesFlag}
-                              onChange={(e) => setImportPinnedSitesFlag(e.target.checked)}
-                              className="rounded border-gray-300 dark:border-gray-600"
+                              type="radio"
+                              name="tabGroupsMode"
+                              checked={tabGroupsMode === 'replace'}
+                              onChange={() => setTabGroupsMode('replace')}
                               disabled={dialogState === 'importing'}
                             />
-                            Pinned sites ({parsedData.backup.pinnedSites?.length})
+                            Replace all tabs
                           </label>
-                          {importPinnedSitesFlag && (
-                            <div className="ml-5 mt-1 space-y-1">
-                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="pinnedSitesMode"
-                                  checked={pinnedSitesMode === 'replace'}
-                                  onChange={() => setPinnedSitesMode('replace')}
-                                  disabled={dialogState === 'importing'}
-                                />
-                                Replace existing
-                              </label>
-                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="pinnedSitesMode"
-                                  checked={pinnedSitesMode === 'append'}
-                                  onChange={() => setPinnedSitesMode('append')}
-                                  disabled={dialogState === 'importing'}
-                                />
-                                Append to existing
-                              </label>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Bookmarks import */}
-                      {parsedData.hasBookmarks && (
-                        <div>
-                          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                          <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
                             <input
-                              type="checkbox"
-                              checked={importBookmarksFlag}
-                              onChange={(e) => setImportBookmarksFlag(e.target.checked)}
-                              className="rounded border-gray-300 dark:border-gray-600"
+                              type="radio"
+                              name="tabGroupsMode"
+                              checked={tabGroupsMode === 'append'}
+                              onChange={() => setTabGroupsMode('append')}
                               disabled={dialogState === 'importing'}
                             />
-                            Bookmarks
+                            Append to existing
                           </label>
-                          {importBookmarksFlag && (
-                            <div className="ml-5 mt-1 space-y-2">
-                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="bookmarkMode"
-                                  checked={bookmarkMode === 'replace'}
-                                  onChange={() => setBookmarkMode('replace')}
-                                  disabled={dialogState === 'importing'}
-                                />
-                                Replace all bookmarks
-                              </label>
-                              <div>
-                                <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                  <input
-                                    type="radio"
-                                    name="bookmarkMode"
-                                    checked={bookmarkMode === 'folder'}
-                                    onChange={() => setBookmarkMode('folder')}
-                                    disabled={dialogState === 'importing'}
-                                  />
-                                  Import to Other Bookmarks
-                                </label>
-                                <p className="text-gray-500 dark:text-gray-500 ml-5 text-xs">
-                                  Creates a subfolder with imported bookmarks
-                                </p>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       )}
-
-                      {/* Tabs and groups import */}
-                      {parsedData.hasTabGroups && (
-                        <div>
-                          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={importTabGroups}
-                              onChange={(e) => setImportTabGroups(e.target.checked)}
-                              className="rounded border-gray-300 dark:border-gray-600"
-                              disabled={dialogState === 'importing'}
-                            />
-                            Tabs and groups ({parsedData.backup.tabGroups?.length})
-                          </label>
-                          {importTabGroups && (
-                            <div className="ml-5 mt-1 space-y-1">
-                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="tabGroupsMode"
-                                  checked={tabGroupsMode === 'replace'}
-                                  onChange={() => setTabGroupsMode('replace')}
-                                  disabled={dialogState === 'importing'}
-                                />
-                                Replace all tabs
-                              </label>
-                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="tabGroupsMode"
-                                  checked={tabGroupsMode === 'append'}
-                                  onChange={() => setTabGroupsMode('append')}
-                                  disabled={dialogState === 'importing'}
-                                />
-                                Append to existing
-                              </label>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Spaces import */}
-                      {parsedData.hasSpaces && (
-                        <div>
-                          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={importSpacesFlag}
-                              onChange={(e) => setImportSpacesFlag(e.target.checked)}
-                              className="rounded border-gray-300 dark:border-gray-600"
-                              disabled={dialogState === 'importing'}
-                            />
-                            Spaces ({parsedData.backup.spaces?.length})
-                          </label>
-                          {importSpacesFlag && (
-                            <div className="ml-5 mt-1 space-y-1">
-                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="spacesMode"
-                                  checked={spacesMode === 'replace'}
-                                  onChange={() => setSpacesMode('replace')}
-                                  disabled={dialogState === 'importing'}
-                                />
-                                Replace all spaces
-                              </label>
-                              <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
-                                <input
-                                  type="radio"
-                                  name="spacesMode"
-                                  checked={spacesMode === 'append'}
-                                  onChange={() => setSpacesMode('append')}
-                                  disabled={dialogState === 'importing'}
-                                />
-                                Append to existing
-                              </label>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </>
+                    </div>
                   )}
 
-                  {/* Import / Cancel buttons */}
-                  <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end gap-2">
-                    <button
-                      onClick={handleClose}
-                      disabled={dialogState === 'importing'}
-                      className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={handleConfirmImport}
-                      disabled={dialogState === 'importing' || nothingSelected}
-                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-                    >
-                      {dialogState === 'importing' ? 'Importing...' : 'Import'}
-                    </button>
-                  </div>
+                  {/* Spaces import */}
+                  {parsedData.hasSpaces && (
+                    <div>
+                      <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={importSpacesFlag}
+                          onChange={(e) => setImportSpacesFlag(e.target.checked)}
+                          className="rounded border-gray-300 dark:border-gray-600"
+                          disabled={dialogState === 'importing'}
+                        />
+                        Spaces ({parsedData.backup.spaces?.length})
+                      </label>
+                      {importSpacesFlag && (
+                        <div className="ml-5 mt-1 space-y-1">
+                          <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="spacesMode"
+                              checked={spacesMode === 'replace'}
+                              onChange={() => setSpacesMode('replace')}
+                              disabled={dialogState === 'importing'}
+                            />
+                            Replace all spaces
+                          </label>
+                          <label className="flex items-center gap-2 text-gray-600 dark:text-gray-400 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="spacesMode"
+                              checked={spacesMode === 'append'}
+                              onChange={() => setSpacesMode('append')}
+                              disabled={dialogState === 'importing'}
+                            />
+                            Append to existing
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
-            </div>
-          </div>
+            </>
+          )}
         </div>
-      )}
+      </Dialog>
     </>
   );
 }

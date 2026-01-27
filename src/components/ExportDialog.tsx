@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { Space } from '../contexts/SpacesContext';
+import { Dialog } from './Dialog';
 
 export interface ExportOptions {
   exportPinnedSites: boolean;
@@ -61,18 +61,6 @@ export function ExportDialog({
       setError(null);
     }
   }, [isOpen]);
-
-  // Escape key handler
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   const handleExport = async () => {
     if (!exportPinnedSites && !exportBookmarks && !exportTabGroups && !exportSpaces) {
@@ -143,92 +131,76 @@ export function ExportDialog({
 
   const nothingSelected = !exportPinnedSites && !exportBookmarks && !exportTabGroups && !exportSpaces;
 
-  if (!isOpen) {
-    return null;
-  }
-
   return (
-    <div className="absolute inset-0 z-[60] bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-3 w-56 border border-gray-200 dark:border-gray-700">
-        <div className="flex justify-between items-center mb-3">
-          <h2 className="font-bold">Export</h2>
+    <Dialog isOpen={isOpen} onClose={onClose} title="Export" maxWidth="max-w-xs" zIndex={60}>
+      <div className="p-3 space-y-3">
+        {/* Pinned sites export */}
+        <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={exportPinnedSites}
+            onChange={(e) => setExportPinnedSites(e.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-600"
+          />
+          Pinned sites ({pinnedSites.length})
+        </label>
+
+        {/* Bookmarks export */}
+        <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={exportBookmarks}
+            onChange={(e) => setExportBookmarks(e.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-600"
+          />
+          Bookmarks
+        </label>
+
+        {/* Tabs and groups export */}
+        <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={exportTabGroups}
+            onChange={(e) => setExportTabGroups(e.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-600"
+          />
+          Tabs and groups
+        </label>
+
+        {/* Spaces export */}
+        <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={exportSpaces}
+            onChange={(e) => setExportSpaces(e.target.checked)}
+            className="rounded border-gray-300 dark:border-gray-600"
+          />
+          Spaces ({spaces.length})
+        </label>
+
+        {/* Error message */}
+        {error && (
+          <p className="text-red-500 text-sm">{error}</p>
+        )}
+
+        {/* Export / Cancel buttons */}
+        <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end gap-2">
           <button
             onClick={onClose}
-            className="p-0.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+            disabled={isExporting}
+            className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
           >
-            <X size={16} />
+            Cancel
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={isExporting || nothingSelected}
+            className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
+          >
+            {isExporting ? 'Exporting...' : 'Export'}
           </button>
         </div>
-
-        <div className="space-y-3">
-          {/* Pinned sites export */}
-          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={exportPinnedSites}
-              onChange={(e) => setExportPinnedSites(e.target.checked)}
-              className="rounded border-gray-300 dark:border-gray-600"
-            />
-            Pinned sites ({pinnedSites.length})
-          </label>
-
-          {/* Bookmarks export */}
-          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={exportBookmarks}
-              onChange={(e) => setExportBookmarks(e.target.checked)}
-              className="rounded border-gray-300 dark:border-gray-600"
-            />
-            Bookmarks
-          </label>
-
-          {/* Tabs and groups export */}
-          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={exportTabGroups}
-              onChange={(e) => setExportTabGroups(e.target.checked)}
-              className="rounded border-gray-300 dark:border-gray-600"
-            />
-            Tabs and groups
-          </label>
-
-          {/* Spaces export */}
-          <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={exportSpaces}
-              onChange={(e) => setExportSpaces(e.target.checked)}
-              className="rounded border-gray-300 dark:border-gray-600"
-            />
-            Spaces ({spaces.length})
-          </label>
-
-          {/* Error message */}
-          {error && (
-            <p className="text-red-500 text-sm">{error}</p>
-          )}
-
-          {/* Export / Cancel buttons */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end gap-2">
-            <button
-              onClick={onClose}
-              disabled={isExporting}
-              className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleExport}
-              disabled={isExporting || nothingSelected}
-              className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50"
-            >
-              {isExporting ? 'Exporting...' : 'Export'}
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

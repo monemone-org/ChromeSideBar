@@ -8,19 +8,19 @@ Identifies code organization issues including large files, duplicated code, miss
 
 ## Summary Table
 
-| Fix Status  | Issue # | Description                               | Priority | Recommended | Dev Notes |
-| ----------- | ------- | ----------------------------------------- | -------- | ----------- | --------- |
-|             | 1       | TabList.tsx - 2,923 lines                 | High     | Maybe       |           |
-|             | 2       | BookmarkTree.tsx - 1,949 lines            | High     | Maybe       |           |
-| fixed       | 3       | Duplicated getFaviconUrl function         | High     | Yes         |           |
-| fixed       | 4       | Duplicated isValidUrl function            | High     | Yes         |           |
-|             | 5       | Similar auto-expand timer logic           | High     | Maybe       |           |
-|             | 6       | Repeated escape key handling              | Medium   | Yes         |           |
-|             | 7       | Timeout constants (magic numbers)         | Medium   | Maybe       |           |
-|             | 8       | Auto-expand delay (magic numbers)         | Medium   | Maybe       |           |
-|             | 9       | TypeScript any usage                      | Low      | No          |           |
-|             | 10      | Dialogs not using shared Dialog component | Low      | No          |           |
-|             | 11      | LocalStorage key strings                  | Low      | No          |           |
+| Fix Status | Issue # | Description                               | Priority | Recommended | Dev Notes |
+| ---------- | ------- | ----------------------------------------- | -------- | ----------- | --------- |
+|            | 1       | TabList.tsx - 2,923 lines                 | High     | Maybe       |           |
+|            | 2       | BookmarkTree.tsx - 1,949 lines            | High     | Maybe       |           |
+| fixed      | 3       | Duplicated getFaviconUrl function         | High     | Yes         |           |
+| fixed      | 4       | Duplicated isValidUrl function            | High     | Yes         |           |
+|            | 5       | Similar auto-expand timer logic           | High     | Maybe       |           |
+| fixed      | 6       | Repeated escape key handling              | Medium   | Yes         |           |
+|            | 7       | Timeout constants (magic numbers)         | Medium   | Maybe       |           |
+|            | 8       | Auto-expand delay (magic numbers)         | Medium   | Maybe       |           |
+|            | 9       | TypeScript any usage                      | Low      | No          |           |
+| fixed      | 10      | Dialogs not using shared Dialog component | Low      | No          |           |
+|            | 11      | LocalStorage key strings                  | Low      | No          |           |
 
 ---
 
@@ -462,7 +462,7 @@ Each dialog has specific needs.
 - Cons: Inconsistency; duplicated logic
 
 ### Recommendation
-**No fix needed.** Option A during next dialog-related feature work. The dialogs work correctly now. Refactoring purely for consistency isn't worth the risk of introducing bugs in stable UI components. Address this opportunistically when modifying these dialogs for other reasons.
+**Fixed.** Migrated all 5 dialogs (AboutDialog, ExportDialog, SettingsDialog, ImportDialog, PinnedIcon edit modal) to use the shared Dialog component. Added `footer` and `zIndex` optional props to Dialog.tsx to support the migration.
 
 ---
 

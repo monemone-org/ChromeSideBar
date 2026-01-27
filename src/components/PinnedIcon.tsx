@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Globe, Edit, Trash, X, RotateCcw, Play, Copy, ExternalLink } from 'lucide-react';
+import { Dialog } from './Dialog';
 import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePinnedSites';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -75,21 +76,6 @@ export const PinnedIcon = ({
       wasDraggingRef.current = true;
     }
   }, [isDragging]);
-
-  // Escape key handler for edit modal
-  useEffect(() =>
-  {
-    if (!showEditModal) return;
-    const handleKeyDown = (e: KeyboardEvent) =>
-    {
-      if (e.key === 'Escape')
-      {
-        setShowEditModal(false);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showEditModal]);
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -315,76 +301,70 @@ export const PinnedIcon = ({
         </ContextMenu.Portal>
       </ContextMenu.Root>
 
-      {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-sm border border-gray-200 dark:border-gray-700 max-h-[calc(100vh-2rem)] flex flex-col my-auto">
-            <div className="flex justify-between items-center p-4 pb-3 flex-shrink-0">
-              <h3 className="font-medium text-gray-900 dark:text-gray-100">Edit Pin</h3>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1 px-4 space-y-3">
-              <div>
-                <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
-                  URL
-                </label>
-                <input
-                  type="text"
-                  value={editUrl}
-                  onChange={(e) => setEditUrl(e.target.value)}
-                  className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                />
-              </div>
-
-              {/* Icon and Color picker */}
-              <IconColorPicker
-                selectedIcon={editCustomIconName}
-                selectedColor={editIconColor}
-                currentIconPreview={currentIconPreview}
-                onIconSelect={handleSelectIcon}
-                onColorSelect={handleColorChange}
-                colorOptions={PINNED_SITE_COLORS}
-                showCustomHex
-                customHexValue={customHexInput}
-                onCustomHexChange={setCustomHexInput}
-                onCustomHexSubmit={handleCustomHexSubmit}
-                currentCustomColor={editIconColor}
-                iconHeaderAction={resetIconButton}
-              />
-            </div>
-            <div className="flex justify-end space-x-2 p-4 pt-3 flex-shrink-0">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveEdit}
-                className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
-              >
-                Save
-              </button>
-            </div>
+      <Dialog
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="Edit Pin"
+        maxWidth="max-w-sm"
+        footer={
+          <div className="flex justify-end space-x-2 p-4 pt-3">
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveEdit}
+              className="px-3 py-1 bg-blue-500 hover:bg-blue-600 text-white rounded-md"
+            >
+              Save
+            </button>
           </div>
+        }
+      >
+        <div className="px-4 space-y-3">
+          <div>
+            <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
+              Title
+            </label>
+            <input
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block font-medium mb-1 text-gray-700 dark:text-gray-300">
+              URL
+            </label>
+            <input
+              type="text"
+              value={editUrl}
+              onChange={(e) => setEditUrl(e.target.value)}
+              className="w-full px-2 py-1.5 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          {/* Icon and Color picker */}
+          <IconColorPicker
+            selectedIcon={editCustomIconName}
+            selectedColor={editIconColor}
+            currentIconPreview={currentIconPreview}
+            onIconSelect={handleSelectIcon}
+            onColorSelect={handleColorChange}
+            colorOptions={PINNED_SITE_COLORS}
+            showCustomHex
+            customHexValue={customHexInput}
+            onCustomHexChange={setCustomHexInput}
+            onCustomHexSubmit={handleCustomHexSubmit}
+            currentCustomColor={editIconColor}
+            iconHeaderAction={resetIconButton}
+          />
         </div>
-      )}
+      </Dialog>
     </>
   );
 };
