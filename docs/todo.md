@@ -11,25 +11,6 @@
 
 - bookmarktree doesn't auto-expand to show the bookmark row when a bookmark tab becomes active, therefore the bookmark row is not selected.
 
-- [x] autoscrolling duplicated
-
-There are many copies of code to scroll to a bookmark row in bookmarktree and tab row in tablist.
-
-      const element = document.querySelector(`[data-bookmark-id="${newNode.id}"]`);
-      element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      	in AudioTabsDropdown, BookmarkTree
-
-        const element = document.querySelector(`[data-tab-id="${activeTab.id}"]`);
-        element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        in AudioTabsDropdown and TabList
-
-       can we consolidate them into 2 reusable function?
-
-       are we autoscrolling for tab history navigation?
-
-
-- when right click on a single selected live bookmark , show "Close" instead of "Delete"
-
 - [ ] Support drag links from browser pane to
             - bookmark  - drop before/after bookmark
                         - create new bookmark 
@@ -291,3 +272,16 @@ SpaceBar
 - Folder popup menu
       - [x] after "New Folder" menu item, there should be an "New Bookmark"
 
+- [x] autoscrolling duplicated
+There are many copies of code to scroll to a bookmark row in bookmarktree and tab row in tablist.
+```
+      const element = document.querySelector(`[data-bookmark-id="${newNode.id}"]`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      	in AudioTabsDropdown, BookmarkTree
+
+        const element = document.querySelector(`[data-tab-id="${activeTab.id}"]`);
+        element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            in AudioTabsDropdown and TabList
+```
+
+- [x] when right click on a single selected live bookmark , show "Close" instead of "Delete"
