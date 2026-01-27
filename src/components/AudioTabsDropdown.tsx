@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { Globe, Volume2 } from 'lucide-react';
 import * as DropdownMenu from './menu/DropdownMenu';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
+import { scrollToBookmark, scrollToTab } from '../utils/scrollHelpers';
 import { useFontSize } from '../contexts/FontSizeContext';
 
 export interface AudioTabsDropdownProps
@@ -32,26 +33,15 @@ export const AudioTabsDropdown = ({
     });
 
     // Scroll to the tab/bookmark after space switch renders
-    setTimeout(() =>
+    const itemKey = getItemKeyForTab(tab.id!);
+    if (itemKey && itemKey.startsWith('bookmark-'))
     {
-      // Check if this tab is a live bookmark tab
-      const itemKey = getItemKeyForTab(tab.id!);
-      let element: Element | null = null;
-
-      if (itemKey && itemKey.startsWith('bookmark-'))
-      {
-        // It's a live bookmark tab - scroll to the bookmark element
-        const bookmarkId = itemKey.substring('bookmark-'.length);
-        element = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
-      }
-      else
-      {
-        // Regular tab - scroll to the tab element
-        element = document.querySelector(`[data-tab-id="${tab.id}"]`);
-      }
-
-      element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }, 100);
+      scrollToBookmark(itemKey.substring('bookmark-'.length));
+    }
+    else
+    {
+      scrollToTab(tab.id!);
+    }
   }, [getItemKeyForTab]);
 
   // Render a tab row as dropdown item

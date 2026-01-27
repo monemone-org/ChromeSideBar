@@ -10,6 +10,7 @@ import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { useDragDrop } from '../hooks/useDragDrop';
 import { useExternalLinkDrop } from '../hooks/useExternalLinkDrop';
 import { getIndentPadding } from '../utils/indent';
+import { scrollToBookmark } from '../utils/scrollHelpers';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
 import { getIconUrl } from '../utils/iconify';
@@ -1117,11 +1118,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       prevActiveItemKeyRef.current = activeItemKey;
       const bookmarkId = activeItemKey.replace('bookmark-', '');
       // Scroll after DOM updates
-      setTimeout(() =>
-      {
-        const element = document.querySelector(`[data-bookmark-id="${bookmarkId}"]`);
-        element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
+      scrollToBookmark(bookmarkId, 50);
     }
     else if (!activeItemKey?.startsWith('bookmark-'))
     {
@@ -1941,10 +1938,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
             // Auto-expand parent folder to show the new bookmark
             setExpandedState(prev => ({ ...prev, [parentId]: true }));
             // Scroll to the new bookmark after DOM updates
-            setTimeout(() => {
-              const element = document.querySelector(`[data-bookmark-id="${newNode.id}"]`);
-              element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }, 100);
+            scrollToBookmark(newNode.id);
           }
           return null;  // Success
         }}
@@ -1962,10 +1956,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
             // Auto-expand parent folder to show the new folder
             setExpandedState(prev => ({ ...prev, [parentId]: true }));
             // Scroll to the new folder after DOM updates
-            setTimeout(() => {
-              const element = document.querySelector(`[data-bookmark-id="${newNode.id}"]`);
-              element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            }, 100);
+            scrollToBookmark(newNode.id);
           });
         }}
         onClose={() => setCreatingFolderParentId(null)}

@@ -9,6 +9,7 @@ import { useDragDrop, DropPosition } from '../hooks/useDragDrop';
 import { useExternalUrlDropForTabs, TabDropTarget } from '../hooks/useExternalUrlDropForTabs';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SPEAKER_ICON_SIZE } from '../constants';
+import { scrollToTab } from '../utils/scrollHelpers';
 
 // External drop target type for tab → bookmark drops
 export interface ExternalDropTarget
@@ -1366,11 +1367,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     if (activeTab && (tabChanged || spaceChanged))
     {
       // Scroll after DOM updates
-      setTimeout(() =>
-      {
-        const element = document.querySelector(`[data-tab-id="${activeTab.id}"]`);
-        element?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 50);
+      scrollToTab(activeTab.id!, 50);
     }
   }, [visibleTabs, activeSpace]);
 

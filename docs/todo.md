@@ -9,9 +9,9 @@
 
 ## Pending
 
-- bookmarktree doesn't auto-expand to show the bookmark row when a bookmark tab becomes active.
+- bookmarktree doesn't auto-expand to show the bookmark row when a bookmark tab becomes active, therefore the bookmark row is not selected.
 
-- autoscrolling duplicated
+- [x] autoscrolling duplicated
 
 There are many copies of code to scroll to a bookmark row in bookmarktree and tab row in tablist.
 
@@ -27,18 +27,6 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 
        are we autoscrolling for tab history navigation?
 
-
-- TabHistoryManager to SpacesContext to background.ts
-
-why are we sending HISTORY_TAB_ACTIVATED from TabHistoryManager to SpacesContext, then send SET_ACTIVE_SPACE back to background.ts?
-why don't we just spaceStateManager.setActiveSpace(message.windowId, message.spaceId); directly in TabHistoryManager?
-
-       are we autoscrolling for tab history navigation?
-
-- getSpaceForTab duplicated in background.ts an audiodropdown
-duplicated in both background.ts and audiodropdown
-
-- after changing active tab in history , selection should reset
 
 - when right click on a single selected live bookmark , show "Close" instead of "Delete"
 
