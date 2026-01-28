@@ -2,7 +2,7 @@
 #
 # Updates version in package.json and manifest.json
 # Format: {major}.{minor}.{build_number}
-# Build number = git commit count
+# Build number = git commit count (source-code-only commits)
 #
 # Usage:
 #   ./tools/update-version.sh          # Update build number only
@@ -37,8 +37,11 @@ elif [ -n "$1" ] && [ -n "$2" ]; then
     MINOR="$2"
 fi
 
-# Get build number (git commit count)
-BUILD=$(git rev-list --count HEAD)
+# Get build number (count only commits that touch extension source/build files)
+BUILD=$(git rev-list --count HEAD -- src/ \
+    public/icon.png public/icon16.png public/icon32.png public/welcome/ \
+    vite.config.ts tailwind.config.js postcss.config.js \
+    tsconfig.json tsconfig.node.json .env.development index.html)
 
 # Construct new version
 NEW_VERSION="${MAJOR}.${MINOR}.${BUILD}"
