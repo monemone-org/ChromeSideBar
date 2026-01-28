@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 type Parser<T> = (value: string) => T;
 type Serializer<T> = (value: T) => string;
@@ -22,6 +22,15 @@ export function useChromeLocalStorage<T>(
   const parse = options?.parse ?? ((v: string) => JSON.parse(v) as T);
   const serialize = options?.serialize ?? ((v: T) => JSON.stringify(v));
 
+  // Use refs for parse/serialize/initialValue to avoid them triggering effect re-runs.
+  // These are inline functions/values recreated every render, but their logic is stable.
+  const parseRef = useRef(parse);
+  const serializeRef = useRef(serialize);
+  const initialValueRef = useRef(initialValue);
+  parseRef.current = parse;
+  serializeRef.current = serialize;
+  initialValueRef.current = initialValue;
+
   const [value, setValue] = useState<T>(initialValue);
 
   // Load on mount - check chrome.storage.local first, then migrate from localStorage if needed
@@ -38,11 +47,11 @@ export function useChromeLocalStorage<T>(
         // Value exists in chrome.storage.local, use it
         try
         {
-          setValue(parse(result[key]));
+          setValue(parseRef.current(result[key]));
         }
         catch
         {
-          setValue(initialValue);
+          setValue(initialValueRef.current);
         }
       }
       else
@@ -54,7 +63,7 @@ export function useChromeLocalStorage<T>(
           // Migrate: read from localStorage, write to chrome.storage.local, delete old key
           try
           {
-            const parsed = parse(localValue);
+            const parsed = parseRef.current(localValue);
             setValue(parsed);
             chrome.storage.local.set({ [key]: localValue }).catch(error =>
             {
@@ -71,7 +80,7 @@ export function useChromeLocalStorage<T>(
           }
           catch
           {
-            setValue(initialValue);
+            setValue(initialValueRef.current);
           }
         }
         // else: no value anywhere, keep initialValue
@@ -86,7 +95,7 @@ export function useChromeLocalStorage<T>(
     });
 
     return () => { mounted = false; };
-  }, [key, initialValue, parse]);
+  }, [key]);
 
   // Listen for changes from other windows (and this window)
   useEffect(() =>
@@ -101,7 +110,7 @@ export function useChromeLocalStorage<T>(
       {
         try
         {
-          setValue(parse(changes[key].newValue));
+          setValue(parseRef.current(changes[key].newValue));
         }
         catch
         {
@@ -112,20 +121,20 @@ export function useChromeLocalStorage<T>(
 
     chrome.storage.onChanged.addListener(listener);
     return () => chrome.storage.onChanged.removeListener(listener);
-  }, [key, parse]);
+  }, [key]);
 
   // Setter - updates both local state and chrome.storage.local
   const setStoredValue = useCallback((newValue: T) =>
   {
     setValue(newValue);
-    chrome.storage.local.set({ [key]: serialize(newValue) }).catch(error =>
+    chrome.storage.local.set({ [key]: serializeRef.current(newValue) }).catch(error =>
     {
       if (import.meta.env.DEV)
       {
         console.error(`useChromeLocalStorage: Failed to set "${key}":`, error);
       }
     });
-  }, [key, serialize]);
+  }, [key]);
 
   return [value, setStoredValue];
 }
