@@ -40,7 +40,8 @@ import {
   Copy,
   ExternalLink,
   SquareArrowOutUpRight,
-  SquareStack
+  SquareStack,
+  ArrowRightFromLine
 } from 'lucide-react';
 import { getRandomGroupColor, GROUP_COLORS } from '../utils/groupColors';
 import clsx from 'clsx';
@@ -138,6 +139,7 @@ interface BookmarkRowProps {
   onOpenAllTabs?: (folderId: string) => void;
   onOpenAllTabsInNewWindow?: (folderId: string) => void;
   onMoveToSpace?: (bookmarkId: string) => void;
+  onMoveToTabs?: (bookmarkId: string) => void;
   onMoveBookmark?: (bookmarkId: string, isFolder: boolean) => void;
   getMatchingSpace?: (folderId: string) => Space | undefined;
   // External drop target (from tab drag)
@@ -198,6 +200,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onOpenAllTabs,
   onOpenAllTabsInNewWindow,
   onMoveToSpace,
+  onMoveToTabs,
   onMoveBookmark,
   externalDropTarget,
   onSelectionClick,
@@ -550,14 +553,18 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onOpenInNewWindow?.(node.url!)}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Window
               </ContextMenu.Item>
-              {onMoveBookmark && (
+              {onMoveToSpace ? (
+                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
+                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                </ContextMenu.Item>
+              ) : onMoveBookmark ? (
                 <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, false)}>
                   <FolderInput size={14} className="mr-2" /> Move Bookmark...
                 </ContextMenu.Item>
-              )}
-              {onMoveToSpace && (
-                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
-                  <SquareStack size={14} className="mr-2" /> Move to Space...
+              ) : null}
+              {isLoaded && onMoveToTabs && (
+                <ContextMenu.Item onSelect={() => onMoveToTabs(node.id)}>
+                  <ArrowRightFromLine size={14} className="mr-2" /> Move To Tabs
                 </ContextMenu.Item>
               )}
             </>
@@ -808,7 +815,7 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
   const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle } = useBookmarkTabsContext();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
 
   // Build lookup: folderId → Space (only when in "All" space)
@@ -1896,6 +1903,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onOpenAllTabs={handleOpenAllTabs}
               onOpenAllTabsInNewWindow={handleOpenAllTabsInNewWindow}
               onMoveToSpace={useSpaces ? openMoveToSpaceDialog : undefined}
+              onMoveToTabs={deassociateBookmarkTab}
               onMoveBookmark={openMoveBookmarkDialog}
               getMatchingSpace={getMatchingSpace}
               externalDropTarget={effectiveExternalDropTarget}

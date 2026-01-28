@@ -9,7 +9,7 @@
 
 - [ ] add popup menu item to Live bookmark in space to "Move To Tabs" which deassociate the livebookmark as regular tab in the space
 
-- [ ] store last active space in local storage and restore when extension is reloaded, so it doesn't always land on "All"
+- [-] store last active space in local storage and restore when extension is reloaded, so it doesn't always land on "All"
 
 - Review Code:
    - [ ] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.

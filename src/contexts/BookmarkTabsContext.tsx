@@ -22,6 +22,7 @@ interface BookmarkTabsContextValue
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
   getBookmarkLiveTitle: (bookmarkId: string) => string | undefined;
   associateExistingTab: (tabId: number, bookmarkId: string) => Promise<void>;
+  deassociateBookmarkTab: (bookmarkId: string) => void;
   // Pinned site functions
   openPinnedTab: (pinnedId: string, url: string) => Promise<number | undefined>;
   closePinnedTab: (pinnedId: string) => void;
@@ -516,6 +517,18 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     });
   }, [storeAssociation]);
 
+  // Deassociate a bookmark from its tab (tab stays alive, bookmark becomes unloaded)
+  const deassociateBookmarkTab = useCallback((bookmarkId: string): void =>
+  {
+    if (currentWindowId === null) return;
+    const itemKey = makeBookmarkKey(bookmarkId);
+    const tabId = itemToTab.get(itemKey);
+    if (tabId !== undefined)
+    {
+      removeLocalTabAssociation(tabId, currentWindowId);
+    }
+  }, [itemToTab, currentWindowId, removeLocalTabAssociation]);
+
   // --- Pinned site-specific wrappers ---
   const openPinnedTab = useCallback(async (pinnedId: string, url: string): Promise<number | undefined> =>
   {
@@ -592,6 +605,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     getTabIdForBookmark,
     getBookmarkLiveTitle,
     associateExistingTab,
+    deassociateBookmarkTab,
     openPinnedTab,
     closePinnedTab,
     isPinnedLoaded,
@@ -613,6 +627,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     getTabIdForBookmark,
     getBookmarkLiveTitle,
     associateExistingTab,
+    deassociateBookmarkTab,
     openPinnedTab,
     closePinnedTab,
     isPinnedLoaded,

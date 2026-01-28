@@ -14,8 +14,10 @@ const ENABLE_AUTO_GROUP_NEW_TABS = false;
 class SpaceWindowStateManager
 {
   static STORAGE_KEY_PREFIX = 'spaceWindowState_';
+  static LAST_ACTIVE_SPACE_KEY = 'lastActiveSpaceId';
 
   #states = new Map<number, SpaceWindowState>();  // windowId -> state
+  #fallbackSpaceId: string | null = null;
 
   private getStorageKey(windowId: number): string
   {
@@ -28,7 +30,10 @@ class SpaceWindowStateManager
 
   getState(windowId: number): SpaceWindowState
   {
-    return this.#states.get(windowId) || { ...DEFAULT_WINDOW_STATE };
+    return this.#states.get(windowId) ||
+      (this.#fallbackSpaceId
+        ? { ...DEFAULT_WINDOW_STATE, activeSpaceId: this.#fallbackSpaceId }
+        : { ...DEFAULT_WINDOW_STATE });
   }
 
   getActiveSpace(windowId: number): string
@@ -54,7 +59,9 @@ class SpaceWindowStateManager
   private saveState(windowId: number, state: SpaceWindowState): void
   {
     this.#states.set(windowId, state);
+    this.#fallbackSpaceId = state.activeSpaceId;
     chrome.storage.session.set({ [this.getStorageKey(windowId)]: state });
+    chrome.storage.local.set({ [SpaceWindowStateManager.LAST_ACTIVE_SPACE_KEY]: state.activeSpaceId });
 
     // Notify sidebar of state change
     chrome.runtime.sendMessage({
@@ -83,6 +90,10 @@ class SpaceWindowStateManager
         }
       }
     }
+
+    // Load fallback space ID from local storage (persists across browser restarts)
+    const localResult = await chrome.storage.local.get([SpaceWindowStateManager.LAST_ACTIVE_SPACE_KEY]);
+    this.#fallbackSpaceId = localResult[SpaceWindowStateManager.LAST_ACTIVE_SPACE_KEY] || null;
   }
 }
 

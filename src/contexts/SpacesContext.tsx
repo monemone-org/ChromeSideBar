@@ -590,6 +590,17 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return getSpaceById(windowState.activeSpaceId) || ALL_SPACE;
   }, [windowState.activeSpaceId, getSpaceById]);
 
+  // If the restored activeSpaceId no longer exists (e.g. space was deleted), fall back to 'all'
+  useEffect(() =>
+  {
+    if (windowState.activeSpaceId !== 'all' &&
+        spaces.length > 0 &&
+        !spaces.some(s => s.id === windowState.activeSpaceId))
+    {
+      setActiveSpaceId('all');
+    }
+  }, [windowState.activeSpaceId, spaces, setActiveSpaceId]);
+
   // ---------------------------------------------------------------------------
   // Context value
   // ---------------------------------------------------------------------------
