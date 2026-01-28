@@ -157,6 +157,7 @@ interface BookmarkRowProps {
   onOpenInNewTabs?: (url: string) => void;
   onOpenInNewWindow?: (url: string) => void;
   onMoveSelectedBookmarks?: () => void;
+  onMoveSelectedToSpace?: () => void;
   hasSelectedBookmarks?: boolean;
   allSelectedAreLive?: boolean;
   onCloseSelectedBookmarks?: () => void;
@@ -209,6 +210,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onOpenInNewTabs,
   onOpenInNewWindow,
   onMoveSelectedBookmarks,
+  onMoveSelectedToSpace,
   hasSelectedBookmarks,
   allSelectedAreLive,
   onCloseSelectedBookmarks,
@@ -468,11 +470,15 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onOpenInNewWindow?.(node.url || '')}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Window
               </ContextMenu.Item>
-              {onMoveSelectedBookmarks && (
+              {onMoveSelectedToSpace ? (
+                <ContextMenu.Item onSelect={onMoveSelectedToSpace}>
+                  <SquareStack size={14} className="mr-2" /> Move To Space...
+                </ContextMenu.Item>
+              ) : onMoveSelectedBookmarks ? (
                 <ContextMenu.Item onSelect={onMoveSelectedBookmarks}>
                   <FolderInput size={14} className="mr-2" /> Move Bookmarks...
                 </ContextMenu.Item>
-              )}
+              ) : null}
               <ContextMenu.Separator />
               {allSelectedAreLive ? (
                 <ContextMenu.Item onSelect={onCloseSelectedBookmarks}>
@@ -983,7 +989,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const [moveToSpaceDialog, setMoveToSpaceDialog] = useState<{
     isOpen: boolean;
     bookmarkId: string | null;
-  }>({ isOpen: false, bookmarkId: null });
+    isMulti: boolean;
+  }>({ isOpen: false, bookmarkId: null, isMulti: false });
   const [moveBookmarkDialog, setMoveBookmarkDialog] = useState<{
     isOpen: boolean;
     bookmarkId: string | null;
@@ -1350,12 +1357,17 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   // Open move to space dialog
   const openMoveToSpaceDialog = useCallback((bookmarkId: string) =>
   {
-    setMoveToSpaceDialog({ isOpen: true, bookmarkId });
+    setMoveToSpaceDialog({ isOpen: true, bookmarkId, isMulti: false });
+  }, []);
+
+  const openMoveSelectedToSpaceDialog = useCallback(() =>
+  {
+    setMoveToSpaceDialog({ isOpen: true, bookmarkId: null, isMulti: true });
   }, []);
 
   const closeMoveToSpaceDialog = useCallback(() =>
   {
-    setMoveToSpaceDialog({ isOpen: false, bookmarkId: null });
+    setMoveToSpaceDialog({ isOpen: false, bookmarkId: null, isMulti: false });
   }, []);
 
   // Open move bookmark dialog
@@ -1378,37 +1390,6 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     }
     closeMoveBookmarkDialog();
   }, [moveBookmarkDialog.bookmarkId, moveBookmark, closeMoveBookmarkDialog]);
-
-  // Handle moving bookmark to a space's folder
-  // Returns error message if failed, undefined if successful
-  const handleMoveBookmarkToSpace = useCallback(async (spaceId: string): Promise<string | void> =>
-  {
-    const bookmarkId = moveToSpaceDialog.bookmarkId;
-    if (!bookmarkId) return 'No bookmark selected';
-
-    const space = spaces.find(s => s.id === spaceId);
-    if (!space?.bookmarkFolderPath)
-    {
-      return `"${space?.name || 'Space'}" has no bookmark folder configured`;
-    }
-
-    const folder = findFolderByPath(space.bookmarkFolderPath);
-    if (!folder)
-    {
-      return `Folder "${space.bookmarkFolderPath}" no longer exists`;
-    }
-
-    try
-    {
-      await chrome.bookmarks.move(bookmarkId, { parentId: folder.id });
-      onShowToast?.(`Moved to ${space.name}. New location: ${space.bookmarkFolderPath}`);
-    }
-    catch (err)
-    {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      return `Failed to move bookmark: ${message}`;
-    }
-  }, [moveToSpaceDialog.bookmarkId, spaces, findFolderByPath, onShowToast]);
 
   // Delete selected bookmarks (or single bookmark if not in selection)
   const handleDeleteSelectedBookmarks = useCallback((clickedBookmarkId: string) =>
@@ -1590,6 +1571,46 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     clearSelection();
     setMoveMultiBookmarkDialog({ isOpen: false });
   }, [getSelectedItems, bookmarks, moveBookmark, clearSelection]);
+
+  // Handle moving bookmark to a space's folder
+  // Returns error message if failed, undefined if successful
+  const handleMoveBookmarkToSpace = useCallback(async (spaceId: string): Promise<string | void> =>
+  {
+    const space = spaces.find(s => s.id === spaceId);
+    if (!space?.bookmarkFolderPath)
+    {
+      return `"${space?.name || 'Space'}" has no bookmark folder configured`;
+    }
+
+    const folder = findFolderByPath(space.bookmarkFolderPath);
+    if (!folder)
+    {
+      return `Folder "${space.bookmarkFolderPath}" no longer exists`;
+    }
+
+    if (moveToSpaceDialog.isMulti)
+    {
+      await handleMoveSelectedBookmarksToFolder(folder.id);
+      onShowToast?.(`Moved selection to ${space.name}`);
+    }
+    else
+    {
+      const bookmarkId = moveToSpaceDialog.bookmarkId;
+      if (!bookmarkId) return 'No bookmark selected';
+
+      try
+      {
+        await moveBookmark(bookmarkId, folder.id, 'into');
+        onShowToast?.(`Moved to ${space.name}. New location: ${space.bookmarkFolderPath}`);
+      }
+      catch (err)
+      {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return `Failed to move bookmark: ${message}`;
+      }
+    }
+  }, [moveToSpaceDialog.bookmarkId, moveToSpaceDialog.isMulti, spaces, findFolderByPath,
+    handleMoveSelectedBookmarksToFolder, moveBookmark, onShowToast]);
 
   // Check if selection has any bookmarks (vs only folders)
   const hasSelectedBookmarks = useCallback((): boolean =>
@@ -1921,6 +1942,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onOpenInNewTabs={handleOpenSelectedInNewTabs}
               onOpenInNewWindow={handleOpenSelectedInNewWindow}
               onMoveSelectedBookmarks={openMoveSelectedBookmarksDialog}
+              onMoveSelectedToSpace={useSpaces ? openMoveSelectedToSpaceDialog : undefined}
               hasSelectedBookmarks={hasSelectedBookmarks()}
               allSelectedAreLive={areAllSelectedBookmarksLive()}
               onCloseSelectedBookmarks={handleCloseSelectedBookmarks}
