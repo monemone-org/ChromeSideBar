@@ -9,7 +9,7 @@ Read `READEME.md` for more details about the extension.
 
 ## Development Workflow
 
-1. **Discuss before coding** - Present a plan and get approval before implementing changes
+1. **Always discuss first** - Before editing any file or executing any command, explain what you plan to do and get explicit approval. This applies in ALL modes, not just plan mode.
 2. **Minimize dependencies** - Avoid adding new npm packages unless necessary; prefer native browser APIs and existing libraries
 3. **Incremental changes** - Make small, focused changes that are easy to review
 
