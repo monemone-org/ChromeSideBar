@@ -418,7 +418,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             <TreeRow
               ref={ref}
               depth={depth}
-              title={bookmarkOpenMode === 'arc' && isLoaded && liveTitle ? `${node.title} - ${liveTitle}` : node.title}
+              title={bookmarkOpenMode === 'arc' && isLoaded && liveTitle ? liveTitle : node.title}
               tooltip={node.url ? `${node.title}\n${node.url}` : undefined}
               icon={combinedIcon}
               hasChildren={isFolder}
