@@ -34,7 +34,7 @@ import { AddToGroupDialog } from './AddToGroupDialog';
 import { ChangeGroupColorDialog } from './ChangeGroupColorDialog';
 import { ExportConflictDialog, ExportConflictMode } from './ExportConflictDialog';
 import { RenameGroupDialog } from './RenameGroupDialog';
-import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink } from 'lucide-react';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink, Link } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
 import { getIndentPadding } from '../utils/indent';
 import { calculateDropPosition } from '../utils/dragDrop';
@@ -95,6 +95,8 @@ interface DraggableTabProps {
   onAddSelectedToBookmark?: () => void;
   onMoveSelectedToSpace?: () => void;
   onMoveSelectedToNewWindow?: () => void;
+  onCopyUrl?: (url: string) => void;
+  onCopyUrls?: () => void;
   // Drag attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -132,6 +134,8 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onAddSelectedToBookmark,
   onMoveSelectedToSpace,
   onMoveSelectedToNewWindow,
+  onCopyUrl,
+  onCopyUrls,
   attributes,
   listeners
 }, ref) => {
@@ -256,12 +260,17 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
             // Multi-selection menu
             <>
               {hasSelectedTabs && onPin && (
-                <>
-                  <ContextMenu.Item onSelect={() => onPin(tab.url || '', tab.title || tab.url || '', tab.favIconUrl)}>
-                    <Pin size={14} className="mr-2" /> Pin to Sidebar
-                  </ContextMenu.Item>
-                  <ContextMenu.Separator />
-                </>
+                <ContextMenu.Item onSelect={() => onPin(tab.url || '', tab.title || tab.url || '', tab.favIconUrl)}>
+                  <Pin size={14} className="mr-2" /> Pin to Sidebar
+                </ContextMenu.Item>
+              )}
+              {hasSelectedTabs && onCopyUrls && (
+                <ContextMenu.Item onSelect={onCopyUrls}>
+                  <Link size={14} className="mr-2" /> Copy URLs
+                </ContextMenu.Item>
+              )}
+              {hasSelectedTabs && (onPin || onCopyUrls) && (
+                <ContextMenu.Separator />
               )}
               {onAddSelectedToBookmark && (
                 <ContextMenu.Item onSelect={onAddSelectedToBookmark}>
@@ -294,6 +303,11 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           {onDuplicate && tab.url && (
             <ContextMenu.Item onSelect={() => onDuplicate(tab.id!)}>
               <Copy size={14} className="mr-2" /> Duplicate
+            </ContextMenu.Item>
+          )}
+          {tab.url && (
+            <ContextMenu.Item onSelect={() => onCopyUrl?.(tab.url!)}>
+              <Link size={14} className="mr-2" /> Copy URL
             </ContextMenu.Item>
           )}
           {/* Separator after Pin/Duplicate section - only if items exist above AND below */}
@@ -2506,6 +2520,31 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     showToast('Groups saved to bookmarks');
   }, [getTabSelectionInfo, visibleTabs, filterBookmarkableTabs, createFolder, createBookmarksInFolder, clearSelection, showToast]);
 
+  // Copy single URL to clipboard
+  const handleCopyUrl = useCallback(async (url: string) =>
+  {
+    await navigator.clipboard.writeText(url);
+  }, []);
+
+  // Copy URLs of all selected tabs to clipboard
+  const handleCopyUrls = useCallback(async () =>
+  {
+    const selectedItems = getSelectedItems();
+    const urls: string[] = [];
+    for (const item of selectedItems)
+    {
+      if (item.type === 'tab')
+      {
+        const tab = visibleTabs.find(t => t.id === parseInt(item.id, 10));
+        if (tab?.url) urls.push(tab.url);
+      }
+    }
+    if (urls.length > 0)
+    {
+      await navigator.clipboard.writeText(urls.join('\n'));
+    }
+  }, [getSelectedItems, visibleTabs]);
+
   // Check if multi-selection
   const isMultiSelection = (selectionCount ?? 0) > 1;
 
@@ -2604,6 +2643,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                   onAddSelectedToBookmark={openAddSelectedToBookmarkDialog}
                   onMoveSelectedToSpace={useSpaces && spaces.length > 0 ? openMoveSelectedToSpaceDialog : undefined}
                   onMoveSelectedToNewWindow={handleMoveSelectedToNewWindow}
+                  onCopyUrl={handleCopyUrl}
+                  onCopyUrls={handleCopyUrls}
                 />
               );
             }
@@ -2650,6 +2691,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                           onAddSelectedToBookmark={openAddSelectedToBookmarkDialog}
                           onMoveSelectedToSpace={useSpaces && spaces.length > 0 ? openMoveSelectedToSpaceDialog : undefined}
                           onMoveSelectedToNewWindow={handleMoveSelectedToNewWindow}
+                          onCopyUrl={handleCopyUrl}
+                          onCopyUrls={handleCopyUrls}
                         />
                       );
                     })}
@@ -2752,6 +2795,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                         onAddSelectedToBookmark={openAddSelectedToBookmarkDialog}
                         onMoveSelectedToSpace={useSpaces && spaces.length > 0 ? openMoveSelectedToSpaceDialog : undefined}
                         onMoveSelectedToNewWindow={handleMoveSelectedToNewWindow}
+                        onCopyUrl={handleCopyUrl}
+                        onCopyUrls={handleCopyUrls}
                       />
                     );
                   })}

@@ -41,7 +41,8 @@ import {
   ExternalLink,
   SquareArrowOutUpRight,
   SquareStack,
-  ArrowRightFromLine
+  ArrowRightFromLine,
+  Link
 } from 'lucide-react';
 import { getRandomGroupColor, GROUP_COLORS } from '../utils/groupColors';
 import clsx from 'clsx';
@@ -161,6 +162,8 @@ interface BookmarkRowProps {
   hasSelectedBookmarks?: boolean;
   allSelectedAreLive?: boolean;
   onCloseSelectedBookmarks?: () => void;
+  onCopyUrl?: (url: string) => void;
+  onCopyUrls?: () => void;
   // Drag-drop attributes
   attributes?: DraggableAttributes;
   listeners?: SyntheticListenerMap;
@@ -214,6 +217,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   hasSelectedBookmarks,
   allSelectedAreLive,
   onCloseSelectedBookmarks,
+  onCopyUrl,
+  onCopyUrls,
   attributes,
   listeners,
   windowId
@@ -457,12 +462,17 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             // Multi-selection menu
             <>
               {hasSelectedBookmarks && onPin && (
-                <>
-                  <ContextMenu.Item onSelect={() => onPin(node.url || '', node.title, node.url ? getFaviconUrl(node.url) : undefined)}>
-                    <Pin size={14} className="mr-2" /> Pin to Sidebar
-                  </ContextMenu.Item>
-                  <ContextMenu.Separator />
-                </>
+                <ContextMenu.Item onSelect={() => onPin(node.url || '', node.title, node.url ? getFaviconUrl(node.url) : undefined)}>
+                  <Pin size={14} className="mr-2" /> Pin to Sidebar
+                </ContextMenu.Item>
+              )}
+              {hasSelectedBookmarks && onCopyUrls && (
+                <ContextMenu.Item onSelect={onCopyUrls}>
+                  <Link size={14} className="mr-2" /> Copy URLs
+                </ContextMenu.Item>
+              )}
+              {hasSelectedBookmarks && (onPin || onCopyUrls) && (
+                <ContextMenu.Separator />
               )}
               <ContextMenu.Item onSelect={() => onOpenInNewTabs?.(node.url || '')}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Tabs
@@ -551,6 +561,9 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               )}
               <ContextMenu.Item onSelect={() => onDuplicate(node.id)}>
                 <Copy size={14} className="mr-2" /> Duplicate
+              </ContextMenu.Item>
+              <ContextMenu.Item onSelect={() => onCopyUrl?.(node.url!)}>
+                <Link size={14} className="mr-2" /> Copy URL
               </ContextMenu.Item>
               <ContextMenu.Separator />
               <ContextMenu.Item onSelect={() => onOpenInNewTabs?.(node.url!)}>
@@ -1647,6 +1660,31 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     clearSelection();
   }, [getSelectedItems, closeBookmarkTab, clearSelection]);
 
+  // Copy single URL to clipboard
+  const handleCopyUrl = useCallback(async (url: string) =>
+  {
+    await navigator.clipboard.writeText(url);
+  }, []);
+
+  // Copy URLs of all selected bookmarks to clipboard
+  const handleCopyUrls = useCallback(async () =>
+  {
+    const selectedItems = getSelectedItems();
+    const urls: string[] = [];
+    for (const item of selectedItems)
+    {
+      if (item.type === 'bookmark')
+      {
+        const node = findNode(item.id);
+        if (node?.url) urls.push(node.url);
+      }
+    }
+    if (urls.length > 0)
+    {
+      await navigator.clipboard.writeText(urls.join('\n'));
+    }
+  }, [getSelectedItems, findNode]);
+
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) => {
     // Calculate overlay offset based on where user clicked in the element
@@ -1946,6 +1984,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               hasSelectedBookmarks={hasSelectedBookmarks()}
               allSelectedAreLive={areAllSelectedBookmarksLive()}
               onCloseSelectedBookmarks={handleCloseSelectedBookmarks}
+              onCopyUrl={handleCopyUrl}
+              onCopyUrls={handleCopyUrls}
               windowId={windowId ?? undefined}
             />
           );
