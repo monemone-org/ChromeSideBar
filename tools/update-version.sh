@@ -64,3 +64,7 @@ else
 fi
 
 echo "Updated package.json and manifest.json to version ${NEW_VERSION}"
+
+# Commit the version changes
+git add package.json public/manifest.json
+git commit -m "build: Bump version to ${NEW_VERSION}"
