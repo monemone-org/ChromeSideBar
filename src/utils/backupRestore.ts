@@ -228,8 +228,19 @@ export async function importFullBackup(
 
   // Import bookmarks
   if (options.importBookmarks && backup.bookmarks && backup.bookmarks.length > 0) {
-    const bookmarkBar = backup.bookmarks.find(n => n.title === 'Bookmarks Bar' || n.id === '1');
-    const otherBookmarks = backup.bookmarks.find(n => n.title === 'Other Bookmarks' || n.id === '2');
+    // The backup structure can be either:
+    // 1. [rootNode] where rootNode.children contains Bookmarks Bar and Other Bookmarks
+    // 2. [bookmarksBar, otherBookmarks] directly (flat structure)
+    const rootNode = backup.bookmarks.length === 1 &&
+      backup.bookmarks[0].children &&
+      !backup.bookmarks[0].url
+        ? backup.bookmarks[0]
+        : null;
+
+    const searchArray = rootNode?.children || backup.bookmarks;
+
+    const bookmarkBar = searchArray.find(n => n.title === 'Bookmarks Bar');
+    const otherBookmarks = searchArray.find(n => n.title === 'Other Bookmarks');
 
     if (options.bookmarkMode === 'replace') {
       // Clear and replace existing bookmarks
@@ -253,11 +264,15 @@ export async function importFullBackup(
         title: `Imported Bookmarks ${dateStr}`,
       });
 
-      for (const topLevel of backup.bookmarks) {
-        if (topLevel.children) {
-          for (const child of topLevel.children) {
-            result.bookmarksCount += await importBookmarkNode(child, importFolder.id);
-          }
+      // Import contents of Bookmarks Bar and Other Bookmarks (not the folder wrappers)
+      if (bookmarkBar?.children) {
+        for (const child of bookmarkBar.children) {
+          result.bookmarksCount += await importBookmarkNode(child, importFolder.id);
+        }
+      }
+      if (otherBookmarks?.children) {
+        for (const child of otherBookmarks.children) {
+          result.bookmarksCount += await importBookmarkNode(child, importFolder.id);
         }
       }
     }
