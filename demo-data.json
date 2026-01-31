@@ -1,0 +1,248 @@
+{
+  "version": 1,
+  "exportedAt": "2025-01-30T00:00:00.000Z",
+  "pinnedSites": [
+    {
+      "id": "pin_001",
+      "url": "https://gmail.com",
+      "title": "Gmail",
+      "customIconName": "Mail",
+      "iconColor": "#ea4335"
+    },
+    {
+      "id": "pin_002",
+      "url": "https://calendar.google.com",
+      "title": "Calendar",
+      "customIconName": "Calendar",
+      "iconColor": "#4285f4"
+    },
+    {
+      "id": "pin_003",
+      "url": "https://github.com",
+      "title": "GitHub",
+      "customIconName": "Github",
+      "iconColor": "#333333"
+    },
+    {
+      "id": "pin_004",
+      "url": "https://notion.so",
+      "title": "Notion",
+      "customIconName": "FileText",
+      "iconColor": "#000000"
+    },
+    {
+      "id": "pin_005",
+      "url": "https://slack.com",
+      "title": "Slack",
+      "customIconName": "MessageSquare",
+      "iconColor": "#4a154b"
+    },
+    {
+      "id": "pin_006",
+      "url": "https://spotify.com",
+      "title": "Spotify",
+      "customIconName": "Music",
+      "iconColor": "#1db954"
+    }
+  ],
+  "bookmarks": [
+    {
+      "id": "1",
+      "title": "",
+      "children": [
+        {
+          "id": "2",
+          "title": "Bookmarks Bar",
+          "children": [
+            {
+              "id": "100",
+              "title": "Work",
+              "children": [
+                {
+                  "id": "101",
+                  "title": "Jira",
+                  "url": "https://jira.atlassian.com"
+                },
+                {
+                  "id": "102",
+                  "title": "Confluence",
+                  "url": "https://confluence.atlassian.com"
+                },
+                {
+                  "id": "103",
+                  "title": "Figma",
+                  "url": "https://figma.com"
+                },
+                {
+                  "id": "104",
+                  "title": "Linear",
+                  "url": "https://linear.app"
+                },
+                {
+                  "id": "105",
+                  "title": "Vercel Dashboard",
+                  "url": "https://vercel.com/dashboard"
+                }
+              ]
+            },
+            {
+              "id": "200",
+              "title": "Personal",
+              "children": [
+                {
+                  "id": "201",
+                  "title": "YouTube",
+                  "url": "https://youtube.com"
+                },
+                {
+                  "id": "202",
+                  "title": "Reddit",
+                  "url": "https://reddit.com"
+                },
+                {
+                  "id": "203",
+                  "title": "Twitter",
+                  "url": "https://twitter.com"
+                },
+                {
+                  "id": "204",
+                  "title": "Netflix",
+                  "url": "https://netflix.com"
+                },
+                {
+                  "id": "205",
+                  "title": "Amazon",
+                  "url": "https://amazon.com"
+                }
+              ]
+            },
+            {
+              "id": "300",
+              "title": "Research",
+              "children": [
+                {
+                  "id": "301",
+                  "title": "MDN Web Docs",
+                  "url": "https://developer.mozilla.org"
+                },
+                {
+                  "id": "302",
+                  "title": "Stack Overflow",
+                  "url": "https://stackoverflow.com"
+                },
+                {
+                  "id": "303",
+                  "title": "React Docs",
+                  "url": "https://react.dev"
+                },
+                {
+                  "id": "304",
+                  "title": "TypeScript Docs",
+                  "url": "https://typescriptlang.org/docs"
+                },
+                {
+                  "id": "305",
+                  "title": "Chrome Extensions API",
+                  "url": "https://developer.chrome.com/docs/extensions"
+                },
+                {
+                  "id": "306",
+                  "title": "Tailwind CSS",
+                  "url": "https://tailwindcss.com/docs"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "3",
+          "title": "Other Bookmarks",
+          "children": []
+        }
+      ]
+    }
+  ],
+  "tabGroups": [
+    {
+      "title": "Work",
+      "color": "blue",
+      "tabs": [
+        {
+          "url": "https://github.com/pulls",
+          "title": "Pull Requests - GitHub",
+          "pinned": false
+        },
+        {
+          "url": "https://linear.app/inbox",
+          "title": "Inbox - Linear",
+          "pinned": false
+        },
+        {
+          "url": "https://figma.com/files/recent",
+          "title": "Recent Files - Figma",
+          "pinned": false
+        }
+      ]
+    },
+    {
+      "title": "Personal",
+      "color": "green",
+      "tabs": [
+        {
+          "url": "https://youtube.com",
+          "title": "YouTube",
+          "pinned": false
+        },
+        {
+          "url": "https://reddit.com/r/programming",
+          "title": "r/programming - Reddit",
+          "pinned": false
+        }
+      ]
+    },
+    {
+      "title": "Research",
+      "color": "purple",
+      "tabs": [
+        {
+          "url": "https://react.dev/learn",
+          "title": "Quick Start - React",
+          "pinned": false
+        },
+        {
+          "url": "https://developer.chrome.com/docs/extensions/mv3",
+          "title": "Manifest V3 - Chrome Extensions",
+          "pinned": false
+        },
+        {
+          "url": "https://stackoverflow.com/questions/tagged/typescript",
+          "title": "TypeScript Questions - Stack Overflow",
+          "pinned": false
+        }
+      ]
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space_work",
+      "name": "Work",
+      "icon": "Briefcase",
+      "color": "blue",
+      "bookmarkFolderPath": "Bookmarks Bar/Work"
+    },
+    {
+      "id": "space_personal",
+      "name": "Personal",
+      "icon": "Home",
+      "color": "green",
+      "bookmarkFolderPath": "Bookmarks Bar/Personal"
+    },
+    {
+      "id": "space_research",
+      "name": "Research",
+      "icon": "BookOpen",
+      "color": "purple",
+      "bookmarkFolderPath": "Bookmarks Bar/Research"
+    }
+  ]
+}
