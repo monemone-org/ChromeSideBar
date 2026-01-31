@@ -170,6 +170,11 @@ Gear icon in the bottom-left corner:
   - `Alt+Shift+F`: Toggle saved filters dropdown
   - Customize shortcuts via `chrome://extensions/shortcuts`
 
+### Permissions
+
+- `sidePanel`, `bookmarks`, `tabs`, `tabGroups`: Core features
+- `storage`: Save your settings locally
+- `favicon`: Show website icons
 
 ## Tech Stack
 
