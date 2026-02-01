@@ -37,6 +37,10 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Latest
 
+- Fixed bookmark folder matching failing on Windows due to case difference in "Other Bookmarks" vs "Other bookmarks"
+
+## 1.0.234
+
 - Arc-style Spaces:
   - Create isolated workspaces linking bookmark folders to Chrome tab groups
   - Switch spaces to show only relevant bookmarks and tabs
