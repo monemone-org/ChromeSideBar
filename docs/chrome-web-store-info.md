@@ -17,19 +17,19 @@ Finally, Spaces are here! Create workspaces that link a bookmark folder to a Chr
 
 ## Key Features
 
-- **Arc-Style Persistent Tabs** - Bookmarks act as live tabs. Click to open, click again to jump back. Close tabs freely—bookmarks stay in the sidebar.
+- Arc-Style Persistent Tabs - Bookmarks act as live tabs. Click to open, click again to jump back. Close tabs freely—bookmarks stay in the sidebar.
 
-- **Arc-Style Spaces** - Isolated workspaces linking bookmark folders to tab groups. Switch contexts with one click.
+- Arc-Style Spaces - Isolated workspaces linking bookmark folders to tab groups. Switch contexts with one click.
 
-- **Arc-Style Unified Sidebar** - Pinned favorites, bookmarks, and tabs in one vertical panel.
+- Arc-Style Unified Sidebar - Pinned favorites, bookmarks, and tabs in one vertical panel.
 
-- **IDE-Style Tab History** - Navigate by usage order like VS Code. Keyboard shortcuts: Cmd+Shift+< / >
+- IDE-Style Tab History - Navigate by usage order like VS Code. Keyboard shortcuts: Cmd+Shift+< / >
 
-- **Tab Groups** - Full support for Chrome's native tab groups. Drag, rename, recolor, save as bookmark folders.
+- Tab Groups - Full support for Chrome's native tab groups. Drag, rename, recolor, save as bookmark folders.
 
-- **Drag & Drop Everything** - Reorder pins, bookmarks, tabs, groups. Drop tabs into folders to save them.
+- Drag & Drop Everything - Reorder pins, bookmarks, tabs, groups. Drop tabs into folders to save them.
 
-- **Search & Filter** - Filter by text, live tabs, or audio. Save frequent searches. Export/import as JSON.
+- Search & Filter - Filter by text, live tabs, or audio. Save frequent searches. Export/import as JSON.
 
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
