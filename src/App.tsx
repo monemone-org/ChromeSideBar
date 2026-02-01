@@ -22,6 +22,8 @@ import { FontSizeContext } from './contexts/FontSizeContext';
 import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
 import { SelectionProvider } from './contexts/SelectionContext';
+import { UnifiedDndProvider } from './contexts/UnifiedDndContext';
+import { UnifiedDragOverlay } from './components/UnifiedDragOverlay';
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
@@ -639,6 +641,7 @@ function App() {
       <BookmarkTabsProvider>
       <SpacesProvider>
       <SelectionProvider>
+      <UnifiedDndProvider>
       <div
         className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
         style={{ fontSize: `${fontSize}px` }}
@@ -780,6 +783,7 @@ function App() {
         resetFavicon={resetFavicon}
         movePin={movePin}
         duplicatePin={duplicatePin}
+        addPin={addPin}
         iconSize={pinnedIconSize}
         bookmarkOpenMode={bookmarkOpenMode}
         filterLiveTabs={filterLiveTabs}
@@ -842,7 +846,11 @@ function App() {
         isVisible={toastVisible}
         onDismiss={hideToast}
       />
+
+      {/* Unified Drag Overlay for cross-component DnD */}
+      <UnifiedDragOverlay />
       </div>
+      </UnifiedDndProvider>
       </SelectionProvider>
       </SpacesProvider>
       </BookmarkTabsProvider>

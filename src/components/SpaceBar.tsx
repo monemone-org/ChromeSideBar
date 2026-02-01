@@ -1,24 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import clsx from 'clsx';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragStartEvent,
-  DragOverlay,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  horizontalListSortingStrategy,
-} from '@dnd-kit/sortable';
+import { useDroppable } from '@dnd-kit/core';
 import { Plus } from 'lucide-react';
-import { SpaceIcon, SpaceIconOverlay } from './SpaceIcon';
+import { SpaceIcon } from './SpaceIcon';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
+import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
+import { DragData, DragFormat, DropData, DropPosition, acceptsFormats } from '../types/dragDrop';
+import { moveTabToSpace, createTabInSpace } from '../utils/tabOperations';
 
 interface SpaceBarProps
 {
@@ -35,8 +23,8 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   dropTargetSpaceId,
 }) =>
 {
-  const { allSpaces, activeSpaceId, switchToSpace, moveSpace, getSpaceById, closeAllTabsInSpace } = useSpacesContext();
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const { allSpaces, spaces, activeSpaceId, switchToSpace, moveSpace, closeAllTabsInSpace, windowId } = useSpacesContext();
+  const { sourceZone, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to make active space visible
@@ -52,14 +40,6 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
     }
   }, [activeSpaceId]);
 
-  // Drag-drop sensors with activation distance to allow clicks
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
   const handleSpaceClick = (spaceId: string) =>
   {
     switchToSpace(spaceId);
@@ -72,22 +52,86 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
     onDeleteSpace(space);
   };
 
-  const handleDragStart = (event: DragStartEvent) =>
+  // Drop handler for SpaceBar zone
+  const handleDrop: DropHandler = useCallback(async (
+    dragData: DragData,
+    dropData: DropData,
+    position: DropPosition,
+    acceptedFormat: DragFormat
+  ) =>
   {
-    setActiveId(event.active.id as string);
-  };
+    if (!position) return;
 
-  const handleDragEnd = (event: DragEndEvent) =>
-  {
-    const { active, over } = event;
-    if (over && active.id !== over.id)
+    // Extract space ID from drop target (e.g., "space-work" -> "work")
+    const targetSpaceId = dropData.targetId.startsWith('space-')
+      ? dropData.targetId.slice(6)
+      : dropData.targetId;
+
+    switch (acceptedFormat)
     {
-      moveSpace(active.id as string, over.id as string);
-    }
-    setActiveId(null);
-  };
+      case DragFormat.SPACE:
+        // Reorder spaces
+        if (dragData.space && dragData.space.spaceId !== dropData.targetId)
+        {
+          moveSpace(dragData.space.spaceId, dropData.targetId);
+        }
+        break;
 
-  const activeSpace = activeId ? getSpaceById(activeId) : null;
+      case DragFormat.TAB:
+        // Move tab to space's Chrome group
+        if (dragData.tab && windowId)
+        {
+          const result = await moveTabToSpace(
+            dragData.tab.tabId,
+            targetSpaceId,
+            spaces,
+            windowId
+          );
+          if (import.meta.env.DEV && !result.success)
+          {
+            console.error('[SpaceBar] Failed to move tab:', result.error);
+          }
+        }
+        break;
+
+      case DragFormat.URL:
+        // Create new tab in space
+        if (dragData.url && windowId)
+        {
+          const result = await createTabInSpace(
+            dragData.url.url,
+            targetSpaceId,
+            spaces,
+            windowId
+          );
+          if (import.meta.env.DEV && !result.success)
+          {
+            console.error('[SpaceBar] Failed to create tab:', result.error);
+          }
+        }
+        break;
+    }
+  }, [moveSpace, spaces, windowId]);
+
+  // Register drop handler
+  useEffect(() =>
+  {
+    registerDropHandler('spaceBar', handleDrop);
+    return () => unregisterDropHandler('spaceBar');
+  }, [registerDropHandler, unregisterDropHandler, handleDrop]);
+
+  // Container droppable
+  const { setNodeRef: setContainerRef } = useDroppable({
+    id: 'spaceBar-container',
+    data: {
+      zone: 'spaceBar',
+      targetId: 'spaceBar-container',
+      canAccept: acceptsFormats(DragFormat.SPACE, DragFormat.TAB, DragFormat.URL),
+    } as DropData,
+  });
+
+  // Only show drop indicators when dragging from within SpaceBar
+  const showDropIndicators = sourceZone === 'spaceBar';
 
   return (
     <div className="flex items-stretch border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -106,45 +150,31 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 
       {/* Horizontal scrollable space icons */}
       <div
-        ref={scrollContainerRef}
+        ref={(node) =>
+        {
+          setContainerRef(node);
+          (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+        }}
         className="flex-1 flex items-center gap-1 px-1 py-1 overflow-x-auto"
         style={{ scrollbarWidth: 'none' }}
+        data-dnd-zone="spaceBar"
       >
-        {/* All spaces in SortableContext for proper position calculation */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={allSpaces.map(s => s.id)}
-            strategy={horizontalListSortingStrategy}
-          >
-            {allSpaces.map((space) => (
-              <SpaceIcon
-                key={space.id}
-                space={space}
-                isActive={space.id === activeSpaceId}
-                onClick={() => handleSpaceClick(space.id)}
-                onEdit={() => onEditSpace(space)}
-                onDelete={() => handleDelete(space)}
-                onCloseAllTabs={() => closeAllTabsInSpace(space)}
-                isAllSpace={space.id === 'all'}
-                isDraggable={space.id !== 'all'}
-                isDropTarget={dropTargetSpaceId === space.id}
-              />
-            ))}
-          </SortableContext>
-          <DragOverlay>
-            {activeSpace && (
-              <SpaceIconOverlay
-                space={activeSpace}
-                isActive={activeSpace.id === activeSpaceId}
-              />
-            )}
-          </DragOverlay>
-        </DndContext>
+        {allSpaces.map((space, index) => (
+          <SpaceIcon
+            key={space.id}
+            space={space}
+            index={index}
+            isActive={space.id === activeSpaceId}
+            onClick={() => handleSpaceClick(space.id)}
+            onEdit={() => onEditSpace(space)}
+            onDelete={() => handleDelete(space)}
+            onCloseAllTabs={() => closeAllTabsInSpace(space)}
+            isAllSpace={space.id === 'all'}
+            isDraggable={space.id !== 'all'}
+            isDropTarget={dropTargetSpaceId === space.id || (showDropIndicators && overId === `space-${space.id}`)}
+            dropPosition={showDropIndicators && overId === `space-${space.id}` ? dropPosition : null}
+          />
+        ))}
       </div>
 
       {/* Fixed "+" button */}

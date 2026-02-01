@@ -2,16 +2,17 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Globe, Edit, Trash, X, RotateCcw, Play, Copy, ExternalLink } from 'lucide-react';
 import { Dialog } from './Dialog';
 import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePinnedSites';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import clsx from 'clsx';
 import * as ContextMenu from './menu/ContextMenu';
 import { IconColorPicker, PINNED_SITE_COLORS, DEFAULT_ICON_COLOR } from './IconColorPicker';
 import { iconToDataUrl } from '../utils/iconify';
+import { createPinDragData, DropData, DropPosition, DragFormat, acceptsFormats } from '../types/dragDrop';
 
 interface PinnedIconProps
 {
   site: PinnedSite;
+  index: number;
   onRemove: (id: string) => void;
   onUpdate: (
     id: string,
@@ -31,10 +32,13 @@ interface PinnedIconProps
   isAudible?: boolean;
   iconSize: number;
   windowId?: number;
+  isDropTarget?: boolean;
+  dropPosition?: DropPosition;
 }
 
 export const PinnedIcon = ({
   site,
+  index,
   onRemove,
   onUpdate,
   onResetFavicon: _onResetFavicon,
@@ -47,6 +51,8 @@ export const PinnedIcon = ({
   isAudible,
   iconSize,
   windowId,
+  isDropTarget,
+  dropPosition,
 }: PinnedIconProps) =>
 {
   const [showEditModal, setShowEditModal] = useState(false);
@@ -59,14 +65,37 @@ export const PinnedIcon = ({
   const iconRef = useRef<HTMLDivElement>(null);
   const wasDraggingRef = useRef(false);
 
+  const pinId = `pin-${site.id}`;
+
+  // Draggable setup
   const {
     attributes,
     listeners,
-    setNodeRef,
-    transform,
-    transition,
+    setNodeRef: setDragRef,
     isDragging,
-  } = useSortable({ id: site.id });
+  } = useDraggable({
+    id: pinId,
+    data: createPinDragData(site.id, site.url, site.title, site.favicon),
+  });
+
+  // Droppable setup - accepts PIN (reorder) or URL (create new pin)
+  const { setNodeRef: setDropRef } = useDroppable({
+    id: pinId,
+    data: {
+      zone: 'pinnedBar',
+      targetId: site.id,
+      canAccept: acceptsFormats(DragFormat.PIN, DragFormat.URL),
+      index,
+    } as DropData,
+  });
+
+  // Combine refs
+  const setRefs = useCallback((node: HTMLDivElement | null) =>
+  {
+    setDragRef(node);
+    setDropRef(node);
+    (iconRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+  }, [setDragRef, setDropRef]);
 
   // Track when dragging ends to prevent click
   useEffect(() =>
@@ -76,13 +105,6 @@ export const PinnedIcon = ({
       wasDraggingRef.current = true;
     }
   }, [isDragging]);
-
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    touchAction: 'none',
-    zIndex: isDragging ? 10 : undefined,
-  };
 
   const handleClick = (e: React.MouseEvent) =>
   {
@@ -185,13 +207,6 @@ export const PinnedIcon = ({
     onRemove(site.id);
   };
 
-  // Combine refs for sortable and icon positioning
-  const setRefs = useCallback((node: HTMLDivElement | null) =>
-  {
-    setNodeRef(node);
-    (iconRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-  }, [setNodeRef]);
-
   // Current icon preview for IconColorPicker
   const currentIconPreview = editFavicon ? (
     <img src={editFavicon} alt="" className="w-5 h-5" />
@@ -210,16 +225,22 @@ export const PinnedIcon = ({
     </button>
   );
 
+  // Drop indicator styles
+  const showDropBefore = isDropTarget && dropPosition === 'before';
+  const showDropAfter = isDropTarget && dropPosition === 'after';
+
   return (
     <>
       <ContextMenu.Root>
         <ContextMenu.Trigger asChild>
           <div
             ref={setRefs}
-            style={{ ...style, width: iconSize + 8, height: iconSize + 8 }}
+            style={{ width: iconSize + 8, height: iconSize + 8 }}
             {...attributes}
             {...listeners}
             title={site.title}
+            data-dnd-id={pinId}
+            data-dnd-zone="pinnedBar"
             className={clsx(
               "group/pin relative flex items-center justify-center rounded",
               isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700",
@@ -228,10 +249,20 @@ export const PinnedIcon = ({
             )}
             onMouseUp={handleClick}
           >
+            {/* Drop indicator - before */}
+            {showDropBefore && (
+              <div className="absolute -left-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
+            )}
+
             {site.favicon ? (
               <img src={site.favicon} alt="" style={{ width: iconSize, height: iconSize }} />
             ) : (
               <Globe style={{ width: iconSize, height: iconSize }} className="text-gray-400" />
+            )}
+
+            {/* Drop indicator - after */}
+            {showDropAfter && (
+              <div className="absolute -right-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
             )}
 
             {/* Loaded state indicator - bottom-right corner */}
