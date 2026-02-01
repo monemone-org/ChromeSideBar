@@ -239,8 +239,10 @@ export async function importFullBackup(
 
     const searchArray = rootNode?.children || backup.bookmarks;
 
-    const bookmarkBar = searchArray.find(n => n.title === 'Bookmarks Bar');
-    const otherBookmarks = searchArray.find(n => n.title === 'Other Bookmarks');
+    // Use case-insensitive matching for root folder names to handle platform differences
+    // (e.g., Windows uses "Other bookmarks" while macOS uses "Other Bookmarks")
+    const bookmarkBar = searchArray.find(n => n.title.toLowerCase() === 'bookmarks bar');
+    const otherBookmarks = searchArray.find(n => n.title.toLowerCase() === 'other bookmarks');
 
     if (options.bookmarkMode === 'replace') {
       // Clear and replace existing bookmarks

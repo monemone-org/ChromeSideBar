@@ -39,7 +39,7 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
 }) =>
 {
   const isCreateMode = space === null;
-  const { createFolder, getBookmarkPath, findFolderByPath } = useBookmarks();
+  const { createFolder, getBookmarkPath, findFolderByPath, getRootFolderTitle } = useBookmarks();
 
   // Form state
   const [name, setName] = useState('');
@@ -166,7 +166,7 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
     if (isCreateMode && !useExistingFolder)
     {
       const folderName = name.trim();
-      const parentPath = 'Other Bookmarks';
+      const parentPath = getRootFolderTitle('2'); // "Other Bookmarks" (actual title from Chrome)
       const targetPath = `${parentPath}/${folderName}`;
 
       // Check if folder already exists
@@ -235,11 +235,12 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
     {
       return bookmarkFolderPath;
     }
+    const otherBookmarksTitle = getRootFolderTitle('2') || 'Other Bookmarks';
     if (name.trim())
     {
-      return `Other Bookmarks/${name.trim()}`;
+      return `${otherBookmarksTitle}/${name.trim()}`;
     }
-    return 'Other Bookmarks/{name}';
+    return `${otherBookmarksTitle}/{name}`;
   };
 
   // Current icon preview for IconColorPicker

@@ -383,8 +383,18 @@ export const useBookmarks = () => {
     await createBookmark(original.parentId, original.title, original.url, original.index + 1);
   }, [getBookmark, createBookmark]);
 
+  // Get the actual title of a root folder by its stable ID
+  // Root folder IDs are stable across platforms: '1'=Bookmarks Bar, '2'=Other Bookmarks, '3'=Mobile Bookmarks
+  const getRootFolderTitle = useCallback((id: '1' | '2' | '3'): string =>
+  {
+    const folder = bookmarks.find(b => b.id === id);
+    return folder?.title || '';
+  }, [bookmarks]);
+
   // Find a folder by its path (e.g., "Bookmarks Bar/Home")
   // Returns the folder node if found, null otherwise
+  // Note: First path segment (root folder) is matched case-insensitively to handle
+  // platform differences (e.g., "Other Bookmarks" vs "Other bookmarks")
   const findFolderByPath = useCallback((path: string): chrome.bookmarks.BookmarkTreeNode | null =>
   {
     if (!path) return null;
@@ -392,12 +402,16 @@ export const useBookmarks = () => {
     const pathParts = path.split('/');
     let currentNodes = bookmarks;
 
-    for (const part of pathParts)
+    for (let i = 0; i < pathParts.length; i++)
     {
-      const found = currentNodes.find(node => node.title === part && !node.url);
+      const part = pathParts[i];
+      // First segment is a root folder - match case-insensitively
+      const found = i === 0
+        ? currentNodes.find(node => node.title.toLowerCase() === part.toLowerCase() && !node.url)
+        : currentNodes.find(node => node.title === part && !node.url);
       if (!found) return null;
       currentNodes = found.children || [];
-      if (pathParts.indexOf(part) === pathParts.length - 1)
+      if (i === pathParts.length - 1)
       {
         return found;
       }
@@ -442,6 +456,7 @@ export const useBookmarks = () => {
     moveBookmark,
     findFolderInParent,
     findFolderByPath,
+    getRootFolderTitle,
     createBookmark,
     createBookmarksBatch,
     getBookmark,
