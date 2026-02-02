@@ -15,6 +15,7 @@ import { TreeRow } from './TreeRow';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getFaviconUrl } from '../utils/favicon';
 import { PinnedIconVisual } from './PinnedIcon';
+import { SpaceIconVisual } from './SpaceIcon';
 
 interface UnifiedDragOverlayProps
 {
@@ -125,19 +126,14 @@ const TabGroupOverlay: React.FC<{ data: TabGroupData }> = ({ data }) =>
   );
 };
 
-// Space overlay - space icon button style
-const SpaceOverlay: React.FC<{ data: SpaceData }> = ({ data }) =>
-{
-  return (
-    <div className="flex items-center gap-2 px-2 py-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 pointer-events-none">
-      <div className="w-7 h-7 rounded flex items-center justify-center bg-gray-200 dark:bg-gray-700">
-        {/* Default icon - in full implementation would get space's actual icon */}
-        <SquareStack size={14} />
-      </div>
-      <span className="text-sm font-medium">{data.name}</span>
-    </div>
-  );
-};
+// Space overlay - matches SpaceIcon appearance
+const SpaceIconOverlay: React.FC<{ data: SpaceData }> = ({ data }) => (
+  <SpaceIconVisual
+    icon={data.icon}
+    color={data.color}
+    className="shadow-lg pointer-events-none cursor-grabbing"
+  />
+);
 
 // Multi-item overlay wrapper - shows stacked effect
 const MultiDragWrapper: React.FC<{
@@ -240,7 +236,7 @@ const getOverlayForDragData = (
         {
           return renderSpace
             ? renderSpace(primaryItem.space)
-            : <SpaceOverlay data={primaryItem.space} />;
+            : <SpaceIconOverlay data={primaryItem.space} />;
         }
         break;
 

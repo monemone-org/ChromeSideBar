@@ -98,6 +98,8 @@ export interface SpaceData
 {
   spaceId: string;
   name: string;
+  icon: string;
+  color: string;
 }
 
 // ============================================================================
@@ -389,10 +391,12 @@ export const createTabGroupDragItem = (
  */
 export const createSpaceDragItem = (
   spaceId: string,
-  name: string
+  name: string,
+  icon: string,
+  color: string
 ): DragItem => ({
   formats: [DragFormat.SPACE],
-  space: { spaceId, name },
+  space: { spaceId, name, icon, color },
 });
 
 /**
@@ -470,8 +474,10 @@ export const createTabGroupDragData = (
 
 export const createSpaceDragData = (
   spaceId: string,
-  name: string
-): DragData => createDragData(createSpaceDragItem(spaceId, name));
+  name: string,
+  icon: string,
+  color: string
+): DragData => createDragData(createSpaceDragItem(spaceId, name, icon, color));
 
 export const createUrlDragData = (
   url: string,

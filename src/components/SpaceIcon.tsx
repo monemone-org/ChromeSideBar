@@ -8,6 +8,47 @@ import { getIcon } from '../utils/spaceIcons';
 import { SpaceContextMenuContent } from './SpaceContextMenuContent';
 import { createSpaceDragData, DropData, DropPosition, DragFormat, acceptsFormats } from '../types/dragDrop';
 
+/**
+ * Shared visual component for space icon rendering.
+ * Used by both SpaceIcon and SpaceOverlay (drag overlay) for consistent appearance.
+ */
+interface SpaceIconVisualProps
+{
+  icon: string;
+  color: string;
+  isActive?: boolean;
+  className?: string;
+}
+
+export const SpaceIconVisual: React.FC<SpaceIconVisualProps> = ({
+  icon,
+  color,
+  isActive = false,
+  className,
+}) =>
+{
+  const colorStyle = GROUP_COLORS[color] || GROUP_COLORS.grey;
+
+  return (
+    <div
+      className={clsx(
+        "w-7 h-7 rounded flex items-center justify-center flex-shrink-0",
+        isActive ? colorStyle.badge : colorStyle.bg,
+        className
+      )}
+    >
+      <span
+        className={clsx(
+          "flex items-center justify-center",
+          isActive ? "text-white dark:text-black" : colorStyle.text
+        )}
+      >
+        {getIcon(icon, 14, isActive)}
+      </span>
+    </div>
+  );
+};
+
 interface SpaceIconProps
 {
   space: Space;
@@ -47,7 +88,7 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
     isDragging,
   } = useDraggable({
     id: spaceId,
-    data: createSpaceDragData(space.id, space.name),
+    data: createSpaceDragData(space.id, space.name, space.icon, space.color),
     disabled: !isDraggable,
   });
 
@@ -69,8 +110,6 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
     setDropRef(node);
   }, [setDragRef, setDropRef]);
 
-  const colorStyle = GROUP_COLORS[space.color] || GROUP_COLORS.grey;
-
   // Drop indicator styles
   const showDropBefore = isDropTarget && dropPosition === 'before';
   const showDropAfter = isDropTarget && dropPosition === 'after';
@@ -85,9 +124,9 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       data-space-button="true"
       data-dnd-id={spaceId}
       className={clsx(
-        "w-7 h-7 rounded flex items-center justify-center transition-all flex-shrink-0 relative",
+        "relative transition-all",
         "hover:scale-105 focus:outline-none",
-        isActive ? colorStyle.badge : [colorStyle.bg, "hover:opacity-80"],
+        !isActive && "hover:opacity-80",
         isDropTarget && !dropPosition && "ring-2 ring-blue-500 scale-110"
       )}
       {...(isDraggable ? { ...attributes, ...listeners } : {})}
@@ -97,14 +136,11 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         <div className="absolute -left-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
       )}
 
-      <span
-        className={clsx(
-          "flex items-center justify-center",
-          isActive ? "text-white dark:text-black" : colorStyle.text
-        )}
-      >
-        {getIcon(space.icon, 14, isActive)}
-      </span>
+      <SpaceIconVisual
+        icon={space.icon}
+        color={space.color}
+        isActive={isActive}
+      />
 
       {/* Drop indicator - after */}
       {showDropAfter && (
@@ -130,38 +166,5 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>
-  );
-};
-
-// Static overlay component for DragOverlay - no sortable hooks
-interface SpaceIconOverlayProps
-{
-  space: Space;
-  isActive: boolean;
-}
-
-export const SpaceIconOverlay: React.FC<SpaceIconOverlayProps> = ({
-  space,
-  isActive,
-}) =>
-{
-  const colorStyle = GROUP_COLORS[space.color] || GROUP_COLORS.grey;
-
-  return (
-    <div
-      className={clsx(
-        "w-7 h-7 rounded flex items-center justify-center flex-shrink-0 cursor-grabbing",
-        isActive ? colorStyle.badge : colorStyle.bg
-      )}
-    >
-      <span
-        className={clsx(
-          "flex items-center justify-center",
-          isActive ? "text-white dark:text-black" : colorStyle.text
-        )}
-      >
-        {getIcon(space.icon, 14, isActive)}
-      </span>
-    </div>
   );
 };
