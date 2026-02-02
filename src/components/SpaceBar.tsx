@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { SpaceIcon } from './SpaceIcon';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DropData, DropPosition, getPrimaryItem, hasFormat } from '../types/dragDrop';
+import { DragData, DragFormat, DropData, DropPosition, getItemsByFormat, getPrimaryItem, hasFormat } from '../types/dragDrop';
 import { moveTabToSpace, createTabInSpace } from '../utils/tabOperations';
 
 interface SpaceBarProps
@@ -85,35 +85,49 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
         break;
 
       case DragFormat.TAB:
-        // Move tab to space's Chrome group
-        if (primaryItem.tab && windowId)
+        // Move all tabs to space's Chrome group
+        if (windowId)
         {
-          const result = await moveTabToSpace(
-            primaryItem.tab.tabId,
-            targetSpaceId,
-            spaces,
-            windowId
-          );
-          if (import.meta.env.DEV && !result.success)
+          const tabItems = getItemsByFormat(dragData, DragFormat.TAB);
+          for (const item of tabItems)
           {
-            console.error('[SpaceBar] Failed to move tab:', result.error);
+            if (item.tab)
+            {
+              const result = await moveTabToSpace(
+                item.tab.tabId,
+                targetSpaceId,
+                spaces,
+                windowId
+              );
+              if (import.meta.env.DEV && !result.success)
+              {
+                console.error('[SpaceBar] Failed to move tab:', result.error);
+              }
+            }
           }
         }
         break;
 
       case DragFormat.URL:
-        // Create new tab in space
-        if (primaryItem.url && windowId)
+        // Create new tabs in space from all URLs
+        if (windowId)
         {
-          const result = await createTabInSpace(
-            primaryItem.url.url,
-            targetSpaceId,
-            spaces,
-            windowId
-          );
-          if (import.meta.env.DEV && !result.success)
+          const urlItems = getItemsByFormat(dragData, DragFormat.URL);
+          for (const item of urlItems)
           {
-            console.error('[SpaceBar] Failed to create tab:', result.error);
+            if (item.url)
+            {
+              const result = await createTabInSpace(
+                item.url.url,
+                targetSpaceId,
+                spaces,
+                windowId
+              );
+              if (import.meta.env.DEV && !result.success)
+              {
+                console.error('[SpaceBar] Failed to create tab:', result.error);
+              }
+            }
           }
         }
         break;
@@ -127,8 +141,12 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
     return () => unregisterDropHandler('spaceBar');
   }, [registerDropHandler, unregisterDropHandler, handleDrop]);
 
-  // Only show drop indicators for SPACE reordering (TAB/URL drop INTO space, no position indicator)
-  const showDropIndicators = !!(activeDragData && hasFormat(activeDragData, DragFormat.SPACE));
+  // Show drop indicators for SPACE reordering (before/after position)
+  const isSpaceDrag = !!(activeDragData && hasFormat(activeDragData, DragFormat.SPACE));
+  // Show drop indicators for TAB/URL drops (into position)
+  const isTabOrUrlDrag = !!(activeDragData && (
+    hasFormat(activeDragData, DragFormat.TAB) || hasFormat(activeDragData, DragFormat.URL)
+  ));
 
   // Create sortable IDs for SortableContext
   const sortableSpaceIds = useMemo(
@@ -171,8 +189,16 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
               onCloseAllTabs={() => closeAllTabsInSpace(space)}
               isAllSpace={space.id === 'all'}
               isDraggable={space.id !== 'all'}
-              isDropTarget={dropTargetSpaceId === space.id || (showDropIndicators && overId === `space-${space.id}`)}
-              dropPosition={showDropIndicators && overId === `space-${space.id}` ? dropPosition : null}
+              isDropTarget={
+                dropTargetSpaceId === space.id ||
+                (isSpaceDrag && overId === `space-${space.id}`) ||
+                (isTabOrUrlDrag && overId === `space-${space.id}`)
+              }
+              dropPosition={
+                (isSpaceDrag && overId === `space-${space.id}`) ? dropPosition :
+                (isTabOrUrlDrag && overId === `space-${space.id}`) ? 'into' :
+                null
+              }
             />
           ))}
         </SortableContext>
