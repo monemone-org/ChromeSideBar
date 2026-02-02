@@ -1,9 +1,9 @@
 # TODO
 
-- All space instead of using an icon, use Text "ALL" so it's differentiated from the other Space icon that can be dragged/dropped.
+- a bug. after opening a pinned sites, then unpin, the associated tab should be
+  unassociated and show up on All space. but it doesn't
 
-- handle default bookmark folder 1,2,3
-
+  
 - in dnd context, do not repeat:
       setOverId(null);
       setOverZone(null);
@@ -12,8 +12,6 @@
       setAcceptedFormat(null);
   use a util function to reset dnd context
 
-  - after dragging a pinned icon from position 2 to 3.  the icon is now at position 2 is loaded. it shouldn't.
-  
   - backup/restore should support all root folders and root folders with different names.
 
 ## In-Progress
@@ -305,3 +303,9 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 
 - [x] store last active space in local storage and restore when extension is reloaded, so it doesn't always land on "All"
 
+- [x] All space instead of using an icon, use Text "ALL" so it's differentiated from the other Space icon that can be dragged/dropped.
+
+- [x] handle default bookmark folder 1,2,3
+
+- [x] after dragging a pinned icon from position 2 to 3.  the pinned site now at position 2 is loaded. it shouldn't.
+  

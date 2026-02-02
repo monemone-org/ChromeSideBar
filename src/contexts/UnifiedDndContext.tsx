@@ -239,6 +239,16 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     setWasValidDropState(valid);
   }, []);
 
+  // Reset over/drop target state
+  const resetOverState = useCallback(() =>
+  {
+    setOverId(null);
+    setOverZone(null);
+    setOverData(null);
+    setDropPosition(null);
+    setAcceptedFormat(null);
+  }, []);
+
   // Reset all drag state
   const resetDragState = useCallback(() =>
   {
@@ -246,17 +256,13 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     setSourceZone(null);
     setActiveId(null);
     setActiveDragWidth(null);
-    setOverId(null);
-    setOverZone(null);
-    setOverData(null);
-    setDropPosition(null);
-    setAcceptedFormat(null);
+    resetOverState();
     setIsMultiDrag(false);
     setMultiDragCount(0);
     clearAutoExpandTimer();
     // Note: wasValidDrop is NOT reset here - it's needed for DragOverlay animation
     // It will be reset on next drag start
-  }, [clearAutoExpandTimer]);
+  }, [clearAutoExpandTimer, resetOverState]);
 
   // Drag start handler
   const handleDragStart = useCallback((event: DragStartEvent) =>
@@ -347,10 +353,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
 
     if (!over || !activeDragData)
     {
-      setOverId(null);
-      setOverZone(null);
-      setOverData(null);
-      setDropPosition(null);
+      resetOverState();
       return;
     }
 
@@ -358,10 +361,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
 
     if (!dropData)
     {
-      setOverId(null);
-      setOverZone(null);
-      setOverData(null);
-      setDropPosition(null);
+      resetOverState();
       return;
     }
 
@@ -369,11 +369,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     const format = dropData.canAccept(activeDragData);
     if (!format)
     {
-      setOverId(null);
-      setOverZone(null);
-      setOverData(null);
-      setDropPosition(null);
-      setAcceptedFormat(null);
+      resetOverState();
       return;
     }
 
@@ -381,10 +377,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     const element = document.querySelector(`[data-dnd-id="${over.id}"]`);
     if (!element)
     {
-      setOverId(null);
-      setOverZone(null);
-      setOverData(null);
-      setDropPosition(null);
+      resetOverState();
       return;
     }
 
@@ -403,7 +396,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     setOverData(dropData);
     setDropPosition(position);
     setAcceptedFormat(format);
-  }, [activeDragData]);
+  }, [activeDragData, resetOverState]);
 
   // Drag move handler - recalculate position as pointer moves within a droppable
   const handleDragMove = useCallback((_event: DragMoveEvent) =>

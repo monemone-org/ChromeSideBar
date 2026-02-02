@@ -43,7 +43,7 @@ export const PinnedBar = ({
   filterText = '',
 }: PinnedBarProps) =>
 {
-  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned } = useBookmarkTabsContext();
+  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned, deassociatePinnedTab } = useBookmarkTabsContext();
   const { windowId } = useSpacesContext();
   const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
 
@@ -56,6 +56,13 @@ export const PinnedBar = ({
       chrome.windows.create({ tabId });
     }
   };
+
+  // Handle unpin: deassociate tab first so it shows in All space, then remove pin
+  const handleRemovePin = useCallback((pinnedId: string) =>
+  {
+    deassociatePinnedTab(pinnedId);
+    removePin(pinnedId);
+  }, [deassociatePinnedTab, removePin]);
 
   // Filter pinned sites based on active filters
   const hasFilters = filterLiveTabs || filterText.trim();
@@ -169,7 +176,7 @@ export const PinnedBar = ({
           key={site.id}
           site={site}
           index={index}
-          onRemove={removePin}
+          onRemove={handleRemovePin}
           onUpdate={updatePin}
           onResetFavicon={resetFavicon}
           onDuplicate={duplicatePin}

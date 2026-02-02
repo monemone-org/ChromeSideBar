@@ -31,6 +31,7 @@ interface BookmarkTabsContextValue
   isPinnedActive: (pinnedId: string) => boolean;
   getTabIdForPinned: (pinnedId: string) => number | undefined;
   getPinnedLiveTitle: (pinnedId: string) => string | undefined;
+  deassociatePinnedTab: (pinnedId: string) => void;
   // Active item tracking
   getActiveItemKey: () => string | null;
   // Tab filtering for sidebar
@@ -562,6 +563,18 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return tabId !== undefined ? tabTitles.get(tabId) : undefined;
   }, [itemToTab, tabTitles]);
 
+  // Deassociate a pinned site from its tab (tab stays alive, becomes unmanaged)
+  const deassociatePinnedTab = useCallback((pinnedId: string): void =>
+  {
+    if (currentWindowId === null) return;
+    const itemKey = makePinnedKey(pinnedId);
+    const tabId = itemToTab.get(itemKey);
+    if (tabId !== undefined)
+    {
+      removeLocalTabAssociation(tabId, currentWindowId);
+    }
+  }, [itemToTab, currentWindowId, removeLocalTabAssociation]);
+
   // --- Active state functions ---
   const isBookmarkActive = useCallback((bookmarkId: string): boolean =>
   {
@@ -613,6 +626,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     isPinnedActive,
     getTabIdForPinned,
     getPinnedLiveTitle,
+    deassociatePinnedTab,
     getActiveItemKey,
     getManagedTabIds,
     getItemKeyForTab,
@@ -635,6 +649,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     isPinnedActive,
     getTabIdForPinned,
     getPinnedLiveTitle,
+    deassociatePinnedTab,
     getActiveItemKey,
     getManagedTabIds,
     getItemKeyForTab,
