@@ -3,16 +3,11 @@
 - a bug. after opening a pinned sites, then unpin, the associated tab should be
   unassociated and show up on All space. but it doesn't
 
+- drag URL to pinned bar doesn't show indicator when cursor is at <50% of pin0.
   
-- in dnd context, do not repeat:
-      setOverId(null);
-      setOverZone(null);
-      setOverData(null);
-      setDropPosition(null);
-      setAcceptedFormat(null);
-  use a util function to reset dnd context
+- backup/restore should support all root folders and root folders with different names.
 
-  - backup/restore should support all root folders and root folders with different names.
+- dropping right at between 2 pins .e.g pin1 and pin2, the drop indicator is after pin2 instead of in between pin1 and pin2 (either after pin1 or before pin2)
 
 ## In-Progress
 
@@ -309,3 +304,12 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 
 - [x] after dragging a pinned icon from position 2 to 3.  the pinned site now at position 2 is loaded. it shouldn't.
   
+- [x] in dnd context, do not repeat:
+      setOverId(null);
+      setOverZone(null);
+      setOverData(null);
+      setDropPosition(null);
+      setAcceptedFormat(null);
+  use a util function to reset dnd context
+
+

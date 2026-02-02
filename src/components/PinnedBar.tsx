@@ -7,7 +7,7 @@ import { useSpacesContext } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
 import { BookmarkOpenMode } from './SettingsDialog';
 import { matchesFilter } from '../utils/searchParser';
-import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getPrimaryItem, hasFormat } from '../types/dragDrop';
+import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getItemsByFormat, getPrimaryItem, hasFormat } from '../types/dragDrop';
 
 interface PinnedBarProps
 {
@@ -114,8 +114,9 @@ export const PinnedBar = ({
         break;
 
       case DragFormat.URL:
-        // Create new pin from URL at the drop position
-        if (primaryItem.url)
+        // Create new pins from URLs at the drop position
+        const urlItems = getItemsByFormat(dragData, DragFormat.URL);
+        if (urlItems.length > 0)
         {
           let insertIndex: number | undefined;
           if (!isEndDrop)
@@ -128,7 +129,15 @@ export const PinnedBar = ({
             }
           }
           // If isEndDrop or target not found, insertIndex stays undefined (append to end)
-          addPin(primaryItem.url.url, primaryItem.url.title || primaryItem.url.url, primaryItem.url.faviconUrl, insertIndex);
+          // Add each URL as a pin, incrementing index to preserve order
+          for (const item of urlItems)
+          {
+            if (item.url)
+            {
+              addPin(item.url.url, item.url.title || item.url.url, item.url.faviconUrl, insertIndex);
+              if (insertIndex !== undefined) insertIndex++;
+            }
+          }
         }
         break;
     }

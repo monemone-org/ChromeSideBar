@@ -86,21 +86,24 @@ export const usePinnedSites = () => {
       favicon,
     };
 
-    let updatedSites: PinnedSite[];
-    if (atIndex !== undefined && atIndex >= 0 && atIndex < pinnedSites.length) {
-      // Insert at specific position
-      updatedSites = [
-        ...pinnedSites.slice(0, atIndex),
-        newPin,
-        ...pinnedSites.slice(atIndex),
-      ];
-    } else {
-      // Append to end
-      updatedSites = [...pinnedSites, newPin];
-    }
-    setPinnedSites(updatedSites);
-    savePinnedSites(updatedSites);
-  }, [pinnedSites, savePinnedSites]);
+    // Use functional update to avoid stale closure when called multiple times
+    setPinnedSites(current => {
+      let updatedSites: PinnedSite[];
+      if (atIndex !== undefined && atIndex >= 0 && atIndex < current.length) {
+        // Insert at specific position
+        updatedSites = [
+          ...current.slice(0, atIndex),
+          newPin,
+          ...current.slice(atIndex),
+        ];
+      } else {
+        // Append to end
+        updatedSites = [...current, newPin];
+      }
+      savePinnedSites(updatedSites);
+      return updatedSites;
+    });
+  }, [savePinnedSites]);
 
   // Add multiple pins at once (handles favicon fetching for each)
   const addPins = useCallback(async (
