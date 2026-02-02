@@ -67,7 +67,8 @@ export const usePinnedSites = () => {
   const addPin = useCallback(async (
     url: string,
     title: string,
-    faviconUrl?: string
+    faviconUrl?: string,
+    atIndex?: number
   ) => {
     // Prefer Chrome's _favicon API (most reliable), fallback to provided faviconUrl
     const chromeFaviconUrl = getFaviconUrl(url);
@@ -85,7 +86,18 @@ export const usePinnedSites = () => {
       favicon,
     };
 
-    const updatedSites = [...pinnedSites, newPin];
+    let updatedSites: PinnedSite[];
+    if (atIndex !== undefined && atIndex >= 0 && atIndex < pinnedSites.length) {
+      // Insert at specific position
+      updatedSites = [
+        ...pinnedSites.slice(0, atIndex),
+        newPin,
+        ...pinnedSites.slice(atIndex),
+      ];
+    } else {
+      // Append to end
+      updatedSites = [...pinnedSites, newPin];
+    }
     setPinnedSites(updatedSites);
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
@@ -169,15 +181,30 @@ export const usePinnedSites = () => {
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
 
-  const movePin = useCallback((activeId: string, overId: string) => {
+  const movePin = useCallback((
+    activeId: string,
+    overId: string,
+    position: 'before' | 'after' = 'before'
+  ) => {
     const oldIndex = pinnedSites.findIndex(s => s.id === activeId);
-    const newIndex = pinnedSites.findIndex(s => s.id === overId);
+    const overIndex = pinnedSites.findIndex(s => s.id === overId);
 
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+    if (oldIndex === -1 || overIndex === -1 || oldIndex === overIndex) return;
+
+    // Calculate target position in original array
+    let targetIndex = position === 'after' ? overIndex + 1 : overIndex;
+
+    // Adjust for the removal: if we're moving from before the target,
+    // the target shifts down by 1 after removal
+    if (oldIndex < targetIndex) {
+      targetIndex -= 1;
+    }
+
+    if (oldIndex === targetIndex) return;
 
     const updatedSites = [...pinnedSites];
     const [removed] = updatedSites.splice(oldIndex, 1);
-    updatedSites.splice(newIndex, 0, removed);
+    updatedSites.splice(targetIndex, 0, removed);
 
     setPinnedSites(updatedSites);
     savePinnedSites(updatedSites);

@@ -99,6 +99,10 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       zone: 'spaceBar',
       targetId: space.id,
       canAccept: acceptsFormats(DragFormat.SPACE, DragFormat.TAB, DragFormat.URL),
+      isHorizontal: true,
+      // TAB/URL drops go "into" the space; SPACE drops are before/after for reordering
+      isContainerForFormat: (format: DragFormat) =>
+        format === DragFormat.TAB || format === DragFormat.URL,
       index,
     } as DropData,
   });

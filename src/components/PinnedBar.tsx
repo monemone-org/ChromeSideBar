@@ -7,7 +7,7 @@ import { useSpacesContext } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
 import { BookmarkOpenMode } from './SettingsDialog';
 import { matchesFilter } from '../utils/searchParser';
-import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getPrimaryItem } from '../types/dragDrop';
+import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getPrimaryItem, hasFormat } from '../types/dragDrop';
 
 interface PinnedBarProps
 {
@@ -20,9 +20,9 @@ interface PinnedBarProps
               customIconName?: string,
               iconColor?: string) => void;
   resetFavicon: (id: string) => void;
-  movePin: (activeId: string, overId: string) => void;
+  movePin: (activeId: string, overId: string, position?: 'before' | 'after') => void;
   duplicatePin: (id: string) => void;
-  addPin: (url: string, title: string, faviconUrl?: string) => void;
+  addPin: (url: string, title: string, faviconUrl?: string, atIndex?: number) => void;
   iconSize: number;
   bookmarkOpenMode?: BookmarkOpenMode;
   filterLiveTabs?: boolean;
@@ -45,7 +45,7 @@ export const PinnedBar = ({
 {
   const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned } = useBookmarkTabsContext();
   const { windowId } = useSpacesContext();
-  const { sourceZone, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
+  const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
 
   // Move pinned tab to a new window
   const movePinnedToNewWindow = (pinnedId: string) =>
@@ -81,25 +81,51 @@ export const PinnedBar = ({
     const primaryItem = getPrimaryItem(dragData);
     if (!primaryItem) return;
 
+    // Handle drop at the end placeholder
+    const isEndDrop = dropData.targetId === 'pinnedBar-end';
+
     switch (acceptedFormat)
     {
       case DragFormat.PIN:
         // Reorder pins
-        if (primaryItem.pin && primaryItem.pin.siteId !== dropData.targetId)
+        if (primaryItem.pin)
         {
-          movePin(primaryItem.pin.siteId, dropData.targetId);
+          if (isEndDrop)
+          {
+            // Move to end - use last pin as target with 'after' position
+            const lastPin = pinnedSites[pinnedSites.length - 1];
+            if (lastPin && primaryItem.pin.siteId !== lastPin.id)
+            {
+              movePin(primaryItem.pin.siteId, lastPin.id, 'after');
+            }
+          }
+          else if (primaryItem.pin.siteId !== dropData.targetId)
+          {
+            movePin(primaryItem.pin.siteId, dropData.targetId, position as 'before' | 'after');
+          }
         }
         break;
 
       case DragFormat.URL:
-        // Create new pin from URL
+        // Create new pin from URL at the drop position
         if (primaryItem.url)
         {
-          addPin(primaryItem.url.url, primaryItem.url.title || primaryItem.url.url, primaryItem.url.faviconUrl);
+          let insertIndex: number | undefined;
+          if (!isEndDrop)
+          {
+            // Find the index of the target pin
+            const targetIndex = pinnedSites.findIndex(p => p.id === dropData.targetId);
+            if (targetIndex !== -1)
+            {
+              insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+            }
+          }
+          // If isEndDrop or target not found, insertIndex stays undefined (append to end)
+          addPin(primaryItem.url.url, primaryItem.url.title || primaryItem.url.url, primaryItem.url.faviconUrl, insertIndex);
         }
         break;
     }
-  }, [movePin, addPin]);
+  }, [movePin, addPin, pinnedSites]);
 
   // Register drop handler
   useEffect(() =>
@@ -108,13 +134,15 @@ export const PinnedBar = ({
     return () => unregisterDropHandler('pinnedBar');
   }, [registerDropHandler, unregisterDropHandler, handleDrop]);
 
-  // Container droppable (for drops not on specific pins)
-  const { setNodeRef: setContainerRef } = useDroppable({
-    id: 'pinnedBar-container',
+  // End placeholder droppable (for appending at the end)
+  const { setNodeRef: setEndPlaceholderRef } = useDroppable({
+    id: 'pinnedBar-end',
     data: {
       zone: 'pinnedBar',
-      targetId: 'pinnedBar-container',
+      targetId: 'pinnedBar-end',
       canAccept: acceptsFormats(DragFormat.PIN, DragFormat.URL),
+      isHorizontal: true,
+      index: pinnedSites.length,
     } as DropData,
   });
 
@@ -123,13 +151,17 @@ export const PinnedBar = ({
     return null;
   }
 
-  // Only show drop indicators when dragging from within PinnedBar
-  const showDropIndicators = sourceZone === 'pinnedBar';
+  // Show drop indicators when dragging PIN or URL (both use before/after positioning)
+  const showDropIndicators = !!(activeDragData && (
+    hasFormat(activeDragData, DragFormat.PIN) || hasFormat(activeDragData, DragFormat.URL)
+  ));
+
+  // Check if end placeholder is drop target
+  const isEndDropTarget = showDropIndicators && overId === 'pinnedBar-end';
 
   return (
     <div
-      ref={setContainerRef}
-      className="flex flex-wrap gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-gray-700"
+      className="flex flex-wrap gap-1.5 px-2 py-1.5 border-b border-gray-200 dark:border-gray-700"
       data-dnd-zone="pinnedBar"
     >
       {visiblePinnedSites.map((site, index) => (
@@ -159,6 +191,18 @@ export const PinnedBar = ({
           dropPosition={showDropIndicators && overId === `pin-${site.id}` ? dropPosition : null}
         />
       ))}
+      {/* End placeholder for dropping after the last pin */}
+      <div
+        ref={setEndPlaceholderRef}
+        data-dnd-id="pinnedBar-end"
+        className="relative flex-1 min-w-4"
+        style={{ minHeight: iconSize + 8 }}
+      >
+        {/* Drop indicator - shows on left side (= after last icon) */}
+        {isEndDropTarget && (
+          <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
+        )}
+      </div>
     </div>
   );
 };

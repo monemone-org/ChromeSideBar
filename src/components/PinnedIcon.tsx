@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Globe, Edit, Trash, X, RotateCcw, Play, Copy, ExternalLink } from 'lucide-react';
 import { Dialog } from './Dialog';
 import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePinnedSites';
@@ -97,7 +97,6 @@ export const PinnedIcon = ({
   const [editIconColor, setEditIconColor] = useState(site.iconColor || DEFAULT_ICON_COLOR);
   const [customHexInput, setCustomHexInput] = useState('');
   const iconRef = useRef<HTMLDivElement>(null);
-  const wasDraggingRef = useRef(false);
 
   const pinId = `pin-${site.id}`;
 
@@ -119,6 +118,7 @@ export const PinnedIcon = ({
       zone: 'pinnedBar',
       targetId: site.id,
       canAccept: acceptsFormats(DragFormat.PIN, DragFormat.URL),
+      isHorizontal: true,
       index,
     } as DropData,
   });
@@ -131,30 +131,8 @@ export const PinnedIcon = ({
     (iconRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
   }, [setDragRef, setDropRef]);
 
-  // Track when dragging ends to prevent click
-  useEffect(() =>
-  {
-    if (isDragging)
-    {
-      wasDraggingRef.current = true;
-    }
-  }, [isDragging]);
-
   const handleClick = (e: React.MouseEvent) =>
   {
-    // Only handle left-clicks
-    if (e.button !== 0)
-    {
-      return;
-    }
-
-    // Prevent navigation if we just finished dragging
-    if (wasDraggingRef.current)
-    {
-      wasDraggingRef.current = false;
-      return;
-    }
-
     if (e.shiftKey)
     {
       // Shift+click: open in new window
@@ -280,7 +258,7 @@ export const PinnedIcon = ({
               // Active state: ring only (dot indicator added separately below)
               isActive && !isDragging && "ring-2 ring-cyan-500 dark:ring-cyan-400"
             )}
-            onMouseUp={handleClick}
+            onClick={handleClick}
           >
             {/* Drop indicator - before */}
             {showDropBefore && (

@@ -1213,7 +1213,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     }
 
     const isFolder = targetElement.getAttribute('data-is-folder') === 'true';
-    let position = calculateDropPosition(targetElement, y, isFolder);
+    let position = calculateDropPosition(targetElement, x, y, isFolder);
     const isExpandedFolder = isFolder && !!expandedState[bookmarkId];
 
     // For expanded folders, 'after' (bottom 25%) becomes 'intoFirst' (insert at index 0)

@@ -188,6 +188,13 @@ export interface DropData
   canAccept: (dragData: DragData) => DragFormat | null;
   isFolder?: boolean;       // for bookmarks - determines if can drop into
   isGroup?: boolean;        // for tab groups - determines if can drop into
+  isHorizontal?: boolean;   // for horizontal bars (PinnedBar, SpaceBar) - use X for position
+  /**
+   * Dynamic container check based on accepted format.
+   * Used when a drop target acts as a container for some formats but not others.
+   * e.g., SpaceIcon is a container for TAB/URL (drop into) but not for SPACE (reorder).
+   */
+  isContainerForFormat?: (format: DragFormat) => boolean;
   depth?: number;           // for indent calculation
   parentId?: string;        // parent container ID
   index?: number;           // position in parent for reordering

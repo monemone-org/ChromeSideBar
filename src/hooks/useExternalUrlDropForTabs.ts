@@ -95,7 +95,7 @@ export const useExternalUrlDropForTabs = ({
       if (groupId)
       {
         const numericGroupId = parseInt(groupId, 10);
-        const position = calculateDropPosition(groupElement, y, true);
+        const position = calculateDropPosition(groupElement, x, y, true);
         const isExpandedGroup = !!expandedGroups[numericGroupId];
 
         // For expanded groups, 'after' becomes 'intoFirst'
@@ -137,7 +137,7 @@ export const useExternalUrlDropForTabs = ({
       if (tabId)
       {
         clearAutoExpandTimer();
-        const position = calculateDropPosition(tabElement, y, false);
+        const position = calculateDropPosition(tabElement, x, y, false);
         return {
           targetId: tabId,
           position: position!,

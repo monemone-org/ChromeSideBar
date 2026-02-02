@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { SpaceIcon } from './SpaceIcon';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getPrimaryItem } from '../types/dragDrop';
+import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getPrimaryItem, hasFormat } from '../types/dragDrop';
 import { moveTabToSpace, createTabInSpace } from '../utils/tabOperations';
 
 interface SpaceBarProps
@@ -24,7 +24,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 }) =>
 {
   const { allSpaces, spaces, activeSpaceId, switchToSpace, moveSpace, closeAllTabsInSpace, windowId } = useSpacesContext();
-  const { sourceZone, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
+  const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to make active space visible
@@ -123,18 +123,19 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
     return () => unregisterDropHandler('spaceBar');
   }, [registerDropHandler, unregisterDropHandler, handleDrop]);
 
-  // Container droppable
+  // Container droppable - only accepts SPACE for reordering (TAB/URL must drop onto specific SpaceIcon)
   const { setNodeRef: setContainerRef } = useDroppable({
     id: 'spaceBar-container',
     data: {
       zone: 'spaceBar',
       targetId: 'spaceBar-container',
-      canAccept: acceptsFormats(DragFormat.SPACE, DragFormat.TAB, DragFormat.URL),
+      canAccept: acceptsFormats(DragFormat.SPACE),
+      isHorizontal: true,
     } as DropData,
   });
 
-  // Only show drop indicators when dragging from within SpaceBar
-  const showDropIndicators = sourceZone === 'spaceBar';
+  // Only show drop indicators for SPACE reordering (TAB/URL drop INTO space, no position indicator)
+  const showDropIndicators = !!(activeDragData && hasFormat(activeDragData, DragFormat.SPACE));
 
   return (
     <div className="flex items-stretch border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -158,7 +159,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
           setContainerRef(node);
           (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
         }}
-        className="flex-1 flex items-center gap-1 px-1 py-1 overflow-x-auto"
+        className="flex-1 flex items-center gap-1.5 px-1 py-1 overflow-x-auto"
         style={{ scrollbarWidth: 'none' }}
         data-dnd-zone="spaceBar"
       >

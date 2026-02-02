@@ -388,11 +388,14 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
       return;
     }
 
-    const isContainer = dropData.isFolder || dropData.isGroup;
+    const isContainer = dropData.isFolder || dropData.isGroup ||
+      (dropData.isContainerForFormat?.(format) ?? false);
     const position = calculateDropPosition(
       element as HTMLElement,
+      pointerPositionRef.current.x,
       pointerPositionRef.current.y,
-      !!isContainer
+      isContainer,
+      !!dropData.isHorizontal
     );
 
     setOverId(over.id as string);
@@ -402,12 +405,28 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     setAcceptedFormat(format);
   }, [activeDragData]);
 
-  // Drag move handler - more frequent position updates
+  // Drag move handler - recalculate position as pointer moves within a droppable
   const handleDragMove = useCallback((_event: DragMoveEvent) =>
   {
-    // Pointer position is tracked via window event listener
-    // This handler can be used for more fine-grained updates if needed
-  }, []);
+    // Skip if not over a valid drop target
+    if (!overId || !overData || !acceptedFormat) return;
+
+    // Find the element and recalculate position
+    const element = document.querySelector(`[data-dnd-id="${overId}"]`);
+    if (!element) return;
+
+    const isContainer = overData.isFolder || overData.isGroup ||
+      (overData.isContainerForFormat?.(acceptedFormat) ?? false);
+    const position = calculateDropPosition(
+      element as HTMLElement,
+      pointerPositionRef.current.x,
+      pointerPositionRef.current.y,
+      isContainer,
+      !!overData.isHorizontal
+    );
+
+    setDropPosition(position);
+  }, [overId, overData, acceptedFormat]);
 
   // Drag end handler
   const handleDragEnd = useCallback(async (event: DragEndEvent) =>
