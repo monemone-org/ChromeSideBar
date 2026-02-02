@@ -1,11 +1,11 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import clsx from 'clsx';
-import { useDroppable } from '@dnd-kit/core';
+import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus } from 'lucide-react';
 import { SpaceIcon } from './SpaceIcon';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getPrimaryItem, hasFormat } from '../types/dragDrop';
+import { DragData, DragFormat, DropData, DropPosition, getPrimaryItem, hasFormat } from '../types/dragDrop';
 import { moveTabToSpace, createTabInSpace } from '../utils/tabOperations';
 
 interface SpaceBarProps
@@ -70,13 +70,17 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
       ? dropData.targetId.slice(6)
       : dropData.targetId;
 
+    // Prevent dropping before "All" space
+    const isDropBeforeAll = dropData.targetId === 'all' && position === 'before';
+    if (isDropBeforeAll) return;
+
     switch (acceptedFormat)
     {
       case DragFormat.SPACE:
-        // Reorder spaces
-        if (primaryItem.space && primaryItem.space.spaceId !== dropData.targetId)
+        // Reorder spaces (handled by SortableContext, but drop handler still called)
+        if (primaryItem.space && primaryItem.space.spaceId !== targetSpaceId)
         {
-          moveSpace(primaryItem.space.spaceId, dropData.targetId);
+          moveSpace(primaryItem.space.spaceId, targetSpaceId);
         }
         break;
 
@@ -123,19 +127,14 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
     return () => unregisterDropHandler('spaceBar');
   }, [registerDropHandler, unregisterDropHandler, handleDrop]);
 
-  // Container droppable - only accepts SPACE for reordering (TAB/URL must drop onto specific SpaceIcon)
-  const { setNodeRef: setContainerRef } = useDroppable({
-    id: 'spaceBar-container',
-    data: {
-      zone: 'spaceBar',
-      targetId: 'spaceBar-container',
-      canAccept: acceptsFormats(DragFormat.SPACE),
-      isHorizontal: true,
-    } as DropData,
-  });
-
   // Only show drop indicators for SPACE reordering (TAB/URL drop INTO space, no position indicator)
   const showDropIndicators = !!(activeDragData && hasFormat(activeDragData, DragFormat.SPACE));
+
+  // Create sortable IDs for SortableContext
+  const sortableSpaceIds = useMemo(
+    () => allSpaces.map(space => `space-${space.id}`),
+    [allSpaces]
+  );
 
   return (
     <div className="flex items-stretch border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -154,31 +153,29 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 
       {/* Horizontal scrollable space icons */}
       <div
-        ref={(node) =>
-        {
-          setContainerRef(node);
-          (scrollContainerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-        }}
+        ref={scrollContainerRef}
         className="flex-1 flex items-center gap-1.5 px-1 py-1 overflow-x-auto"
         style={{ scrollbarWidth: 'none' }}
         data-dnd-zone="spaceBar"
       >
-        {allSpaces.map((space, index) => (
-          <SpaceIcon
-            key={space.id}
-            space={space}
-            index={index}
-            isActive={space.id === activeSpaceId}
-            onClick={() => handleSpaceClick(space.id)}
-            onEdit={() => onEditSpace(space)}
-            onDelete={() => handleDelete(space)}
-            onCloseAllTabs={() => closeAllTabsInSpace(space)}
-            isAllSpace={space.id === 'all'}
-            isDraggable={space.id !== 'all'}
-            isDropTarget={dropTargetSpaceId === space.id || (showDropIndicators && overId === `space-${space.id}`)}
-            dropPosition={showDropIndicators && overId === `space-${space.id}` ? dropPosition : null}
-          />
-        ))}
+        <SortableContext items={sortableSpaceIds} strategy={horizontalListSortingStrategy}>
+          {allSpaces.map((space, index) => (
+            <SpaceIcon
+              key={space.id}
+              space={space}
+              index={index}
+              isActive={space.id === activeSpaceId}
+              onClick={() => handleSpaceClick(space.id)}
+              onEdit={() => onEditSpace(space)}
+              onDelete={() => handleDelete(space)}
+              onCloseAllTabs={() => closeAllTabsInSpace(space)}
+              isAllSpace={space.id === 'all'}
+              isDraggable={space.id !== 'all'}
+              isDropTarget={dropTargetSpaceId === space.id || (showDropIndicators && overId === `space-${space.id}`)}
+              dropPosition={showDropIndicators && overId === `space-${space.id}` ? dropPosition : null}
+            />
+          ))}
+        </SortableContext>
       </div>
 
       {/* Fixed "+" button */}

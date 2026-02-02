@@ -14,6 +14,7 @@
 
   - after dragging a pinned icon from position 2 to 3.  the icon is now at position 2 is loaded. it shouldn't.
   
+  - backup/restore should support all root folders and root folders with different names.
 
 ## In-Progress
 

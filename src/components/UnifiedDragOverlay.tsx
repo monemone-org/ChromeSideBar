@@ -2,7 +2,8 @@
  * UnifiedDragOverlay - Renders drag overlay based on current drag item type
  *
  * This component reads from UnifiedDndContext and renders the appropriate
- * overlay for pins, bookmarks, tabs, tab groups, or spaces.
+ * overlay for pins, bookmarks, tabs, and tab groups.
+ * Note: Spaces use useSortable with visible original, so no overlay is needed.
  */
 
 import React from 'react';
@@ -10,13 +11,12 @@ import { DragOverlay } from '@dnd-kit/core';
 import { Globe, Folder, SquareStack } from 'lucide-react';
 import clsx from 'clsx';
 import { useUnifiedDndOptional } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, PinData, BookmarkData, TabData, TabGroupData, SpaceData, getPrimaryItem } from '../types/dragDrop';
+import { DragData, DragFormat, PinData, BookmarkData, TabData, TabGroupData, getPrimaryItem } from '../types/dragDrop';
 import { TreeRow } from './TreeRow';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getFaviconUrl } from '../utils/favicon';
 import { getIcon } from '../utils/spaceIcons';
 import { PinnedIconVisual } from './PinnedIcon';
-import { SpaceIconVisual } from './SpaceIcon';
 
 interface UnifiedDragOverlayProps
 {
@@ -25,7 +25,6 @@ interface UnifiedDragOverlayProps
   renderBookmark?: (data: BookmarkData) => React.ReactNode;
   renderTab?: (data: TabData) => React.ReactNode;
   renderTabGroup?: (data: TabGroupData) => React.ReactNode;
-  renderSpace?: (data: SpaceData) => React.ReactNode;
 
   // Multi-drag overlay props
   multiDragCount?: number;
@@ -134,15 +133,6 @@ const TabGroupOverlay: React.FC<{ data: TabGroupData; badges?: React.ReactNode; 
   );
 };
 
-// Space overlay - matches SpaceIcon appearance
-const SpaceIconOverlay: React.FC<{ data: SpaceData }> = ({ data }) => (
-  <SpaceIconVisual
-    icon={data.icon}
-    color={data.color}
-    className="shadow-lg pointer-events-none cursor-grabbing"
-  />
-);
-
 // Multi-item overlay wrapper - shows stacked effect
 const MultiDragWrapper: React.FC<{
   count: number;
@@ -192,8 +182,7 @@ const getOverlayForDragData = (
   renderPin?: (data: PinData) => React.ReactNode,
   renderBookmark?: (data: BookmarkData) => React.ReactNode,
   renderTab?: (data: TabData) => React.ReactNode,
-  renderTabGroup?: (data: TabGroupData) => React.ReactNode,
-  renderSpace?: (data: SpaceData) => React.ReactNode
+  renderTabGroup?: (data: TabGroupData) => React.ReactNode
 ): React.ReactNode =>
 {
   const primaryItem = getPrimaryItem(activeDragData);
@@ -241,12 +230,7 @@ const getOverlayForDragData = (
         break;
 
       case DragFormat.SPACE:
-        if (primaryItem.space)
-        {
-          return renderSpace
-            ? renderSpace(primaryItem.space)
-            : <SpaceIconOverlay data={primaryItem.space} />;
-        }
+        // Space uses useSortable with visible original - no overlay needed
         break;
 
       case DragFormat.URL:
@@ -266,7 +250,6 @@ export const UnifiedDragOverlay: React.FC<UnifiedDragOverlayProps> = ({
   renderBookmark,
   renderTab,
   renderTabGroup,
-  renderSpace,
   multiDragCount,
   yOffset = 0,
   pinnedIconSize = DEFAULT_PINNED_ICON_SIZE,
@@ -297,8 +280,7 @@ export const UnifiedDragOverlay: React.FC<UnifiedDragOverlayProps> = ({
     renderPin,
     renderBookmark,
     renderTab,
-    renderTabGroup,
-    renderSpace
+    renderTabGroup
   );
 
   // Wrap in multi-drag container if needed
@@ -314,7 +296,7 @@ export const UnifiedDragOverlay: React.FC<UnifiedDragOverlayProps> = ({
   return (
     <DragOverlay
       dropAnimation={null}
-      modifiers={yOffset > 0 ? [
+      modifiers={yOffset !== 0 ? [
         ({ transform }) => ({ ...transform, y: transform.y + yOffset }),
       ] : undefined}
     >

@@ -1,6 +1,7 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import clsx from 'clsx';
-import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import * as ContextMenu from './menu/ContextMenu';
 import { Space } from '../contexts/SpacesContext';
 import { GROUP_COLORS } from '../utils/groupColors';
@@ -80,22 +81,20 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
 {
   const spaceId = `space-${space.id}`;
 
-  // Draggable setup
+  // useSortable combines draggable + droppable
+  // The data object includes BOTH drag data AND drop data
   const {
     attributes,
     listeners,
-    setNodeRef: setDragRef,
-    isDragging,
-  } = useDraggable({
-    id: spaceId,
-    data: createSpaceDragData(space.id, space.name, space.icon, space.color),
-    disabled: !isDraggable,
-  });
-
-  // Droppable setup - accepts SPACE (reorder), TAB (move to space), or URL (create tab in space)
-  const { setNodeRef: setDropRef } = useDroppable({
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({
     id: spaceId,
     data: {
+      // Drag data (for when this item is being dragged)
+      ...createSpaceDragData(space.id, space.name, space.icon, space.color),
+      // Drop data (for when items are dropped onto this)
       zone: 'spaceBar',
       targetId: space.id,
       canAccept: acceptsFormats(DragFormat.SPACE, DragFormat.TAB, DragFormat.URL),
@@ -105,50 +104,58 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         format === DragFormat.TAB || format === DragFormat.URL,
       index,
     } as DropData,
+    disabled: !isDraggable,
   });
 
-  // Combine refs
-  const setRefs = useCallback((node: HTMLButtonElement | null) =>
-  {
-    setDragRef(node);
-    setDropRef(node);
-  }, [setDragRef, setDropRef]);
-
-  // Drop indicator styles
-  const showDropBefore = isDropTarget && dropPosition === 'before';
-  const showDropAfter = isDropTarget && dropPosition === 'after';
+  // Apply transform style for sortable animation
+  const style = isDraggable ? {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  } : undefined;
 
   const iconButton = (
     <button
-      ref={setRefs}
-      style={{ opacity: isDragging ? 0.5 : 1 }}
+      ref={setNodeRef}
+      style={style}
       onClick={onClick}
       title={space.name}
       data-space-id={space.id}
       data-space-button="true"
       data-dnd-id={spaceId}
       className={clsx(
-        "relative transition-all",
+        "relative",
         "hover:scale-105 focus:outline-none",
         !isActive && "hover:opacity-80",
-        isDropTarget && !dropPosition && "ring-2 ring-blue-500 scale-110"
+        isDropTarget && (dropPosition === 'into' || dropPosition === 'intoFirst') && "ring-2 ring-blue-500 scale-110"
       )}
       {...(isDraggable ? { ...attributes, ...listeners } : {})}
     >
-      {/* Drop indicator - before */}
-      {showDropBefore && (
-        <div className="absolute -left-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
-      )}
-
-      <SpaceIconVisual
-        icon={space.icon}
-        color={space.color}
-        isActive={isActive}
-      />
-
-      {/* Drop indicator - after */}
-      {showDropAfter && (
-        <div className="absolute -right-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
+      {isAllSpace ? (
+        <div
+          className={clsx(
+            "w-7 h-7 rounded flex items-center justify-center flex-shrink-0",
+            isActive
+              ? "bg-[#5F6368] dark:bg-[#BDC1C6]"      // grey.badge
+              : "bg-[#F1F3F4] dark:bg-[#5F6368]/30"   // grey.bg
+          )}
+        >
+          <span
+            className={clsx(
+              "text-[9px] font-bold",
+              isActive
+                ? "text-white dark:text-black"              // standard active
+                : "text-[#5F6368] dark:text-[#BDC1C6]"      // grey.text
+            )}
+          >
+            ALL
+          </span>
+        </div>
+      ) : (
+        <SpaceIconVisual
+          icon={space.icon}
+          color={space.color}
+          isActive={isActive}
+        />
       )}
     </button>
   );
