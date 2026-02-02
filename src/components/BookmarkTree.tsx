@@ -222,7 +222,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   const dndId = `bookmark-${node.id}`;
   const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
 
-  const isBeingDragged = activeId === node.id && !isMultiDrag;
+  const isBeingDragged = isMultiDrag ? isSelected : activeId === node.id;
   const isDropTarget = dropTargetId === node.id;
   // Check for external drop target (tab → bookmark)
   const isExternalDropTarget = externalDropTarget?.bookmarkId === node.id;

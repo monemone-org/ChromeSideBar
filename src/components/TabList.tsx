@@ -639,9 +639,10 @@ TabGroupHeader.displayName = 'TabGroupHeader';
 // --- Draggable Group Header Wrapper ---
 interface DraggableGroupHeaderProps extends Omit<TabGroupHeaderProps, 'attributes' | 'listeners' | 'isDragging'> {
   tabCount: number;
+  multiDragInfo?: { count: number } | null;
 }
 
-const DraggableGroupHeader = ({ group, tabCount, matchedSpace, ...props }: DraggableGroupHeaderProps) =>
+const DraggableGroupHeader = ({ group, tabCount, matchedSpace, multiDragInfo, isSelected, ...props }: DraggableGroupHeaderProps) =>
 {
   const groupId = `group-${group.id}`;
 
@@ -678,12 +679,16 @@ const DraggableGroupHeader = ({ group, tabCount, matchedSpace, ...props }: Dragg
     [setDragRef, setDropRef]
   );
 
+  // Show as dragging if actively dragged OR part of multi-selection drag
+  const isBeingDragged = isDragging || (!!multiDragInfo && !!isSelected);
+
   return (
     <TabGroupHeader
       ref={setRefs}
       group={group}
       matchedSpace={matchedSpace}
-      isDragging={isDragging}
+      isSelected={isSelected}
+      isDragging={isBeingDragged}
       attributes={attributes}
       listeners={listeners}
       {...props}
@@ -2199,7 +2204,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                   key={item.tab.id}
                   tab={item.tab}
                   indentLevel={0}
-                  isBeingDragged={activeId === item.tab.id && !multiDragInfo}
+                  isBeingDragged={multiDragInfo ? isTabSelected(tabId) : activeId === item.tab.id}
                   globalDragActive={!!activeId || !!externalUrlDropTarget}
                   showDropBefore={(isTarget && dropPosition === 'before') || (isExternalTarget && externalUrlDropTarget?.position === 'before')}
                   showDropAfter={(isTarget && dropPosition === 'after') || (isExternalTarget && externalUrlDropTarget?.position === 'after')}
@@ -2247,7 +2252,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                           key={tab.id}
                           tab={tab}
                           indentLevel={0}
-                          isBeingDragged={activeId === tab.id && !multiDragInfo}
+                          isBeingDragged={multiDragInfo ? isTabSelected(tabId) : activeId === tab.id}
                           globalDragActive={!!activeId || !!externalUrlDropTarget}
                           showDropBefore={(isTabTarget && dropPosition === 'before') || (isExternalTabTarget && externalUrlDropTarget?.position === 'before')}
                           showDropAfter={(isTabTarget && dropPosition === 'after') || (isExternalTabTarget && externalUrlDropTarget?.position === 'after')}
@@ -2303,6 +2308,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                     tabCount={item.tabs.length}
                     isExpanded={isGroupExpanded}
                     isSelected={isTabSelected(groupTargetId)}
+                    multiDragInfo={multiDragInfo}
                     globalDragActive={!!activeId || !!externalUrlDropTarget}
                     showDropBefore={(isTarget && dropPosition === 'before') || (isExternalGroupTarget && externalUrlDropTarget?.position === 'before')}
                     showDropAfter={showDropAfter}
@@ -2347,7 +2353,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                         key={tab.id}
                         tab={tab}
                         indentLevel={1}
-                        isBeingDragged={activeId === tab.id && !multiDragInfo}
+                        isBeingDragged={multiDragInfo ? isTabSelected(tabId) : activeId === tab.id}
                         globalDragActive={!!activeId || !!externalUrlDropTarget}
                         showDropBefore={(isTabTarget && dropPosition === 'before') || (isExternalTabTarget && externalUrlDropTarget?.position === 'before')}
                         showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab || (isExternalTabTarget && externalUrlDropTarget?.position === 'after')}
