@@ -54,6 +54,7 @@ export interface TabData
   groupId?: number;
   url?: string;
   title: string;
+  faviconUrl?: string;
 }
 
 /**
@@ -65,6 +66,7 @@ export interface TabGroupData
   tabCount: number;
   title: string;
   color?: chrome.tabGroups.ColorEnum;
+  matchedSpaceIcon?: string;
 }
 
 /**
@@ -364,11 +366,12 @@ export const createTabDragItem = (
   tabId: number,
   title: string,
   url?: string,
-  groupId?: number
+  groupId?: number,
+  faviconUrl?: string
 ): DragItem => ({
   formats: url ? [DragFormat.TAB, DragFormat.URL] : [DragFormat.TAB],
-  tab: { tabId, groupId, url, title },
-  url: url ? { url, title } : undefined,
+  tab: { tabId, groupId, url, title, faviconUrl },
+  url: url ? { url, title, faviconUrl } : undefined,
 });
 
 /**
@@ -379,10 +382,11 @@ export const createTabGroupDragItem = (
   groupId: number,
   title: string,
   tabCount: number,
-  color?: chrome.tabGroups.ColorEnum
+  color?: chrome.tabGroups.ColorEnum,
+  matchedSpaceIcon?: string
 ): DragItem => ({
   formats: [DragFormat.TAB_GROUP],
-  tabGroup: { groupId, title, tabCount, color },
+  tabGroup: { groupId, title, tabCount, color, matchedSpaceIcon },
 });
 
 /**
@@ -462,15 +466,17 @@ export const createTabDragData = (
   tabId: number,
   title: string,
   url?: string,
-  groupId?: number
-): DragData => createDragData(createTabDragItem(tabId, title, url, groupId));
+  groupId?: number,
+  faviconUrl?: string
+): DragData => createDragData(createTabDragItem(tabId, title, url, groupId, faviconUrl));
 
 export const createTabGroupDragData = (
   groupId: number,
   title: string,
   tabCount: number,
-  color?: chrome.tabGroups.ColorEnum
-): DragData => createDragData(createTabGroupDragItem(groupId, title, tabCount, color));
+  color?: chrome.tabGroups.ColorEnum,
+  matchedSpaceIcon?: string
+): DragData => createDragData(createTabGroupDragItem(groupId, title, tabCount, color, matchedSpaceIcon));
 
 export const createSpaceDragData = (
   spaceId: string,

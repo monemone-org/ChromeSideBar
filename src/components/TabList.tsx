@@ -51,7 +51,6 @@ import { DropIndicators } from './DropIndicators';
 import * as ContextMenu from './menu/ContextMenu';
 import { useInView } from '../hooks/useInView';
 import {
-  DragOverlay,
   useDraggable,
   useDroppable,
   DraggableAttributes,
@@ -389,7 +388,8 @@ const DraggableTabRow = forwardRef<HTMLDivElement, DraggableTabProps>((props, re
       props.tab.id!,
       props.tab.title || '',
       props.tab.url,
-      props.tab.groupId
+      props.tab.groupId,
+      props.tab.favIconUrl
     ),
   });
 
@@ -641,18 +641,19 @@ interface DraggableGroupHeaderProps extends Omit<TabGroupHeaderProps, 'attribute
   tabCount: number;
 }
 
-const DraggableGroupHeader = ({ group, tabCount, ...props }: DraggableGroupHeaderProps) =>
+const DraggableGroupHeader = ({ group, tabCount, matchedSpace, ...props }: DraggableGroupHeaderProps) =>
 {
   const groupId = `group-${group.id}`;
 
-  // Draggable with DragData
+  // Draggable with DragData - use matchedSpace from props for consistency
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: groupId,
     data: createTabGroupDragData(
       group.id,
       group.title || 'Unnamed Group',
       tabCount,
-      group.color
+      group.color,
+      matchedSpace?.icon
     ),
   });
 
@@ -681,125 +682,12 @@ const DraggableGroupHeader = ({ group, tabCount, ...props }: DraggableGroupHeade
     <TabGroupHeader
       ref={setRefs}
       group={group}
+      matchedSpace={matchedSpace}
       isDragging={isDragging}
       attributes={attributes}
       listeners={listeners}
       {...props}
     />
-  );
-};
-
-// Drag overlay content for groups
-const GroupDragOverlay = ({ group, matchedSpace, tabCount, badges }: { group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number; badges?: React.ReactNode }) =>
-{
-  const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
-
-  // Show space icon if group title matches a space, otherwise generic SquareStack
-  // Icon is shown inside the badge with inverted colors for contrast
-  const iconElement = matchedSpace
-    ? getIcon(matchedSpace.icon, 12, true)
-    : <SquareStack size={12} />;
-
-  const titleComponent = (
-    <div className="flex items-center">
-      <span className={clsx("px-2 py-0.5 rounded-full font-medium text-white dark:text-black flex items-center gap-1 w-fit", colorStyle.badge)}>
-        {iconElement}
-        {group.title || 'Unnamed Group'}
-      </span>
-      <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-        ({tabCount} {tabCount === 1 ? 'tab' : 'tabs'})
-      </span>
-    </div>
-  );
-
-  return (
-    <div className="w-[280px]">
-      <TreeRow
-        depth={0}
-        title={titleComponent}
-        hideIcon
-        hasChildren={true}
-        className="pointer-events-none"
-        badges={badges}
-      />
-    </div>
-  );
-};
-
-// Drag overlay content - matches tab row layout with transparent background
-const TabDragOverlay = ({ tab, badges }: { tab: chrome.tabs.Tab; badges?: React.ReactNode }) =>
-{
-  const icon = tab.favIconUrl ? (
-    <img src={tab.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />
-  ) : (
-    <Globe className="w-4 h-4 text-gray-400 flex-shrink-0" />
-  );
-
-  return (
-    <div className="w-[280px]">
-      <TreeRow
-        depth={0}
-        title={tab.title}
-        icon={icon}
-        hasChildren={false}
-        className="pointer-events-none bg-blue-100 dark:bg-blue-900/50 rounded"
-        badges={badges}
-      />
-    </div>
-  );
-};
-
-// Multi-tab drag overlay - shows stacked items for multi-selection drag
-type MultiDragFirstItemType =
-  | { type: 'tab'; tab: chrome.tabs.Tab }
-  | { type: 'group'; group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number };
-
-interface MultiTabDragOverlayProps {
-  count: number;
-  firstItem: MultiDragFirstItemType;
-}
-
-const MultiTabDragOverlay = ({ count, firstItem }: MultiTabDragOverlayProps) =>
-{
-  // Badge element to pass to overlay components
-  const badges = (
-    <span className="text-xs font-medium text-blue-600 dark:text-blue-300 bg-blue-200 dark:bg-blue-800 px-1.5 py-0.5 rounded-full">
-      {count} items
-    </span>
-  );
-
-  // Render the appropriate overlay component based on first item type
-  const overlayContent = firstItem.type === 'group' ? (
-    <GroupDragOverlay
-      group={firstItem.group}
-      matchedSpace={firstItem.matchedSpace}
-      tabCount={firstItem.tabCount}
-      badges={badges}
-    />
-  ) : (
-    <TabDragOverlay tab={firstItem.tab} badges={badges} />
-  );
-
-  return (
-    <div className="relative pointer-events-none w-[280px]">
-      {/* Stacked background layers (shown in reverse order for proper z-indexing) */}
-      {count > 2 && (
-        <div
-          className="absolute w-full h-7 bg-blue-50 dark:bg-blue-950 rounded border border-blue-200 dark:border-blue-800"
-          style={{ top: 12, left: 12 }}
-        />
-      )}
-      {count > 1 && (
-        <div
-          className="absolute w-full h-7 bg-blue-100 dark:bg-blue-900/70 rounded border border-blue-200 dark:border-blue-700"
-          style={{ top: 6, left: 6 }}
-        />
-      )}
-      {/* Front item with content */}
-      <div className="relative bg-blue-100 dark:bg-blue-900/50 rounded border border-blue-300 dark:border-blue-600">
-        {overlayContent}
-      </div>
-    </div>
   );
 };
 
@@ -1208,10 +1096,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   const {
     activeId: unifiedActiveId,
     activeDragData,
-    sourceZone,
     overId,
     dropPosition,
-    wasValidDrop,
     registerDropHandler,
     unregisterDropHandler,
     registerDragItemsProvider,
@@ -1254,24 +1140,11 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     return null;
   }, [overId]);
 
-  // Ref for wasValidDrop (needed for DragOverlay animation)
-  const wasValidDropRef = useRef(false);
-  useEffect(() =>
-  {
-    wasValidDropRef.current = wasValidDrop;
-  }, [wasValidDrop]);
-
-  // Drag state for tab or group (for overlay rendering)
-  const [activeTab, setActiveTab] = useState<chrome.tabs.Tab | null>(null);
-  const [activeGroup, setActiveGroup] = useState<{ group: chrome.tabGroups.TabGroup; tabCount: number } | null>(null);
   // Multi-selection drag state - first item can be tab or group
   type MultiDragFirstItem =
     | { type: 'tab'; tab: chrome.tabs.Tab }
     | { type: 'group'; group: chrome.tabGroups.TabGroup; matchedSpace?: Space; tabCount: number };
   const [multiDragInfo, setMultiDragInfo] = useState<{ count: number; firstItem: MultiDragFirstItem } | null>(null);
-
-  // Ref to store the computed drag overlay offset (based on cursor position within element at drag start)
-  const dragStartOffsetRef = useRef<number>(24);
 
   // Handle external URL drop - create a new tab
   const handleExternalUrlDrop = useCallback(async (
@@ -1369,8 +1242,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   // Helper to clear local DnD state (unified context handles shared state)
   const clearDndState = useCallback(() =>
   {
-    setActiveTab(null);
-    setActiveGroup(null);
     setMultiDragInfo(null);
   }, []);
 
@@ -1554,7 +1425,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       // Tab is being dragged
       const tabId = typeof activeId === 'number' ? activeId : parseInt(String(activeId).replace('tab-', ''), 10);
       const tabIdStr = String(tabId);
-      const tab = visibleTabs.find(t => t.id === tabId);
 
       // Handle selection for multi-drag
       if (isTabSelected(tabIdStr))
@@ -1589,16 +1459,11 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         setContextMultiDragInfo(1);
       }
 
-      setActiveTab(tab || null);
-      setActiveGroup(null);
     }
     else if (activeDragData && hasFormat(activeDragData, DragFormat.TAB_GROUP) && activeId)
     {
       // Group is being dragged
       const groupIdStr = typeof activeId === 'string' ? activeId : `group-${activeId}`;
-      const groupId = parseInt(groupIdStr.replace('group-', ''), 10);
-      const group = visibleTabGroups.find(g => g.id === groupId);
-      const groupTabs = visibleTabs.filter(t => (t.groupId ?? -1) === groupId);
 
       // Handle selection for multi-drag
       if (isTabSelected(groupIdStr))
@@ -1632,9 +1497,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         setMultiDragInfo(null);
         setContextMultiDragInfo(1);
       }
-
-      setActiveTab(null);
-      setActiveGroup(group ? { group, tabCount: groupTabs.length } : null);
     }
     else if (!activeDragData)
     {
@@ -2546,19 +2408,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
           )}
 
 
-          {/* Tab-specific drag overlay - only rendered when dragging tabs/groups */}
-          {sourceZone === 'tabList' && (
-            <DragOverlay
-              dropAnimation={wasValidDropRef.current ? null : undefined}
-              modifiers={[
-                ({ transform }) => ({ ...transform, y: transform.y + dragStartOffsetRef.current }),
-              ]}
-            >
-              {multiDragInfo && <MultiTabDragOverlay count={multiDragInfo.count} firstItem={multiDragInfo.firstItem} />}
-              {activeTab && !multiDragInfo && <TabDragOverlay tab={activeTab} />}
-              {activeGroup && !multiDragInfo && <GroupDragOverlay group={activeGroup.group} matchedSpace={spaces.find(s => s.name === activeGroup.group.title)} tabCount={activeGroup.tabCount} />}
-            </DragOverlay>
-          )}
       </div>
 
       <AddToGroupDialog

@@ -848,7 +848,7 @@ function App() {
       />
 
       {/* Unified Drag Overlay for cross-component DnD */}
-      <UnifiedDragOverlay pinnedIconSize={pinnedIconSize} />
+      <UnifiedDragOverlay pinnedIconSize={pinnedIconSize} yOffset={24} />
       </div>
       </UnifiedDndProvider>
       </SelectionProvider>

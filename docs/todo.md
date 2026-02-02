@@ -2,6 +2,19 @@
 
 - All space instead of using an icon, use Text "ALL" so it's differentiated from the other Space icon that can be dragged/dropped.
 
+- handle default bookmark folder 1,2,3
+
+- in dnd context, do not repeat:
+      setOverId(null);
+      setOverZone(null);
+      setOverData(null);
+      setDropPosition(null);
+      setAcceptedFormat(null);
+  use a util function to reset dnd context
+
+  - after dragging a pinned icon from position 2 to 3.  the icon is now at position 2 is loaded. it shouldn't.
+  
+
 ## In-Progress
 
 

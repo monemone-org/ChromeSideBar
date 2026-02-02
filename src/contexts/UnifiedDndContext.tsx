@@ -36,6 +36,7 @@ interface UnifiedDndState
   activeDragData: DragData | null;
   sourceZone: DropZone | null;
   activeId: string | number | null;
+  activeDragWidth: number | null;  // Width of dragged element for overlay sizing
 
   // Current drop target state
   overId: string | null;
@@ -124,6 +125,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
   const [activeDragData, setActiveDragData] = useState<DragData | null>(null);
   const [sourceZone, setSourceZone] = useState<DropZone | null>(null);
   const [activeId, setActiveId] = useState<string | number | null>(null);
+  const [activeDragWidth, setActiveDragWidth] = useState<number | null>(null);
 
   // Drop target state
   const [overId, setOverId] = useState<string | null>(null);
@@ -243,6 +245,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     setActiveDragData(null);
     setSourceZone(null);
     setActiveId(null);
+    setActiveDragWidth(null);
     setOverId(null);
     setOverZone(null);
     setOverData(null);
@@ -275,6 +278,10 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     const element = document.querySelector(`[data-dnd-id="${active.id}"]`);
     const zoneElement = element?.closest('[data-dnd-zone]');
     const zone = zoneElement?.getAttribute('data-dnd-zone') as DropZone | null;
+
+    // Capture element width for overlay sizing
+    const width = element?.getBoundingClientRect().width ?? null;
+    setActiveDragWidth(width);
 
     if (import.meta.env.DEV)
     {
@@ -482,6 +489,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     activeDragData,
     sourceZone,
     activeId,
+    activeDragWidth,
     overId,
     overZone,
     overData,
