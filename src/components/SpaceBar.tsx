@@ -5,7 +5,7 @@ import { Plus } from 'lucide-react';
 import { SpaceIcon } from './SpaceIcon';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DropData, DropPosition, acceptsFormats } from '../types/dragDrop';
+import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getPrimaryItem } from '../types/dragDrop';
 import { moveTabToSpace, createTabInSpace } from '../utils/tabOperations';
 
 interface SpaceBarProps
@@ -62,6 +62,9 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   {
     if (!position) return;
 
+    const primaryItem = getPrimaryItem(dragData);
+    if (!primaryItem) return;
+
     // Extract space ID from drop target (e.g., "space-work" -> "work")
     const targetSpaceId = dropData.targetId.startsWith('space-')
       ? dropData.targetId.slice(6)
@@ -71,18 +74,18 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
     {
       case DragFormat.SPACE:
         // Reorder spaces
-        if (dragData.space && dragData.space.spaceId !== dropData.targetId)
+        if (primaryItem.space && primaryItem.space.spaceId !== dropData.targetId)
         {
-          moveSpace(dragData.space.spaceId, dropData.targetId);
+          moveSpace(primaryItem.space.spaceId, dropData.targetId);
         }
         break;
 
       case DragFormat.TAB:
         // Move tab to space's Chrome group
-        if (dragData.tab && windowId)
+        if (primaryItem.tab && windowId)
         {
           const result = await moveTabToSpace(
-            dragData.tab.tabId,
+            primaryItem.tab.tabId,
             targetSpaceId,
             spaces,
             windowId
@@ -96,10 +99,10 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 
       case DragFormat.URL:
         // Create new tab in space
-        if (dragData.url && windowId)
+        if (primaryItem.url && windowId)
         {
           const result = await createTabInSpace(
-            dragData.url.url,
+            primaryItem.url.url,
             targetSpaceId,
             spaces,
             windowId

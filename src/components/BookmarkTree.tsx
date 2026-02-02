@@ -53,7 +53,7 @@ import {
 } from '@dnd-kit/core';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DropData, createBookmarkDragData, acceptsFormatsIf } from '../types/dragDrop';
+import { DragData, DragFormat, DragItem, DropData, createBookmarkDragData, createBookmarkDragItem, acceptsFormatsIf, getPrimaryItem, hasFormat } from '../types/dragDrop';
 import { getFaviconUrl } from '../utils/favicon';
 import { saveTabGroupAsBookmarkFolder } from '../utils/bookmarkOperations';
 
@@ -217,9 +217,10 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onCopyUrls,
   attributes,
   listeners,
-  windowId
+  windowId,
 }, ref) => {
   const isFolder = !node.url;
+  const dndId = `bookmark-${node.id}`;
   const isSpecialFolder = SPECIAL_FOLDER_IDS.includes(node.id);
 
   const isBeingDragged = activeId === node.id && !isMultiDrag;
@@ -442,6 +443,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               data-bookmark-id={node.id}
               data-is-folder={isFolder}
               data-depth={depth}
+              data-dnd-id={dndId}
               className={clsx(
                 showDropInto && "bg-blue-100 dark:bg-blue-900/50 ring-2 ring-blue-500",
                 !isSpecialFolder && "touch-none"
@@ -644,7 +646,8 @@ const DraggableBookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>((props
         [DragFormat.BOOKMARK, DragFormat.TAB_GROUP, DragFormat.URL],
         (dragData, format) => {
           // Can't drop bookmark on itself
-          if (format === DragFormat.BOOKMARK && dragData.bookmark?.bookmarkId === nodeId)
+          const primaryItem = getPrimaryItem(dragData);
+          if (format === DragFormat.BOOKMARK && primaryItem?.bookmark?.bookmarkId === nodeId)
           {
             return false;
           }
@@ -1235,6 +1238,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     clearAutoExpandTimer,
     registerDropHandler,
     unregisterDropHandler,
+    registerDragItemsProvider,
+    unregisterDragItemsProvider,
     setWasValidDrop,
     setMultiDragInfo,
   } = useUnifiedDnd();
@@ -1743,7 +1748,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   // Sync local overlay state when unified context state changes
   useEffect(() =>
   {
-    if (activeDragData?.formats.includes(DragFormat.BOOKMARK) && activeId)
+    if (activeDragData && hasFormat(activeDragData, DragFormat.BOOKMARK) && activeId)
     {
       // Bookmark being dragged - update local overlay state
       const node = findNode(activeId);
@@ -1797,8 +1802,9 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         case DragFormat.BOOKMARK:
         {
           // Bookmark reordering
-          if (!dragData.bookmark) return;
-          const sourceId = dragData.bookmark.bookmarkId;
+          const primaryItem = getPrimaryItem(dragData);
+          if (!primaryItem?.bookmark) return;
+          const sourceId = primaryItem.bookmark.bookmarkId;
 
           // Validation: Can't drop folder into its own descendants
           if (isDescendant(sourceId, targetId, bookmarks))
@@ -1892,7 +1898,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         case DragFormat.URL:
         {
           // URL dropped on bookmark tree - create bookmark
-          if (!dragData.url) return;
+          const primaryItem = getPrimaryItem(dragData);
+          if (!primaryItem?.url) return;
 
           let parentId: string;
           let index: number | undefined;
@@ -1925,7 +1932,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
             }
           }
 
-          await createBookmark(parentId, dragData.url.title || dragData.url.url, dragData.url.url, index);
+          await createBookmark(parentId, primaryItem.url.title || primaryItem.url.url, primaryItem.url.url, index);
           setWasValidDrop(true);
           break;
         }
@@ -1933,10 +1940,11 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         case DragFormat.TAB_GROUP:
         {
           // Tab group dropped - create folder with all group's tabs as bookmarks
-          if (!dragData.tabGroup) return;
+          const primaryItem = getPrimaryItem(dragData);
+          if (!primaryItem?.tabGroup) return;
 
-          const groupId = dragData.tabGroup.groupId;
-          const folderName = dragData.tabGroup.title || 'Unnamed Group';
+          const groupId = primaryItem.tabGroup.groupId;
+          const folderName = primaryItem.tabGroup.title || 'Unnamed Group';
 
           // Get tabs in the group
           const groupTabs = await chrome.tabs.query({ groupId });
@@ -1996,6 +2004,66 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     registerDropHandler('bookmarkTree', handleBookmarkDrop);
     return () => unregisterDropHandler('bookmarkTree');
   }, [registerDropHandler, unregisterDropHandler, handleBookmarkDrop]);
+
+  // Helper to find a bookmark node by ID in the tree
+  const findBookmarkById = useCallback((
+    nodes: chrome.bookmarks.BookmarkTreeNode[],
+    id: string
+  ): chrome.bookmarks.BookmarkTreeNode | null =>
+  {
+    for (const node of nodes)
+    {
+      if (node.id === id) return node;
+      if (node.children)
+      {
+        const found = findBookmarkById(node.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }, []);
+
+  // Drag items provider - builds multi-item DragData from selection
+  const getDragItems = useCallback((draggedId: string | number): DragItem[] =>
+  {
+    const selectedItems = getSelectedItems();
+    const draggedIdStr = String(draggedId).replace('bookmark-', '');
+
+    // Check if dragged item is in selection
+    const isInSelection = selectedItems.some(item => item.id === draggedIdStr);
+
+    if (isInSelection && selectedItems.length > 1)
+    {
+      // Multi-drag: build DragItems for all selected
+      return selectedItems
+        .map(item =>
+        {
+          const node = findBookmarkById(bookmarks, item.id);
+          if (node)
+          {
+            return createBookmarkDragItem(
+              node.id,
+              !node.url,  // isFolder
+              node.title,
+              node.url,
+              node.parentId
+            );
+          }
+          return null;
+        })
+        .filter((item): item is DragItem => item !== null);
+    }
+
+    // Single drag: return empty array to use fallback from useDraggable data
+    return [];
+  }, [getSelectedItems, bookmarks, findBookmarkById]);
+
+  // Register drag items provider for bookmarkTree zone
+  useEffect(() =>
+  {
+    registerDragItemsProvider('bookmarkTree', getDragItems);
+    return () => unregisterDragItemsProvider('bookmarkTree');
+  }, [registerDragItemsProvider, unregisterDragItemsProvider, getDragItems]);
 
   const hasVisibleBookmarks = visibleBookmarks.length > 0;
 

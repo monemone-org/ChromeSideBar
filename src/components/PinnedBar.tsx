@@ -7,7 +7,7 @@ import { useSpacesContext } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
 import { BookmarkOpenMode } from './SettingsDialog';
 import { matchesFilter } from '../utils/searchParser';
-import { DragData, DragFormat, DropData, DropPosition, acceptsFormats } from '../types/dragDrop';
+import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getPrimaryItem } from '../types/dragDrop';
 
 interface PinnedBarProps
 {
@@ -78,21 +78,24 @@ export const PinnedBar = ({
   {
     if (!position) return;
 
+    const primaryItem = getPrimaryItem(dragData);
+    if (!primaryItem) return;
+
     switch (acceptedFormat)
     {
       case DragFormat.PIN:
         // Reorder pins
-        if (dragData.pin && dragData.pin.siteId !== dropData.targetId)
+        if (primaryItem.pin && primaryItem.pin.siteId !== dropData.targetId)
         {
-          movePin(dragData.pin.siteId, dropData.targetId);
+          movePin(primaryItem.pin.siteId, dropData.targetId);
         }
         break;
 
       case DragFormat.URL:
         // Create new pin from URL
-        if (dragData.url)
+        if (primaryItem.url)
         {
-          addPin(dragData.url.url, dragData.url.title || dragData.url.url, dragData.url.faviconUrl);
+          addPin(primaryItem.url.url, primaryItem.url.title || primaryItem.url.url, primaryItem.url.faviconUrl);
         }
         break;
     }

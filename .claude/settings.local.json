@@ -14,7 +14,8 @@
       "Bash(pbcopy)",
       "Bash(git show:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(printf:*)"
+      "Bash(printf:*)",
+      "Bash(npm run build:debug:*)"
     ]
   }
 }

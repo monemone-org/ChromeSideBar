@@ -20,11 +20,13 @@ import {
 } from '@dnd-kit/core';
 import {
   DragData,
+  DragItem,
   DragFormat,
   DropData,
   DropZone,
   DropPosition,
   calculateDropPosition,
+  getAllFormats,
 } from '../types/dragDrop';
 
 // Context state for drag operations
@@ -60,6 +62,10 @@ interface UnifiedDndActions
   registerDropHandler: (zone: DropZone, handler: DropHandler) => void;
   unregisterDropHandler: (zone: DropZone) => void;
 
+  // Drag items providers - registered by components to build multi-item DragData
+  registerDragItemsProvider: (zone: DropZone, provider: DragItemsProvider) => void;
+  unregisterDragItemsProvider: (zone: DropZone) => void;
+
   // Auto-expand timer management
   setAutoExpandTimer: (targetId: string, onExpand: () => void) => void;
   clearAutoExpandTimer: () => void;
@@ -81,6 +87,10 @@ export type DropHandler = (
   dropPosition: DropPosition,
   acceptedFormat: DragFormat
 ) => Promise<void> | void;
+
+// Drag items provider type - called at drag start to get all selected items
+// Returns DragItem[] for multi-selection, or empty array to use single-item fallback
+export type DragItemsProvider = (draggedItemId: string | number) => DragItem[];
 
 interface UnifiedDndContextValue extends UnifiedDndState, UnifiedDndActions {}
 
@@ -132,6 +142,9 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
 
   // Drop handlers registered by components
   const dropHandlersRef = useRef<Map<DropZone, DropHandler>>(new Map());
+
+  // Drag items providers registered by components
+  const dragItemsProvidersRef = useRef<Map<DropZone, DragItemsProvider>>(new Map());
 
   // Auto-expand timer refs
   const autoExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -193,6 +206,17 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     dropHandlersRef.current.delete(zone);
   }, []);
 
+  // Register/unregister drag items providers
+  const registerDragItemsProvider = useCallback((zone: DropZone, provider: DragItemsProvider) =>
+  {
+    dragItemsProvidersRef.current.set(zone, provider);
+  }, []);
+
+  const unregisterDragItemsProvider = useCallback((zone: DropZone) =>
+  {
+    dragItemsProvidersRef.current.delete(zone);
+  }, []);
+
   // Set multi-drag info
   const setMultiDragInfo = useCallback((count: number) =>
   {
@@ -235,9 +259,9 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
   const handleDragStart = useCallback((event: DragStartEvent) =>
   {
     const { active } = event;
-    const dragData = active.data.current as DragData | undefined;
+    const singleItemDragData = active.data.current as DragData | undefined;
 
-    if (!dragData)
+    if (!singleItemDragData)
     {
       if (import.meta.env.DEV)
       {
@@ -246,20 +270,66 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
       return;
     }
 
-    // Extract source zone from the draggable element
-    // The element should have data-dnd-zone attribute
+    // Extract source zone from the draggable element or its parent
+    // First find the element, then walk up to find data-dnd-zone
     const element = document.querySelector(`[data-dnd-id="${active.id}"]`);
-    const zone = element?.getAttribute('data-dnd-zone') as DropZone | null;
+    const zoneElement = element?.closest('[data-dnd-zone]');
+    const zone = zoneElement?.getAttribute('data-dnd-zone') as DropZone | null;
+
+    if (import.meta.env.DEV)
+    {
+      console.log('[UnifiedDnd] Zone detection:', {
+        activeId: active.id,
+        elementFound: !!element,
+        zone,
+        registeredProviders: Array.from(dragItemsProvidersRef.current.keys()),
+      });
+    }
+
+    // Try to get multi-item drag data from the provider
+    let dragData: DragData = singleItemDragData;
+    if (zone)
+    {
+      const provider = dragItemsProvidersRef.current.get(zone);
+      if (provider)
+      {
+        const items = provider(active.id);
+        if (import.meta.env.DEV)
+        {
+          console.log('[UnifiedDnd] Provider returned:', { itemCount: items.length });
+        }
+        if (items.length > 0)
+        {
+          dragData = { items };
+        }
+      }
+    }
 
     setActiveDragData(dragData);
     setSourceZone(zone);
     setActiveId(active.id as string | number);
+    setIsMultiDrag(dragData.items.length > 1);
+    setMultiDragCount(dragData.items.length);
     wasValidDropRef.current = false;
     setWasValidDropState(false);
 
     if (import.meta.env.DEV)
     {
-      console.log('UnifiedDnd: Drag started', { id: active.id, formats: dragData.formats, zone });
+      console.log('UnifiedDnd: Drag started', {
+        id: active.id,
+        zone,
+        itemCount: dragData.items.length,
+        formats: getAllFormats(dragData),
+        items: dragData.items.map(item => ({
+          formats: item.formats,
+          tab: item.tab,
+          tabGroup: item.tabGroup,
+          bookmark: item.bookmark,
+          pin: item.pin,
+          space: item.space,
+          url: item.url,
+        })),
+      });
     }
   }, []);
 
@@ -425,6 +495,8 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     // Actions
     registerDropHandler,
     unregisterDropHandler,
+    registerDragItemsProvider,
+    unregisterDragItemsProvider,
     setAutoExpandTimer,
     clearAutoExpandTimer,
     setMultiDragInfo,

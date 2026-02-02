@@ -84,7 +84,6 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       data-space-id={space.id}
       data-space-button="true"
       data-dnd-id={spaceId}
-      data-dnd-zone="spaceBar"
       className={clsx(
         "w-7 h-7 rounded flex items-center justify-center transition-all flex-shrink-0 relative",
         "hover:scale-105 focus:outline-none",

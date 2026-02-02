@@ -10,7 +10,7 @@ import { DragOverlay } from '@dnd-kit/core';
 import { Globe, Folder, SquareStack } from 'lucide-react';
 import clsx from 'clsx';
 import { useUnifiedDndOptional } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, PinData, BookmarkData, TabData, TabGroupData, SpaceData } from '../types/dragDrop';
+import { DragData, DragFormat, PinData, BookmarkData, TabData, TabGroupData, SpaceData, getPrimaryItem } from '../types/dragDrop';
 import { TreeRow } from './TreeRow';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getFaviconUrl } from '../utils/favicon';
@@ -179,7 +179,7 @@ const MultiDragWrapper: React.FC<{
 };
 
 /**
- * Determine which overlay to render based on available formats.
+ * Determine which overlay to render based on the primary item's formats.
  * We render the most specific format available (first in formats array).
  */
 const getOverlayForDragData = (
@@ -191,53 +191,56 @@ const getOverlayForDragData = (
   renderSpace?: (data: SpaceData) => React.ReactNode
 ): React.ReactNode =>
 {
+  const primaryItem = getPrimaryItem(activeDragData);
+  if (!primaryItem) return null;
+
   // Check formats in order of specificity (first format is most specific)
-  for (const format of activeDragData.formats)
+  for (const format of primaryItem.formats)
   {
     switch (format)
     {
       case DragFormat.PIN:
-        if (activeDragData.pin)
+        if (primaryItem.pin)
         {
           return renderPin
-            ? renderPin(activeDragData.pin)
-            : <PinOverlay data={activeDragData.pin} />;
+            ? renderPin(primaryItem.pin)
+            : <PinOverlay data={primaryItem.pin} />;
         }
         break;
 
       case DragFormat.BOOKMARK:
-        if (activeDragData.bookmark)
+        if (primaryItem.bookmark)
         {
           return renderBookmark
-            ? renderBookmark(activeDragData.bookmark)
-            : <BookmarkOverlay data={activeDragData.bookmark} />;
+            ? renderBookmark(primaryItem.bookmark)
+            : <BookmarkOverlay data={primaryItem.bookmark} />;
         }
         break;
 
       case DragFormat.TAB:
-        if (activeDragData.tab)
+        if (primaryItem.tab)
         {
           return renderTab
-            ? renderTab(activeDragData.tab)
-            : <TabOverlay data={activeDragData.tab} />;
+            ? renderTab(primaryItem.tab)
+            : <TabOverlay data={primaryItem.tab} />;
         }
         break;
 
       case DragFormat.TAB_GROUP:
-        if (activeDragData.tabGroup)
+        if (primaryItem.tabGroup)
         {
           return renderTabGroup
-            ? renderTabGroup(activeDragData.tabGroup)
-            : <TabGroupOverlay data={activeDragData.tabGroup} />;
+            ? renderTabGroup(primaryItem.tabGroup)
+            : <TabGroupOverlay data={primaryItem.tabGroup} />;
         }
         break;
 
       case DragFormat.SPACE:
-        if (activeDragData.space)
+        if (primaryItem.space)
         {
           return renderSpace
-            ? renderSpace(activeDragData.space)
-            : <SpaceOverlay data={activeDragData.space} />;
+            ? renderSpace(primaryItem.space)
+            : <SpaceOverlay data={primaryItem.space} />;
         }
         break;
 

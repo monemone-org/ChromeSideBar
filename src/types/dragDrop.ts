@@ -1,9 +1,12 @@
 /**
  * Unified Drag-and-Drop Types
  *
- * Multi-format drag data system: each drag provides data in multiple formats,
- * and drop targets pick the format they can handle. Similar to native
- * DataTransfer with multiple MIME types.
+ * Multi-item, multi-format drag data system:
+ * - DragData contains multiple DragItems (for multi-selection)
+ * - Each DragItem can provide multiple formats (for format negotiation)
+ *
+ * Similar to native DataTransfer with multiple MIME types, but extended
+ * to support dragging multiple items at once.
  */
 
 // Re-export DropPosition from utils for convenience
@@ -15,7 +18,7 @@ export type DropZone = 'pinnedBar' | 'spaceBar' | 'tabList' | 'bookmarkTree';
 
 /**
  * Drag data formats - what kind of data is available.
- * A single drag can provide multiple formats (e.g., a tab provides TAB + URL).
+ * A single DragItem can provide multiple formats (e.g., a tab provides TAB + URL).
  */
 export enum DragFormat
 {
@@ -98,37 +101,28 @@ export interface SpaceData
 }
 
 // ============================================================================
-// DragData - multi-format container
+// DragItem - single item with multiple formats
 // ============================================================================
 
 /**
- * DragData contains all available formats for a drag operation.
- * Drop targets check formats[] and use the first format they can handle.
+ * A single dragged item that can provide multiple formats.
  *
- * @example Dragging a Tab:
+ * @example A tab provides TAB + URL:
  * {
  *   formats: [DragFormat.TAB, DragFormat.URL],
  *   tab: { tabId: 123, title: 'Google', url: '...' },
  *   url: { url: '...', title: 'Google' }
  * }
  *
- * @example Dragging a Live Bookmark (has associated tab):
- * {
- *   formats: [DragFormat.TAB, DragFormat.BOOKMARK, DragFormat.URL],
- *   tab: { tabId: 456, ... },
- *   bookmark: { bookmarkId: 'abc', ... },
- *   url: { url: '...', ... }
- * }
- *
- * @example Dragging a Folder (no URL):
+ * @example A folder only provides BOOKMARK:
  * {
  *   formats: [DragFormat.BOOKMARK],
- *   bookmark: { bookmarkId: '123', isFolder: true, ... }
+ *   bookmark: { bookmarkId: '123', isFolder: true, title: 'Work' }
  * }
  */
-export interface DragData
+export interface DragItem
 {
-  // Available formats in preference order (first = most specific)
+  // Available formats for this item (first = most specific)
   formats: DragFormat[];
 
   // Format-specific data (present if format is in the formats array)
@@ -141,12 +135,43 @@ export interface DragData
 }
 
 // ============================================================================
+// DragData - multi-item container
+// ============================================================================
+
+/**
+ * DragData contains multiple items being dragged (for multi-selection).
+ * Each item can provide multiple formats.
+ *
+ * @example Dragging a single tab:
+ * {
+ *   items: [{
+ *     formats: [DragFormat.TAB, DragFormat.URL],
+ *     tab: { tabId: 123, ... },
+ *     url: { url: '...', ... }
+ *   }]
+ * }
+ *
+ * @example Dragging a group + 2 tabs (multi-selection):
+ * {
+ *   items: [
+ *     { formats: [DragFormat.TAB_GROUP], tabGroup: { groupId: 1, ... } },
+ *     { formats: [DragFormat.TAB, DragFormat.URL], tab: { tabId: 101, ... }, url: { ... } },
+ *     { formats: [DragFormat.TAB, DragFormat.URL], tab: { tabId: 102, ... }, url: { ... } },
+ *   ]
+ * }
+ */
+export interface DragData
+{
+  items: DragItem[];
+}
+
+// ============================================================================
 // DropData - drop target configuration
 // ============================================================================
 
 /**
  * Drop target data - attached to useDroppable({ data }).
- * The canAccept function returns the format it can handle, or null to reject.
+ * The canAccept function checks if any items have acceptable formats.
  */
 export interface DropData
 {
@@ -154,7 +179,7 @@ export interface DropData
   targetId: string;
   /**
    * Returns the format this target can accept, or null to reject.
-   * The drop handler will receive this format to know how to process the drop.
+   * For multi-item drags, returns the format if ANY item can be accepted.
    */
   canAccept: (dragData: DragData) => DragFormat | null;
   isFolder?: boolean;       // for bookmarks - determines if can drop into
@@ -165,16 +190,46 @@ export interface DropData
 }
 
 // ============================================================================
-// Helper functions for canAccept
+// Helper functions for DragData
 // ============================================================================
 
 /**
- * Find the first format from the preferred list that exists in dragData.
+ * Get all unique formats available across all items.
+ */
+export const getAllFormats = (dragData: DragData): DragFormat[] =>
+  [...new Set(dragData.items.flatMap(item => item.formats))];
+
+/**
+ * Check if any item has the specified format.
+ */
+export const hasFormat = (dragData: DragData, format: DragFormat): boolean =>
+  dragData.items.some(item => item.formats.includes(format));
+
+/**
+ * Get all items that have the specified format.
+ */
+export const getItemsByFormat = (dragData: DragData, format: DragFormat): DragItem[] =>
+  dragData.items.filter(item => item.formats.includes(format));
+
+/**
+ * Get the first item (primary dragged item).
+ */
+export const getPrimaryItem = (dragData: DragData): DragItem | undefined =>
+  dragData.items[0];
+
+/**
+ * Check if this is a multi-item drag.
+ */
+export const isMultiDrag = (dragData: DragData): boolean =>
+  dragData.items.length > 1;
+
+/**
+ * Find the first format from the preferred list that exists in any item.
  * Returns the format or null if none match.
  *
  * @example
  * // PinnedBar accepts PIN (for reorder) or URL (to create new pin)
- * canAccept: (dragData) => findFirstFormat(dragData, [DragFormat.PIN, DragFormat.URL])
+ * findFirstFormat(dragData, [DragFormat.PIN, DragFormat.URL])
  */
 export const findFirstFormat = (
   dragData: DragData,
@@ -183,7 +238,7 @@ export const findFirstFormat = (
 {
   for (const format of preferredFormats)
   {
-    if (dragData.formats.includes(format))
+    if (hasFormat(dragData, format))
     {
       return format;
     }
@@ -201,15 +256,16 @@ export const acceptsFormats = (...formats: DragFormat[]) =>
   (dragData: DragData): DragFormat | null => findFirstFormat(dragData, formats);
 
 /**
- * Create a canAccept function with custom validation per format.
+ * Create a canAccept function with custom validation.
  * The validator receives the dragData and the matched format.
  *
  * @example
  * canAccept: acceptsFormatsIf(
  *   [DragFormat.BOOKMARK, DragFormat.URL],
  *   (dragData, format) => {
- *     // Reject dropping bookmark on itself
- *     if (format === DragFormat.BOOKMARK && dragData.bookmark?.bookmarkId === myId) {
+ *     // Reject if primary item is dropping on itself
+ *     const primary = getPrimaryItem(dragData);
+ *     if (format === DragFormat.BOOKMARK && primary?.bookmark?.bookmarkId === myId) {
  *       return false;
  *     }
  *     return true;
@@ -231,49 +287,47 @@ export const acceptsFormatsIf = (
   };
 
 // ============================================================================
-// DragData factory functions
+// DragItem factory functions
 // ============================================================================
 
 /**
- * Create DragData for a pinned site.
+ * Create a DragItem for a pinned site.
  * Provides: PIN, URL
  */
-export const createPinDragData = (
+export const createPinDragItem = (
   siteId: string,
   url: string,
   title: string,
   faviconUrl?: string
-): DragData => ({
+): DragItem => ({
   formats: [DragFormat.PIN, DragFormat.URL],
   pin: { siteId, url, title, faviconUrl },
   url: { url, title, faviconUrl },
 });
 
 /**
- * Create DragData for a bookmark (non-folder).
- * Provides: BOOKMARK, URL
+ * Create a DragItem for a bookmark.
+ * Provides: BOOKMARK, URL (if not a folder)
  */
-export const createBookmarkDragData = (
+export const createBookmarkDragItem = (
   bookmarkId: string,
   isFolder: boolean,
   title: string,
   url?: string,
   parentId?: string,
   depth?: number
-): DragData =>
+): DragItem =>
 {
   const bookmark: BookmarkData = { bookmarkId, isFolder, title, url, parentId, depth };
 
   if (isFolder)
   {
-    // Folders only provide BOOKMARK format (no URL)
     return {
       formats: [DragFormat.BOOKMARK],
       bookmark,
     };
   }
 
-  // Regular bookmarks provide BOOKMARK + URL
   return {
     formats: [DragFormat.BOOKMARK, DragFormat.URL],
     bookmark,
@@ -282,9 +336,114 @@ export const createBookmarkDragData = (
 };
 
 /**
- * Create DragData for a live bookmark (has associated tab).
+ * Create a DragItem for a live bookmark (has associated tab).
  * Provides: TAB, BOOKMARK, URL
  */
+export const createLiveBookmarkDragItem = (
+  bookmarkId: string,
+  title: string,
+  url: string,
+  tabId: number,
+  groupId?: number,
+  parentId?: string,
+  depth?: number
+): DragItem => ({
+  formats: [DragFormat.TAB, DragFormat.BOOKMARK, DragFormat.URL],
+  tab: { tabId, groupId, url, title },
+  bookmark: { bookmarkId, isFolder: false, url, title, parentId, depth },
+  url: { url, title },
+});
+
+/**
+ * Create a DragItem for a Chrome tab.
+ * Provides: TAB, URL
+ */
+export const createTabDragItem = (
+  tabId: number,
+  title: string,
+  url?: string,
+  groupId?: number
+): DragItem => ({
+  formats: url ? [DragFormat.TAB, DragFormat.URL] : [DragFormat.TAB],
+  tab: { tabId, groupId, url, title },
+  url: url ? { url, title } : undefined,
+});
+
+/**
+ * Create a DragItem for a Chrome tab group.
+ * Provides: TAB_GROUP only
+ */
+export const createTabGroupDragItem = (
+  groupId: number,
+  title: string,
+  tabCount: number,
+  color?: chrome.tabGroups.ColorEnum
+): DragItem => ({
+  formats: [DragFormat.TAB_GROUP],
+  tabGroup: { groupId, title, tabCount, color },
+});
+
+/**
+ * Create a DragItem for a space.
+ * Provides: SPACE only
+ */
+export const createSpaceDragItem = (
+  spaceId: string,
+  name: string
+): DragItem => ({
+  formats: [DragFormat.SPACE],
+  space: { spaceId, name },
+});
+
+/**
+ * Create a DragItem for a generic URL.
+ * Provides: URL only
+ */
+export const createUrlDragItem = (
+  url: string,
+  title?: string,
+  faviconUrl?: string
+): DragItem => ({
+  formats: [DragFormat.URL],
+  url: { url, title, faviconUrl },
+});
+
+// ============================================================================
+// DragData factory functions
+// ============================================================================
+
+/**
+ * Create DragData from a single item.
+ */
+export const createDragData = (item: DragItem): DragData => ({
+  items: [item],
+});
+
+/**
+ * Create DragData from multiple items.
+ */
+export const createMultiDragData = (items: DragItem[]): DragData => ({
+  items,
+});
+
+// Convenience functions for single-item drags (backwards compatible signatures)
+
+export const createPinDragData = (
+  siteId: string,
+  url: string,
+  title: string,
+  faviconUrl?: string
+): DragData => createDragData(createPinDragItem(siteId, url, title, faviconUrl));
+
+export const createBookmarkDragData = (
+  bookmarkId: string,
+  isFolder: boolean,
+  title: string,
+  url?: string,
+  parentId?: string,
+  depth?: number
+): DragData => createDragData(createBookmarkDragItem(bookmarkId, isFolder, title, url, parentId, depth));
+
 export const createLiveBookmarkDragData = (
   bookmarkId: string,
   title: string,
@@ -293,66 +452,32 @@ export const createLiveBookmarkDragData = (
   groupId?: number,
   parentId?: string,
   depth?: number
-): DragData => ({
-  formats: [DragFormat.TAB, DragFormat.BOOKMARK, DragFormat.URL],
-  tab: { tabId, groupId, url, title },
-  bookmark: { bookmarkId, isFolder: false, url, title, parentId, depth },
-  url: { url, title },
-});
+): DragData => createDragData(createLiveBookmarkDragItem(bookmarkId, title, url, tabId, groupId, parentId, depth));
 
-/**
- * Create DragData for a Chrome tab.
- * Provides: TAB, URL
- */
 export const createTabDragData = (
   tabId: number,
   title: string,
   url?: string,
   groupId?: number
-): DragData => ({
-  formats: url ? [DragFormat.TAB, DragFormat.URL] : [DragFormat.TAB],
-  tab: { tabId, groupId, url, title },
-  url: url ? { url, title } : undefined,
-});
+): DragData => createDragData(createTabDragItem(tabId, title, url, groupId));
 
-/**
- * Create DragData for a Chrome tab group.
- * Provides: TAB_GROUP only (no URL for groups)
- */
 export const createTabGroupDragData = (
   groupId: number,
   title: string,
   tabCount: number,
   color?: chrome.tabGroups.ColorEnum
-): DragData => ({
-  formats: [DragFormat.TAB_GROUP],
-  tabGroup: { groupId, title, tabCount, color },
-});
+): DragData => createDragData(createTabGroupDragItem(groupId, title, tabCount, color));
 
-/**
- * Create DragData for a space.
- * Provides: SPACE only
- */
 export const createSpaceDragData = (
   spaceId: string,
   name: string
-): DragData => ({
-  formats: [DragFormat.SPACE],
-  space: { spaceId, name },
-});
+): DragData => createDragData(createSpaceDragItem(spaceId, name));
 
-/**
- * Create DragData for a generic URL (e.g., from external drop).
- * Provides: URL only
- */
 export const createUrlDragData = (
   url: string,
   title?: string,
   faviconUrl?: string
-): DragData => ({
-  formats: [DragFormat.URL],
-  url: { url, title, faviconUrl },
-});
+): DragData => createDragData(createUrlDragItem(url, title, faviconUrl));
 
 // ============================================================================
 // DropData factory

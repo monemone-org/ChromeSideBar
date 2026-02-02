@@ -7,7 +7,7 @@ import { SelectionItem } from '../contexts/SelectionContext';
 import { useSelection } from '../hooks/useSelection';
 import type { DropPosition } from '../utils/dragDrop';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DropData, createTabDragData, createTabGroupDragData, acceptsFormats } from '../types/dragDrop';
+import { DragData, DragFormat, DragItem, DropData, createTabDragData, createTabGroupDragData, createTabDragItem, createTabGroupDragItem, acceptsFormats, getPrimaryItem, hasFormat } from '../types/dragDrop';
 
 // Re-export DropPosition for components that need it
 export type { DropPosition };
@@ -137,8 +137,9 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
   onCopyUrl,
   onCopyUrls,
   attributes,
-  listeners
+  listeners,
 }, ref) => {
+  const dndId = `tab-${tab.id}`;
   const icon = tab.favIconUrl ? (
     <img src={tab.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0" />
   ) : (
@@ -242,6 +243,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               badges={badges}
               data-tab-id={tab.id}
               data-group-id={tab.groupId ?? -1}
+              data-dnd-id={dndId}
             >
               {/* Border overlay for grouped tabs - shows on hover or context menu, hidden during drag */}
               {groupColor && !globalDragActive && (
@@ -502,9 +504,10 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
   onMoveSelectedToNewWindow,
   onCloseSelected,
   attributes,
-  listeners
+  listeners,
 }, ref) =>
 {
+  const dndId = `group-${group.id}`;
   const colorStyle = GROUP_COLORS[group.color] || GROUP_COLORS.grey;
 
   // Show space icon if group title matches a space, otherwise generic SquareStack
@@ -550,6 +553,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
               )}
               data-group-header-id={group.id}
               data-is-group-header="true"
+              data-dnd-id={dndId}
             >
               {/* Hover border overlay - shows on hover or context menu, hidden during drag */}
               {!showDropInto && !globalDragActive && (
@@ -1210,6 +1214,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     wasValidDrop,
     registerDropHandler,
     unregisterDropHandler,
+    registerDragItemsProvider,
+    unregisterDragItemsProvider,
     setWasValidDrop,
     setMultiDragInfo: setContextMultiDragInfo,
   } = useUnifiedDnd();
@@ -1543,7 +1549,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   // Sync local overlay state when unified context drag starts/ends
   useEffect(() =>
   {
-    if (activeDragData?.formats.includes(DragFormat.TAB) && activeId)
+    if (activeDragData && hasFormat(activeDragData, DragFormat.TAB) && activeId)
     {
       // Tab is being dragged
       const tabId = typeof activeId === 'number' ? activeId : parseInt(String(activeId).replace('tab-', ''), 10);
@@ -1586,7 +1592,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       setActiveTab(tab || null);
       setActiveGroup(null);
     }
-    else if (activeDragData?.formats.includes(DragFormat.TAB_GROUP) && activeId)
+    else if (activeDragData && hasFormat(activeDragData, DragFormat.TAB_GROUP) && activeId)
     {
       // Group is being dragged
       const groupIdStr = typeof activeId === 'string' ? activeId : `group-${activeId}`;
@@ -1654,10 +1660,12 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
     try
     {
-      if (acceptedFormat === DragFormat.TAB && dragData.tab)
+      const primaryItem = getPrimaryItem(dragData);
+
+      if (acceptedFormat === DragFormat.TAB && primaryItem?.tab)
       {
         // Tab being dropped on tabList
-        const tabId = dragData.tab.tabId;
+        const tabId = primaryItem.tab.tabId;
         const sourceTab = visibleTabs.find(t => t.id === tabId);
         if (!sourceTab) return;
 
@@ -1731,10 +1739,10 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
         setWasValidDrop(true);
       }
-      else if (acceptedFormat === DragFormat.TAB_GROUP && dragData.tabGroup)
+      else if (acceptedFormat === DragFormat.TAB_GROUP && primaryItem?.tabGroup)
       {
         // Tab group being dropped on tabList
-        const groupId = dragData.tabGroup.groupId;
+        const groupId = primaryItem.tabGroup.groupId;
 
         // Check for multi-group selection
         const selectedItems = getSelectedItems();
@@ -1804,7 +1812,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
         setWasValidDrop(true);
       }
-      else if (acceptedFormat === DragFormat.URL && dragData.url)
+      else if (acceptedFormat === DragFormat.URL && primaryItem?.url)
       {
         // URL dropped on tabList - open as new tab at specific position
         let targetIndex: number | undefined;
@@ -1861,7 +1869,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
         // Create the tab
         const newTab = await chrome.tabs.create({
-          url: dragData.url.url,
+          url: primaryItem.url.url,
           active: false,
           windowId: windowId ?? undefined,
           index: targetIndex
@@ -1888,6 +1896,72 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     registerDropHandler('tabList', handleTabListDrop);
     return () => unregisterDropHandler('tabList');
   }, [registerDropHandler, unregisterDropHandler, handleTabListDrop]);
+
+  // Drag items provider - builds multi-item DragData from selection
+  const getDragItems = useCallback((draggedId: string | number): DragItem[] =>
+  {
+    const selectedItems = getSelectedItems();
+    const draggedIdStr = String(draggedId);
+
+    // Check if dragged item is in selection
+    const isTabInSelection = selectedItems.some(
+      item => item.type === 'tab' && item.id === draggedIdStr.replace('tab-', '')
+    );
+    const isGroupInSelection = selectedItems.some(
+      item => item.type === 'group' && `group-${item.id.replace('group-', '')}` === draggedIdStr
+    );
+
+    if (import.meta.env.DEV)
+    {
+      console.log('[getDragItems]', {
+        draggedId,
+        draggedIdStr,
+        draggedIdWithoutPrefix: draggedIdStr.replace('tab-', ''),
+        selectedItems,
+        isTabInSelection,
+        isGroupInSelection,
+      });
+    }
+
+    if ((isTabInSelection || isGroupInSelection) && selectedItems.length > 1)
+    {
+      // Multi-drag: build DragItems for all selected
+      return selectedItems
+        .map(item =>
+        {
+          if (item.type === 'tab')
+          {
+            const tab = visibleTabs.find(t => t.id === parseInt(item.id, 10));
+            if (tab)
+            {
+              return createTabDragItem(tab.id!, tab.title || '', tab.url, tab.groupId);
+            }
+          }
+          else if (item.type === 'group')
+          {
+            const groupId = parseInt(item.id.replace('group-', ''), 10);
+            const group = visibleTabGroups.find(g => g.id === groupId);
+            const tabCount = visibleTabs.filter(t => t.groupId === groupId).length;
+            if (group)
+            {
+              return createTabGroupDragItem(groupId, group.title || '', tabCount, group.color);
+            }
+          }
+          return null;
+        })
+        .filter((item): item is DragItem => item !== null);
+    }
+
+    // Single drag: return empty array to use fallback from useDraggable data
+    return [];
+  }, [getSelectedItems, visibleTabs, visibleTabGroups]);
+
+  // Register drag items provider for tabList zone
+  useEffect(() =>
+  {
+    registerDragItemsProvider('tabList', getDragItems);
+    return () => unregisterDragItemsProvider('tabList');
+  }, [registerDragItemsProvider, unregisterDragItemsProvider, getDragItems]);
 
   const toggleGroup = (groupId: number | string) =>
   {

@@ -70,7 +70,11 @@ export const SelectionProvider = ({ children }: SelectionProviderProps) =>
 
   const clearTabSelection = useCallback(() =>
   {
-    setTabSelectionState(new Map());
+    setTabSelectionState(prev =>
+    {
+      if (prev.size === 0) return prev;  // Don't create new Map if already empty
+      return new Map();
+    });
     setTabAnchor(null);
   }, []);
 
@@ -82,7 +86,11 @@ export const SelectionProvider = ({ children }: SelectionProviderProps) =>
 
   const clearBookmarkSelection = useCallback(() =>
   {
-    setBookmarkSelectionState(new Map());
+    setBookmarkSelectionState(prev =>
+    {
+      if (prev.size === 0) return prev;  // Don't create new Map if already empty
+      return new Map();
+    });
     setBookmarkAnchor(null);
   }, []);
 
@@ -138,33 +146,33 @@ export const SelectionProvider = ({ children }: SelectionProviderProps) =>
     }, [tabSelection]);
   }
 
-  useEffect(() =>
-  {
-    if (import.meta.env.DEV)
-    {
-      console.log('[Selection] tabAnchor changed:', tabAnchor);
-    }
-  }, [tabAnchor]);
+  // useEffect(() =>
+  // {
+  //   if (import.meta.env.DEV)
+  //   {
+  //     console.log('[Selection] tabAnchor changed:', tabAnchor);
+  //   }
+  // }, [tabAnchor]);
 
-  useEffect(() =>
-  {
-    if (import.meta.env.DEV)
-    {
-      console.log('[Selection] bookmarkSelection changed:', {
-        count: bookmarkSelection.size,
-        ids: Array.from(bookmarkSelection.keys()),
-        items: Array.from(bookmarkSelection.values()),
-      });
-    }
-  }, [bookmarkSelection]);
+  // useEffect(() =>
+  // {
+  //   if (import.meta.env.DEV)
+  //   {
+  //     console.log('[Selection] bookmarkSelection changed:', {
+  //       count: bookmarkSelection.size,
+  //       ids: Array.from(bookmarkSelection.keys()),
+  //       items: Array.from(bookmarkSelection.values()),
+  //     });
+  //   }
+  // }, [bookmarkSelection]);
 
-  useEffect(() =>
-  {
-    if (import.meta.env.DEV)
-    {
-      console.log('[Selection] bookmarkAnchor changed:', bookmarkAnchor);
-    }
-  }, [bookmarkAnchor]);
+  // useEffect(() =>
+  // {
+  //   if (import.meta.env.DEV)
+  //   {
+  //     console.log('[Selection] bookmarkAnchor changed:', bookmarkAnchor);
+  //   }
+  // }, [bookmarkAnchor]);
 
   // Global Escape key listener to clear all selection
   useEffect(() =>

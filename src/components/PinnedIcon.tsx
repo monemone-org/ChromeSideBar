@@ -240,7 +240,6 @@ export const PinnedIcon = ({
             {...listeners}
             title={site.title}
             data-dnd-id={pinId}
-            data-dnd-zone="pinnedBar"
             className={clsx(
               "group/pin relative flex items-center justify-center rounded",
               isDragging ? "cursor-grabbing opacity-50" : "cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700",
