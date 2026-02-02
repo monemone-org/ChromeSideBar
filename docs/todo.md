@@ -1,8 +1,8 @@
 # TODO
 
+- All space instead of using an icon, use Text "ALL" so it's differentiated from the other Space icon that can be dragged/dropped.
 
 ## In-Progress
-
 
 
 ## Pending

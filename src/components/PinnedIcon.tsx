@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Globe, Edit, Trash, X, RotateCcw, Play, Copy, ExternalLink } from 'lucide-react';
 import { Dialog } from './Dialog';
 import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePinnedSites';
@@ -8,6 +8,40 @@ import * as ContextMenu from './menu/ContextMenu';
 import { IconColorPicker, PINNED_SITE_COLORS, DEFAULT_ICON_COLOR } from './IconColorPicker';
 import { iconToDataUrl } from '../utils/iconify';
 import { createPinDragData, DropData, DropPosition, DragFormat, acceptsFormats } from '../types/dragDrop';
+
+/**
+ * Shared visual component for pinned icon rendering.
+ * Used by both PinnedIcon and PinOverlay (drag overlay) for consistent appearance.
+ */
+interface PinnedIconVisualProps
+{
+  favicon?: string;
+  iconSize: number;
+  title?: string;
+  className?: string;
+}
+
+export const PinnedIconVisual: React.FC<PinnedIconVisualProps> = ({
+  favicon,
+  iconSize,
+  title,
+  className,
+}) => (
+  <div
+    style={{ width: iconSize + 8, height: iconSize + 8 }}
+    title={title}
+    className={clsx(
+      "relative flex items-center justify-center rounded",
+      className
+    )}
+  >
+    {favicon ? (
+      <img src={favicon} alt="" style={{ width: iconSize, height: iconSize }} />
+    ) : (
+      <Globe style={{ width: iconSize, height: iconSize }} className="text-gray-400" />
+    )}
+  </div>
+);
 
 interface PinnedIconProps
 {
@@ -253,11 +287,7 @@ export const PinnedIcon = ({
               <div className="absolute -left-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
             )}
 
-            {site.favicon ? (
-              <img src={site.favicon} alt="" style={{ width: iconSize, height: iconSize }} />
-            ) : (
-              <Globe style={{ width: iconSize, height: iconSize }} className="text-gray-400" />
-            )}
+            <PinnedIconVisual favicon={site.favicon} iconSize={iconSize} />            
 
             {/* Drop indicator - after */}
             {showDropAfter && (

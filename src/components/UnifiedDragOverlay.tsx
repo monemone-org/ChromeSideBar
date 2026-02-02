@@ -14,6 +14,7 @@ import { DragData, DragFormat, PinData, BookmarkData, TabData, TabGroupData, Spa
 import { TreeRow } from './TreeRow';
 import { GROUP_COLORS } from '../utils/groupColors';
 import { getFaviconUrl } from '../utils/favicon';
+import { PinnedIconVisual } from './PinnedIcon';
 
 interface UnifiedDragOverlayProps
 {
@@ -29,22 +30,20 @@ interface UnifiedDragOverlayProps
 
   // Offset modifier (for positioning below cursor)
   yOffset?: number;
+
+  // Pinned icon size (for matching PinnedIcon appearance)
+  pinnedIconSize?: number;
 }
 
-// Pin overlay - simple icon
-const PinOverlay: React.FC<{ data: PinData }> = ({ data }) =>
-{
-  return (
-    <div className="flex items-center gap-2 px-2 py-1.5 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 pointer-events-none">
-      {data.faviconUrl ? (
-        <img src={data.faviconUrl} alt="" className="w-5 h-5" />
-      ) : (
-        <Globe className="w-5 h-5 text-gray-400" />
-      )}
-      <span className="text-sm truncate max-w-[200px]">{data.title}</span>
-    </div>
-  );
-};
+// Pin overlay - matches PinnedIcon appearance
+const PinOverlay: React.FC<{ data: PinData; iconSize: number }> = ({ data, iconSize }) => (
+  <PinnedIconVisual
+    favicon={data.faviconUrl}
+    iconSize={iconSize}
+    title={data.title}
+    className="bg-white dark:bg-gray-800 shadow-lg border border-gray-200 dark:border-gray-700 pointer-events-none"
+  />
+);
 
 // Bookmark overlay - uses TreeRow style
 const BookmarkOverlay: React.FC<{ data: BookmarkData }> = ({ data }) =>
@@ -184,6 +183,7 @@ const MultiDragWrapper: React.FC<{
  */
 const getOverlayForDragData = (
   activeDragData: DragData,
+  pinnedIconSize: number,
   renderPin?: (data: PinData) => React.ReactNode,
   renderBookmark?: (data: BookmarkData) => React.ReactNode,
   renderTab?: (data: TabData) => React.ReactNode,
@@ -204,7 +204,7 @@ const getOverlayForDragData = (
         {
           return renderPin
             ? renderPin(primaryItem.pin)
-            : <PinOverlay data={primaryItem.pin} />;
+            : <PinOverlay data={primaryItem.pin} iconSize={pinnedIconSize} />;
         }
         break;
 
@@ -253,6 +253,9 @@ const getOverlayForDragData = (
   return null;
 };
 
+// Default pinned icon size (matches default in App.tsx)
+const DEFAULT_PINNED_ICON_SIZE = 22;
+
 export const UnifiedDragOverlay: React.FC<UnifiedDragOverlayProps> = ({
   renderPin,
   renderBookmark,
@@ -261,6 +264,7 @@ export const UnifiedDragOverlay: React.FC<UnifiedDragOverlayProps> = ({
   renderSpace,
   multiDragCount,
   yOffset = 0,
+  pinnedIconSize = DEFAULT_PINNED_ICON_SIZE,
 }) =>
 {
   const dnd = useUnifiedDndOptional();
@@ -276,6 +280,7 @@ export const UnifiedDragOverlay: React.FC<UnifiedDragOverlayProps> = ({
   // Render appropriate overlay based on available formats
   let overlayContent = getOverlayForDragData(
     activeDragData,
+    pinnedIconSize,
     renderPin,
     renderBookmark,
     renderTab,
