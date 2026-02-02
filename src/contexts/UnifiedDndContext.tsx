@@ -16,7 +16,9 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  pointerWithin,
   closestCenter,
+  CollisionDetection,
 } from '@dnd-kit/core';
 import {
   DragData,
@@ -118,6 +120,24 @@ interface UnifiedDndProviderProps
 {
   children: React.ReactNode;
 }
+
+/**
+ * Custom collision detection: prioritizes pointer position, falls back to closest center.
+ * - First tries pointerWithin (accurate when cursor is inside a droppable)
+ * - Falls back to closestCenter (works for gaps between elements)
+ */
+const pointerWithinThenClosest: CollisionDetection = (args) =>
+{
+  // First, check if pointer is inside any droppable
+  const pointerCollisions = pointerWithin(args);
+  if (pointerCollisions.length > 0)
+  {
+    return pointerCollisions;
+  }
+
+  // Fall back to closest center for gaps
+  return closestCenter(args);
+};
 
 export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children }) =>
 {
@@ -528,7 +548,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
     <UnifiedDndContext.Provider value={contextValue}>
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={pointerWithinThenClosest}
         autoScroll={{
           threshold: { x: 0.1, y: 0.1 },
           acceleration: 7,
