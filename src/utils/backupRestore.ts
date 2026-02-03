@@ -239,10 +239,11 @@ export async function importFullBackup(
 
     const searchArray = rootNode?.children || backup.bookmarks;
 
-    // Use case-insensitive matching for root folder names to handle platform differences
-    // (e.g., Windows uses "Other bookmarks" while macOS uses "Other Bookmarks")
-    const bookmarkBar = searchArray.find(n => n.title.toLowerCase() === 'bookmarks bar');
-    const otherBookmarks = searchArray.find(n => n.title.toLowerCase() === 'other bookmarks');
+    // Match root folders by ID - stable across platforms and locales
+    // "1" = Bookmarks Bar, "2" = Other Bookmarks, "3" = Mobile Bookmarks
+    const bookmarkBar = searchArray.find(n => n.id === '1');
+    const otherBookmarks = searchArray.find(n => n.id === '2');
+    const mobileBookmarks = searchArray.find(n => n.id === '3');
 
     if (options.bookmarkMode === 'replace') {
       // Clear and replace existing bookmarks
@@ -258,6 +259,12 @@ export async function importFullBackup(
           result.bookmarksCount += await importBookmarkNode(child, '2');
         }
       }
+      if (mobileBookmarks?.children) {
+        await clearBookmarkFolder('3');
+        for (const child of mobileBookmarks.children) {
+          result.bookmarksCount += await importBookmarkNode(child, '3');
+        }
+      }
     } else {
       // Create in "Other Bookmarks" as a subfolder
       const dateStr = new Date().toLocaleDateString();
@@ -266,15 +273,32 @@ export async function importFullBackup(
         title: `Imported Bookmarks ${dateStr}`,
       });
 
-      // Import contents of Bookmarks Bar and Other Bookmarks (not the folder wrappers)
-      if (bookmarkBar?.children) {
+      // Create subfolders for each root folder to preserve structure
+      if (bookmarkBar?.children && bookmarkBar.children.length > 0) {
+        const barFolder = await chrome.bookmarks.create({
+          parentId: importFolder.id,
+          title: bookmarkBar.title || 'Bookmarks Bar',
+        });
         for (const child of bookmarkBar.children) {
-          result.bookmarksCount += await importBookmarkNode(child, importFolder.id);
+          result.bookmarksCount += await importBookmarkNode(child, barFolder.id);
         }
       }
-      if (otherBookmarks?.children) {
+      if (otherBookmarks?.children && otherBookmarks.children.length > 0) {
+        const otherFolder = await chrome.bookmarks.create({
+          parentId: importFolder.id,
+          title: otherBookmarks.title || 'Other Bookmarks',
+        });
         for (const child of otherBookmarks.children) {
-          result.bookmarksCount += await importBookmarkNode(child, importFolder.id);
+          result.bookmarksCount += await importBookmarkNode(child, otherFolder.id);
+        }
+      }
+      if (mobileBookmarks?.children && mobileBookmarks.children.length > 0) {
+        const mobileFolder = await chrome.bookmarks.create({
+          parentId: importFolder.id,
+          title: mobileBookmarks.title || 'Mobile Bookmarks',
+        });
+        for (const child of mobileBookmarks.children) {
+          result.bookmarksCount += await importBookmarkNode(child, mobileFolder.id);
         }
       }
     }

@@ -1,6 +1,6 @@
 # TODO
 
-- backup/restore should support all root folders and root folders with different names.
+- [x] backup/restore should support all root folders and root folders with different names.
 
 
 ## In-Progress
