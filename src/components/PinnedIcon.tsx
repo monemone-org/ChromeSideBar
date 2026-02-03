@@ -327,7 +327,7 @@ export const PinnedIcon = ({
             </ContextMenu.Item>
             <ContextMenu.Separator />
             <ContextMenu.Item onSelect={handleEdit}>
-              <Edit size={14} className="mr-2" /> Edit
+              <Edit size={14} className="mr-2" /> Edit Pin...
             </ContextMenu.Item>
             <ContextMenu.Item onSelect={() => onDuplicate(site.id)}>
               <Copy size={14} className="mr-2" /> Duplicate

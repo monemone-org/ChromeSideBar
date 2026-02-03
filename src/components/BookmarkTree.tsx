@@ -589,7 +589,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             <>
               <ContextMenu.Separator />
               <ContextMenu.Item onSelect={() => onEdit(node)}>
-                <Edit size={14} className="mr-2" /> Edit
+                <Edit size={14} className="mr-2" /> Edit Bookmark...
               </ContextMenu.Item>
               {isLoaded && !isFolder && onCloseBookmark ? (
                 <ContextMenu.Item onSelect={() => onCloseBookmark(node.id)}>
