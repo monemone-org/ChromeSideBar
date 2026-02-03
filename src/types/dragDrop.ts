@@ -189,6 +189,7 @@ export interface DropData
   isFolder?: boolean;       // for bookmarks - determines if can drop into
   isGroup?: boolean;        // for tab groups - determines if can drop into
   isHorizontal?: boolean;   // for horizontal bars (PinnedBar, SpaceBar) - use X for position
+  isExpanded?: boolean;     // for groups/folders - whether expanded (affects drop position)
   /**
    * Dynamic container check based on accepted format.
    * Used when a drop target acts as a container for some formats but not others.

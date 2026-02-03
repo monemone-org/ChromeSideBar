@@ -667,6 +667,7 @@ const DraggableGroupHeader = ({ group, tabCount, matchedSpace, multiDragInfo, is
       targetId: `group-${group.id}`,
       canAccept: acceptsFormats(DragFormat.TAB, DragFormat.TAB_GROUP, DragFormat.URL),
       isGroup: true,
+      isExpanded: props.isExpanded,
     } as DropData,
   });
 

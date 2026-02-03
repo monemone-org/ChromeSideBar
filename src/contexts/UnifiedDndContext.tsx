@@ -408,7 +408,8 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
       pointerPositionRef.current.x,
       pointerPositionRef.current.y,
       isContainer,
-      !!dropData.isHorizontal
+      !!dropData.isHorizontal,
+      dropData.isExpanded ?? false
     );
 
     setOverId(over.id as string);
@@ -435,7 +436,8 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
       pointerPositionRef.current.x,
       pointerPositionRef.current.y,
       isContainer,
-      !!overData.isHorizontal
+      !!overData.isHorizontal,
+      overData.isExpanded ?? false
     );
 
     setDropPosition(position);

@@ -7,13 +7,17 @@ export type DropPosition = 'before' | 'after' | 'into' | 'intoFirst' | null;
  *
  * Containers (folders/groups): 25% before, 50% into, 25% after
  * Items (bookmarks/tabs): 50% before, 50% after
+ *
+ * For expanded containers, the bottom 25% returns 'intoFirst' instead of 'after',
+ * since dropping after an expanded group should insert at the start of the group.
  */
 export const calculateDropPosition = (
   element: HTMLElement,
   pointerX: number,
   pointerY: number,
   isContainer: boolean,
-  isHorizontal: boolean = false
+  isHorizontal: boolean = false,
+  isExpanded: boolean = false
 ): DropPosition =>
 {
   const rect = element.getBoundingClientRect();
@@ -28,7 +32,11 @@ export const calculateDropPosition = (
     if (isContainer)
     {
       if (relativeX < width * 0.25) return 'before';
-      if (relativeX > width * 0.75) return 'after';
+      if (relativeX > width * 0.75)
+      {
+        // For expanded containers, 'after' becomes 'intoFirst' (insert at start)
+        return isExpanded ? 'intoFirst' : 'after';
+      }
       return 'into';
     }
     else
@@ -46,7 +54,11 @@ export const calculateDropPosition = (
     if (isContainer)
     {
       if (relativeY < height * 0.25) return 'before';
-      if (relativeY > height * 0.75) return 'after';
+      if (relativeY > height * 0.75)
+      {
+        // For expanded containers, 'after' becomes 'intoFirst' (insert at start)
+        return isExpanded ? 'intoFirst' : 'after';
+      }
       return 'into';
     }
     else

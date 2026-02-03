@@ -654,6 +654,7 @@ const DraggableBookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>((props
         }
       ),
       isFolder,
+      isExpanded: isFolder && !!props.expandedState[nodeId],
       depth: props.depth,
       parentId: props.node.parentId,
     } as DropData,
