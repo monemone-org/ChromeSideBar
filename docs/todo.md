@@ -1,13 +1,6 @@
 # TODO
 
-
-- [-] bookmark tree not handling multi-item drop
-
 - backup/restore should support all root folders and root folders with different names.
-
-- settings dialog, cancel button looks disabled. import export dialogs too.
-
-- popup menu "Edit" -> "Edit Pin..." and "Edit Bookmark..."
 
 
 ## In-Progress
@@ -302,4 +295,9 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 
 - [x] when dnd-ing, bookmark tree shouldn't have a hover over ring on bookmarks.
 
+- [x] bookmark tree not handling multi-item drop
+
+- [x] settings dialog, cancel button looks disabled. import export dialogs too.
+
+- [x] popup menu "Edit" -> "Edit Pin..." and "Edit Bookmark..."
 

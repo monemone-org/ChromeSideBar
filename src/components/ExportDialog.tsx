@@ -188,7 +188,7 @@ export function ExportDialog({
           <button
             onClick={onClose}
             disabled={isExporting}
-            className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50"
+            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded disabled:opacity-50"
           >
             Cancel
           </button>

@@ -73,7 +73,7 @@ export function AboutDialog({ isOpen, onClose, onShowWelcome }: AboutDialogProps
         <div className="border-t border-gray-200 dark:border-gray-700 pt-3 flex justify-end">
           <button
             onClick={onClose}
-            className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600"
+            className="px-3 py-1 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
           >
             Close
           </button>
