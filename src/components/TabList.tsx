@@ -1378,14 +1378,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       }
       else if (displayItem.type === 'group')
       {
-        // Add group header
-        items.push({
-          id: `group-${displayItem.group.id}`,
-          type: 'group',
-          index: index++
-        });
-        // Add tabs in expanded groups
-        if (expandedGroups[displayItem.group.id])
+        // In space view: show tabs flat without group header
+        if (isInSpace)
         {
           for (const tab of displayItem.tabs)
           {
@@ -1396,10 +1390,31 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
             });
           }
         }
+        else
+        {
+          // Normal view: add group header
+          items.push({
+            id: `group-${displayItem.group.id}`,
+            type: 'group',
+            index: index++
+          });
+          // Add tabs in expanded groups
+          if (expandedGroups[displayItem.group.id])
+          {
+            for (const tab of displayItem.tabs)
+            {
+              items.push({
+                id: String(tab.id),
+                type: 'tab',
+                index: index++
+              });
+            }
+          }
+        }
       }
     }
     return items;
-  }, [displayItems, expandedGroups]);
+  }, [displayItems, expandedGroups, isInSpace]);
 
   // Get items in range for shift-click selection
   const getTabItemsInRange = useCallback((startIndex: number, endIndex: number): SelectionItem[] =>
