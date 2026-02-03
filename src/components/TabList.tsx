@@ -7,7 +7,7 @@ import { SelectionItem } from '../contexts/SelectionContext';
 import { useSelection } from '../hooks/useSelection';
 import type { DropPosition } from '../utils/dragDrop';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DragItem, DropData, createTabDragData, createTabGroupDragData, createTabDragItem, createTabGroupDragItem, acceptsFormats, getPrimaryItem, hasFormat } from '../types/dragDrop';
+import { DragData, DragFormat, DragItem, DropData, createTabDragData, createTabGroupDragData, createTabDragItem, createTabGroupDragItem, acceptsFormats, getPrimaryItem, hasFormat, collectUrlsFromDragItems } from '../types/dragDrop';
 
 // Re-export DropPosition for components that need it
 export type { DropPosition };
@@ -401,7 +401,7 @@ const DraggableTabRow = forwardRef<HTMLDivElement, DraggableTabProps>((props, re
     data: {
       zone: 'tabList',
       targetId: String(props.tab.id),
-      canAccept: acceptsFormats(DragFormat.TAB, DragFormat.TAB_GROUP, DragFormat.URL),
+      canAccept: acceptsFormats(DragFormat.TAB, DragFormat.TAB_GROUP, DragFormat.BOOKMARK, DragFormat.URL),
       isGroup: false,
     } as DropData,
   });
@@ -447,6 +447,73 @@ const DraggableTab = (props: DraggableTabProps) => {
     <StaticTabRow ref={ref} {...props} />
   );
 };
+
+// --- DroppableNewTabRow Component ---
+// Wraps the "+ New Tab" row with droppable behavior to accept bookmark drops
+interface DroppableNewTabRowProps
+{
+  onClick: () => void;
+  showDropIndicator: boolean;
+  showDropInto: boolean;
+}
+
+const DroppableNewTabRow = forwardRef<HTMLDivElement, DroppableNewTabRowProps>(
+  ({ onClick, showDropIndicator, showDropInto }, forwardedRef) =>
+  {
+    const { setNodeRef: setDropRef } = useDroppable({
+      id: 'end-of-list',
+      data: {
+        zone: 'tabList',
+        targetId: 'end-of-list',
+        canAccept: acceptsFormats(DragFormat.TAB, DragFormat.TAB_GROUP, DragFormat.BOOKMARK, DragFormat.URL),
+        isFolder: true,  // Enables container drop position calculation (25%/50%/25% zones)
+      } as DropData,
+    });
+
+    // Merge refs
+    const setRefs = useCallback(
+      (node: HTMLDivElement | null) =>
+      {
+        setDropRef(node);
+        if (typeof forwardedRef === 'function')
+        {
+          forwardedRef(node);
+        }
+        else if (forwardedRef)
+        {
+          forwardedRef.current = node;
+        }
+      },
+      [setDropRef, forwardedRef]
+    );
+
+    return (
+      <TreeRow
+        ref={setRefs}
+        depth={0}
+        icon={<Plus size={14} />}
+        title="New Tab"
+        hasChildren={false}
+        onClick={onClick}
+        className={clsx(
+          "cursor-pointer",
+          showDropInto
+            ? "bg-blue-100 dark:bg-blue-900/50 text-gray-700 dark:text-gray-200"
+            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+        )}
+        data-dnd-id="end-of-list"
+      >
+        {showDropIndicator && (
+          <div className="absolute left-0 right-0 top-0 h-0.5 bg-blue-500 z-20" />
+        )}
+        {showDropInto && (
+          <div className="absolute inset-0 rounded-md ring-2 ring-blue-500 pointer-events-none" />
+        )}
+      </TreeRow>
+    );
+  }
+);
+DroppableNewTabRow.displayName = 'DroppableNewTabRow';
 
 interface TabGroupHeaderProps {
   group: chrome.tabGroups.TabGroup;
@@ -666,7 +733,7 @@ const DraggableGroupHeader = ({ group, tabCount, matchedSpace, multiDragInfo, is
     data: {
       zone: 'tabList',
       targetId: `group-${group.id}`,
-      canAccept: acceptsFormats(DragFormat.TAB, DragFormat.TAB_GROUP, DragFormat.URL),
+      canAccept: acceptsFormats(DragFormat.TAB, DragFormat.TAB_GROUP, DragFormat.BOOKMARK, DragFormat.URL),
       isGroup: true,
       isExpanded: props.isExpanded,
     } as DropData,
@@ -1137,6 +1204,10 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   {
     if (typeof overId === 'string')
     {
+      if (overId === 'end-of-list')
+      {
+        return 'end-of-list';
+      }
       if (overId.startsWith('tab-'))
       {
         return overId.replace('tab-', '');
@@ -1175,7 +1246,12 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
       if (target)
       {
-        if (target.isGroup)
+        if (target.targetId === 'end-of-list')
+        {
+          // Dropping on "+ New Tab" row - create at end of list
+          // index remains undefined, which creates at end
+        }
+        else if (target.isGroup)
         {
           // Dropping on a group - add to that group
           groupId = target.groupId;
@@ -1531,6 +1607,23 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
   // handleDragMove is no longer needed - unified context handles drop target detection via useDroppable
 
+  // Helper: create tabs from URL-bearing items in drag data
+  const createTabsFromDragUrls = useCallback(async (dragData: DragData): Promise<boolean> =>
+  {
+    const urls = await collectUrlsFromDragItems(dragData);
+    if (urls.length === 0) return false;
+
+    for (const url of urls)
+    {
+      await chrome.tabs.create({
+        url,
+        active: false,
+        windowId: windowId ?? undefined,
+      });
+    }
+    return true;
+  }, [windowId]);
+
   // Drop handler for tabList zone - handles tab and group reordering
   const handleTabListDrop: DropHandler = useCallback(async (
     dragData: DragData,
@@ -1554,6 +1647,20 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         const tabId = primaryItem.tab.tabId;
         const sourceTab = visibleTabs.find(t => t.id === tabId);
         if (!sourceTab) return;
+
+        // Special case: dropping TAB "into" end-of-list creates new tabs with same URLs
+        if (targetId === 'end-of-list' && position === 'into')
+        {
+          if (await createTabsFromDragUrls(dragData))
+          {
+            setWasValidDrop(true);
+          }
+          return;
+        }
+        else if (targetId === 'end-of-list' && position === 'before' && isInSpace)
+        {
+          return;
+        }
 
         // Check for multi-selection
         const selectedItems = getSelectedItems();
@@ -1627,6 +1734,17 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       }
       else if (acceptedFormat === DragFormat.TAB_GROUP && primaryItem?.tabGroup)
       {
+        // For "into" end-of-list, create tabs from any URL-bearing items (TAB, BOOKMARK, URL)
+        // Groups themselves don't have URLs, but mixed selection might include tabs/bookmarks
+        if (targetId === 'end-of-list' && position === 'into')
+        {
+          if (await createTabsFromDragUrls(dragData))
+          {
+            setWasValidDrop(true);
+          }
+          return;
+        }
+
         // Tab group being dropped on tabList
         const groupId = primaryItem.tabGroup.groupId;
 
@@ -1698,9 +1816,13 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
         setWasValidDrop(true);
       }
-      else if (acceptedFormat === DragFormat.URL && primaryItem?.url)
+      else if (acceptedFormat === DragFormat.BOOKMARK || acceptedFormat === DragFormat.URL)
       {
-        // URL dropped on tabList - open as new tab at specific position
+        // Collect all URLs from drag items (handles bookmarks, folders, URLs, multi-selection)
+        const urls = await collectUrlsFromDragItems(dragData);
+        if (urls.length === 0) return;
+
+        // Determine target position
         let targetIndex: number | undefined;
         let targetGroupId: number | undefined;
 
@@ -1733,7 +1855,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         }
         else if (targetId === 'end-of-list')
         {
-          // Drop at end of list - no specific index needed
           targetIndex = undefined;
         }
         else
@@ -1753,18 +1874,23 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
           }
         }
 
-        // Create the tab
-        const newTab = await chrome.tabs.create({
-          url: primaryItem.url.url,
-          active: false,
-          windowId: windowId ?? undefined,
-          index: targetIndex
-        });
+        // Create tabs for all URLs
+        const createdTabIds: number[] = [];
+        for (let i = 0; i < urls.length; i++)
+        {
+          const newTab = await chrome.tabs.create({
+            url: urls[i],
+            active: false,
+            windowId: windowId ?? undefined,
+            index: targetIndex !== undefined ? targetIndex + i : undefined
+          });
+          if (newTab.id) createdTabIds.push(newTab.id);
+        }
 
         // Add to group if needed
-        if (newTab.id && targetGroupId)
+        if (createdTabIds.length > 0 && targetGroupId)
         {
-          await chrome.tabs.group({ tabIds: [newTab.id], groupId: targetGroupId });
+          await chrome.tabs.group({ tabIds: createdTabIds, groupId: targetGroupId });
         }
 
         setWasValidDrop(true);
@@ -1774,7 +1900,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     {
       console.error('TabList drop operation failed:', error);
     }
-  }, [visibleTabs, getSelectedItems, moveTab, groupTab, ungroupTab, moveGroup, clearSelection, setWasValidDrop, windowId]);
+  }, [visibleTabs, getSelectedItems, moveTab, groupTab, ungroupTab, moveGroup, clearSelection, setWasValidDrop, windowId, createTabsFromDragUrls]);
 
   // Register drop handler for tabList zone
   useEffect(() =>
@@ -2455,21 +2581,19 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
           })}
 
           {/* + New Tab Row (also serves as end-of-list drop zone) */}
-          <TreeRow
+          <DroppableNewTabRow
             ref={endOfListRef}
-            depth={0}
-            icon={<Plus size={14} />}
-            title="New Tab"
-            hasChildren={false}
             onClick={handleNewTab}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
-          >
-            {dropTargetId === 'end-of-list' && (
-              <div
-                className="absolute left-0 right-0 top-0 h-0.5 bg-blue-500 z-20"
-              />
-            )}
-          </TreeRow>
+            showDropIndicator={dropTargetId === 'end-of-list' && dropPosition === 'before' && !isInSpace}
+            showDropInto={
+              !!(externalUrlDropTarget?.targetId === 'end-of-list') ||
+              !!(dropTargetId === 'end-of-list' && dropPosition === 'into' && activeDragData && (
+                hasFormat(activeDragData, DragFormat.TAB) ||
+                hasFormat(activeDragData, DragFormat.BOOKMARK) ||
+                hasFormat(activeDragData, DragFormat.URL)
+              ))
+            }
+          />
 
           {/* Error message */}
           {error && (

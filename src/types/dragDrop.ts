@@ -13,6 +13,8 @@
 export type { DropPosition } from '../utils/dragDrop';
 export { calculateDropPosition } from '../utils/dragDrop';
 
+import { getAllBookmarkUrlsInFolder } from '../utils/bookmarkOperations';
+
 // Drop zones - each component that participates in DnD
 export type DropZone = 'pinnedBar' | 'spaceBar' | 'tabList' | 'bookmarkTree';
 
@@ -297,6 +299,43 @@ export const acceptsFormatsIf = (
     }
     return null;
   };
+
+/**
+ * Collect all URLs from drag items.
+ * Handles bookmarks (including folders with recursive URL collection), and URL items.
+ * Supports multi-selection.
+ */
+export async function collectUrlsFromDragItems(dragData: DragData): Promise<string[]>
+{
+  const urls: string[] = [];
+
+  for (const item of dragData.items)
+  {
+    if (item.bookmark?.isFolder)
+    {
+      // Bookmark folder - recursively get all URLs
+      const folderUrls = await getAllBookmarkUrlsInFolder(item.bookmark.bookmarkId);
+      urls.push(...folderUrls);
+    }
+    else if (item.bookmark?.url)
+    {
+      // Leaf bookmark
+      urls.push(item.bookmark.url);
+    }
+    else if (item.url?.url)
+    {
+      // URL item
+      urls.push(item.url.url);
+    }
+    else if (item.tab?.url)
+    {
+      // TAB item
+      urls.push(item.tab.url);
+    }
+  }
+
+  return urls;
+}
 
 // ============================================================================
 // DragItem factory functions

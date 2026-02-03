@@ -120,3 +120,32 @@ export async function saveTabGroupAsBookmarkFolder(
 
   return { success: true, folder };
 }
+
+/**
+ * Recursively get all bookmark URLs within a folder.
+ *
+ * @param folderId - The folder ID to get URLs from
+ * @returns Array of URLs from all bookmarks in the folder (recursive)
+ */
+export async function getAllBookmarkUrlsInFolder(folderId: string): Promise<string[]>
+{
+  const results: string[] = [];
+
+  const children = await chrome.bookmarks.getChildren(folderId);
+
+  for (const child of children)
+  {
+    if (child.url)
+    {
+      results.push(child.url);
+    }
+    else
+    {
+      // Recurse into subfolders
+      const subUrls = await getAllBookmarkUrlsInFolder(child.id);
+      results.push(...subUrls);
+    }
+  }
+
+  return results;
+}

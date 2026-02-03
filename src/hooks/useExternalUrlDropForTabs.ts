@@ -140,6 +140,22 @@ export const useExternalUrlDropForTabs = ({
       }
     }
 
+    // Check for end-of-list (+ New Tab row)
+    const endOfListElement = elements.find(el =>
+      el.getAttribute('data-dnd-id') === 'end-of-list'
+    ) as HTMLElement | undefined;
+
+    if (endOfListElement)
+    {
+      clearAutoExpandTimer();
+      // Use 'into' position to indicate dropping into the list (creates tab at end)
+      return {
+        targetId: 'end-of-list',
+        position: 'into',
+        isGroup: false,
+      };
+    }
+
     clearAutoExpandTimer();
     return null;
   }, [expandedGroups, setAutoExpandTimer, clearAutoExpandTimer]);

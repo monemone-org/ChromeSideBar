@@ -1,7 +1,5 @@
 # TODO
 
-- [x] backup/restore should support all root folders and root folders with different names.
-
 
 ## In-Progress
 
@@ -300,4 +298,6 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 - [x] settings dialog, cancel button looks disabled. import export dialogs too.
 
 - [x] popup menu "Edit" -> "Edit Pin..." and "Edit Bookmark..."
+
+- [x] backup/restore should support all root folders and root folders with different names.
 
