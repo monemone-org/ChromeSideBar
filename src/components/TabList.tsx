@@ -691,7 +691,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
           </ContextMenu.Item>
           <ContextMenu.Separator />
           <ContextMenu.Item danger onSelect={onCloseGroup}>
-            <X size={14} className="mr-2" /> Close All Tabs in Group
+            <X size={14} className="mr-2" /> Close Tabs in Group
           </ContextMenu.Item>
             </>
           )}
