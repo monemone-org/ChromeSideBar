@@ -222,6 +222,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               isSelected={isSelected && !groupColor}  // Don't show selection highlight for grouped tabs (they have their own color)
               isHighlighted={!groupColor && !isSelected && isOpen}
               isDragging={isBeingDragged}
+              disableHoverBorder={globalDragActive}
               dndAttributes={attributes}
               dndListeners={listeners}
               className={rowClassName}
@@ -2252,7 +2253,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                   tab={item.tab}
                   indentLevel={0}
                   isBeingDragged={multiDragInfo ? isTabSelected(tabId) : activeId === item.tab.id}
-                  globalDragActive={!!activeId || !!externalUrlDropTarget}
+                  globalDragActive={!!unifiedActiveId || !!externalUrlDropTarget}
                   showDropBefore={(isTarget && dropPosition === 'before') || (isExternalTarget && externalUrlDropTarget?.position === 'before')}
                   showDropAfter={(isTarget && dropPosition === 'after') || (isExternalTarget && externalUrlDropTarget?.position === 'after')}
                   isSelected={isTabSelected(tabId)}
@@ -2300,7 +2301,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                           tab={tab}
                           indentLevel={0}
                           isBeingDragged={multiDragInfo ? isTabSelected(tabId) : activeId === tab.id}
-                          globalDragActive={!!activeId || !!externalUrlDropTarget}
+                          globalDragActive={!!unifiedActiveId || !!externalUrlDropTarget}
                           showDropBefore={(isTabTarget && dropPosition === 'before') || (isExternalTabTarget && externalUrlDropTarget?.position === 'before')}
                           showDropAfter={(isTabTarget && dropPosition === 'after') || (isExternalTabTarget && externalUrlDropTarget?.position === 'after')}
                           isSelected={isTabSelected(tabId)}
@@ -2356,7 +2357,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                     isExpanded={isGroupExpanded}
                     isSelected={isTabSelected(groupTargetId)}
                     multiDragInfo={multiDragInfo}
-                    globalDragActive={!!activeId || !!externalUrlDropTarget}
+                    globalDragActive={!!unifiedActiveId || !!externalUrlDropTarget}
                     showDropBefore={(isTarget && dropPosition === 'before') || (isExternalGroupTarget && externalUrlDropTarget?.position === 'before')}
                     showDropAfter={showDropAfter}
                     showDropInto={showDropInto}
@@ -2401,7 +2402,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
                         tab={tab}
                         indentLevel={1}
                         isBeingDragged={multiDragInfo ? isTabSelected(tabId) : activeId === tab.id}
-                        globalDragActive={!!activeId || !!externalUrlDropTarget}
+                        globalDragActive={!!unifiedActiveId || !!externalUrlDropTarget}
                         showDropBefore={(isTabTarget && dropPosition === 'before') || (isExternalTabTarget && externalUrlDropTarget?.position === 'before')}
                         showDropAfter={(isTabTarget && dropPosition === 'after') || showGroupAfterOnLastTab || (isExternalTabTarget && externalUrlDropTarget?.position === 'after')}
                         beforeIndentPx={effectivePosition === 'before' ? indentPx : undefined}

@@ -2024,7 +2024,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onDuplicate={duplicateBookmark}
               onExpandAll={handleExpandAll}
               onPin={handlePinSelectedBookmarks}
-              globalDragActive={!!activeId}
+              globalDragActive={!!unifiedActiveId}
               isMultiDrag={isMultiDrag}
               activeId={activeId}
               dropTargetId={dropTargetId}

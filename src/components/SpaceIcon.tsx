@@ -127,7 +127,7 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
         "hover:scale-105 focus:outline-none",
         !isActive && "hover:opacity-80",
         isDropTarget && (dropPosition === 'into' || dropPosition === 'intoFirst') &&
-          "ring-2 ring-blue-500 scale-125 shadow-lg shadow-blue-500/50"
+          "ring-2 ring-blue-500 rounded scale-125 shadow-lg shadow-blue-500/50"
       )}
       {...(isDraggable ? { ...attributes, ...listeners } : {})}
     >
