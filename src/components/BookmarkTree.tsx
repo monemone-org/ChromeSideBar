@@ -52,7 +52,7 @@ import {
 } from '@dnd-kit/core';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DragItem, DropData, createBookmarkDragData, createBookmarkDragItem, acceptsFormatsIf, getPrimaryItem, hasFormat } from '../types/dragDrop';
+import { DragData, DragFormat, DragItem, DropData, createBookmarkDragData, createBookmarkDragItem, acceptsFormatsIf, getPrimaryItem, getItemsByFormat, hasFormat } from '../types/dragDrop';
 import { getFaviconUrl } from '../utils/favicon';
 import { saveTabGroupAsBookmarkFolder } from '../utils/bookmarkOperations';
 
@@ -1761,9 +1761,9 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
 
         case DragFormat.URL:
         {
-          // URL dropped on bookmark tree - create bookmark
-          const primaryItem = getPrimaryItem(dragData);
-          if (!primaryItem?.url) return;
+          // URL dropped on bookmark tree - create bookmarks for all URLs
+          const urlItems = getItemsByFormat(dragData, DragFormat.URL);
+          if (urlItems.length === 0) return;
 
           let parentId: string;
           let index: number | undefined;
@@ -1796,7 +1796,15 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
             }
           }
 
-          await createBookmark(parentId, primaryItem.url.title || primaryItem.url.url, primaryItem.url.url, index);
+          // Create bookmark for each URL, incrementing index to maintain order
+          for (const item of urlItems)
+          {
+            if (item.url)
+            {
+              await createBookmark(parentId, item.url.title || item.url.url, item.url.url, index);
+              if (index !== undefined) index++;
+            }
+          }
           setWasValidDrop(true);
           break;
         }
