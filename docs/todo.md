@@ -1,13 +1,14 @@
 # TODO
 
-- a bug. after opening a pinned sites, then unpin, the associated tab should be
-  unassociated and show up on All space. but it doesn't
 
-- drag URL to pinned bar doesn't show indicator when cursor is at <50% of pin0.
-  
+- [-] bookmark tree not handling multi-item drop
+
 - backup/restore should support all root folders and root folders with different names.
 
-- dropping right at between 2 pins .e.g pin1 and pin2, the drop indicator is after pin2 instead of in between pin1 and pin2 (either after pin1 or before pin2)
+- settings dialog, cancel button looks disabled. import export dialogs too.
+
+- popup menu "Edit" -> "Edit Pin..." and "Edit Bookmark..."
+
 
 ## In-Progress
 
@@ -34,24 +35,6 @@
                   - before/after pinned site 
                   - create new pinned site
              
-
-- [ ] Support dropping pinned site
-            - bookmark  - drop before/after bookmark
-                        - create new bookmark 
-            - folder - drop into/intoFirst folder
-                    - create new bookmark 
-            - group - drop into/intoFirst group
-                    - open as new tab grouped
-            - tab - drop before/after tab
-                  - open as new tab 
-            - end of list - drop 
-                          - open as new tab 
-            - space bar into space bar buttons 
-                  - open as new tab in the target space.
-            - pinned site area
-                  - before/after pinned site 
-                  - create new pinned site
-
 - [ ] Folder popup menu
        - [ ] add "Close Live Bookmarks" to the end of the popup menu which closes live bookmarks under the selected folder.
 
@@ -311,5 +294,12 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
       setDropPosition(null);
       setAcceptedFormat(null);
   use a util function to reset dnd context
+
+- [x] drag URL to pinned bar doesn't show indicator when cursor is at <50% of pin0.
+  
+- [x] a bug. after opening a pinned sites, then unpin, the associated tab should be
+  unassociated and show up on All space. but it doesn't
+
+- [x] when dnd-ing, bookmark tree shouldn't have a hover over ring on bookmarks.
 
 
