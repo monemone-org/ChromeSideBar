@@ -35,7 +35,13 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
-## Latest
+## 1.0.255
+
+- Rewrote drag and drop to support more scenarios: drag multiple items at once, drag tabs/bookmarks to spaces, drag tabs to pin bar, auto-expand folders on hover
+- Fixed root folder matching in backup restore using folder IDs instead of names
+- Fixed bookmark import/export to support mobile bookmarks
+
+## 1.0.235
 
 - Fixed bookmark folder matching failing on Windows due to case difference in "Other Bookmarks" vs "Other bookmarks"
 
