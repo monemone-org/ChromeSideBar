@@ -1110,6 +1110,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     unregisterDragItemsProvider,
     setWasValidDrop,
     setMultiDragInfo: setContextMultiDragInfo,
+    setAutoExpandTimer,
+    clearAutoExpandTimer,
   } = useUnifiedDnd();
 
   // Map unified activeId to local activeId format (tabs use number IDs, groups use "group-X" strings)
@@ -1830,6 +1832,50 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     registerDragItemsProvider('tabList', getDragItems);
     return () => unregisterDragItemsProvider('tabList');
   }, [registerDragItemsProvider, unregisterDragItemsProvider, getDragItems]);
+
+  // Auto-expand collapsed groups when hovering over them during internal DnD
+  // (Ported from main branch handleDragOver logic)
+  useEffect(() =>
+  {
+    // Only handle tab/group IDs - don't interfere with other zones' timers
+    const isTabZoneId = typeof overId === 'string' && (overId.startsWith('tab-') || overId.startsWith('group-'));
+
+    if (!overId || !dropPosition)
+    {
+      // Only clear timer if we were handling a tab zone ID (or no ID at all)
+      if (!overId || isTabZoneId)
+      {
+        clearAutoExpandTimer();
+      }
+      return;
+    }
+
+    // Ignore IDs from other zones
+    if (!isTabZoneId)
+    {
+      return;
+    }
+
+    // Check if hovering over a collapsed group with 'into' position
+    // overId format for groups: "group-123"
+    if (overId.startsWith('group-'))
+    {
+      const groupId = parseInt(overId.replace('group-', ''), 10);
+      const isExpanded = expandedGroups[groupId];
+
+      if (!isExpanded && dropPosition === 'into')
+      {
+        setAutoExpandTimer(overId, () =>
+        {
+          // Expand only (don't collapse if already expanded) - matches main branch behavior
+          setExpandedGroups(prev => prev[groupId] ? prev : { ...prev, [groupId]: true });
+        });
+        return;
+      }
+    }
+
+    clearAutoExpandTimer();
+  }, [overId, dropPosition, expandedGroups, setAutoExpandTimer, clearAutoExpandTimer, setExpandedGroups]);
 
   const toggleGroup = (groupId: number | string) =>
   {

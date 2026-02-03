@@ -1929,6 +1929,49 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     return () => unregisterDragItemsProvider('bookmarkTree');
   }, [registerDragItemsProvider, unregisterDragItemsProvider, getDragItems]);
 
+  // Auto-expand collapsed folders when hovering over them during internal DnD
+  useEffect(() =>
+  {
+    // Only handle bookmark IDs - don't interfere with other zones' timers
+    const isBookmarkZoneId = typeof overId === 'string' && overId.startsWith('bookmark-');
+
+    if (!overId || !dropPosition)
+    {
+      // Only clear timer if we were handling a bookmark zone ID (or no ID at all)
+      if (!overId || isBookmarkZoneId)
+      {
+        clearAutoExpandTimer();
+      }
+      return;
+    }
+
+    // Ignore IDs from other zones
+    if (!isBookmarkZoneId)
+    {
+      return;
+    }
+
+    // Check if hovering over a collapsed folder with 'into' position
+    // overId format for bookmarks: "bookmark-{id}"
+    const bookmarkId = overId.replace('bookmark-', '');
+    const node = findNode(bookmarkId);
+
+    // Check if it's a folder (has children array or no url)
+    const isFolder = node && (node.children !== undefined || !node.url);
+    const isExpanded = expandedState[bookmarkId];
+
+    if (isFolder && !isExpanded && dropPosition === 'into')
+    {
+      setAutoExpandTimer(overId, () =>
+      {
+        setExpandedState(prev => prev[bookmarkId] ? prev : { ...prev, [bookmarkId]: true });
+      });
+      return;
+    }
+
+    clearAutoExpandTimer();
+  }, [overId, dropPosition, expandedState, findNode, setAutoExpandTimer, clearAutoExpandTimer, setExpandedState]);
+
   const hasVisibleBookmarks = visibleBookmarks.length > 0;
 
   // Show message if space folder is missing
