@@ -680,6 +680,17 @@ const groupTracker = new TabGroupTracker();
 const lastAudibleTracker = new LastAudibleTracker();
 tabSpaceRegistry = new TabSpaceRegistry();
 
+// Promise that resolves when all state managers have loaded.
+// Event handlers must await this before accessing state to prevent race conditions
+// when the service worker restarts after being idle.
+let stateReadyResolve: () => void;
+const stateReady = new Promise<void>((resolve) =>
+{
+  stateReadyResolve = resolve;
+  // Safety timeout - don't block forever if load fails
+  setTimeout(resolve, 1000);
+});
+
 // Load persisted state
 Promise.all([
   spaceStateManager.load(),
@@ -687,7 +698,10 @@ Promise.all([
   groupTracker.load(),
   lastAudibleTracker.load(),
   tabSpaceRegistry.load()
-]);
+]).then(() =>
+{
+  stateReadyResolve();
+});
 
 // =============================================================================
 // Event Listeners
@@ -696,6 +710,9 @@ Promise.all([
 // Update tracked group when active tab changes + track history + switch to tab's Space
 chrome.tabs.onActivated.addListener(async (activeInfo) =>
 {
+  // Wait for state to load (handles service worker restart)
+  await stateReady;
+
   const isNavigating = historyManager.isNavigating(activeInfo.windowId);
 
   if (import.meta.env.DEV)
@@ -741,18 +758,20 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
 });
 
 // Clean up history, last audible tracker, and tab registry when tab is closed
-chrome.tabs.onRemoved.addListener((tabId, removeInfo) =>
+chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
 {
+  await stateReady;
   historyManager.remove(removeInfo.windowId, tabId);
   lastAudibleTracker.clearIfMatches(tabId);
   tabSpaceRegistry.unregister(removeInfo.windowId, tabId);
 });
 
 // Track when a tab stops being audible
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) =>
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
 {
   if (changeInfo.audible === false)
   {
+    await stateReady;
     lastAudibleTracker.setLastAudibleTabId(tabId);
   }
 });
@@ -856,7 +875,7 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
 }
 
 // Add new tabs to active Space's Chrome group
-chrome.tabs.onCreated.addListener((tab) =>
+chrome.tabs.onCreated.addListener(async (tab) =>
 {
   if (!tab.id || !tab.windowId) return;
 
@@ -866,9 +885,12 @@ chrome.tabs.onCreated.addListener((tab) =>
     return;
   }
 
+  // Wait for state to load (handles service worker restart)
+  await stateReady;
+
   // Ungrouped tab - queue for grouping
   // (processGroupingRequest will check if it's a managed tab and ungroup if needed)
-  // Mone: we need to change tab's active space group in background.ts and not in Tablist, 
+  // Mone: we need to change tab's active space group in background.ts and not in Tablist,
   //       useTab or BookmarkTabContext because we need this to work even when the SideBar
   //       is hidden.
   //       e.g. user is in Space A. user hide side bar. user use Cmd+T to create new tab.
