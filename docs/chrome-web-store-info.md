@@ -35,6 +35,11 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
+## 1.0.259
+
+- Drop bookmarks onto the tab list to open them as new tabs
+- Fixed shift-click multi-selection not working in some situations
+
 ## 1.0.255
 
 - Rewrote drag and drop to support more scenarios: drag multiple items at once, drag tabs/bookmarks to spaces, drag tabs to pin bar, auto-expand folders on hover
