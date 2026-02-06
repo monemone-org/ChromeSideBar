@@ -211,8 +211,7 @@ export const PinnedBar = ({
       <div
         ref={setEndPlaceholderRef}
         data-dnd-id="pinnedBar-end"
-        className="relative flex-1 min-w-4"
-        style={{ minHeight: iconSize + 8 }}
+        className="relative flex-1 min-w-0"
       >
         {/* Drop indicator - shows on left side (= after last icon) */}
         {isEndDropTarget && (
