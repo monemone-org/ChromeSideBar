@@ -164,26 +164,29 @@ export class CloseTabAction implements UndoableAction
 
           if (groupMap.has(groupKey))
           {
-            // Group already recreated — add tab to it
+            // Group already recreated in this undo batch — add tab to it
             await chrome.tabs.group({ tabIds: [newTab.id], groupId: groupMap.get(groupKey)! });
           }
           else
           {
-            // Check if group with this title still exists in the window
-            const existing = await chrome.tabGroups.query({
-              windowId: this.windowId,
-              title: snapshot.groupTitle,
-            });
+            // Try original groupId first (still exists if not all its tabs were closed)
+            let targetGroupId: number | null = null;
 
-            if (existing.length > 0)
+            try
             {
-              // Add to existing group
-              await chrome.tabs.group({ tabIds: [newTab.id], groupId: existing[0].id });
-              groupMap.set(groupKey, existing[0].id);
+              const orig = await chrome.tabGroups.get(snapshot.groupId);
+              if (orig) targetGroupId = snapshot.groupId;
+            }
+            catch { /* original group gone */ }
+
+            if (targetGroupId)
+            {
+              await chrome.tabs.group({ tabIds: [newTab.id], groupId: targetGroupId });
+              groupMap.set(groupKey, targetGroupId);
             }
             else
             {
-              // Create new group
+              // Original group gone — create new group
               const newGroupId = await chrome.tabs.group({
                 tabIds: [newTab.id],
                 createProperties: { windowId: this.windowId },
