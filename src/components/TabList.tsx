@@ -841,7 +841,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     createTab();
   }, [createTab]);
 
-  // Close tabs via CloseTabAction (undoable) or direct closeTabs (fallback).
+  // Close tabs via CloseTabAction (undoable when onPerformAction available).
   // If closing all tabs in window, show confirmation (no undo — window will close).
   const performClose = useCallback((tabIds: number[]) =>
   {
@@ -856,16 +856,18 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       return;
     }
 
-    if (onPerformAction && windowId)
+    if (!windowId) return;
+
+    const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+    if (onPerformAction)
     {
-      const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
       onPerformAction(action);
     }
     else
     {
-      closeTabs(tabIds);
+      action.do();
     }
-  }, [tabs, onPerformAction, windowId, getItemKeyForTab, restoreItemAssociation, closeTabs]);
+  }, [tabs, onPerformAction, windowId, getItemKeyForTab, restoreItemAssociation]);
 
   // Space-aware close all tabs - closes only visible tabs
   const handleCloseAllTabs = useCallback(() =>

@@ -126,8 +126,8 @@ Recreate tabs in reverse order using `chrome.tabs.create()` with saved URL, inde
 
 ### P2 — Pinned sites & spaces
 
-11. Delete pinned site
-12. Delete space
+- [x] 11. Delete pinned site
+- [x] 12. Delete space
 
 ### P3 — Move operations
 
@@ -151,8 +151,6 @@ Recreate tabs in reverse order using `chrome.tabs.create()` with saved URL, inde
 6. **Toast expires:** If user doesn't tap Undo within 5s, toast auto-dismisses and the action stands
 7. **Successive actions:** User deletes item A, then immediately deletes item B -> first undo is lost, only B can be undone
 
-
-## Implementation Notes
 
 ### Toast component changes
 - Add optional `onUndo` callback to `ToastProps`

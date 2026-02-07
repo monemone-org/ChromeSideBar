@@ -1,5 +1,7 @@
 # TODO
 
+- [ ] toast is too tall when the tab title is long.  Limit the title displayed to a fixed width and add "..." if trimmed.
+
 
 ## In-Progress
 

@@ -2,6 +2,8 @@ import { useEffect, useCallback } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { PinnedIcon } from './PinnedIcon';
 import { PinnedSite } from '../hooks/usePinnedSites';
+import { UndoableAction } from '../actions/types';
+import { DeletePinnedSiteAction } from '../actions/deletePinnedSiteAction';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
@@ -27,11 +29,11 @@ interface PinnedBarProps
   bookmarkOpenMode?: BookmarkOpenMode;
   filterLiveTabs?: boolean;
   filterText?: string;
+  onPerformAction?: (action: UndoableAction) => Promise<void>;
 }
 
 export const PinnedBar = ({
   pinnedSites,
-  removePin,
   updatePin,
   resetFavicon,
   movePin,
@@ -41,9 +43,10 @@ export const PinnedBar = ({
   bookmarkOpenMode = 'arc',
   filterLiveTabs = false,
   filterText = '',
+  onPerformAction,
 }: PinnedBarProps) =>
 {
-  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned, deassociatePinnedTab } = useBookmarkTabsContext();
+  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned } = useBookmarkTabsContext();
   const { windowId } = useSpacesContext();
   const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
 
@@ -57,12 +60,23 @@ export const PinnedBar = ({
     }
   };
 
-  // Handle unpin: deassociate tab first so it shows in All space, then remove pin
+  // Handle unpin: create undoable action and either perform (with undo toast) or just do()
   const handleRemovePin = useCallback((pinnedId: string) =>
   {
-    deassociatePinnedTab(pinnedId);
-    removePin(pinnedId);
-  }, [deassociatePinnedTab, removePin]);
+    const action = new DeletePinnedSiteAction(
+      [pinnedId],
+      () => pinnedSites,
+      getTabIdForPinned
+    );
+    if (onPerformAction)
+    {
+      onPerformAction(action);
+    }
+    else
+    {
+      action.do();
+    }
+  }, [onPerformAction, pinnedSites, getTabIdForPinned]);
 
   // Filter pinned sites based on active filters
   const hasFilters = filterLiveTabs || filterText.trim();

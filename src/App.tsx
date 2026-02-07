@@ -268,7 +268,7 @@ interface SpaceTitleWrapperProps
 
 const SpaceTitleWrapper: React.FC<SpaceTitleWrapperProps> = ({ onEditSpace, onDeleteSpace, onPerformAction }) =>
 {
-  const { getTabIdsInSpace, closeAllTabsInSpace, windowId } = useSpacesContext();
+  const { getTabIdsInSpace, windowId } = useSpacesContext();
   const { getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
   const [confirmCloseAllDialog, setConfirmCloseAllDialog] = useState<{
     isOpen: boolean;
@@ -277,29 +277,31 @@ const SpaceTitleWrapper: React.FC<SpaceTitleWrapperProps> = ({ onEditSpace, onDe
 
   const handleCloseAllTabs = useCallback(async (space: Space) =>
   {
-    if (onPerformAction && windowId)
+    if (!windowId) return;
+
+    const tabIds = await getTabIdsInSpace(space);
+    if (tabIds.length === 0) return;
+
+    // Check if this would close all tabs in the window
+    const allTabs = await chrome.tabs.query({ windowId });
+    const remaining = allTabs.filter(t => t.id !== undefined && !tabIds.includes(t.id!));
+    if (remaining.length === 0)
     {
-      const tabIds = await getTabIdsInSpace(space);
-      if (tabIds.length === 0) return;
+      // Show confirmation — closing will destroy the window (no undo possible)
+      setConfirmCloseAllDialog({ isOpen: true, tabIds });
+      return;
+    }
 
-      // Check if this would close all tabs in the window
-      const allTabs = await chrome.tabs.query({ windowId });
-      const remaining = allTabs.filter(t => t.id !== undefined && !tabIds.includes(t.id!));
-      if (remaining.length === 0)
-      {
-        // Show confirmation — closing will destroy the window (no undo possible)
-        setConfirmCloseAllDialog({ isOpen: true, tabIds });
-        return;
-      }
-
-      const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+    const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+    if (onPerformAction)
+    {
       onPerformAction(action);
     }
     else
     {
-      closeAllTabsInSpace(space);
+      action.do();
     }
-  }, [onPerformAction, windowId, getTabIdsInSpace, closeAllTabsInSpace, getItemKeyForTab, restoreItemAssociation]);
+  }, [onPerformAction, windowId, getTabIdsInSpace, getItemKeyForTab, restoreItemAssociation]);
 
   // Confirm close all tabs in window (no undo — window will close)
   const handleConfirmCloseAll = useCallback(() =>
@@ -865,10 +867,6 @@ function App() {
             {import.meta.env.DEV && (
               <>
                 <DropdownMenu.Separator />
-                <DropdownMenu.Item onSelect={() => chrome.runtime.reload()}>
-                  <RefreshCw size={14} className="mr-2" />
-                  Reload Extension
-                </DropdownMenu.Item>
                 <DropdownMenu.Item onSelect={async () => {
                   const { runSearchParserTests } = await import('./tests/searchParserTest');
                   runSearchParserTests(showToast);
@@ -890,6 +888,25 @@ function App() {
                   <span className="w-[14px] mr-2" />
                   Unit Test Do/Undo Close Tabs
                 </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={async () => {
+                  const { runDeletePinnedSiteTests } = await import('./tests/deletePinnedSiteActionTest');
+                  await runDeletePinnedSiteTests(showToast);
+                }}>
+                  <span className="w-[14px] mr-2" />
+                  Unit Test Do/Undo Delete Pinned Sites
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={async () => {
+                  const { runDeleteSpaceTests } = await import('./tests/deleteSpaceActionTest');
+                  await runDeleteSpaceTests(showToast);
+                }}>
+                  <span className="w-[14px] mr-2" />
+                  Unit Test Do/Undo Delete Space
+                </DropdownMenu.Item>
+                {/*} add new unit tests here */}
+                <DropdownMenu.Item onSelect={() => chrome.runtime.reload()}>
+                  <RefreshCw size={14} className="mr-2" />
+                  Reload Extension
+                </DropdownMenu.Item>
               </>
             )}
           </DropdownMenu.Content>
@@ -909,6 +926,7 @@ function App() {
         bookmarkOpenMode={bookmarkOpenMode}
         filterLiveTabs={filterLiveTabs}
         filterText={filterText}
+        onPerformAction={performAction}
       />
 
       {/* Space Title */}
@@ -946,6 +964,7 @@ function App() {
         showDeleteDialog={showSpaceDeleteDialog}
         spaceToDelete={spaceToDelete}
         onCloseDeleteDialog={() => setShowSpaceDeleteDialog(false)}
+        onPerformAction={performAction}
       />
 
       {/* Space Navigator Dialog */}

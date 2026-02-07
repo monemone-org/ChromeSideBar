@@ -33,7 +33,7 @@ export const SpaceDeleteDialog: React.FC<SpaceDeleteDialogProps> = ({
             Are you sure you want to delete <strong>"{space.name}"</strong>?
           </p>
           <p className="mt-2 text-[0.85em] text-gray-500 dark:text-gray-400">
-            This will only remove the space. Your bookmarks and tabs will not be deleted.
+            Your bookmarks will not be deleted. Tabs in this space will be closed.
           </p>
         </div>
 

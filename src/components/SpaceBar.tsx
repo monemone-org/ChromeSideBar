@@ -29,7 +29,7 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   onPerformAction,
 }) =>
 {
-  const { allSpaces, spaces, activeSpaceId, switchToSpace, moveSpace, getTabIdsInSpace, closeAllTabsInSpace, windowId } = useSpacesContext();
+  const { allSpaces, spaces, activeSpaceId, switchToSpace, moveSpace, getTabIdsInSpace, windowId } = useSpacesContext();
   const { getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
   const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -65,29 +65,31 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
 
   const handleCloseAllTabsInSpace = useCallback(async (space: Space) =>
   {
-    if (onPerformAction && windowId)
+    if (!windowId) return;
+
+    const tabIds = await getTabIdsInSpace(space);
+    if (tabIds.length === 0) return;
+
+    // Check if this would close all tabs in the window
+    const allTabs = await chrome.tabs.query({ windowId });
+    const remaining = allTabs.filter(t => t.id !== undefined && !tabIds.includes(t.id!));
+    if (remaining.length === 0)
     {
-      const tabIds = await getTabIdsInSpace(space);
-      if (tabIds.length === 0) return;
+      // Show confirmation — closing will destroy the window (no undo possible)
+      setConfirmCloseAllDialog({ isOpen: true, tabIds });
+      return;
+    }
 
-      // Check if this would close all tabs in the window
-      const allTabs = await chrome.tabs.query({ windowId });
-      const remaining = allTabs.filter(t => t.id !== undefined && !tabIds.includes(t.id!));
-      if (remaining.length === 0)
-      {
-        // Show confirmation — closing will destroy the window (no undo possible)
-        setConfirmCloseAllDialog({ isOpen: true, tabIds });
-        return;
-      }
-
-      const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+    const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+    if (onPerformAction)
+    {
       onPerformAction(action);
     }
     else
     {
-      closeAllTabsInSpace(space);
+      action.do();
     }
-  }, [onPerformAction, windowId, getTabIdsInSpace, closeAllTabsInSpace, getItemKeyForTab, restoreItemAssociation]);
+  }, [onPerformAction, windowId, getTabIdsInSpace, getItemKeyForTab, restoreItemAssociation]);
 
   // Confirm close all tabs in window (no undo — window will close)
   const handleConfirmCloseAll = useCallback(() =>

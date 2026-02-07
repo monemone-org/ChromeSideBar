@@ -2,6 +2,9 @@ import React from 'react';
 import { SpaceEditDialog } from './SpaceEditDialog';
 import { SpaceDeleteDialog } from './SpaceDeleteDialog';
 import { Space, useSpacesContext } from '../contexts/SpacesContext';
+import { UndoableAction } from '../actions/types';
+import { DeleteSpaceAction } from '../actions/deleteSpaceAction';
+import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 
 interface SpaceDialogsProps
 {
@@ -12,6 +15,8 @@ interface SpaceDialogsProps
   showDeleteDialog: boolean;
   spaceToDelete: Space | null;
   onCloseDeleteDialog: () => void;
+
+  onPerformAction?: (action: UndoableAction) => Promise<void>;
 }
 
 export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
@@ -21,9 +26,11 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
   showDeleteDialog,
   spaceToDelete,
   onCloseDeleteDialog,
+  onPerformAction,
 }) =>
 {
-  const { spaces, createSpace, updateSpace, deleteSpace, setActiveSpaceId } = useSpacesContext();
+  const { spaces, createSpace, updateSpace, setActiveSpaceId, windowId } = useSpacesContext();
+  const { getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
 
   const handleSaveSpace = async (spaceData: {
     name: string;
@@ -53,12 +60,25 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
 
   const handleDeleteSpace = () =>
   {
-    if (spaceToDelete)
+    if (!spaceToDelete || !windowId) return;
+
+    const action = new DeleteSpaceAction(
+      spaceToDelete.id,
+      () => spaces,
+      windowId,
+      getItemKeyForTab,
+      restoreItemAssociation
+    );
+    if (onPerformAction)
     {
-      deleteSpace(spaceToDelete.id);
-      // Switch to "All" space after deletion
-      setActiveSpaceId('all');
+      onPerformAction(action);
     }
+    else
+    {
+      action.do();
+    }
+    // Switch to "All" space after deletion
+    setActiveSpaceId('all');
   };
 
   return (
