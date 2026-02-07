@@ -1,13 +1,16 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckCircle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useFontSize } from '../contexts/FontSizeContext';
+
+type SlideState = 'entering' | 'visible' | 'exiting' | 'hidden';
 
 interface ToastProps
 {
   message: string;
   isVisible: boolean;
   onDismiss: () => void;
+  onUndo?: () => void;
   duration?: number;
 }
 
@@ -15,39 +18,93 @@ export const Toast = ({
   message,
   isVisible,
   onDismiss,
-  duration = 3000
+  onUndo,
+  duration
 }: ToastProps) =>
 {
   const fontSize = useFontSize();
+  const [slideState, setSlideState] = useState<SlideState>('hidden');
+  const effectiveDuration = duration ?? (onUndo ? 5000 : 2500);
 
+  const startExit = useCallback(() =>
+  {
+    setSlideState('exiting');
+  }, []);
+
+  // Drive slide state from isVisible
   useEffect(() =>
   {
-    if (!isVisible) return;
+    if (isVisible)
+    {
+      setSlideState('entering');
+      // Trigger reflow then transition to visible
+      const frame = requestAnimationFrame(() =>
+      {
+        setSlideState('visible');
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+    else
+    {
+      setSlideState((prev) => (prev === 'visible' ? 'exiting' : 'hidden'));
+    }
+  }, [isVisible]);
+
+  // Auto-dismiss timer
+  useEffect(() =>
+  {
+    if (slideState !== 'visible') return;
 
     const timer = setTimeout(() =>
     {
-      onDismiss();
-    }, duration);
+      startExit();
+    }, effectiveDuration);
 
     return () => clearTimeout(timer);
-  }, [isVisible, duration, onDismiss]);
+  }, [slideState, effectiveDuration, startExit]);
 
-  if (!isVisible) return null;
+  // After exit animation completes, call onDismiss and go hidden
+  const handleTransitionEnd = useCallback(() =>
+  {
+    if (slideState === 'exiting')
+    {
+      setSlideState('hidden');
+      onDismiss();
+    }
+  }, [slideState, onDismiss]);
+
+  if (slideState === 'hidden') return null;
+
+  const translateY = slideState === 'visible' ? 'translateY(0)' : 'translateY(100%)';
 
   return createPortal(
-    <div
-      className="fixed bottom-14 left-4 right-4 z-50 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
-      style={{ fontSize: `${fontSize}px` }}
-    >
-      <CheckCircle size={16} className="shrink-0 self-start mt-0.5" />
-      <span className="flex-1">{message}</span>
-      <button
-        onClick={onDismiss}
-        className="shrink-0 p-0.5 hover:bg-green-500 rounded"
-        aria-label="Dismiss"
+    <div className="fixed bottom-14 left-0 right-0 z-50 flex justify-center pointer-events-none">
+      <div
+        className="pointer-events-auto bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 mx-4 min-w-[80%]"
+        style={{
+          fontSize: `${fontSize}px`,
+          transform: translateY,
+          transition: 'transform 200ms ease-out',
+        }}
+        onTransitionEnd={handleTransitionEnd}
       >
-        <X size={16} />
-      </button>
+        <span className="flex-1">{message}</span>
+        {onUndo && (
+          <button
+            onClick={() => { onUndo(); startExit(); }}
+            className="shrink-0 px-2 py-0.5 text-blue-300 hover:text-blue-200 font-medium rounded"
+          >
+            Undo
+          </button>
+        )}
+        <button
+          onClick={startExit}
+          className="shrink-0 p-0.5 hover:bg-gray-700 rounded"
+          aria-label="Dismiss"
+        >
+          <X size={16} />
+        </button>
+      </div>
     </div>,
     document.body
   );
