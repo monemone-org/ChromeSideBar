@@ -1,7 +1,7 @@
 ---
 created: 2025-01-31
 after-version: 1.0.235
-status: in-progress
+status: completed
 ---
 
 # 027 - Unified Drag-and-Drop Refactor

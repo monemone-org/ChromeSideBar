@@ -1,7 +1,7 @@
 // Unit tests for searchParser
-// Run via the Test button in Settings (dev mode only)
+// Run via the "Unit Test Search Parser" menu item (dev mode only)
 
-import { parseSearchQuery, matchesSearch, matchesFilter, ASTNode } from './searchParser';
+import { parseSearchQuery, matchesSearch, matchesFilter, ASTNode } from '../utils/searchParser';
 
 interface TestResult
 {
@@ -373,9 +373,13 @@ const tests: Array<{ name: string; fn: () => void }> = [
   },
 ];
 
-// Run all tests
-export function runSearchParserTests(): { results: TestResult[]; passed: number; failed: number }
+// Run all tests and report via console + toast
+export function runSearchParserTests(
+  onShowToast: (message: string) => void
+): void
 {
+  console.log('=== Search Parser Tests ===');
+
   const results: TestResult[] = [];
   let passed = 0;
   let failed = 0;
@@ -395,5 +399,27 @@ export function runSearchParserTests(): { results: TestResult[]; passed: number;
     }
   }
 
-  return { results, passed, failed };
+  // Report
+  console.log('--- Results ---');
+  for (const r of results)
+  {
+    if (r.passed)
+    {
+      console.log(`✓ ${r.name}`);
+    }
+    else
+    {
+      console.error(`✗ ${r.name}: ${r.error}`);
+    }
+  }
+  console.log(`${passed}/${results.length} passed`);
+
+  if (failed === 0)
+  {
+    onShowToast(`All ${passed} search parser tests passed`);
+  }
+  else
+  {
+    onShowToast(`${failed}/${results.length} search parser tests failed — see console`);
+  }
 }

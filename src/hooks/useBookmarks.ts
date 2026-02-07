@@ -16,6 +16,21 @@ const refreshAll = () => {
 
 export { refreshAll as refreshAllBookmarks };
 
+// Wrap an async operation in batch mode to suppress intermediate refetches
+export async function runBatchOperation<T>(fn: () => Promise<T>): Promise<T>
+{
+  isBatchOperation = true;
+  try
+  {
+    return await fn();
+  }
+  finally
+  {
+    isBatchOperation = false;
+    refreshAll();
+  }
+}
+
 export const useBookmarks = () => {
   const [bookmarks, setBookmarks] = useState<chrome.bookmarks.BookmarkTreeNode[]>([]);
   const [error, setError] = useState<string | null>(null);

@@ -6,7 +6,6 @@ import { SelectionItem } from '../contexts/SelectionContext';
 import { useSelection } from '../hooks/useSelection';
 import { FolderPickerDialog } from './FolderPickerDialog';
 import { SpaceNavigatorDialog } from './SpaceNavigatorDialog';
-import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { useExternalLinkDrop } from '../hooks/useExternalLinkDrop';
 import { getIndentPadding } from '../utils/indent';
 import { scrollToBookmark } from '../utils/scrollHelpers';
@@ -55,6 +54,8 @@ import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
 import { DragData, DragFormat, DragItem, DropData, createBookmarkDragData, createBookmarkDragItem, acceptsFormatsIf, getPrimaryItem, getItemsByFormat, hasFormat } from '../types/dragDrop';
 import { getFaviconUrl } from '../utils/favicon';
 import { saveTabGroupAsBookmarkFolder } from '../utils/bookmarkOperations';
+import { UndoableAction } from '../actions/types';
+import { DeleteBookmarkAction } from '../actions/deleteBookmarkAction';
 
 // Standard Chrome bookmark folder IDs
 const BOOKMARKS_BAR_ID = '1';
@@ -773,13 +774,14 @@ interface BookmarkTreeProps {
   filterText?: string;
   activeSpace?: Space | null;
   onShowToast?: (message: string) => void;
+  onPerformAction?: (action: UndoableAction) => Promise<void>;
   useSpaces?: boolean;
   suppressAutoScrollRef?: React.RefObject<boolean>;
 }
 
-export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
-  const { bookmarks, removeBookmark, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab } = useBookmarkTabsContext();
+export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
+  const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
 
   // Build lookup: folderId → Space (only when in "All" space)
@@ -954,12 +956,6 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     bookmarkId: string | null;
     isFolder: boolean;
   }>({ isOpen: false, bookmarkId: null, isFolder: false });
-
-  // Confirm delete dialog for multi-delete
-  const [confirmDeleteDialog, setConfirmDeleteDialog] = useState<{
-    isOpen: boolean;
-    bookmarkIds: string[];
-  }>({ isOpen: false, bookmarkIds: [] });
 
   // Move multiple bookmarks dialog
   const [moveMultiBookmarkDialog, setMoveMultiBookmarkDialog] = useState({
@@ -1352,36 +1348,27 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const handleDeleteSelectedBookmarks = useCallback((clickedBookmarkId: string) =>
   {
     const selectedItems = getSelectedItems();
-    if (selectedItems.length > 1)
+    const ids = selectedItems.length > 1
+      ? selectedItems.map(item => item.id)
+      : [clickedBookmarkId];
+
+    const action = new DeleteBookmarkAction(ids, getTabIdForBookmark);
+
+    if (onPerformAction)
     {
-      // Multiple selected - show confirmation dialog
-      const bookmarkIds = selectedItems.map(item => item.id);
-      setConfirmDeleteDialog({ isOpen: true, bookmarkIds });
+      onPerformAction(action);
     }
     else
     {
-      // Single bookmark - delete directly
-      removeBookmark(clickedBookmarkId);
+      // Fallback: execute without undo support
+      action.do();
     }
-  }, [getSelectedItems, removeBookmark]);
 
-  // Confirm multi-delete
-  const handleConfirmMultiDelete = useCallback(async () =>
-  {
-    for (const id of confirmDeleteDialog.bookmarkIds)
+    if (selectedItems.length > 1)
     {
-      try
-      {
-        await chrome.bookmarks.removeTree(id);
-      }
-      catch
-      {
-        // Ignore errors (bookmark might have already been deleted if it was a child)
-      }
+      clearSelection();
     }
-    clearSelection();
-    setConfirmDeleteDialog({ isOpen: false, bookmarkIds: [] });
-  }, [confirmDeleteDialog.bookmarkIds, clearSelection]);
+  }, [getSelectedItems, onPerformAction, clearSelection, getTabIdForBookmark]);
 
   // Pin selected bookmarks (or single if not multi-selected)
   const handlePinSelectedBookmarks = useCallback((
@@ -2169,13 +2156,6 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         onClose={() => setMoveMultiBookmarkDialog({ isOpen: false })}
       />
 
-      <ConfirmDeleteDialog
-        isOpen={confirmDeleteDialog.isOpen}
-        itemCount={confirmDeleteDialog.bookmarkIds.length}
-        itemType="bookmarks"
-        onConfirm={handleConfirmMultiDelete}
-        onClose={() => setConfirmDeleteDialog({ isOpen: false, bookmarkIds: [] })}
-      />
     </>
   );
 };

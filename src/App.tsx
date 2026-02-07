@@ -12,6 +12,7 @@ import { WelcomeDialog } from './components/WelcomeDialog';
 import { AudioTabsDropdown } from './components/AudioTabsDropdown';
 import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
+import { UndoableAction } from './actions/types';
 import { usePinnedSites, PinnedSite } from './hooks/usePinnedSites';
 import { useTabs } from './hooks/useTabs';
 import { useBookmarks, refreshAllBookmarks } from './hooks/useBookmarks';
@@ -50,6 +51,7 @@ interface SidebarContentProps
   onExternalDropTargetChange: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget: () => ResolveBookmarkDropTarget | null;
   onShowToast?: (message: string) => void;
+  onPerformAction?: (action: UndoableAction) => Promise<void>;
   onSpaceDropTargetChange?: (spaceId: string | null) => void;
 }
 
@@ -72,6 +74,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   onExternalDropTargetChange,
   resolveBookmarkDropTarget,
   onShowToast,
+  onPerformAction,
   onSpaceDropTargetChange,
 }) =>
 {
@@ -171,6 +174,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         filterText={filterText}
         activeSpace={activeSpace}
         onShowToast={onShowToast}
+        onPerformAction={onPerformAction}
         useSpaces={useSpaces}
         suppressAutoScrollRef={suppressAutoScrollRef}
       />
@@ -535,8 +539,12 @@ function App() {
     setRecentFilters([trimmed, ...filtered].slice(0, 5));
   }, [recentFilters]);
 
+  // Undoable action state
+  const [lastAction, setLastAction] = useState<UndoableAction | null>(null);
+
   // Toast helpers
   const showToast = useCallback((message: string) => {
+    setLastAction(null);
     setToastMessage(message);
     setToastVisible(true);
   }, []);
@@ -544,6 +552,43 @@ function App() {
   const hideToast = useCallback(() => {
     setToastVisible(false);
   }, []);
+
+  // Execute an undoable action: run do(), show toast with undo button
+  const performAction = useCallback(async (action: UndoableAction) => {
+    try
+    {
+      await action.do();
+      setLastAction(action);
+      setToastMessage(action.description);
+      setToastVisible(true);
+    }
+    catch (err)
+    {
+      setLastAction(null);
+      const message = err instanceof Error ? err.message : 'Action failed';
+      setToastMessage(message);
+      setToastVisible(true);
+    }
+  }, []);
+
+  // Undo the last action
+  const handleUndo = useCallback(async () => {
+    if (!lastAction) return;
+    try
+    {
+      await lastAction.undo();
+      setLastAction(null);
+      setToastMessage('Restored');
+      setToastVisible(true);
+    }
+    catch (err)
+    {
+      setLastAction(null);
+      const message = err instanceof Error ? err.message : 'Undo failed';
+      setToastMessage(message);
+      setToastVisible(true);
+    }
+  }, [lastAction]);
 
   // Reset all filters
   const handleResetFilters = useCallback(() => {
@@ -769,6 +814,20 @@ function App() {
                   <RefreshCw size={14} className="mr-2" />
                   Reload Extension
                 </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={async () => {
+                  const { runSearchParserTests } = await import('./tests/searchParserTest');
+                  runSearchParserTests(showToast);
+                }}>
+                  <span className="w-[14px] mr-2" />
+                  Unit Test Search Parser
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={async () => {
+                  const { runDeleteBookmarkTests } = await import('./tests/deleteBookmarkActionTest');
+                  await runDeleteBookmarkTests(showToast);
+                }}>
+                  <span className="w-[14px] mr-2" />
+                  Unit Test Do/Undo
+                </DropdownMenu.Item>
               </>
             )}
           </DropdownMenu.Content>
@@ -812,6 +871,7 @@ function App() {
         onExternalDropTargetChange={setExternalDropTarget}
         resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current}
         onShowToast={showToast}
+        onPerformAction={performAction}
         onSpaceDropTargetChange={setSpaceDropTargetId}
       />
 
@@ -845,6 +905,7 @@ function App() {
         message={toastMessage}
         isVisible={toastVisible}
         onDismiss={hideToast}
+        onUndo={lastAction ? handleUndo : undefined}
       />
 
       {/* Unified Drag Overlay for cross-component DnD */}

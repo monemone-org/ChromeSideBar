@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { FlaskConical } from 'lucide-react';
-import { runSearchParserTests } from '../utils/searchParser.test';
 import { Dialog } from './Dialog';
 
 export type BookmarkOpenMode = 'arc' | 'newTab' | 'activeTab';
@@ -36,9 +34,6 @@ export function SettingsDialog({
   const [tempBookmarkOpenMode, setTempBookmarkOpenMode] = useState(settings.bookmarkOpenMode);
   const [tempUseSpaces, setTempUseSpaces] = useState(settings.useSpaces);
   const [tempArcSingleClickOpensTab, setTempArcSingleClickOpensTab] = useState(settings.arcSingleClickOpensTab);
-
-  // Test results state (dev mode only)
-  const [testResults, setTestResults] = useState<{ passed: number; failed: number; results: Array<{ name: string; passed: boolean; error?: string }> } | null>(null);
 
   // Track previous isOpen to detect when dialog opens
   const wasOpen = useRef(false);
@@ -209,39 +204,10 @@ export function SettingsDialog({
             </div>
           </div>
 
-          {/* Dev mode: Unit tests */}
+          {/* Dev mode tools */}
           {import.meta.env.DEV && (
             <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-              <div className="flex items-center justify-between mb-2">
-                <label className="font-medium text-gray-700 dark:text-gray-300 flex items-center gap-1">
-                  <FlaskConical size={14} />
-                  Unit Tests
-                </label>
-                <button
-                  onClick={() => setTestResults(runSearchParserTests())}
-                  className="px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300 rounded hover:bg-purple-200 dark:hover:bg-purple-800"
-                >
-                  Run Tests
-                </button>
-              </div>
-              {testResults && (
-                <div className="text-xs">
-                  <div className={`font-medium ${testResults.failed === 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                    {testResults.passed} passed, {testResults.failed} failed
-                  </div>
-                  {testResults.failed > 0 && (
-                    <div className="mt-1 max-h-24 overflow-y-auto space-y-0.5">
-                      {testResults.results.filter(r => !r.passed).map((r, i) => (
-                        <div key={i} className="text-red-600 dark:text-red-400">
-                          <div className="font-medium">{r.name}</div>
-                          <div className="text-red-500 dark:text-red-500 pl-2">{r.error}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-              <div className="flex items-center justify-between mt-3">
+              <div className="flex items-center justify-between">
                 <label className="text-gray-700 dark:text-gray-300">
                   Reset Welcome
                 </label>
