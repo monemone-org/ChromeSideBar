@@ -110,19 +110,19 @@ Recreate tabs in reverse order using `chrome.tabs.create()` with saved URL, inde
 
 ### P1 — Bookmark deletion
 
-1. Delete single bookmark
-2. Delete single folder (and all contents)
-3. Delete multiple selected bookmarks/folders (mix of both)
+-[x] 1. Delete single bookmark
+-[x] 2. Delete single folder (and all contents)
+-[x] 3. Delete multiple selected bookmarks/folders (mix of both)
 
 ### P1 — Tab close
 
-4. Close single tab (X button or context menu)
-5. Close multiple selected tabs
-6. Close tabs before
-7. Close tabs after
-8. Close other tabs
-9. Close pinned site / bookmark tab (Arc-style and pinned button tabs)
-10. Close all tabs in space
+-[x] 4. Close single tab (X button or context menu)
+-[x] 5. Close multiple selected tabs
+-[x] 6. Close tabs before
+-[x] 7. Close tabs after
+-[x] 8. Close other tabs
+-[x] 10. Close all tabs in space
+-[x] 10. Close all tabs in All, not undoable but with confirmation 
 
 ### P2 — Pinned sites & spaces
 

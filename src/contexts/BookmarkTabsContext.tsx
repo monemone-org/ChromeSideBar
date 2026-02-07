@@ -22,6 +22,7 @@ interface BookmarkTabsContextValue
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
   getBookmarkLiveTitle: (bookmarkId: string) => string | undefined;
   associateExistingTab: (tabId: number, bookmarkId: string) => Promise<void>;
+  restoreItemAssociation: (tabId: number, itemKey: string) => Promise<void>;
   deassociateBookmarkTab: (bookmarkId: string) => void;
   // Pinned site functions
   openPinnedTab: (pinnedId: string, url: string) => Promise<number | undefined>;
@@ -518,6 +519,25 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     });
   }, [storeAssociation]);
 
+  // Restore an item association by raw itemKey (for undo — works for both bookmark and pinned)
+  const restoreItemAssociation = useCallback(async (tabId: number, itemKey: string): Promise<void> =>
+  {
+    await storeAssociation(tabId, itemKey);
+
+    setItemToTab((prev) =>
+    {
+      const newMap = new Map(prev);
+      newMap.set(itemKey, tabId);
+      return newMap;
+    });
+    setTabToItem((prev) =>
+    {
+      const newMap = new Map(prev);
+      newMap.set(tabId, itemKey);
+      return newMap;
+    });
+  }, [storeAssociation]);
+
   // Deassociate a bookmark from its tab (tab stays alive, bookmark becomes unloaded)
   const deassociateBookmarkTab = useCallback((bookmarkId: string): void =>
   {
@@ -618,6 +638,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     getTabIdForBookmark,
     getBookmarkLiveTitle,
     associateExistingTab,
+    restoreItemAssociation,
     deassociateBookmarkTab,
     openPinnedTab,
     closePinnedTab,
@@ -641,6 +662,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     getTabIdForBookmark,
     getBookmarkLiveTitle,
     associateExistingTab,
+    restoreItemAssociation,
     deassociateBookmarkTab,
     openPinnedTab,
     closePinnedTab,

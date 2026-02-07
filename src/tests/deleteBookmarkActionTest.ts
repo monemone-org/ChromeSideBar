@@ -1,4 +1,5 @@
 import { DeleteBookmarkAction } from '../actions/deleteBookmarkAction';
+import { TestResult } from './testUtils';
 
 // --- Types ---
 
@@ -24,13 +25,6 @@ interface TestCase
   selectionOrder?: string[];   // Pass IDs in this title order (default: tree traversal order)
   expectedDescription: string;
   expectedAfterDo: TreeShape[];
-}
-
-interface TestResult
-{
-  name: string;
-  passed: boolean;
-  error?: string;
 }
 
 // --- Helpers ---

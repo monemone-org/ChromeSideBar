@@ -36,6 +36,8 @@ import { Toast } from './Toast';
 import { TreeRow } from './TreeRow';
 import { FolderPickerDialog } from './FolderPickerDialog';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import { CloseTabAction } from '../actions/closeTabAction';
+import type { UndoableAction } from '../actions/types';
 import { SpaceNavigatorDialog } from './SpaceNavigatorDialog';
 import { AddToGroupDialog } from './AddToGroupDialog';
 import { ChangeGroupColorDialog } from './ChangeGroupColorDialog';
@@ -781,14 +783,15 @@ interface TabListProps {
   activeSpace?: Space;  // If provided, use this instead of context
   useSpaces?: boolean;  // When true, show "Add to Space" menu; when false, show "Add to Group" menu
   onSpaceDropTargetChange?: (spaceId: string | null) => void;
+  onPerformAction?: (action: UndoableAction) => Promise<void>;
 }
 
-export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExternalDropTargetChange: _onExternalDropTargetChange, resolveBookmarkDropTarget: _resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange: _onSpaceDropTargetChange }: TabListProps) =>
+export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExternalDropTargetChange: _onExternalDropTargetChange, resolveBookmarkDropTarget: _resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange: _onSpaceDropTargetChange, onPerformAction }: TabListProps) =>
 {
   const { spaces, activeSpace: activeSpaceFromContext, windowId } = useSpacesContext();
-  const { tabs, closeTab, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, error } = useTabs(windowId ?? undefined);
+  const { tabs, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, error } = useTabs(windowId ?? undefined);
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
-  const { getManagedTabIds, associateExistingTab } = useBookmarkTabsContext();
+  const { getManagedTabIds, associateExistingTab, getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
 
   // Use prop if provided, otherwise use context
   const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
@@ -838,17 +841,40 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     createTab();
   }, [createTab]);
 
+  // Close tabs via CloseTabAction (undoable) or direct closeTabs (fallback).
+  // If closing all tabs in window, show confirmation (no undo — window will close).
+  const performClose = useCallback((tabIds: number[]) =>
+  {
+    if (tabIds.length === 0) return;
+
+    // Check if this would close every tab in the window
+    const closingSet = new Set(tabIds);
+    const remaining = tabs.filter(t => t.id !== undefined && !closingSet.has(t.id!));
+    if (remaining.length === 0)
+    {
+      setConfirmCloseAllDialog({ isOpen: true, tabIds });
+      return;
+    }
+
+    if (onPerformAction && windowId)
+    {
+      const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+      onPerformAction(action);
+    }
+    else
+    {
+      closeTabs(tabIds);
+    }
+  }, [tabs, onPerformAction, windowId, getItemKeyForTab, restoreItemAssociation, closeTabs]);
+
   // Space-aware close all tabs - closes only visible tabs
   const handleCloseAllTabs = useCallback(() =>
   {
     const tabIds = visibleTabs
       .map(tab => tab.id!)
       .filter(id => id !== undefined);
-    if (tabIds.length > 0)
-    {
-      closeTabs(tabIds);
-    }
-  }, [visibleTabs, closeTabs]);
+    performClose(tabIds);
+  }, [visibleTabs, performClose]);
 
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expandedGroupsLoaded, setExpandedGroupsLoaded] = useState(false);
@@ -1511,8 +1537,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     getItemsInRange: getTabItemsInRange
   });
 
-  // Confirm delete dialog for multi-close
-  const [confirmDeleteDialog, setConfirmDeleteDialog] = useState<{
+  // Confirm dialog for closing all tabs in window (window will close, no undo possible)
+  const [confirmCloseAllDialog, setConfirmCloseAllDialog] = useState<{
     isOpen: boolean;
     tabIds: number[];
   }>({ isOpen: false, tabIds: [] });
@@ -2027,7 +2053,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   const closeGroup = (groupTabs: chrome.tabs.Tab[]) =>
   {
     const tabIds = groupTabs.map(tab => tab.id).filter((id): id is number => id !== undefined);
-    closeTabs(tabIds);
+    performClose(tabIds);
   };
 
   // Move tab to a new window
@@ -2052,8 +2078,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     const tabIds = scopedTabs.slice(0, index)
       .map(t => t.id)
       .filter((id): id is number => id !== undefined);
-    closeTabs(tabIds);
-  }, [visibleTabs, closeTabs]);
+    performClose(tabIds);
+  }, [visibleTabs, performClose]);
 
   const closeTabsAfter = useCallback((tabId: number) =>
   {
@@ -2069,8 +2095,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     const tabIds = scopedTabs.slice(index + 1)
       .map(t => t.id)
       .filter((id): id is number => id !== undefined);
-    closeTabs(tabIds);
-  }, [visibleTabs, closeTabs]);
+    performClose(tabIds);
+  }, [visibleTabs, performClose]);
 
   const closeOthers = useCallback((tabId: number) =>
   {
@@ -2085,8 +2111,8 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       .filter(t => t.id !== tabId)
       .map(t => t.id)
       .filter((id): id is number => id !== undefined);
-    closeTabs(tabIds);
-  }, [visibleTabs, closeTabs]);
+    performClose(tabIds);
+  }, [visibleTabs, performClose]);
 
   // Close selected tabs (or single tab if not in selection)
   const handleCloseSelectedTabs = useCallback((clickedTabId: number) =>
@@ -2094,19 +2120,20 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     const selectedItems = getSelectedItems();
     if (selectedItems.length > 1)
     {
-      // Multiple selected - show confirmation dialog
+      // Multiple selected - close directly (undo via toast)
       const tabIds = selectedItems
         .filter(item => item.type === 'tab')
         .map(item => parseInt(item.id, 10))
         .filter(id => !isNaN(id));
-      setConfirmDeleteDialog({ isOpen: true, tabIds });
+      performClose(tabIds);
+      clearSelection();
     }
     else
     {
       // Single tab - close directly
-      closeTab(clickedTabId);
+      performClose([clickedTabId]);
     }
-  }, [getSelectedItems, closeTab]);
+  }, [getSelectedItems, performClose, clearSelection]);
 
   // Pin selected tabs to sidebar (or single tab if not in selection)
   const handlePinSelectedTabs = useCallback((
@@ -2142,13 +2169,6 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   }, [onPin, onPinMultiple, getSelectedItems, visibleTabs, clearSelection]);
 
   // Confirm multi-close
-  const handleConfirmMultiClose = useCallback(() =>
-  {
-    closeTabs(confirmDeleteDialog.tabIds);
-    clearSelection();
-    setConfirmDeleteDialog({ isOpen: false, tabIds: [] });
-  }, [confirmDeleteDialog.tabIds, closeTabs, clearSelection]);
-
   // Get selection info for multi-selection actions
   const getTabSelectionInfo = useCallback(() =>
   {
@@ -2269,16 +2289,20 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   const handleCloseSelectedFromMenu = useCallback(() =>
   {
     const { allTabIds } = getTabSelectionInfo();
-    if (allTabIds.length > 1)
+    if (allTabIds.length > 0)
     {
-      setConfirmDeleteDialog({ isOpen: true, tabIds: allTabIds });
-    }
-    else if (allTabIds.length === 1)
-    {
-      closeTab(allTabIds[0]);
+      performClose(allTabIds);
       clearSelection();
     }
-  }, [getTabSelectionInfo, closeTab, clearSelection]);
+  }, [getTabSelectionInfo, performClose, clearSelection]);
+
+  // Confirm close all tabs in window (no undo — window will close)
+  const handleConfirmCloseAll = useCallback(() =>
+  {
+    closeTabs(confirmCloseAllDialog.tabIds);
+    clearSelection();
+    setConfirmCloseAllDialog({ isOpen: false, tabIds: [] });
+  }, [confirmCloseAllDialog.tabIds, closeTabs, clearSelection]);
 
   // Open save groups to bookmarks dialog
   const openSaveGroupsToBookmarksDialog = useCallback(() =>
@@ -2664,11 +2688,12 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
       />
 
       <ConfirmDeleteDialog
-        isOpen={confirmDeleteDialog.isOpen}
-        itemCount={confirmDeleteDialog.tabIds.length}
+        isOpen={confirmCloseAllDialog.isOpen}
+        itemCount={confirmCloseAllDialog.tabIds.length}
         itemType="tabs"
-        onConfirm={handleConfirmMultiClose}
-        onClose={() => setConfirmDeleteDialog({ isOpen: false, tabIds: [] })}
+        details="This will close the window."
+        onConfirm={handleConfirmCloseAll}
+        onClose={() => setConfirmCloseAllDialog({ isOpen: false, tabIds: [] })}
       />
 
       {/* Multi-selection dialogs */}

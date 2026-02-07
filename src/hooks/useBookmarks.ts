@@ -88,11 +88,11 @@ export const useBookmarks = () => {
     };
   }, [fetchBookmarks]);
 
-  const removeBookmark = useCallback((id: string) => {
-    chrome.bookmarks.removeTree(id, () => {
-      handleError('remove');
-    });
-  }, [handleError]);
+  // const removeBookmark = useCallback((id: string) => {
+  //   chrome.bookmarks.removeTree(id, () => {
+  //     handleError('remove');
+  //   });
+  // }, [handleError]);
 
   const createFolder = useCallback((
     parentId: string,
@@ -313,7 +313,7 @@ export const useBookmarks = () => {
     });
   }, [handleError]);
 
-  // Remove all children from a folder
+  // Remove all children from a folder, for Importing
   const clearFolder = useCallback(async (folderId: string): Promise<void> =>
   {
     const children = await getChildren(folderId);
@@ -464,7 +464,7 @@ export const useBookmarks = () => {
 
   return {
     bookmarks,
-    removeBookmark,
+    //removeBookmark,
     createFolder,
     updateBookmark,
     sortBookmarks,

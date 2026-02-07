@@ -80,12 +80,6 @@ export const useTabs = (windowId?: number) => {
     };
   }, [fetchTabs]);
 
-  const closeTab = useCallback((tabId: number) => {
-    chrome.tabs.remove(tabId, () => {
-      handleError('close');
-    });
-  }, [handleError]);
-
   // Close multiple tabs with batch mode to suppress individual onRemoved events
   const closeTabs = useCallback((tabIds: number[]) => {
     if (tabIds.length === 0) return;
@@ -260,15 +254,15 @@ export const useTabs = (windowId?: number) => {
     }
   }, [tabs, handleError, fetchTabs, windowId]);
 
-  const closeAllTabs = useCallback(() => {
-    const tabIds = tabs.map(t => t.id!);
-    // Create a new blank tab first, then close others
-    chrome.tabs.create({ active: true, windowId }, () => {
-      chrome.tabs.remove(tabIds, () => {
-        handleError('close all');
-      });
-    });
-  }, [tabs, handleError, windowId]);
+  // const closeAllTabs = useCallback(() => {
+  //   const tabIds = tabs.map(t => t.id!);
+  //   // Create a new blank tab first, then close others
+  //   chrome.tabs.create({ active: true, windowId }, () => {
+  //     chrome.tabs.remove(tabIds, () => {
+  //       handleError('close all');
+  //     });
+  //   });
+  // }, [tabs, handleError, windowId]);
 
   const createTab = useCallback(() =>
   {
@@ -408,7 +402,6 @@ export const useTabs = (windowId?: number) => {
 
   return {
     tabs,
-    closeTab,
     closeTabs,
     activateTab,
     moveTab,
@@ -420,7 +413,7 @@ export const useTabs = (windowId?: number) => {
     duplicateTab,
     sortTabs,
     sortGroupTabs,
-    closeAllTabs,
+    // closeAllTabs,
     refreshTabs: fetchTabs,
     error
   };

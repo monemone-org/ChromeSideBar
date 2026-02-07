@@ -20,7 +20,9 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { useChromeLocalStorage } from './hooks/useChromeLocalStorage';
 import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { FontSizeContext } from './contexts/FontSizeContext';
-import { BookmarkTabsProvider } from './contexts/BookmarkTabsContext';
+import { BookmarkTabsProvider, useBookmarkTabsContext } from './contexts/BookmarkTabsContext';
+import { CloseTabAction } from './actions/closeTabAction';
+import { ConfirmDeleteDialog } from './components/ConfirmDeleteDialog';
 import { SpacesProvider, Space, useSpacesContext } from './contexts/SpacesContext';
 import { SelectionProvider } from './contexts/SelectionContext';
 import { UnifiedDndProvider } from './contexts/UnifiedDndContext';
@@ -189,6 +191,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         activeSpace={activeSpace}
         useSpaces={useSpaces}
         onSpaceDropTargetChange={onSpaceDropTargetChange}
+        onPerformAction={onPerformAction}
       />
     </div>
   );
@@ -260,18 +263,70 @@ interface SpaceTitleWrapperProps
 {
   onEditSpace: (space: Space) => void;
   onDeleteSpace: (space: Space) => void;
+  onPerformAction?: (action: UndoableAction) => Promise<void>;
 }
 
-const SpaceTitleWrapper: React.FC<SpaceTitleWrapperProps> = ({ onEditSpace, onDeleteSpace }) =>
+const SpaceTitleWrapper: React.FC<SpaceTitleWrapperProps> = ({ onEditSpace, onDeleteSpace, onPerformAction }) =>
 {
-  const { closeAllTabsInSpace } = useSpacesContext();
+  const { getTabIdsInSpace, closeAllTabsInSpace, windowId } = useSpacesContext();
+  const { getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
+  const [confirmCloseAllDialog, setConfirmCloseAllDialog] = useState<{
+    isOpen: boolean;
+    tabIds: number[];
+  }>({ isOpen: false, tabIds: [] });
+
+  const handleCloseAllTabs = useCallback(async (space: Space) =>
+  {
+    if (onPerformAction && windowId)
+    {
+      const tabIds = await getTabIdsInSpace(space);
+      if (tabIds.length === 0) return;
+
+      // Check if this would close all tabs in the window
+      const allTabs = await chrome.tabs.query({ windowId });
+      const remaining = allTabs.filter(t => t.id !== undefined && !tabIds.includes(t.id!));
+      if (remaining.length === 0)
+      {
+        // Show confirmation — closing will destroy the window (no undo possible)
+        setConfirmCloseAllDialog({ isOpen: true, tabIds });
+        return;
+      }
+
+      const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+      onPerformAction(action);
+    }
+    else
+    {
+      closeAllTabsInSpace(space);
+    }
+  }, [onPerformAction, windowId, getTabIdsInSpace, closeAllTabsInSpace, getItemKeyForTab, restoreItemAssociation]);
+
+  // Confirm close all tabs in window (no undo — window will close)
+  const handleConfirmCloseAll = useCallback(() =>
+  {
+    if (confirmCloseAllDialog.tabIds.length > 0)
+    {
+      chrome.tabs.remove(confirmCloseAllDialog.tabIds);
+    }
+    setConfirmCloseAllDialog({ isOpen: false, tabIds: [] });
+  }, [confirmCloseAllDialog.tabIds]);
 
   return (
-    <SpaceTitle
-      onEditSpace={onEditSpace}
-      onDeleteSpace={onDeleteSpace}
-      onCloseAllTabs={closeAllTabsInSpace}
-    />
+    <>
+      <SpaceTitle
+        onEditSpace={onEditSpace}
+        onDeleteSpace={onDeleteSpace}
+        onCloseAllTabs={handleCloseAllTabs}
+      />
+      <ConfirmDeleteDialog
+        isOpen={confirmCloseAllDialog.isOpen}
+        itemCount={confirmCloseAllDialog.tabIds.length}
+        itemType="tabs"
+        details="This will close the window."
+        onConfirm={handleConfirmCloseAll}
+        onClose={() => setConfirmCloseAllDialog({ isOpen: false, tabIds: [] })}
+      />
+    </>
   );
 };
 
@@ -826,7 +881,14 @@ function App() {
                   await runDeleteBookmarkTests(showToast);
                 }}>
                   <span className="w-[14px] mr-2" />
-                  Unit Test Do/Undo
+                  Unit Test Do/Undo Delete Bookmarks
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={async () => {
+                  const { runCloseTabTests } = await import('./tests/closeTabActionTest');
+                  await runCloseTabTests(showToast);
+                }}>
+                  <span className="w-[14px] mr-2" />
+                  Unit Test Do/Undo Close Tabs
                 </DropdownMenu.Item>
               </>
             )}
@@ -853,6 +915,7 @@ function App() {
       <SpaceTitleWrapper
         onEditSpace={handleEditSpace}
         onDeleteSpace={handleDeleteSpace}
+        onPerformAction={performAction}
       />
 
       {/* Content with 2-finger swipe navigation */}
@@ -898,6 +961,7 @@ function App() {
           onEditSpace={handleEditSpace}
           onDeleteSpace={handleDeleteSpace}
           dropTargetSpaceId={spaceDropTargetId}
+          onPerformAction={performAction}
         />
       )}
 

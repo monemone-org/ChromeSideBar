@@ -106,6 +106,7 @@ interface SpacesContextValue
   getSpaceSwitchSource: () => 'user' | 'navigation';
 
   // Actions
+  getTabIdsInSpace: (space: Space) => Promise<number[]>;
   closeAllTabsInSpace: (space: Space) => Promise<void>;
 }
 
@@ -491,31 +492,25 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Actions
   // ---------------------------------------------------------------------------
 
-  // Close all tabs in a space (uses Chrome tab groups)
-  const closeAllTabsInSpace = useCallback(async (space: Space) =>
+  // Collect all tab IDs that belong to a space (group tabs + live bookmark tabs)
+  const getTabIdsInSpace = useCallback(async (space: Space): Promise<number[]> =>
   {
-    if (import.meta.env.DEV) console.log('[closeAllTabsInSpace] Called with space:', space);
-
-    // For "All" space, close all tabs in current window
+    // For "All" space, return all tabs in current window
     if (space.id === 'all')
     {
       try
       {
         const tabs = await chrome.tabs.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
-        const tabIds = tabs.map(t => t.id).filter((id): id is number => id !== undefined);
-        if (tabIds.length > 0)
-        {
-          await chrome.tabs.remove(tabIds);
-        }
+        return tabs.map(t => t.id).filter((id): id is number => id !== undefined);
       }
       catch (error)
       {
-        console.error('Failed to close all tabs:', error);
+        console.error('Failed to query tabs:', error);
+        return [];
       }
-      return;
     }
 
-    if (!windowId) return;
+    if (!windowId) return [];
 
     const tabIdsToClose: number[] = [];
 
@@ -534,7 +529,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
     catch (error)
     {
-      if (import.meta.env.DEV) console.error('[closeAllTabsInSpace] Failed to get group tabs:', error);
+      if (import.meta.env.DEV) console.error('[getTabIdsInSpace] Failed to get group tabs:', error);
     }
 
     // 2. Also find live bookmark tabs for bookmarks in the space's folder
@@ -554,13 +549,19 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
 
-    // 3. Close all collected tabs
-    if (import.meta.env.DEV) console.log('[closeAllTabsInSpace] Final tabIdsToClose:', tabIdsToClose);
-    if (tabIdsToClose.length > 0)
+    return tabIdsToClose;
+  }, [windowId, findFolderByPath, getAllBookmarksInFolder, getTabIdForBookmark]);
+
+  // Close all tabs in a space (non-undoable fallback)
+  const closeAllTabsInSpace = useCallback(async (space: Space) =>
+  {
+    const tabIds = await getTabIdsInSpace(space);
+    if (import.meta.env.DEV) console.log('[closeAllTabsInSpace] tabIds:', tabIds);
+    if (tabIds.length > 0)
     {
       try
       {
-        await chrome.tabs.remove(tabIdsToClose);
+        await chrome.tabs.remove(tabIds);
         if (import.meta.env.DEV) console.log('[closeAllTabsInSpace] Closed tabs successfully');
       }
       catch (error)
@@ -568,11 +569,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.error('Failed to close tabs:', error);
       }
     }
-    else
-    {
-      if (import.meta.env.DEV) console.log('[closeAllTabsInSpace] No tabs to close');
-    }
-  }, [windowId, findFolderByPath, getAllBookmarksInFolder, getTabIdForBookmark]);
+  }, [getTabIdsInSpace]);
 
   // ---------------------------------------------------------------------------
   // Derived state
@@ -623,6 +620,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     switchToSpace,
     getTabsForSpace,
     getSpaceSwitchSource,
+    getTabIdsInSpace,
     closeAllTabsInSpace,
   }), [
     spaces,
@@ -642,6 +640,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     switchToSpace,
     getTabsForSpace,
     getSpaceSwitchSource,
+    getTabIdsInSpace,
     closeAllTabsInSpace,
   ]);
 

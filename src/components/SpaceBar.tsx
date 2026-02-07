@@ -1,12 +1,16 @@
-import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import clsx from 'clsx';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus } from 'lucide-react';
 import { SpaceIcon } from './SpaceIcon';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
+import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
 import { DragData, DragFormat, DropData, DropPosition, getItemsByFormat, getPrimaryItem, hasFormat } from '../types/dragDrop';
 import { moveTabToSpace, createTabInSpace } from '../utils/tabOperations';
+import { CloseTabAction } from '../actions/closeTabAction';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import type { UndoableAction } from '../actions/types';
 
 interface SpaceBarProps
 {
@@ -14,6 +18,7 @@ interface SpaceBarProps
   onEditSpace: (space: Space) => void;
   onDeleteSpace: (space: Space) => void;
   dropTargetSpaceId?: string | null;
+  onPerformAction?: (action: UndoableAction) => Promise<void>;
 }
 
 export const SpaceBar: React.FC<SpaceBarProps> = ({
@@ -21,11 +26,17 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   onEditSpace,
   onDeleteSpace,
   dropTargetSpaceId,
+  onPerformAction,
 }) =>
 {
-  const { allSpaces, spaces, activeSpaceId, switchToSpace, moveSpace, closeAllTabsInSpace, windowId } = useSpacesContext();
+  const { allSpaces, spaces, activeSpaceId, switchToSpace, moveSpace, getTabIdsInSpace, closeAllTabsInSpace, windowId } = useSpacesContext();
+  const { getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
   const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [confirmCloseAllDialog, setConfirmCloseAllDialog] = useState<{
+    isOpen: boolean;
+    tabIds: number[];
+  }>({ isOpen: false, tabIds: [] });
 
   // Auto-scroll to make active space visible
   useEffect(() =>
@@ -51,6 +62,42 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   {
     onDeleteSpace(space);
   };
+
+  const handleCloseAllTabsInSpace = useCallback(async (space: Space) =>
+  {
+    if (onPerformAction && windowId)
+    {
+      const tabIds = await getTabIdsInSpace(space);
+      if (tabIds.length === 0) return;
+
+      // Check if this would close all tabs in the window
+      const allTabs = await chrome.tabs.query({ windowId });
+      const remaining = allTabs.filter(t => t.id !== undefined && !tabIds.includes(t.id!));
+      if (remaining.length === 0)
+      {
+        // Show confirmation — closing will destroy the window (no undo possible)
+        setConfirmCloseAllDialog({ isOpen: true, tabIds });
+        return;
+      }
+
+      const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+      onPerformAction(action);
+    }
+    else
+    {
+      closeAllTabsInSpace(space);
+    }
+  }, [onPerformAction, windowId, getTabIdsInSpace, closeAllTabsInSpace, getItemKeyForTab, restoreItemAssociation]);
+
+  // Confirm close all tabs in window (no undo — window will close)
+  const handleConfirmCloseAll = useCallback(() =>
+  {
+    if (confirmCloseAllDialog.tabIds.length > 0)
+    {
+      chrome.tabs.remove(confirmCloseAllDialog.tabIds);
+    }
+    setConfirmCloseAllDialog({ isOpen: false, tabIds: [] });
+  }, [confirmCloseAllDialog.tabIds]);
 
   // Drop handler for SpaceBar zone
   const handleDrop: DropHandler = useCallback(async (
@@ -155,72 +202,83 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
   );
 
   return (
-    <div className="flex items-stretch border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-      {/* Vertical "SPACE" label */}
-      <div className="flex items-center justify-center px-0.5">
-        <span
-          className="text-[8px] font-medium text-gray-400 dark:text-gray-500 tracking-wide"
-          style={{
-            writingMode: 'vertical-lr',
-            transform: 'rotate(180deg)',
-          }}
+    <>
+      <div className="flex items-stretch border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+        {/* Vertical "SPACE" label */}
+        <div className="flex items-center justify-center px-0.5">
+          <span
+            className="text-[8px] font-medium text-gray-400 dark:text-gray-500 tracking-wide"
+            style={{
+              writingMode: 'vertical-lr',
+              transform: 'rotate(180deg)',
+            }}
+          >
+            SPACE
+          </span>
+        </div>
+
+        {/* Horizontal scrollable space icons */}
+        <div
+          ref={scrollContainerRef}
+          className="flex-1 flex items-center gap-1.5 px-1 py-1 overflow-x-auto"
+          style={{ scrollbarWidth: 'none' }}
+          data-dnd-zone="spaceBar"
         >
-          SPACE
-        </span>
+          <SortableContext items={sortableSpaceIds} strategy={horizontalListSortingStrategy}>
+            {allSpaces.map((space, index) => (
+              <SpaceIcon
+                key={space.id}
+                space={space}
+                index={index}
+                isActive={space.id === activeSpaceId}
+                onClick={() => handleSpaceClick(space.id)}
+                onEdit={() => onEditSpace(space)}
+                onDelete={() => handleDelete(space)}
+                onCloseAllTabs={() => handleCloseAllTabsInSpace(space)}
+                isAllSpace={space.id === 'all'}
+                isDraggable={space.id !== 'all'}
+                isDropTarget={
+                  dropTargetSpaceId === space.id ||
+                  (isSpaceDrag && overId === `space-${space.id}`) ||
+                  (isTabOrUrlDrag && overId === `space-${space.id}`)
+                }
+                dropPosition={
+                  (isSpaceDrag && overId === `space-${space.id}`) ? dropPosition :
+                  (isTabOrUrlDrag && overId === `space-${space.id}`) ? 'into' :
+                  null
+                }
+              />
+            ))}
+          </SortableContext>
+        </div>
+
+        {/* Fixed "+" button */}
+        <div className="flex items-center px-1">
+          <button
+            onClick={onCreateSpace}
+            title="Create new space"
+            className={clsx(
+              "p-1.5 rounded",
+              "text-gray-500 dark:text-gray-400",
+              "hover:text-gray-900 dark:hover:text-gray-100",
+              "hover:bg-gray-200 dark:hover:bg-gray-700",
+              "transition-all duration-150",
+              "focus:outline-none"
+            )}
+          >
+            <Plus size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* Horizontal scrollable space icons */}
-      <div
-        ref={scrollContainerRef}
-        className="flex-1 flex items-center gap-1.5 px-1 py-1 overflow-x-auto"
-        style={{ scrollbarWidth: 'none' }}
-        data-dnd-zone="spaceBar"
-      >
-        <SortableContext items={sortableSpaceIds} strategy={horizontalListSortingStrategy}>
-          {allSpaces.map((space, index) => (
-            <SpaceIcon
-              key={space.id}
-              space={space}
-              index={index}
-              isActive={space.id === activeSpaceId}
-              onClick={() => handleSpaceClick(space.id)}
-              onEdit={() => onEditSpace(space)}
-              onDelete={() => handleDelete(space)}
-              onCloseAllTabs={() => closeAllTabsInSpace(space)}
-              isAllSpace={space.id === 'all'}
-              isDraggable={space.id !== 'all'}
-              isDropTarget={
-                dropTargetSpaceId === space.id ||
-                (isSpaceDrag && overId === `space-${space.id}`) ||
-                (isTabOrUrlDrag && overId === `space-${space.id}`)
-              }
-              dropPosition={
-                (isSpaceDrag && overId === `space-${space.id}`) ? dropPosition :
-                (isTabOrUrlDrag && overId === `space-${space.id}`) ? 'into' :
-                null
-              }
-            />
-          ))}
-        </SortableContext>
-      </div>
-
-      {/* Fixed "+" button */}
-      <div className="flex items-center px-1">
-        <button
-          onClick={onCreateSpace}
-          title="Create new space"
-          className={clsx(
-            "p-1.5 rounded",
-            "text-gray-500 dark:text-gray-400",
-            "hover:text-gray-900 dark:hover:text-gray-100",
-            "hover:bg-gray-200 dark:hover:bg-gray-700",
-            "transition-all duration-150",
-            "focus:outline-none"
-          )}
-        >
-          <Plus size={16} />
-        </button>
-      </div>
-    </div>
+      <ConfirmDeleteDialog
+        isOpen={confirmCloseAllDialog.isOpen}
+        itemCount={confirmCloseAllDialog.tabIds.length}
+        itemType="tabs"
+        details="This will close the window."
+        onConfirm={handleConfirmCloseAll}
+        onClose={() => setConfirmCloseAllDialog({ isOpen: false, tabIds: [] })}
+      />
+    </>
   );
 };
