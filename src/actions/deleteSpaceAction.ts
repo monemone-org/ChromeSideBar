@@ -1,4 +1,5 @@
 import { UndoableAction } from './types';
+import { truncateTitle } from '../utils/truncateTitle';
 import { Space } from '../contexts/SpacesContext';
 
 interface TabSnapshot
@@ -121,7 +122,8 @@ export class DeleteSpaceAction implements UndoableAction
     await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: remaining });
 
     // Build description
-    this.description = `Deleted space "${space.name}"`;
+    this.description = `Deleted space "${truncateTitle(space.name)}"`;
+
 
     if (import.meta.env.DEV)
     {

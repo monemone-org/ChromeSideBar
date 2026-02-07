@@ -1,4 +1,5 @@
 import { UndoableAction } from './types';
+import { truncateTitle } from '../utils/truncateTitle';
 import { PinnedSite } from '../hooks/usePinnedSites';
 
 interface PinnedSnapshot
@@ -68,7 +69,8 @@ export class DeletePinnedSiteAction implements UndoableAction
     if (this.snapshots.length === 1)
     {
       const name = this.snapshots[0].pin.title || this.snapshots[0].pin.url;
-      this.description = `Unpinned "${name}"`;
+      this.description = `Unpinned "${truncateTitle(name)}"`;
+
     }
     else
     {

@@ -1,4 +1,5 @@
 import { UndoableAction } from './types';
+import { truncateTitle } from '../utils/truncateTitle';
 import { runBatchOperation } from '../hooks/useBookmarks';
 
 type BookmarkSnapshot = chrome.bookmarks.BookmarkTreeNode;
@@ -88,7 +89,8 @@ export class DeleteBookmarkAction implements UndoableAction
     if (this.snapshots.length === 1)
     {
       const name = this.snapshots[0].title || 'bookmark';
-      this.description = `Deleted "${name}"`;
+      this.description = `Deleted "${truncateTitle(name)}"`;
+
     }
     else
     {

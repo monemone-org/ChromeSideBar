@@ -1,4 +1,5 @@
 import { UndoableAction } from './types';
+import { truncateTitle } from '../utils/truncateTitle';
 
 interface TabSnapshot
 {
@@ -103,7 +104,8 @@ export class CloseTabAction implements UndoableAction
     if (this.snapshots.length === 1)
     {
       const name = this.snapshots[0].title || this.snapshots[0].url;
-      this.description = `Closed "${name}"`;
+      this.description = `Closed "${truncateTitle(name)}"`;
+
     }
     else
     {
