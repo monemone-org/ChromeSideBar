@@ -297,7 +297,7 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
               />
               <button
                 onClick={onCustomHexSubmit}
-                className="px-1.5 py-0.5 text-[0.85em] bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded"
+                className="px-1.5 py-0.5 text-[0.85em] bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-blue-500 rounded"
               >
                 Set
               </button>

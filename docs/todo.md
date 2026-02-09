@@ -1,7 +1,5 @@
 # TODO
 
-- [ ] toast is too tall when the tab title is long.  Limit the title displayed to a fixed width and add "..." if trimmed.
-
 
 ## In-Progress
 
@@ -302,4 +300,6 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 - [x] popup menu "Edit" -> "Edit Pin..." and "Edit Bookmark..."
 
 - [x] backup/restore should support all root folders and root folders with different names.
+
+- [x] toast is too tall when the tab title is long.  Limit the title displayed to a fixed width and add "..." if trimmed.
 
