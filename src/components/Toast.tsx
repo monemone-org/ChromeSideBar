@@ -78,7 +78,7 @@ export const Toast = ({
   const translateY = slideState === 'visible' ? 'translateY(0)' : 'translateY(100%)';
 
   return createPortal(
-    <div className="fixed bottom-14 left-0 right-0 z-50 flex justify-center pointer-events-none">
+    <div className="fixed bottom-10 left-0 right-0 z-50 flex justify-center pointer-events-none">
       <div
         className="pointer-events-auto bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 mx-4 min-w-[80%]"
         style={{
