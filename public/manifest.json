@@ -52,12 +52,12 @@
       },
       "description": "Next Used Tab"
     },
-    "navigate-spaces": {
+    "jump-to-audio-tab": {
       "suggested_key": {
-        "default": "Ctrl+Shift+S",
-        "mac": "Command+Shift+S"
+        "default": "Ctrl+Shift+A",
+        "mac": "Command+Shift+A"
       },
-      "description": "Navigate Spaces"
+      "description": "Jump to Audio/Video Tab"
     }
   }
 }

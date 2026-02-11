@@ -1,5 +1,9 @@
 # TODO
 
+- Change "Sort tab group first" setting to an option that choose among:
+      1. Show Groups before ungrouped tabs in "All" space
+      2. Show Groups after ungrouped tabs in "All" space
+      3. Show Groups and ungroup tabs in Chrome's native order.
 
 ## In-Progress
 

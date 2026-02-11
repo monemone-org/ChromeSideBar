@@ -899,6 +899,58 @@ chrome.tabs.onCreated.addListener(async (tab) =>
 });
 
 // =============================================================================
+// Audio Tab Helper
+// =============================================================================
+
+/**
+ * Returns lists of playing and recently-played audio tabs.
+ * - playingTabIds: currently audible tabs (ordered by play-start time)
+ * - historyTabIds: recently stopped audio tabs (ordered by activation recency)
+ */
+function getAudioTabLists(allTabs: chrome.tabs.Tab[]): { playingTabIds: number[]; historyTabIds: number[] }
+{
+  const audibleTabIds = new Set(
+    allTabs.filter(t => t.audible && t.id !== undefined).map(t => t.id!)
+  );
+  const lastAudibleIds = lastAudibleTracker.getLastAudibleTabIds();
+
+  // Playing tabs: from lastAudibleIds, filtered to currently audible (keeps play-start order)
+  const playingTabIds = lastAudibleIds.filter(id => audibleTabIds.has(id));
+
+  // Include any audible tabs not yet in history (just started playing)
+  for (const tab of allTabs)
+  {
+    if (tab.audible && tab.id !== undefined && !playingTabIds.includes(tab.id))
+    {
+      playingTabIds.push(tab.id);
+    }
+  }
+
+  // Non-playing tabs from history
+  const historyTabIds = lastAudibleIds.filter(id => !audibleTabIds.has(id));
+
+  // Sort historyTabIds by activation order
+  const windowId = allTabs[0]?.windowId;
+  if (windowId !== undefined)
+  {
+    const activationOrder = historyManager.getActivationOrder(windowId);
+    historyTabIds.sort((a, b) =>
+    {
+      const aIndex = activationOrder.indexOf(a);
+      const bIndex = activationOrder.indexOf(b);
+      // Not in history = put at end
+      if (aIndex === -1 && bIndex === -1) return 0;
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      // Lower index = more recently activated
+      return aIndex - bIndex;
+    });
+  }
+
+  return { playingTabIds, historyTabIds };
+}
+
+// =============================================================================
 // Message Handlers
 // =============================================================================
 
@@ -985,45 +1037,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
   {
     chrome.tabs.query({ currentWindow: true }, (allTabs) =>
     {
-      const audibleTabIds = new Set(
-        allTabs.filter(t => t.audible && t.id !== undefined).map(t => t.id!)
-      );
-      const lastAudibleIds = lastAudibleTracker.getLastAudibleTabIds();
-
-      // Playing tabs: from lastAudibleIds, filtered to currently audible (keeps play-start order)
-      const playingTabIds = lastAudibleIds.filter(id => audibleTabIds.has(id));
-
-      // Include any audible tabs not yet in history (just started playing)
-      for (const tab of allTabs)
-      {
-        if (tab.audible && tab.id !== undefined && !playingTabIds.includes(tab.id))
-        {
-          playingTabIds.push(tab.id);
-        }
-      }
-
-      // Non-playing tabs from history
-      const historyTabIds = lastAudibleIds.filter(id => !audibleTabIds.has(id));
-
-      // Sort historyTabIds by activation order (need windowId from query)
-      const windowId = allTabs[0]?.windowId;
-      if (windowId !== undefined)
-      {
-        const activationOrder = historyManager.getActivationOrder(windowId);
-        historyTabIds.sort((a, b) =>
-        {
-          const aIndex = activationOrder.indexOf(a);
-          const bIndex = activationOrder.indexOf(b);
-          // Not in history = put at end
-          if (aIndex === -1 && bIndex === -1) return 0;
-          if (aIndex === -1) return 1;
-          if (bIndex === -1) return -1;
-          // Lower index = more recently activated
-          return aIndex - bIndex;
-        });
-      }
-
-      sendResponse({ playingTabIds, historyTabIds });
+      sendResponse(getAudioTabLists(allTabs));
     });
     return true;
   }
@@ -1044,5 +1058,20 @@ chrome.commands.onCommand.addListener((command) =>
       historyManager.navigate(tabs[0].windowId, direction);
     });
   }
-  // Note: focus-filter-input and navigate-spaces are handled directly in the side panel
+  else if (command === "jump-to-audio-tab")
+  {
+    chrome.tabs.query({ currentWindow: true }, (allTabs) =>
+    {
+      const { playingTabIds, historyTabIds } = getAudioTabLists(allTabs);
+
+      // Try first playing tab, then fall back to first history tab
+      const targetTabId = playingTabIds[0] ?? historyTabIds[0];
+
+      if (targetTabId !== undefined)
+      {
+        chrome.tabs.update(targetTabId, { active: true });
+      }
+    });
+  }
+  // Note: focus-filter-input is handled directly in the side panel
 });

@@ -705,21 +705,6 @@ function App() {
 
   // DropdownMenu handles click-outside and escape key automatically
 
-  // Listen for navigate-spaces command
-  useEffect(() =>
-  {
-    const handleCommand = (command: string) =>
-    {
-      if (command === 'navigate-spaces')
-      {
-        setShowSpaceNavigator(true);
-      }
-    };
-
-    chrome.commands.onCommand.addListener(handleCommand);
-    return () => chrome.commands.onCommand.removeListener(handleCommand);
-  }, []);
-
   // Refresh data when sidepanel becomes visible
   useEffect(() =>
   {
