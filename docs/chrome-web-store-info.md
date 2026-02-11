@@ -35,6 +35,13 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
+## 1.0.272
+
+- Undo support: undo deleting bookmarks, closing tabs, and deleting pinned sites/spaces with a toast notification
+- Jump-to-audio-tab keyboard shortcut (Cmd+Shift+A)
+- Tab group display order setting with three options
+- Fixed audio history tabs not sorted by recency
+
 ## 1.0.259
 
 - Drop bookmarks onto the tab list to open them as new tabs
