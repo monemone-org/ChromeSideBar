@@ -2,11 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import { Dialog } from './Dialog';
 
 export type BookmarkOpenMode = 'arc' | 'newTab' | 'activeTab';
+export type TabGroupDisplayOrder = 'groupsFirst' | 'groupsLast' | 'chromeOrder';
 
 export interface SettingsValues {
   fontSize: number;
   hideOtherBookmarks: boolean;
-  sortGroupsFirst: boolean;
+  tabGroupDisplayOrder: TabGroupDisplayOrder;
   pinnedIconSize: number;
   bookmarkOpenMode: BookmarkOpenMode;
   useSpaces: boolean;
@@ -29,7 +30,7 @@ export function SettingsDialog({
   // Temporary state for the dialog
   const [tempFontSize, setTempFontSize] = useState(settings.fontSize);
   const [tempHideOtherBookmarks, setTempHideOtherBookmarks] = useState(settings.hideOtherBookmarks);
-  const [tempSortGroupsFirst, setTempSortGroupsFirst] = useState(settings.sortGroupsFirst);
+  const [tempTabGroupDisplayOrder, setTempTabGroupDisplayOrder] = useState(settings.tabGroupDisplayOrder);
   const [tempPinnedIconSize, setTempPinnedIconSize] = useState(settings.pinnedIconSize);
   const [tempBookmarkOpenMode, setTempBookmarkOpenMode] = useState(settings.bookmarkOpenMode);
   const [tempUseSpaces, setTempUseSpaces] = useState(settings.useSpaces);
@@ -47,11 +48,10 @@ export function SettingsDialog({
       // Read fresh from localStorage for visual preferences
       const storedFontSize = localStorage.getItem('sidebar-font-size-px');
       const storedPinnedIconSize = localStorage.getItem('sidebar-pinned-icon-size-px');
-      const storedSortGroupsFirst = localStorage.getItem('sidebar-sort-groups-first');
-
       setTempFontSize(storedFontSize ? parseInt(storedFontSize, 10) : settings.fontSize);
       setTempPinnedIconSize(storedPinnedIconSize ? parseInt(storedPinnedIconSize, 10) : settings.pinnedIconSize);
-      setTempSortGroupsFirst(storedSortGroupsFirst ? storedSortGroupsFirst === 'true' : settings.sortGroupsFirst);
+      const storedTabGroupDisplayOrder = localStorage.getItem('sidebar-tab-group-display-order');
+      setTempTabGroupDisplayOrder((storedTabGroupDisplayOrder as TabGroupDisplayOrder) || settings.tabGroupDisplayOrder);
 
       // These don't need fresh read - not shown in dialog or use chrome.storage.local
       setTempHideOtherBookmarks(settings.hideOtherBookmarks);
@@ -66,7 +66,7 @@ export function SettingsDialog({
     onApply({
       fontSize: tempFontSize,
       hideOtherBookmarks: tempHideOtherBookmarks,
-      sortGroupsFirst: tempSortGroupsFirst,
+      tabGroupDisplayOrder: tempTabGroupDisplayOrder,
       pinnedIconSize: tempPinnedIconSize,
       bookmarkOpenMode: tempBookmarkOpenMode,
       useSpaces: tempUseSpaces,
@@ -192,15 +192,20 @@ export function SettingsDialog({
               <p className="text-gray-500 dark:text-gray-400 ml-5">
                 Organize tabs and bookmarks into focused workspaces
               </p>
-              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={tempSortGroupsFirst}
-                  onChange={(e) => setTempSortGroupsFirst(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
-                />
-                Sort tab groups first
-              </label>
+              <div>
+                <label className="block text-gray-700 dark:text-gray-300 mb-1">
+                  Tab group display order
+                </label>
+                <select
+                  value={tempTabGroupDisplayOrder}
+                  onChange={(e) => setTempTabGroupDisplayOrder(e.target.value as TabGroupDisplayOrder)}
+                  className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                >
+                  <option value="groupsFirst">Groups before ungrouped tabs</option>
+                  <option value="groupsLast">Groups after ungrouped tabs</option>
+                  <option value="chromeOrder">Chrome's native order</option>
+                </select>
+              </div>
             </div>
           </div>
 

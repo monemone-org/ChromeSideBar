@@ -162,7 +162,7 @@ All owned by `src/App.tsx`, hook implementation in `src/hooks/useLocalStorage.ts
 |-----|---------|------|---------|
 | `sidebar-font-size-px` | 14 | number | Font size |
 | `sidebar-hide-other-bookmarks` | false | boolean | Hide "Other Bookmarks" folder |
-| `sidebar-sort-groups-first` | true | boolean | Sort tab groups before regular tabs |
+| `sidebar-tab-group-display-order` | "groupsFirst" | TabGroupDisplayOrder | Tab group display order: "groupsFirst", "groupsLast", or "chromeOrder" |
 | `sidebar-pinned-icon-size-px` | 22 | number | Pinned icon size |
 | `sidebar-bookmark-open-mode` | "arc" | string | How bookmarks open ("arc" or "newTab") |
 | `sidebar-use-spaces` | true | boolean | Enable spaces feature |

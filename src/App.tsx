@@ -4,7 +4,7 @@ import { TabList, ExternalDropTarget, ResolveBookmarkDropTarget } from './compon
 import { PinnedBar } from './components/PinnedBar';
 import { Toolbar } from './components/Toolbar';
 import { SpaceBar } from './components/SpaceBar';
-import { SettingsDialog, SettingsValues, BookmarkOpenMode } from './components/SettingsDialog';
+import { SettingsDialog, SettingsValues, BookmarkOpenMode, TabGroupDisplayOrder } from './components/SettingsDialog';
 import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
@@ -48,7 +48,8 @@ interface SidebarContentProps
   onResolverReady: (fn: ResolveBookmarkDropTarget) => void;
   filterLiveTabs: boolean;
   filterText: string;
-  sortGroupsFirst: boolean;
+  tabGroupDisplayOrder: TabGroupDisplayOrder;
+  onTabGroupDisplayOrderChange: (order: TabGroupDisplayOrder) => void;
   useSpaces: boolean;
   onExternalDropTargetChange: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget: () => ResolveBookmarkDropTarget | null;
@@ -71,7 +72,8 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   onResolverReady,
   filterLiveTabs,
   filterText,
-  sortGroupsFirst,
+  tabGroupDisplayOrder,
+  onTabGroupDisplayOrderChange,
   useSpaces,
   onExternalDropTargetChange,
   resolveBookmarkDropTarget,
@@ -183,7 +185,8 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
       <TabList
         onPin={onPin}
         onPinMultiple={onPinMultiple}
-        sortGroupsFirst={sortGroupsFirst}
+        tabGroupDisplayOrder={tabGroupDisplayOrder}
+        onTabGroupDisplayOrderChange={onTabGroupDisplayOrderChange}
         onExternalDropTargetChange={onExternalDropTargetChange}
         resolveBookmarkDropTarget={resolveBookmarkDropTarget}
         arcStyleEnabled={bookmarkOpenMode === 'arc'}
@@ -455,11 +458,29 @@ function App() {
     false,
     { parse: (v) => v === 'true', serialize: (v) => v.toString() }
   );
-  const [sortGroupsFirst, setSortGroupsFirst] = useLocalStorage(
-    'sidebar-sort-groups-first',
-    true,
-    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  const [tabGroupDisplayOrder, setTabGroupDisplayOrder] = useLocalStorage<TabGroupDisplayOrder>(
+    'sidebar-tab-group-display-order',
+    'groupsFirst',
+    {
+      parse: (v) => v as TabGroupDisplayOrder,
+      serialize: (v) => v
+    }
   );
+
+  // One-time migration from old 'sidebar-sort-groups-first' to new key
+  useEffect(() =>
+  {
+    const oldKey = 'sidebar-sort-groups-first';
+    const newKey = 'sidebar-tab-group-display-order';
+    const oldValue = localStorage.getItem(oldKey);
+    if (oldValue !== null && localStorage.getItem(newKey) === null)
+    {
+      const migrated = oldValue === 'true' ? 'groupsFirst' : 'chromeOrder';
+      localStorage.setItem(newKey, migrated);
+      localStorage.removeItem(oldKey);
+      setTabGroupDisplayOrder(migrated);
+    }
+  }, [setTabGroupDisplayOrder]);
   const [pinnedIconSize, setPinnedIconSize] = useLocalStorage(
     'sidebar-pinned-icon-size-px',
     22,
@@ -550,7 +571,7 @@ function App() {
   const handleApplySettings = (newSettings: SettingsValues) => {
     setFontSize(newSettings.fontSize);
     setHideOtherBookmarks(newSettings.hideOtherBookmarks);
-    setSortGroupsFirst(newSettings.sortGroupsFirst);
+    setTabGroupDisplayOrder(newSettings.tabGroupDisplayOrder);
     setPinnedIconSize(newSettings.pinnedIconSize);
     setBookmarkOpenMode(newSettings.bookmarkOpenMode);
     setSpacesEnabled(newSettings.useSpaces);
@@ -741,7 +762,7 @@ function App() {
         settings={{
           fontSize,
           hideOtherBookmarks,
-          sortGroupsFirst,
+          tabGroupDisplayOrder,
           pinnedIconSize,
           bookmarkOpenMode,
           useSpaces: spacesEnabled,
@@ -934,7 +955,8 @@ function App() {
         onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }}
         filterLiveTabs={filterLiveTabs}
         filterText={filterText}
-        sortGroupsFirst={sortGroupsFirst}
+        tabGroupDisplayOrder={tabGroupDisplayOrder}
+        onTabGroupDisplayOrderChange={setTabGroupDisplayOrder}
         useSpaces={spacesEnabled}
         onExternalDropTargetChange={setExternalDropTarget}
         resolveBookmarkDropTarget={() => bookmarkDropResolverRef.current}

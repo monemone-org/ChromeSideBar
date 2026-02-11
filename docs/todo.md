@@ -1,10 +1,5 @@
 # TODO
 
-- Change "Sort tab group first" setting to an option that choose among:
-      1. Show Groups before ungrouped tabs in "All" space
-      2. Show Groups after ungrouped tabs in "All" space
-      3. Show Groups and ungroup tabs in Chrome's native order.
-
 ## In-Progress
 
 
@@ -306,4 +301,9 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 - [x] backup/restore should support all root folders and root folders with different names.
 
 - [x] toast is too tall when the tab title is long.  Limit the title displayed to a fixed width and add "..." if trimmed.
+
+- [x] Change "Sort tab group first" setting to an option that choose among:
+      1. Show Groups before ungrouped tabs in "All" space
+      2. Show Groups after ungrouped tabs in "All" space
+      3. Show Groups and ungroup tabs in Chrome's native order.
 

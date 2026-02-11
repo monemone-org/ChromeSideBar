@@ -3,6 +3,7 @@ import { useTabs } from '../hooks/useTabs';
 import { useTabGroups } from '../hooks/useTabGroups';
 import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
+import type { TabGroupDisplayOrder } from './SettingsDialog';
 import { SelectionItem } from '../contexts/SelectionContext';
 import { useSelection } from '../hooks/useSelection';
 import type { DropPosition } from '../utils/dragDrop';
@@ -43,7 +44,7 @@ import { AddToGroupDialog } from './AddToGroupDialog';
 import { ChangeGroupColorDialog } from './ChangeGroupColorDialog';
 import { ExportConflictDialog, ExportConflictMode } from './ExportConflictDialog';
 import { RenameGroupDialog } from './RenameGroupDialog';
-import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink, Link } from 'lucide-react';
+import { Globe, Volume2, Pin, Plus, X, ArrowDownAZ, ArrowDownZA, Edit, Palette, FolderPlus, Copy, SquareStack, Bookmark, ExternalLink, Link, Check } from 'lucide-react';
 import { SectionHeader } from './SectionHeader';
 import { getIndentPadding } from '../utils/indent';
 import { matchesFilter } from '../utils/searchParser';
@@ -775,7 +776,8 @@ type DisplayItem =
 interface TabListProps {
   onPin?: (url: string, title: string, faviconUrl?: string) => void;
   onPinMultiple?: (pins: Array<{ url: string; title: string; faviconUrl?: string }>) => void;
-  sortGroupsFirst?: boolean;
+  tabGroupDisplayOrder?: TabGroupDisplayOrder;
+  onTabGroupDisplayOrderChange?: (order: TabGroupDisplayOrder) => void;
   onExternalDropTargetChange?: (target: ExternalDropTarget | null) => void;
   resolveBookmarkDropTarget?: () => ResolveBookmarkDropTarget | null;
   arcStyleEnabled?: boolean;
@@ -786,7 +788,7 @@ interface TabListProps {
   onPerformAction?: (action: UndoableAction) => Promise<void>;
 }
 
-export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExternalDropTargetChange: _onExternalDropTargetChange, resolveBookmarkDropTarget: _resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange: _onSpaceDropTargetChange, onPerformAction }: TabListProps) =>
+export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFirst', onTabGroupDisplayOrderChange, onExternalDropTargetChange: _onExternalDropTargetChange, resolveBookmarkDropTarget: _resolveBookmarkDropTarget, arcStyleEnabled = false, filterText = '', activeSpace: activeSpaceProp, useSpaces = true, onSpaceDropTargetChange: _onSpaceDropTargetChange, onPerformAction }: TabListProps) =>
 {
   const { spaces, activeSpace: activeSpaceFromContext, windowId } = useSpacesContext();
   const { tabs, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, error } = useTabs(windowId ?? undefined);
@@ -1412,9 +1414,11 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
   // Sensors are now configured in UnifiedDndContext
 
-  // Build display items: groups and ungrouped tabs in natural browser order
-  // Uses visibleTabs and visibleTabGroups to exclude SideBarForArc group
-  // Managed tabs (bookmarks) are filtered via getManagedTabIds() in useTabs hook
+  // Build display items: groups and ungrouped tabs
+  // Order depends on tabGroupDisplayOrder setting:
+  // - chromeOrder: natural browser order (groups appear at first tab's position)
+  // - groupsFirst: all groups before ungrouped tabs
+  // - groupsLast: all ungrouped tabs before groups
   const displayItems = useMemo<DisplayItem[]>(() =>
   {
     const groupMap = new Map<number, chrome.tabGroups.TabGroup>();
@@ -1424,8 +1428,9 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
     });
 
     const tabsByGroup = new Map<number, chrome.tabs.Tab[]>();
+    const groupFirstIndex = new Map<number, number>();
 
-    visibleTabs.forEach((tab) =>
+    visibleTabs.forEach((tab, index) =>
     {
       const groupId = tab.groupId ?? -1;
       if (groupId !== -1)
@@ -1433,12 +1438,44 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         if (!tabsByGroup.has(groupId))
         {
           tabsByGroup.set(groupId, []);
+          groupFirstIndex.set(groupId, index);
         }
         tabsByGroup.get(groupId)!.push(tab);
       }
     });
 
-    const items: DisplayItem[] = [];
+    // For chromeOrder, build items in natural order
+    if (tabGroupDisplayOrder === 'chromeOrder')
+    {
+      const items: DisplayItem[] = [];
+      const processedGroups = new Set<number>();
+
+      visibleTabs.forEach((tab, index) =>
+      {
+        const groupId = tab.groupId ?? -1;
+
+        if (groupId === -1)
+        {
+          items.push({ type: 'tab', tab });
+        }
+        else if (!processedGroups.has(groupId))
+        {
+          processedGroups.add(groupId);
+          const group = groupMap.get(groupId);
+          const groupTabs = tabsByGroup.get(groupId) || [];
+          if (group)
+          {
+            items.push({ type: 'group', group, tabs: groupTabs, startIndex: index });
+          }
+        }
+      });
+
+      return items;
+    }
+
+    // For groupsFirst/groupsLast, separate groups and ungrouped tabs
+    const groupItems: DisplayItem[] = [];
+    const ungroupedItems: DisplayItem[] = [];
     const processedGroups = new Set<number>();
 
     visibleTabs.forEach((tab, index) =>
@@ -1447,7 +1484,7 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
 
       if (groupId === -1)
       {
-        items.push({ type: 'tab', tab });
+        ungroupedItems.push({ type: 'tab', tab });
       }
       else if (!processedGroups.has(groupId))
       {
@@ -1456,13 +1493,15 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
         const groupTabs = tabsByGroup.get(groupId) || [];
         if (group)
         {
-          items.push({ type: 'group', group, tabs: groupTabs, startIndex: index });
+          groupItems.push({ type: 'group', group, tabs: groupTabs, startIndex: groupFirstIndex.get(groupId) ?? index });
         }
       }
     });
 
-    return items;
-  }, [visibleTabs, visibleTabGroups]);
+    return tabGroupDisplayOrder === 'groupsFirst'
+      ? [...groupItems, ...ungroupedItems]
+      : [...ungroupedItems, ...groupItems];
+  }, [visibleTabs, visibleTabGroups, tabGroupDisplayOrder]);
 
   // Build flat list of visible items for selection range calculation
   const flatVisibleItems = useMemo((): SelectionItem[] =>
@@ -2378,14 +2417,27 @@ export const TabList = ({ onPin, onPinMultiple, sortGroupsFirst = true, onExtern
   const tabsMenuContent = (
     <>
       <ContextMenu.Item onSelect={() => {
-        sortTabs('asc', visibleTabGroups, sortGroupsFirst);
+        sortTabs('asc', visibleTabGroups, tabGroupDisplayOrder);
       }}>
         <ArrowDownAZ size={14} className="mr-2" /> Sort by Domain (A-Z)
       </ContextMenu.Item>
       <ContextMenu.Item onSelect={() => {
-        sortTabs('desc', visibleTabGroups, sortGroupsFirst);
+        sortTabs('desc', visibleTabGroups, tabGroupDisplayOrder);
       }}>
         <ArrowDownZA size={14} className="mr-2" /> Sort by Domain (Z-A)
+      </ContextMenu.Item>
+      <ContextMenu.Separator />
+      <ContextMenu.Item onSelect={() => onTabGroupDisplayOrderChange?.('groupsFirst')}>
+        {tabGroupDisplayOrder === 'groupsFirst' ? <Check size={14} className="mr-2" /> : <span className="w-[14px] mr-2" />}
+        Groups before ungrouped tabs
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => onTabGroupDisplayOrderChange?.('groupsLast')}>
+        {tabGroupDisplayOrder === 'groupsLast' ? <Check size={14} className="mr-2" /> : <span className="w-[14px] mr-2" />}
+        Groups after ungrouped tabs
+      </ContextMenu.Item>
+      <ContextMenu.Item onSelect={() => onTabGroupDisplayOrderChange?.('chromeOrder')}>
+        {tabGroupDisplayOrder === 'chromeOrder' ? <Check size={14} className="mr-2" /> : <span className="w-[14px] mr-2" />}
+        Chrome's native order
       </ContextMenu.Item>
       <ContextMenu.Separator />
       <ContextMenu.Item onSelect={handleCloseAllTabs}>

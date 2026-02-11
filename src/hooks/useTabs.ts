@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
+import type { TabGroupDisplayOrder } from '../components/SettingsDialog';
 
 // Helper: safely extract hostname from URL
 const getHostname = (url: string | undefined): string =>
@@ -108,7 +109,7 @@ export const useTabs = (windowId?: number) => {
 
   const sortTabs = useCallback(async (direction: 'asc' | 'desc' = 'asc',
                                       tabGroups: chrome.tabGroups.TabGroup[] = [],
-                                      groupsFirst: boolean = true) =>
+                                      displayOrder: TabGroupDisplayOrder = 'groupsFirst') =>
   {
     // Build group info map (id -> {title, color})
     const groupInfoMap = new Map<number, { title: string; color: chrome.tabGroups.ColorEnum }>();
@@ -136,14 +137,19 @@ export const useTabs = (windowId?: number) => {
           if (cmp === 0) cmp = a.groupId! - b.groupId!;
         }
       }
-      else if (groupsFirst && (aGrouped || bGrouped))
+      else if (displayOrder === 'groupsFirst' && (aGrouped || bGrouped))
       {
         // Grouped tabs come first
         cmp = aGrouped ? -1 : 1;
       }
+      else if (displayOrder === 'groupsLast' && (aGrouped || bGrouped))
+      {
+        // Ungrouped tabs come first
+        cmp = aGrouped ? 1 : -1;
+      }
       else
       {
-        // Both ungrouped (or mixed when groupsFirst is off): sort by domain, then title
+        // Both ungrouped, or chromeOrder: sort by domain, then title
         cmp = compareDomainTitle(a, b);
       }
 
