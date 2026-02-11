@@ -677,7 +677,8 @@ function App() {
 
       // Convert ID arrays to Sets for O(1) lookup
       const playingIdSet = new Set(response?.playingTabIds || []);
-      const historyIdSet = new Set(response?.historyTabIds || []);
+      const historyTabIds = response?.historyTabIds || [];
+      const historyIdSet = new Set(historyTabIds);
       const playing: chrome.tabs.Tab[] = [];
       const history: chrome.tabs.Tab[] = [];
 
@@ -689,6 +690,7 @@ function App() {
           if (historyIdSet.has(tab.id)) history.push(tab);
         }
       }
+      history.sort((a, b) => historyTabIds.indexOf(a.id!) - historyTabIds.indexOf(b.id!));
 
       setPlayingTabs(playing);
       setLastAudibleTabs(history);
