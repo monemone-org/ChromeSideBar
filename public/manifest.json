@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Side Bar for Arc Users",
-  "version": "1.0.274",
+  "version": "1.0.275",
   "description": "Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel",
   "permissions": [
     "sidePanel",
