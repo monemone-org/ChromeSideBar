@@ -7,6 +7,11 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 // Feature flags
 const ENABLE_AUTO_GROUP_NEW_TABS = false;
 
+// Workaround: chrome.tabGroups.update() sets title/color internally but
+// chrome.tabGroups.query() returns stale data until manual collapse/expand.
+// See https://github.com/brave/brave-browser/issues/52949
+const ISSUE_52949_WORKAROUND = true;
+
 // =============================================================================
 // SpaceWindowStateManager - Manages SpaceWindowState per window
 // =============================================================================
@@ -866,6 +871,18 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
         title: space.name,
         color: space.color,
       });
+
+      if (ISSUE_52949_WORKAROUND)
+      {
+        // Send correct group details directly — query() returns stale data for new groups
+        chrome.runtime.sendMessage({
+          type: 'TAB_GROUP_TITLE_SET',
+          groupId: newGroupId,
+          title: space.name,
+          color: space.color,
+          windowId
+        }).catch(() => {});
+      }
     }
   }
   catch (error)
