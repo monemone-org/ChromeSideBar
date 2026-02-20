@@ -35,6 +35,11 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
+## 1.0.275
+
+- Dropping bookmarks/pins with live tabs onto the tab list now moves the existing tab instead of opening a duplicate
+- Fixed new tab not assigned to active Space's tab group when no existing group exists (Chrome bug 52949 workaround https://github.com/brave/brave-browser/issues/52949)
+
 ## 1.0.272
 
 - Undo support: undo deleting bookmarks, closing tabs, and deleting pinned sites/spaces with a toast notification
@@ -128,5 +133,3 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 - Drag Tabs to Bookmarks: Drop tabs into bookmark folders to create bookmarks
 - Full Import/Export: Backup everything as JSON
 - Duplicate Tab: Right-click to duplicate tabs
-
-
