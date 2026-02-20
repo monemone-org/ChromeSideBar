@@ -121,15 +121,25 @@ export async function saveTabGroupAsBookmarkFolder(
   return { success: true, folder };
 }
 
-/**
- * Recursively get all bookmark URLs within a folder.
- *
- * @param folderId - The folder ID to get URLs from
- * @returns Array of URLs from all bookmarks in the folder (recursive)
- */
-export async function getAllBookmarkUrlsInFolder(folderId: string): Promise<string[]>
+export interface BookmarkItem
 {
-  const results: string[] = [];
+  url: string;
+  tabId: number | null;
+}
+
+/**
+ * Recursively get all bookmark items within a folder, resolving live tabs when possible.
+ *
+ * @param folderId - The folder ID to get items from
+ * @param getTabIdForBookmark - Optional lookup to find a live tab for a bookmark ID
+ * @returns Array of { url, tabId } from all bookmarks in the folder (recursive)
+ */
+export async function getAllBookmarkItemsInFolder(
+  folderId: string,
+  getTabIdForBookmark?: (bookmarkId: string) => number | undefined
+): Promise<BookmarkItem[]>
+{
+  const results: BookmarkItem[] = [];
 
   const children = await chrome.bookmarks.getChildren(folderId);
 
@@ -137,15 +147,24 @@ export async function getAllBookmarkUrlsInFolder(folderId: string): Promise<stri
   {
     if (child.url)
     {
-      results.push(child.url);
+      const tabId = getTabIdForBookmark?.(child.id);
+      results.push({ url: child.url, tabId: tabId ?? null });
     }
     else
     {
-      // Recurse into subfolders
-      const subUrls = await getAllBookmarkUrlsInFolder(child.id);
-      results.push(...subUrls);
+      const subItems = await getAllBookmarkItemsInFolder(child.id, getTabIdForBookmark);
+      results.push(...subItems);
     }
   }
 
   return results;
+}
+
+/**
+ * Recursively get all bookmark URLs within a folder (convenience wrapper).
+ */
+export async function getAllBookmarkUrlsInFolder(folderId: string): Promise<string[]>
+{
+  const items = await getAllBookmarkItemsInFolder(folderId);
+  return items.map(item => item.url);
 }

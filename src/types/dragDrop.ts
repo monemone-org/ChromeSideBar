@@ -13,7 +13,8 @@
 export type { DropPosition } from '../utils/dragDrop';
 export { calculateDropPosition } from '../utils/dragDrop';
 
-import { getAllBookmarkUrlsInFolder } from '../utils/bookmarkOperations';
+import { getAllBookmarkItemsInFolder } from '../utils/bookmarkOperations';
+import type { BookmarkItem } from '../utils/bookmarkOperations';
 
 // Drop zones - each component that participates in DnD
 export type DropZone = 'pinnedBar' | 'spaceBar' | 'tabList' | 'bookmarkTree';
@@ -301,41 +302,71 @@ export const acceptsFormatsIf = (
   };
 
 /**
- * Collect all URLs from drag items.
- * Handles bookmarks (including folders with recursive URL collection), and URL items.
- * Supports multi-selection.
+ * Optional live-tab lookup functions for resolving associated tabs.
  */
-export async function collectUrlsFromDragItems(dragData: DragData): Promise<string[]>
+export interface LiveTabLookups
 {
-  const urls: string[] = [];
+  getTabIdForBookmark?: (bookmarkId: string) => number | undefined;
+  getTabIdForPinned?: (pinnedId: string) => number | undefined;
+}
+
+/**
+ * Collect items from drag data, returning { url, tabId } for each.
+ * When live-tab lookups are provided, resolves associated tabs for bookmarks
+ * (including recursive folder traversal) and pinned sites.
+ * When no lookups are provided, all items have tabId: null (URL-only mode).
+ */
+export async function collectItemsFromDragData(
+  dragData: DragData,
+  lookups?: LiveTabLookups
+): Promise<BookmarkItem[]>
+{
+  const items: BookmarkItem[] = [];
 
   for (const item of dragData.items)
   {
     if (item.bookmark?.isFolder)
     {
-      // Bookmark folder - recursively get all URLs
-      const folderUrls = await getAllBookmarkUrlsInFolder(item.bookmark.bookmarkId);
-      urls.push(...folderUrls);
+      const folderItems = await getAllBookmarkItemsInFolder(
+        item.bookmark.bookmarkId,
+        lookups?.getTabIdForBookmark
+      );
+      items.push(...folderItems);
     }
     else if (item.bookmark?.url)
     {
-      // Leaf bookmark
-      urls.push(item.bookmark.url);
+      const tabId = lookups?.getTabIdForBookmark?.(item.bookmark.bookmarkId);
+      items.push({ url: item.bookmark.url, tabId: tabId ?? null });
     }
-    else if (item.url?.url)
+    else if (item.pin?.url)
     {
-      // URL item
-      urls.push(item.url.url);
+      const tabId = lookups?.getTabIdForPinned?.(item.pin.siteId);
+      items.push({ url: item.pin.url, tabId: tabId ?? null });
     }
     else if (item.tab?.url)
     {
-      // TAB item
-      urls.push(item.tab.url);
+      items.push({ url: item.tab.url, tabId: item.tab.tabId });
+    }
+    else if (item.url?.url)
+    {
+      items.push({ url: item.url.url, tabId: null });
     }
   }
 
-  return urls;
+  return items;
 }
+
+/**
+ * Collect all URLs from drag items (convenience wrapper).
+ * Handles bookmarks (including folders with recursive URL collection), pins, tabs, and URL items.
+ */
+export async function collectUrlsFromDragItems(dragData: DragData): Promise<string[]>
+{
+  const items = await collectItemsFromDragData(dragData);
+  return items.map(item => item.url);
+}
+
+export type { BookmarkItem } from '../utils/bookmarkOperations';
 
 // ============================================================================
 // DragItem factory functions

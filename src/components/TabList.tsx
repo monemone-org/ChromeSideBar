@@ -8,7 +8,7 @@ import { SelectionItem } from '../contexts/SelectionContext';
 import { useSelection } from '../hooks/useSelection';
 import type { DropPosition } from '../utils/dragDrop';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
-import { DragData, DragFormat, DragItem, DropData, createTabDragData, createTabGroupDragData, createTabDragItem, createTabGroupDragItem, acceptsFormats, getPrimaryItem, hasFormat, collectUrlsFromDragItems } from '../types/dragDrop';
+import { DragData, DragFormat, DragItem, DropData, createTabDragData, createTabGroupDragData, createTabDragItem, createTabGroupDragItem, acceptsFormats, getPrimaryItem, hasFormat, collectUrlsFromDragItems, collectItemsFromDragData } from '../types/dragDrop';
 
 // Re-export DropPosition for components that need it
 export type { DropPosition };
@@ -793,7 +793,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
   const { spaces, activeSpace: activeSpaceFromContext, windowId } = useSpacesContext();
   const { tabs, closeTabs, activateTab, moveTab, groupTab, ungroupTab, createGroupWithTab, createTabInGroup, createTab, duplicateTab, sortTabs, sortGroupTabs, error } = useTabs(windowId ?? undefined);
   const { tabGroups, updateGroup, moveGroup } = useTabGroups();
-  const { getManagedTabIds, associateExistingTab, getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
+  const { getManagedTabIds, associateExistingTab, getItemKeyForTab, restoreItemAssociation, deassociateBookmarkTab, getTabIdForBookmark, deassociatePinnedTab, getTabIdForPinned } = useBookmarkTabsContext();
 
   // Use prop if provided, otherwise use context
   const activeSpace = activeSpaceProp ?? activeSpaceFromContext;
@@ -1885,10 +1885,6 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
       }
       else if (acceptedFormat === DragFormat.BOOKMARK || acceptedFormat === DragFormat.URL)
       {
-        // Collect all URLs from drag items (handles bookmarks, folders, URLs, multi-selection)
-        const urls = await collectUrlsFromDragItems(dragData);
-        if (urls.length === 0) return;
-
         // Determine target position
         let targetIndex: number | undefined;
         let targetGroupId: number | undefined;
@@ -1941,23 +1937,52 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
           }
         }
 
-        // Create tabs for all URLs
-        const createdTabIds: number[] = [];
-        for (let i = 0; i < urls.length; i++)
+        // Collect items, resolving live tabs for bookmarks and pins
+        const collectedItems = await collectItemsFromDragData(dragData, {
+          getTabIdForBookmark,
+          getTabIdForPinned,
+        });
+        if (collectedItems.length === 0) return;
+
+        // Map each item to a tab ID: deassociate live tabs, create new tabs for URLs
+        const allTabIds: number[] = [];
+        for (const item of collectedItems)
         {
-          const newTab = await chrome.tabs.create({
-            url: urls[i],
-            active: false,
-            windowId: windowId ?? undefined,
-            index: targetIndex !== undefined ? targetIndex + i : undefined
-          });
-          if (newTab.id) createdTabIds.push(newTab.id);
+          if (item.tabId !== null)
+          {
+            // Live tab — deassociate so it becomes unmanaged
+            const itemKey = getItemKeyForTab(item.tabId);
+            if (itemKey?.startsWith('bookmark-'))
+            {
+              deassociateBookmarkTab(itemKey.replace('bookmark-', ''));
+            }
+            else if (itemKey?.startsWith('pinned-'))
+            {
+              deassociatePinnedTab(itemKey.replace('pinned-', ''));
+            }
+            allTabIds.push(item.tabId);
+          }
+          else
+          {
+            // No live tab — create a new one
+            const newTab = await chrome.tabs.create({
+              url: item.url,
+              active: false,
+              windowId: windowId ?? undefined,
+            });
+            if (newTab.id) allTabIds.push(newTab.id);
+          }
         }
 
-        // Add to group if needed
-        if (createdTabIds.length > 0 && targetGroupId)
+        if (allTabIds.length === 0) return;
+
+        // Move all tabs to target position in one call
+        await chrome.tabs.move(allTabIds, { index: targetIndex ?? -1 });
+
+        // Group if dropped on a group target (otherwise leave as-is for background.ts auto-grouping)
+        if (targetGroupId)
         {
-          await chrome.tabs.group({ tabIds: createdTabIds, groupId: targetGroupId });
+          await chrome.tabs.group({ tabIds: allTabIds, groupId: targetGroupId });
         }
 
         setWasValidDrop(true);
@@ -1967,7 +1992,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
     {
       console.error('TabList drop operation failed:', error);
     }
-  }, [visibleTabs, getSelectedItems, moveTab, groupTab, ungroupTab, moveGroup, clearSelection, setWasValidDrop, windowId, createTabsFromDragUrls]);
+  }, [visibleTabs, getSelectedItems, moveTab, groupTab, ungroupTab, moveGroup, clearSelection, setWasValidDrop, windowId, createTabsFromDragUrls, deassociateBookmarkTab, getTabIdForBookmark, deassociatePinnedTab, getTabIdForPinned, getItemKeyForTab]);
 
   // Register drop handler for tabList zone
   useEffect(() =>
