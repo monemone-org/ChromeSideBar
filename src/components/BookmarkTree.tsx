@@ -478,15 +478,17 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onOpenInNewWindow?.(node.url || '')}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Window
               </ContextMenu.Item>
-              {onMoveSelectedToSpace ? (
-                <ContextMenu.Item onSelect={onMoveSelectedToSpace}>
-                  <SquareStack size={14} className="mr-2" /> Move To Space...
-                </ContextMenu.Item>
-              ) : onMoveSelectedBookmarks ? (
+              <ContextMenu.Separator />
+              {onMoveSelectedBookmarks && (
                 <ContextMenu.Item onSelect={onMoveSelectedBookmarks}>
                   <FolderInput size={14} className="mr-2" /> Move Bookmarks...
                 </ContextMenu.Item>
-              ) : null}
+              )}
+              {onMoveSelectedToSpace && (
+                <ContextMenu.Item onSelect={onMoveSelectedToSpace}>
+                  <SquareStack size={14} className="mr-2" /> Move To Space...
+                </ContextMenu.Item>
+              )}
               <ContextMenu.Separator />
               {allSelectedAreLive ? (
                 <ContextMenu.Item onSelect={onCloseSelectedBookmarks}>
@@ -537,7 +539,9 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                   <FolderOpen size={14} className="mr-2" /> Open as Tab Group
                 </ContextMenu.Item>
               )}
-
+              {(onOpenAsTabGroup || onOpenAllTabsInNewWindow) && (
+                <ContextMenu.Separator />
+              )}
               {onMoveBookmark && !isSpecialFolder && (
                 <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, true)}>
                   <FolderInput size={14} className="mr-2" /> Move Folder...
@@ -570,15 +574,17 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               <ContextMenu.Item onSelect={() => onOpenInNewWindow?.(node.url!)}>
                 <ExternalLink size={14} className="mr-2" /> Open in New Window
               </ContextMenu.Item>
-              {onMoveToSpace ? (
-                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
-                  <SquareStack size={14} className="mr-2" /> Move to Space...
-                </ContextMenu.Item>
-              ) : onMoveBookmark ? (
+              <ContextMenu.Separator />
+              {onMoveBookmark && (
                 <ContextMenu.Item onSelect={() => onMoveBookmark(node.id, false)}>
                   <FolderInput size={14} className="mr-2" /> Move Bookmark...
                 </ContextMenu.Item>
-              ) : null}
+              )}
+              {onMoveToSpace && (
+                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
+                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                </ContextMenu.Item>
+              )}
               {isLoaded && onMoveToTabs && (
                 <ContextMenu.Item onSelect={() => onMoveToTabs(node.id)}>
                   <ArrowRightFromLine size={14} className="mr-2" /> Move To Tabs
