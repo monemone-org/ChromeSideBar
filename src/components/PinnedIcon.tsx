@@ -138,9 +138,9 @@ export const PinnedIcon = ({
       // Shift+click: open in new window
       chrome.windows.create({ url: site.url });
     }
-    else if (e.metaKey || e.ctrlKey)
+    else if (e.metaKey || e.ctrlKey || e.altKey)
     {
-      // Cmd+click (Mac) or Ctrl+click (Windows/Linux): open in new tab
+      // Cmd/Ctrl/Option+click: open in new tab
       chrome.tabs.create({ url: site.url, windowId });
     }
     else

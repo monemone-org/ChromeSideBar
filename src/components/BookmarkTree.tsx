@@ -256,6 +256,13 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
 
   const handleRowClick = (e: React.MouseEvent) => {
 
+    // Option+click: open bookmark in new tab
+    if (e.altKey && node.url)
+    {
+      chrome.tabs.create({ url: node.url, active: false, windowId: windowId ?? undefined });
+      return;
+    }
+
     // Always update selection state on click
     onSelectionClick?.(e);
 
