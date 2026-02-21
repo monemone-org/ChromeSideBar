@@ -82,7 +82,7 @@ export const Toast = ({
       <div
         className="pointer-events-auto bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 mx-4 min-w-[80%]"
         style={{
-          fontSize: `${fontSize}px`,
+          fontSize: `${Math.max(11, Math.round(fontSize * 0.85))}px`,
           transform: translateY,
           transition: 'transform 200ms ease-out',
         }}
