@@ -35,6 +35,11 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
+## 1.0.277
+
+- Option+click on bookmarks and pinned sites opens them in a new tab
+- Reduced toast notification size for better readability
+
 ## 1.0.275
 
 - Dropping bookmarks/pins with live tabs onto the tab list now moves the existing tab instead of opening a duplicate
