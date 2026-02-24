@@ -1,6 +1,7 @@
 import { UndoableAction } from './types';
 import { truncateTitle } from '../utils/truncateTitle';
 import { Space } from '../contexts/SpacesContext';
+import { toChromeColor } from '../utils/groupColors';
 
 interface TabSnapshot
 {
@@ -207,7 +208,7 @@ export class DeleteSpaceAction implements UndoableAction
           });
           await chrome.tabGroups.update(groupId, {
             title: this.snapshot.space.name,
-            color: this.snapshot.space.color,
+            color: toChromeColor(this.snapshot.space.color),
           });
 
           if (import.meta.env.DEV)

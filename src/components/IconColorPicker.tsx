@@ -3,6 +3,21 @@ import { Search, Globe } from 'lucide-react';
 import clsx from 'clsx';
 import { getIconUrl, getIconNames } from '../utils/iconify';
 import { COLOR_CIRCLE_SIZE } from '../utils/groupColors';
+import { EMOJI_DATA, EMOJI_CATEGORIES } from '../data/emojiData';
+import { LayoutGrid } from 'lucide-react';
+
+// Representative emoji for each category (used as filter icons)
+const CATEGORY_ICONS: Record<string, string> = {
+  'Smileys & Emotion': '😀',
+  'People & Body': '👋',
+  'Animals & Nature': '🐻',
+  'Food & Drink': '🍔',
+  'Travel & Places': '🚗',
+  'Activities': '⚽',
+  'Objects': '💡',
+  'Symbols': '💟',
+  'Flags': '🚩',
+};
 
 // Color option interface - works for both hex colors and tab group colors
 export interface ColorOption
@@ -13,6 +28,8 @@ export interface ColorOption
   style?: React.CSSProperties;
   className?: string;
 }
+
+type IconTab = 'icons' | 'emoji';
 
 interface IconColorPickerProps
 {
@@ -34,6 +51,10 @@ interface IconColorPickerProps
   onCustomHexChange?: (value: string) => void;
   onCustomHexSubmit?: () => void;
   currentCustomColor?: string; // For showing non-preset colors
+
+  // Emoji support (optional - when provided, shows Icons/Emoji tab toggle)
+  selectedEmoji?: string;
+  onEmojiSelect?: (emoji: string) => void;
 
   // Labels
   iconLabel?: string;
@@ -67,6 +88,8 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
   onCustomHexChange,
   onCustomHexSubmit,
   currentCustomColor,
+  selectedEmoji,
+  onEmojiSelect,
   iconLabel = 'Icon',
   colorLabel = 'Color',
   iconHeaderAction,
@@ -74,11 +97,16 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
   colorCircleSize = COLOR_CIRCLE_SIZE,
 }) =>
 {
+  const hasEmojiSupport = !!onEmojiSelect;
+  const [activeTab, setActiveTab] = useState<IconTab>(selectedEmoji ? 'emoji' : 'icons');
   const [iconSearch, setIconSearch] = useState('');
+  const [emojiSearch, setEmojiSearch] = useState('');
+  const [selectedEmojiCategory, setSelectedEmojiCategory] = useState<string | null>(null);
   const [allIconNames, setAllIconNames] = useState<string[]>([]);
   const [iconsLoading, setIconsLoading] = useState(false);
   const [iconsError, setIconsError] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
+  const [emojiScrollTop, setEmojiScrollTop] = useState(0);
 
   // Load icons on mount
   useEffect(() =>
@@ -112,13 +140,37 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
     return allIconNames.filter((name) => name.toLowerCase().includes(search));
   }, [iconSearch, allIconNames]);
 
-  // Calculate total rows and content height
+  // Filter emojis based on search and category
+  const filteredEmojis = useMemo(() =>
+  {
+    let result = EMOJI_DATA;
+    if (selectedEmojiCategory)
+    {
+      result = result.filter((e) => e.category === selectedEmojiCategory);
+    }
+    if (emojiSearch.trim())
+    {
+      const search = emojiSearch.toLowerCase();
+      result = result.filter((e) => e.name.includes(search));
+    }
+    return result;
+  }, [emojiSearch, selectedEmojiCategory]);
+
+  // Calculate total rows and content height for icons
   const totalRows = Math.ceil(filteredIcons.length / COLS);
   const totalContentHeight = totalRows * ROW_HEIGHT - GAP + PADDING * 2;
 
-  // Determine visible row range with buffer
+  // Calculate total rows and content height for emojis
+  const emojiTotalRows = Math.ceil(filteredEmojis.length / COLS);
+  const emojiTotalContentHeight = emojiTotalRows * ROW_HEIGHT - GAP + PADDING * 2;
+
+  // Determine visible row range with buffer for icons
   const startRow = Math.max(0, Math.floor((scrollTop - PADDING) / ROW_HEIGHT) - 2);
   const endRow = Math.min(totalRows, Math.ceil((scrollTop + iconGridHeight - PADDING) / ROW_HEIGHT) + 2);
+
+  // Determine visible row range with buffer for emojis
+  const emojiStartRow = Math.max(0, Math.floor((emojiScrollTop - PADDING) / ROW_HEIGHT) - 2);
+  const emojiEndRow = Math.min(emojiTotalRows, Math.ceil((emojiScrollTop + iconGridHeight - PADDING) / ROW_HEIGHT) + 2);
 
   // Get visible icons
   const visibleIcons = useMemo(() =>
@@ -131,10 +183,26 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
     }));
   }, [filteredIcons, startRow, endRow]);
 
+  // Get visible emojis
+  const visibleEmojis = useMemo(() =>
+  {
+    const startIndex = emojiStartRow * COLS;
+    const endIndex = emojiEndRow * COLS;
+    return filteredEmojis.slice(startIndex, endIndex).map((entry, i) => ({
+      entry,
+      index: startIndex + i,
+    }));
+  }, [filteredEmojis, emojiStartRow, emojiEndRow]);
+
   // Scroll handler
   const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) =>
   {
     setScrollTop(e.currentTarget.scrollTop);
+  }, []);
+
+  const handleEmojiGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) =>
+  {
+    setEmojiScrollTop(e.currentTarget.scrollTop);
   }, []);
 
   // Reset scroll when search changes
@@ -142,6 +210,11 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
   {
     setScrollTop(0);
   }, [iconSearch]);
+
+  useEffect(() =>
+  {
+    setEmojiScrollTop(0);
+  }, [emojiSearch, selectedEmojiCategory]);
 
   // Render an icon by name from CDN
   const renderIcon = (iconName: string, size: number = 18) =>
@@ -189,69 +262,174 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
             <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              value={iconSearch}
-              onChange={(e) => setIconSearch(e.target.value)}
-              placeholder="Search icons..."
+              value={activeTab === 'icons' ? iconSearch : emojiSearch}
+              onChange={(e) => activeTab === 'icons' ? setIconSearch(e.target.value) : setEmojiSearch(e.target.value)}
+              placeholder={activeTab === 'icons' ? 'Search icons...' : 'Search emoji...'}
               className="w-full pl-7 pr-2 py-1 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none text-[0.85em]"
             />
           </div>
         </div>
-        {/* Icon name */}
-        <p className="text-[0.85em] text-gray-500 dark:text-gray-400 mb-2">
-          {selectedIcon || 'No icon selected'}
-        </p>
 
-        {/* Icon grid - virtualized */}
-        <div
-          onScroll={handleGridScroll}
-          className="relative bg-gray-50 dark:bg-gray-900 rounded-md overflow-y-auto overflow-x-hidden"
-          style={{ height: Math.min(iconGridHeight, Math.max(totalContentHeight, 64)) }}
-        >
-          {iconsLoading ? (
-            <div className="flex items-center justify-center h-16 text-gray-400 text-[0.85em]">
-              Loading icons...
-            </div>
-          ) : iconsError ? (
-            <div className="flex items-center justify-center h-16 text-gray-400 text-[0.85em]">
-              {iconsError}
-            </div>
-          ) : (
-            <div style={{ height: totalContentHeight, position: 'relative' }}>
-              {visibleIcons.map(({ name, index }) =>
-              {
-                const row = Math.floor(index / COLS);
-                const col = index % COLS;
-                return (
-                  <button
-                    key={name}
-                    onClick={() => onIconSelect(name)}
-                    className={clsx(
-                      "absolute w-8 h-8 flex items-center justify-center rounded",
-                      "hover:bg-gray-200 dark:hover:bg-gray-700",
-                      selectedIcon === name && "bg-blue-100 dark:bg-blue-900/50 ring-1 ring-blue-500"
-                    )}
-                    style={{
-                      top: PADDING + row * ROW_HEIGHT,
-                      left: PADDING + col * (ICON_SIZE + GAP),
-                    }}
-                    title={name}
-                  >
-                    {renderIcon(name)}
-                  </button>
-                );
-              })}
-              {filteredIcons.length === 0 && !iconsLoading && (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-[0.85em]">
-                  No icons found
+        {/* Tab bar + grid container (only when emoji support is enabled) */}
+        {hasEmojiSupport && (
+          <div className="flex border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setActiveTab('icons')}
+              className={clsx(
+                "px-3 py-1 text-[0.85em] -mb-px border-b-2",
+                activeTab === 'icons'
+                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              )}
+            >
+              Icons
+            </button>
+            <button
+              onClick={() => setActiveTab('emoji')}
+              className={clsx(
+                "px-3 py-1 text-[0.85em] -mb-px border-b-2",
+                activeTab === 'emoji'
+                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              )}
+            >
+              Emoji
+            </button>
+          </div>
+        )}
+
+        {/* Icons tab content */}
+        {activeTab === 'icons' && (
+          <>
+            {/* Icon grid - virtualized */}
+            <div
+              onScroll={handleGridScroll}
+              className={clsx(
+                "relative bg-gray-50 dark:bg-gray-900 overflow-y-auto overflow-x-hidden",
+                hasEmojiSupport ? "rounded-b-md" : "rounded-md"
+              )}
+              style={{ height: Math.min(iconGridHeight, Math.max(totalContentHeight, 64)) }}
+            >
+              {iconsLoading ? (
+                <div className="flex items-center justify-center h-16 text-gray-400 text-[0.85em]">
+                  Loading icons...
+                </div>
+              ) : iconsError ? (
+                <div className="flex items-center justify-center h-16 text-gray-400 text-[0.85em]">
+                  {iconsError}
+                </div>
+              ) : (
+                <div style={{ height: totalContentHeight, position: 'relative' }}>
+                  {visibleIcons.map(({ name, index }) =>
+                  {
+                    const row = Math.floor(index / COLS);
+                    const col = index % COLS;
+                    return (
+                      <button
+                        key={name}
+                        onClick={() => onIconSelect(name)}
+                        className={clsx(
+                          "absolute w-8 h-8 flex items-center justify-center rounded",
+                          "hover:bg-gray-200 dark:hover:bg-gray-700",
+                          selectedIcon === name && !selectedEmoji && "bg-blue-100 dark:bg-blue-900/50 ring-1 ring-blue-500"
+                        )}
+                        style={{
+                          top: PADDING + row * ROW_HEIGHT,
+                          left: PADDING + col * (ICON_SIZE + GAP),
+                        }}
+                        title={name}
+                      >
+                        {renderIcon(name)}
+                      </button>
+                    );
+                  })}
+                  {filteredIcons.length === 0 && !iconsLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-[0.85em]">
+                      No icons found
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
-        {!iconsError && (
-          <p className="text-[0.85em] text-gray-400 mt-1">
-            {filteredIcons.length} icons
-          </p>
+          </>
+        )}
+
+        {/* Emoji tab content */}
+        {activeTab === 'emoji' && hasEmojiSupport && (
+          <>
+            {/* Category filter - emoji icons */}
+            <div className="flex items-center gap-0.5 mb-1">
+              <button
+                onClick={() => setSelectedEmojiCategory(null)}
+                className={clsx(
+                  "w-7 h-7 flex items-center justify-center rounded",
+                  !selectedEmojiCategory
+                    ? "bg-blue-100 dark:bg-blue-900/50"
+                    : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                )}
+                title="All"
+              >
+                <LayoutGrid size={14} className={clsx(
+                  !selectedEmojiCategory
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "text-gray-400 dark:text-gray-500"
+                )} />
+              </button>
+              {EMOJI_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedEmojiCategory(cat)}
+                  className={clsx(
+                    "w-7 h-7 flex items-center justify-center rounded text-base",
+                    selectedEmojiCategory === cat
+                      ? "bg-blue-100 dark:bg-blue-900/50"
+                      : "hover:bg-gray-100 dark:hover:bg-gray-700 opacity-60 hover:opacity-100"
+                  )}
+                  title={cat}
+                >
+                  {CATEGORY_ICONS[cat]}
+                </button>
+              ))}
+            </div>
+
+            {/* Emoji grid - virtualized */}
+            <div
+              onScroll={handleEmojiGridScroll}
+              className="relative bg-gray-50 dark:bg-gray-900 rounded-b-md overflow-y-auto overflow-x-hidden"
+              style={{ height: Math.min(iconGridHeight, Math.max(emojiTotalContentHeight, 64)) }}
+            >
+              <div style={{ height: emojiTotalContentHeight, position: 'relative' }}>
+                {visibleEmojis.map(({ entry, index }) =>
+                {
+                  const row = Math.floor(index / COLS);
+                  const col = index % COLS;
+                  return (
+                    <button
+                      key={entry.emoji}
+                      onClick={() => onEmojiSelect!(entry.emoji)}
+                      className={clsx(
+                        "absolute w-8 h-8 flex items-center justify-center rounded",
+                        "hover:bg-gray-200 dark:hover:bg-gray-700",
+                        selectedEmoji === entry.emoji && "bg-blue-100 dark:bg-blue-900/50 ring-1 ring-blue-500"
+                      )}
+                      style={{
+                        top: PADDING + row * ROW_HEIGHT,
+                        left: PADDING + col * (ICON_SIZE + GAP),
+                      }}
+                      title={entry.name}
+                    >
+                      <span className="text-lg">{entry.emoji}</span>
+                    </button>
+                  );
+                })}
+                {filteredEmojis.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-[0.85em]">
+                    No emoji found
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -284,9 +462,22 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
             />
           ))}
 
-          {/* Custom hex input (optional) */}
+          {/* Custom color dot + hex input (optional) */}
           {showCustomHex && onCustomHexChange && onCustomHexSubmit && (
             <div className="flex items-center gap-1 ml-1">
+              {currentCustomColor && !colorOptions.some((o) => o.value === currentCustomColor) && (
+                <div
+                  className={clsx(
+                    colorCircleSize,
+                    "rounded-full border-2 flex-shrink-0",
+                    isColorSelected(currentCustomColor)
+                      ? "border-gray-900 dark:border-white ring-2 ring-offset-1 ring-gray-400 dark:ring-gray-500"
+                      : "border-transparent"
+                  )}
+                  style={{ backgroundColor: currentCustomColor }}
+                  title={currentCustomColor}
+                />
+              )}
               <input
                 type="text"
                 value={customHexValue}
@@ -305,16 +496,6 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
           )}
         </div>
 
-        {/* Show current color if not a preset */}
-        {currentCustomColor && !colorOptions.some((o) => o.value === currentCustomColor) && (
-          <div className="flex items-center gap-1 mt-1">
-            <div
-              className="w-4 h-4 rounded-full border border-gray-300 dark:border-gray-600"
-              style={{ backgroundColor: currentCustomColor }}
-            />
-            <span className="text-[0.85em] text-gray-500">{currentCustomColor}</span>
-          </div>
-        )}
       </div>
     </div>
   );

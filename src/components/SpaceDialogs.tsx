@@ -35,7 +35,7 @@ export const SpaceDialogs: React.FC<SpaceDialogsProps> = ({
   const handleSaveSpace = async (spaceData: {
     name: string;
     icon: string;
-    color: chrome.tabGroups.ColorEnum;
+    color: string;
     bookmarkFolderPath: string;
   }) =>
   {

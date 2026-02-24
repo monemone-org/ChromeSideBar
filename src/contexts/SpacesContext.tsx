@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useBookmarkTabsContext } from './BookmarkTabsContext';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from '../utils/spaceMessages';
+import { toChromeColor } from '../utils/groupColors';
 
 // =============================================================================
 // Types
@@ -12,7 +13,7 @@ export interface Space
   id: string;
   name: string;
   icon: string;                         // Lucide icon name or emoji
-  color: chrome.tabGroups.ColorEnum;    // grey, blue, red, yellow, green, pink, purple, cyan, orange
+  color: string;                         // Chrome color name or hex (e.g. 'blue', '#FF5733')
   bookmarkFolderPath: string;           // e.g. "Bookmarks Bar/Work"
 }
 
@@ -82,7 +83,7 @@ interface SpacesContextValue
   createSpace: (
     name: string,
     icon: string,
-    color: chrome.tabGroups.ColorEnum,
+    color: string,
     bookmarkFolderPath: string
   ) => Space;
   updateSpace: (id: string, updates: Partial<Omit<Space, 'id'>>) => void;
@@ -266,7 +267,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createSpace = useCallback((
     name: string,
     icon: string,
-    color: chrome.tabGroups.ColorEnum,
+    color: string,
     bookmarkFolderPath: string
   ): Space =>
   {
@@ -316,7 +317,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         {
           await chrome.tabGroups.update(groups[0].id, {
             title: updates.name ?? space.name,
-            color: updates.color ?? space.color,
+            color: toChromeColor(updates.color ?? space.color),
           });
         }
       }

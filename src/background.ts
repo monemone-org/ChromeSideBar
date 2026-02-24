@@ -1,5 +1,6 @@
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
 import { isPinnedManagedTab } from './utils/tabAssociations';
+import { toChromeColor } from './utils/groupColors';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -587,7 +588,7 @@ interface Space
 {
   id: string;
   name: string;
-  color: chrome.tabGroups.ColorEnum;
+  color: string;
 }
 
 // Find Chrome group by name in a window
@@ -869,7 +870,7 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
       });
       await chrome.tabGroups.update(newGroupId, {
         title: space.name,
-        color: space.color,
+        color: toChromeColor(space.color),
       });
 
       if (ISSUE_52949_WORKAROUND)
@@ -879,7 +880,7 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
           type: 'TAB_GROUP_TITLE_SET',
           groupId: newGroupId,
           title: space.name,
-          color: space.color,
+          color: toChromeColor(space.color),
           windowId
         }).catch(() => {});
       }

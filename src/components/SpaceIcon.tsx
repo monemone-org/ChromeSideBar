@@ -4,7 +4,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import * as ContextMenu from './menu/ContextMenu';
 import { Space } from '../contexts/SpacesContext';
-import { GROUP_COLORS } from '../utils/groupColors';
+import { GROUP_COLORS, getHexColorStyle } from '../utils/groupColors';
 import { getIcon } from '../utils/spaceIcons';
 import { SpaceContextMenuContent } from './SpaceContextMenuContent';
 import { createSpaceDragData, DropData, DropPosition, DragFormat, acceptsFormats } from '../types/dragDrop';
@@ -28,21 +28,44 @@ export const SpaceIconVisual: React.FC<SpaceIconVisualProps> = ({
   className,
 }) =>
 {
-  const colorStyle = GROUP_COLORS[color] || GROUP_COLORS.grey;
+  const colorStyle = GROUP_COLORS[color];
 
+  if (colorStyle)
+  {
+    // Chrome color name path - use Tailwind classes
+    return (
+      <div
+        className={clsx(
+          "w-7 h-7 rounded flex items-center justify-center flex-shrink-0",
+          isActive ? colorStyle.badge : colorStyle.bg,
+          className
+        )}
+      >
+        <span
+          className={clsx(
+            "flex items-center justify-center",
+            isActive ? "text-white dark:text-black" : colorStyle.text
+          )}
+        >
+          {getIcon(icon, 14, isActive)}
+        </span>
+      </div>
+    );
+  }
+
+  // Hex color path - use inline styles
+  const hexStyle = getHexColorStyle(color);
   return (
     <div
       className={clsx(
         "w-7 h-7 rounded flex items-center justify-center flex-shrink-0",
-        isActive ? colorStyle.badge : colorStyle.bg,
         className
       )}
+      style={{ backgroundColor: isActive ? hexStyle.badge : hexStyle.bg }}
     >
       <span
-        className={clsx(
-          "flex items-center justify-center",
-          isActive ? "text-white dark:text-black" : colorStyle.text
-        )}
+        className="flex items-center justify-center"
+        style={{ color: isActive ? 'white' : hexStyle.text }}
       >
         {getIcon(icon, 14, isActive)}
       </span>

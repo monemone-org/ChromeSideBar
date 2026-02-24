@@ -12,6 +12,7 @@ export interface PinnedSite {
   favicon?: string;
   customIconName?: string;  // Lucide icon name when using custom icon
   iconColor?: string;       // Custom icon color (hex, e.g., "#ef4444")
+  emoji?: string;           // Emoji character (e.g., "😀")
 }
 
 const STORAGE_KEY = 'pinnedSites';
@@ -148,7 +149,8 @@ export const usePinnedSites = () => {
     url: string,
     favicon?: string,
     customIconName?: string,
-    iconColor?: string
+    iconColor?: string,
+    emoji?: string
   ) => {
     const updatedSites = pinnedSites.map(site =>
       site.id === id ? {
@@ -156,8 +158,10 @@ export const usePinnedSites = () => {
         title,
         url,
         ...(favicon !== undefined && { favicon }),
-        customIconName,
-        iconColor: customIconName ? iconColor : undefined,
+        // emoji and customIconName are mutually exclusive
+        customIconName: emoji ? undefined : customIconName,
+        iconColor: emoji ? undefined : (customIconName ? iconColor : undefined),
+        emoji: customIconName ? undefined : emoji,
       } : site
     );
     setPinnedSites(updatedSites);
@@ -178,6 +182,7 @@ export const usePinnedSites = () => {
         favicon,
         customIconName: undefined,
         iconColor: undefined,
+        emoji: undefined,
       } : s
     );
     setPinnedSites(updatedSites);

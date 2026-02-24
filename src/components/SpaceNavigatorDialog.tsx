@@ -3,7 +3,8 @@ import { QuickDismissDialog } from './QuickDismissDialog';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { LayoutGrid } from 'lucide-react';
 import { getIconUrl } from '../utils/iconify';
-import { GROUP_COLORS } from '../utils/groupColors';
+import { isEmoji } from '../utils/emoji';
+import { GROUP_COLORS, getHexColorStyle } from '../utils/groupColors';
 import clsx from 'clsx';
 
 export interface SpaceNavigatorDialogProps
@@ -138,6 +139,11 @@ export const SpaceNavigatorDialog = ({
 
   const renderIcon = (iconName: string, size: number = 16) =>
   {
+    if (isEmoji(iconName))
+    {
+      return <span style={{ fontSize: size }} className="leading-none">{iconName}</span>;
+    }
+
     if (iconName === 'LayoutGrid')
     {
       return <LayoutGrid size={size} />;
@@ -168,7 +174,8 @@ export const SpaceNavigatorDialog = ({
         ) : (
           filteredSpaces.map((space, index) =>
           {
-            const colorStyle = GROUP_COLORS[space.color] || GROUP_COLORS.grey;
+            const colorStyle = GROUP_COLORS[space.color];
+            const hexStyle = !colorStyle ? getHexColorStyle(space.color) : undefined;
             const isActive = space.id === activeSpaceId;
             const isHighlighted = index === highlightedIndex;
             const isDisabled = requireBookmarkFolder && !space.bookmarkFolderPath;
@@ -201,10 +208,14 @@ export const SpaceNavigatorDialog = ({
                 <span
                   className={clsx(
                     "w-5 h-5 rounded flex items-center justify-center flex-shrink-0",
-                    colorStyle.bg
+                    colorStyle?.bg
                   )}
+                  style={hexStyle ? { backgroundColor: hexStyle.bg } : undefined}
                 >
-                  <span className={colorStyle.text}>
+                  <span
+                    className={colorStyle?.text}
+                    style={hexStyle ? { color: hexStyle.text } : undefined}
+                  >
                     {renderIcon(space.icon, 12)}
                   </span>
                 </span>

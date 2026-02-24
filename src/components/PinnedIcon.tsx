@@ -21,11 +21,12 @@ interface PinnedIconVisualProps
   className?: string;
 }
 
-export const PinnedIconVisual: React.FC<PinnedIconVisualProps> = ({
+export const PinnedIconVisual: React.FC<PinnedIconVisualProps & { emoji?: string }> = ({
   favicon,
   iconSize,
   title,
   className,
+  emoji,
 }) => (
   <div
     style={{ width: iconSize + 8, height: iconSize + 8 }}
@@ -35,7 +36,9 @@ export const PinnedIconVisual: React.FC<PinnedIconVisualProps> = ({
       className
     )}
   >
-    {favicon ? (
+    {emoji ? (
+      <span style={{ fontSize: iconSize }} className="leading-none">{emoji}</span>
+    ) : favicon ? (
       <img src={favicon} alt="" style={{ width: iconSize, height: iconSize }} />
     ) : (
       <Globe style={{ width: iconSize, height: iconSize }} className="text-gray-400" />
@@ -54,7 +57,8 @@ interface PinnedIconProps
     url: string,
     favicon?: string,
     customIconName?: string,
-    iconColor?: string
+    iconColor?: string,
+    emoji?: string
   ) => void;
   onResetFavicon: (id: string) => void;
   onDuplicate: (id: string) => void;
@@ -95,6 +99,7 @@ export const PinnedIcon = ({
   const [editFavicon, setEditFavicon] = useState(site.favicon);
   const [editCustomIconName, setEditCustomIconName] = useState(site.customIconName);
   const [editIconColor, setEditIconColor] = useState(site.iconColor || DEFAULT_ICON_COLOR);
+  const [editEmoji, setEditEmoji] = useState(site.emoji);
   const [customHexInput, setCustomHexInput] = useState('');
   const iconRef = useRef<HTMLDivElement>(null);
 
@@ -157,6 +162,7 @@ export const PinnedIcon = ({
     setEditFavicon(site.favicon);
     setEditCustomIconName(site.customIconName);
     setEditIconColor(site.iconColor || DEFAULT_ICON_COLOR);
+    setEditEmoji(site.emoji);
     setCustomHexInput('');
     setShowEditModal(true);
   };
@@ -168,8 +174,9 @@ export const PinnedIcon = ({
       editTitle,
       editUrl,
       editFavicon,
-      editCustomIconName,
-      editCustomIconName ? editIconColor : undefined
+      editEmoji ? undefined : editCustomIconName,
+      editEmoji ? undefined : (editCustomIconName ? editIconColor : undefined),
+      editEmoji
     );
     setShowEditModal(false);
   };
@@ -179,6 +186,7 @@ export const PinnedIcon = ({
     const dataUrl = await iconToDataUrl(iconName, editIconColor);
     setEditFavicon(dataUrl);
     setEditCustomIconName(iconName);
+    setEditEmoji(undefined);
   }, [editIconColor]);
 
   const handleColorChange = useCallback(async (color: string) =>
@@ -204,6 +212,12 @@ export const PinnedIcon = ({
     }
   }, [customHexInput, handleColorChange]);
 
+  const handleEmojiSelect = useCallback((emoji: string) =>
+  {
+    setEditEmoji(emoji);
+    setEditCustomIconName(undefined);
+  }, []);
+
   const handleResetIcon = useCallback(async () =>
   {
     // Fetch site favicon and update local edit state
@@ -212,6 +226,7 @@ export const PinnedIcon = ({
     setEditFavicon(favicon);
     setEditCustomIconName(undefined);
     setEditIconColor(DEFAULT_ICON_COLOR);
+    setEditEmoji(undefined);
   }, [editUrl, site.url]);
 
   const handleUnpin = () =>
@@ -220,7 +235,9 @@ export const PinnedIcon = ({
   };
 
   // Current icon preview for IconColorPicker
-  const currentIconPreview = editFavicon ? (
+  const currentIconPreview = editEmoji ? (
+    <span className="text-xl leading-none">{editEmoji}</span>
+  ) : editFavicon ? (
     <img src={editFavicon} alt="" className="w-5 h-5" />
   ) : (
     <Globe className="w-5 h-5 text-gray-400" />
@@ -265,7 +282,7 @@ export const PinnedIcon = ({
               <div className="absolute -left-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
             )}
 
-            <PinnedIconVisual favicon={site.favicon} iconSize={iconSize} />            
+            <PinnedIconVisual favicon={site.favicon} iconSize={iconSize} emoji={site.emoji} />
 
             {/* Drop indicator - after */}
             {showDropAfter && (
@@ -400,6 +417,8 @@ export const PinnedIcon = ({
             onCustomHexSubmit={handleCustomHexSubmit}
             currentCustomColor={editIconColor}
             iconHeaderAction={resetIconButton}
+            selectedEmoji={editEmoji}
+            onEmojiSelect={handleEmojiSelect}
           />
         </div>
       </Dialog>

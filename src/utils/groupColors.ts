@@ -41,3 +41,102 @@ export const getRandomGroupColor = (): chrome.tabGroups.ColorEnum =>
   const colors = GROUP_COLOR_OPTIONS.map(opt => opt.value);
   return colors[Math.floor(Math.random() * colors.length)];
 };
+
+// =============================================================================
+// Hex color helpers
+// =============================================================================
+
+// Check if a color string is one of Chrome's 9 tab group color names
+export const isChromeColorName = (color: string): boolean =>
+  color in GROUP_COLORS;
+
+// Check if a string is a valid 6-digit hex color (#RRGGBB or RRGGBB)
+const isValidHex = (hex: string): boolean =>
+  /^#?[0-9A-Fa-f]{6}$/.test(hex);
+
+// Parse hex (#RRGGBB) to [r, g, b]. Returns [0,0,0] for malformed input.
+const hexToRgb = (hex: string): [number, number, number] =>
+{
+  if (!isValidHex(hex)) return [0, 0, 0];
+  const h = hex.replace('#', '');
+  return [
+    parseInt(h.substring(0, 2), 16),
+    parseInt(h.substring(2, 4), 16),
+    parseInt(h.substring(4, 6), 16),
+  ];
+};
+
+// Convert RGB to HSL, returns [hue (0-360), saturation (0-100), lightness (0-100)]
+const rgbToHsl = (r: number, g: number, b: number): [number, number, number] =>
+{
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+
+  if (max === min) return [0, 0, l * 100];
+
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+
+  return [h * 360, s * 100, l * 100];
+};
+
+// Convert hex to nearest Chrome tab group color by hue
+export const hexToNearestChromeColor = (hex: string): chrome.tabGroups.ColorEnum =>
+{
+  const [r, g, b] = hexToRgb(hex);
+  const [hue, saturation] = rgbToHsl(r, g, b);
+
+  // Low saturation → grey
+  if (saturation < 10) return 'grey';
+
+  // Map hue ranges to Chrome colors
+  // Red:    0-15, 346-360
+  // Orange: 16-45
+  // Yellow: 46-65
+  // Green:  66-165
+  // Cyan:   166-195
+  // Blue:   196-260
+  // Purple: 261-290
+  // Pink:   291-345
+  if (hue < 16 || hue >= 346) return 'red';
+  if (hue < 46) return 'orange';
+  if (hue < 66) return 'yellow';
+  if (hue < 166) return 'green';
+  if (hue < 196) return 'cyan';
+  if (hue < 261) return 'blue';
+  if (hue < 291) return 'purple';
+  return 'pink';
+};
+
+// Get the Chrome ColorEnum for any color string (passthrough for names, convert for hex)
+export const toChromeColor = (color: string): chrome.tabGroups.ColorEnum =>
+{
+  if (isChromeColorName(color)) return color as chrome.tabGroups.ColorEnum;
+  if (isValidHex(color)) return hexToNearestChromeColor(color);
+  return 'grey'; // fallback for malformed values
+};
+
+// Generate inline styles for hex colors (for SpaceIconVisual, overlays)
+export interface HexColorStyle
+{
+  bg: string;           // CSS background-color for inactive
+  badge: string;        // CSS background-color for active
+  text: string;         // CSS color for text
+}
+
+export const getHexColorStyle = (hex: string): HexColorStyle =>
+{
+  const [r, g, b] = hexToRgb(hex);
+  return {
+    bg: `rgba(${r}, ${g}, ${b}, 0.15)`,
+    badge: hex,
+    text: hex,
+  };
+};

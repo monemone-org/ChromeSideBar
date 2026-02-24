@@ -3,6 +3,7 @@
 
 import { DeleteSpaceAction } from '../actions/deleteSpaceAction';
 import { Space } from '../contexts/SpacesContext';
+import { toChromeColor } from '../utils/groupColors';
 import { TestResult } from './testUtils';
 
 // --- Types ---
@@ -11,7 +12,7 @@ interface SpaceShape
 {
   id: string;
   name: string;
-  color: chrome.tabGroups.ColorEnum;
+  color: string;
   icon: string;
   index: number;
 }
@@ -194,7 +195,7 @@ function makeSpace(n: number, overrides?: Partial<Space>): Space
     id: `space_test_${n}`,
     name: `TestSpace${n}`,
     icon: 'Folder',
-    color: 'blue' as chrome.tabGroups.ColorEnum,
+    color: 'blue',
     bookmarkFolderPath: '',
     ...overrides,
   };
@@ -346,7 +347,7 @@ export async function runDeleteSpaceTests(
               });
               await chrome.tabGroups.update(groupId, {
                 title: targetSpace.name,
-                color: targetSpace.color,
+                color: toChromeColor(targetSpace.color),
               });
             }
             else

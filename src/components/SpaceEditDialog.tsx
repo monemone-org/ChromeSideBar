@@ -7,6 +7,7 @@ import { useBookmarks } from '../hooks/useBookmarks';
 import { Space } from '../contexts/SpacesContext';
 import { GROUP_COLOR_OPTIONS } from '../utils/groupColors';
 import { getIconUrl } from '../utils/iconify';
+import { isEmoji } from '../utils/emoji';
 import { Folder, FolderOpen } from 'lucide-react';
 
 interface SpaceEditDialogProps
@@ -18,9 +19,9 @@ interface SpaceEditDialogProps
   onSave: (spaceData: {
     name: string;
     icon: string;
-    color: chrome.tabGroups.ColorEnum;
+    color: string;
     bookmarkFolderPath: string;
-  }) => void;
+  }) => void | Promise<void>;
 }
 
 // Convert GROUP_COLOR_OPTIONS to ColorOption format for IconColorPicker
@@ -44,7 +45,8 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
   // Form state
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('briefcase');
-  const [color, setColor] = useState<chrome.tabGroups.ColorEnum>('blue');
+  const [color, setColor] = useState<string>('blue');
+  const [customHexInput, setCustomHexInput] = useState('');
   const [bookmarkFolderPath, setBookmarkFolderPath] = useState('');
   const [useExistingFolder, setUseExistingFolder] = useState(false);
 
@@ -66,6 +68,8 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
         setName(space.name);
         setIcon(space.icon);
         setColor(space.color);
+        // If it's a custom hex color, pre-fill the hex input
+        setCustomHexInput(space.color.startsWith('#') ? space.color : '');
         setBookmarkFolderPath(space.bookmarkFolderPath);
         setUseExistingFolder(true);
       }
@@ -243,10 +247,38 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
     return `${otherBookmarksTitle}/{name}`;
   };
 
+  // Handle emoji selection - sets icon to the emoji string
+  const handleEmojiSelect = useCallback((emoji: string) =>
+  {
+    setIcon(emoji);
+  }, []);
+
+  // Handle icon selection - sets icon to Lucide name (clears any emoji)
+  const handleIconSelect = useCallback((iconName: string) =>
+  {
+    setIcon(iconName);
+  }, []);
+
+  // Handle custom hex color submit
+  const handleCustomHexSubmit = useCallback(() =>
+  {
+    const hex = customHexInput.trim();
+    if (/^#?[0-9A-Fa-f]{6}$/.test(hex))
+    {
+      const normalized = hex.startsWith('#') ? hex : `#${hex}`;
+      setColor(normalized);
+      setCustomHexInput(normalized);
+    }
+  }, [customHexInput]);
+
   // Current icon preview for IconColorPicker
   const currentIconPreview = useMemo(() =>
   {
     if (!icon) return null;
+    if (isEmoji(icon))
+    {
+      return <span className="text-xl leading-none">{icon}</span>;
+    }
     return (
       <img
         src={getIconUrl(icon)}
@@ -297,23 +329,39 @@ export const SpaceEditDialog: React.FC<SpaceEditDialogProps> = ({
 
             {/* Icon and Color picker */}
             <IconColorPicker
-              selectedIcon={icon}
+              selectedIcon={isEmoji(icon) ? undefined : icon}
               selectedColor={color}
               currentIconPreview={currentIconPreview}
-              onIconSelect={setIcon}
-              onColorSelect={(c) => setColor(c as chrome.tabGroups.ColorEnum)}
+              onIconSelect={handleIconSelect}
+              onColorSelect={setColor}
               colorOptions={SPACE_COLOR_OPTIONS}
+              selectedEmoji={isEmoji(icon) ? icon : undefined}
+              onEmojiSelect={handleEmojiSelect}
               iconGridHeight={90}
+              showCustomHex
+              customHexValue={customHexInput}
+              onCustomHexChange={setCustomHexInput}
+              onCustomHexSubmit={handleCustomHexSubmit}
+              currentCustomColor={color}
             />
 
             {/* Bookmark folder */}
             <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-              <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Bookmark Folder
-              </label>
-              <p className="text-[0.85em] text-gray-500 dark:text-gray-400 mb-2">
-                Bookmarks saved in this space will be stored in this folder.
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-medium text-gray-700 dark:text-gray-300">
+                  Bookmark Folder
+                </label>
+                <div className="relative group">
+                  <span
+                    className="inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold text-gray-400 dark:text-gray-500 border border-gray-300 dark:border-gray-600 cursor-help"
+                  >
+                    ?
+                  </span>
+                  <div className="absolute right-0 bottom-full mb-1 hidden group-hover:block w-48 px-2 py-1 text-[0.8em] text-white bg-gray-800 dark:bg-gray-700 rounded shadow-lg z-10 pointer-events-none">
+                    Bookmarks saved in this space will be stored in this folder.
+                  </div>
+                </div>
+              </div>
               <div className="flex items-center gap-2 px-2 py-1.5 border rounded bg-gray-50 dark:bg-gray-900 dark:border-gray-600">
                 {useExistingFolder ? (
                   <FolderOpen size={14} className="text-yellow-500 flex-shrink-0" />

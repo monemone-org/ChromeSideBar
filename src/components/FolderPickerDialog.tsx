@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { useSpacesContext, Space } from '../contexts/SpacesContext';
-import { getIconUrl } from '../utils/iconify';
-import { GROUP_COLORS } from '../utils/groupColors';
+import { SpaceFolderIcon } from './SpaceFolderIcon';
 import { Dialog } from './Dialog';
 import { TreeRow } from './TreeRow';
 import { Folder, FolderPlus } from 'lucide-react';
@@ -65,40 +64,9 @@ const FolderItem = ({
 
   // Check if this folder is linked to a space
   const matchingSpace = getMatchingSpace(node.id);
-  const spaceColorClass = matchingSpace ? GROUP_COLORS[matchingSpace.color]?.text : undefined;
-
-  // Render space icon overlay - handles both emoji and Lucide icon names
-  const renderSpaceIconOverlay = (iconName: string, colorStyle: typeof GROUP_COLORS[string]) =>
-  {
-    // Check if it's an emoji (starts with high Unicode codepoint)
-    const isEmoji = iconName.codePointAt(0)! > 255;
-    if (isEmoji)
-    {
-      return <span className="text-[10px] leading-none">{iconName}</span>;
-    }
-    // Lucide icon - load from Iconify CDN, displayed on colored badge
-    return (
-      <span className={`flex items-center justify-center w-[14px] h-[14px] rounded-full ${colorStyle.badge}`}>
-        <img
-          src={getIconUrl(iconName)}
-          alt=""
-          className="w-[10px] h-[10px] invert dark:invert-0"
-        />
-      </span>
-    );
-  };
 
   // Folder icon with optional space overlay
-  const folderIcon = matchingSpace ? (
-    <div className="relative">
-      <Folder size={16} className={spaceColorClass} />
-      <span className="absolute -bottom-[5px] -right-[5px] flex items-center justify-center">
-        {renderSpaceIconOverlay(matchingSpace.icon, GROUP_COLORS[matchingSpace.color] || GROUP_COLORS.grey)}
-      </span>
-    </div>
-  ) : (
-    <Folder size={16} className="text-gray-500" />
-  );
+  const folderIcon = <SpaceFolderIcon space={matchingSpace} />;
 
   // Focus input when creating folder here
   useEffect(() =>

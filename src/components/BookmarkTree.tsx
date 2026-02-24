@@ -11,7 +11,6 @@ import { getIndentPadding } from '../utils/indent';
 import { scrollToBookmark } from '../utils/scrollHelpers';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
-import { getIconUrl } from '../utils/iconify';
 import { DropIndicators } from './DropIndicators';
 import { ExternalDropTarget, ResolveBookmarkDropTarget } from './TabList';
 import { BookmarkOpenMode } from './SettingsDialog';
@@ -22,7 +21,6 @@ import { TreeRow } from './TreeRow';
 import { useInView } from '../hooks/useInView';
 import { SPEAKER_ICON_SIZE } from '../constants';
 import {
-  Folder,
   Globe,
   Trash,
   Edit,
@@ -42,7 +40,8 @@ import {
   ArrowRightFromLine,
   Link
 } from 'lucide-react';
-import { getRandomGroupColor, GROUP_COLORS } from '../utils/groupColors';
+import { getRandomGroupColor } from '../utils/groupColors';
+import { SpaceFolderIcon } from './SpaceFolderIcon';
 import clsx from 'clsx';
 import {
   useDraggable,
@@ -296,40 +295,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     }
   };
 
-  const spaceColorClass = matchingSpace ? GROUP_COLORS[matchingSpace.color]?.text : undefined;
-
-  // Render space icon overlay - handles both emoji and Lucide icon names
-  const renderSpaceIconOverlay = (iconName: string, colorStyle: typeof GROUP_COLORS[string]) =>
-  {
-    // Check if it's an emoji (starts with high Unicode codepoint)
-    const isEmoji = iconName.codePointAt(0)! > 255;
-    if (isEmoji)
-    {
-      return <span className="text-[10px] leading-none">{iconName}</span>;
-    }
-    // Lucide icon - load from Iconify CDN, displayed on colored badge
-    return (
-      <span className={`flex items-center justify-center w-[14px] h-[14px] rounded-full ${colorStyle.badge}`}>
-        <img
-          src={getIconUrl(iconName)}
-          alt=""
-          className="w-[10px] h-[10px] invert dark:invert-0"
-        />
-      </span>
-    );
-  };
-
   const icon = isFolder ? (
-    matchingSpace ? (
-      <div className="relative">
-        <Folder size={16} className={spaceColorClass} />
-        <span className="absolute -bottom-[5px] -right-[5px] flex items-center justify-center">
-          {renderSpaceIconOverlay(matchingSpace.icon, GROUP_COLORS[matchingSpace.color] || GROUP_COLORS.grey)}
-        </span>
-      </div>
-    ) : (
-      <Folder size={16} className="text-gray-500" />
-    )
+    <SpaceFolderIcon space={matchingSpace} />
   ) : node.url ? (
     <img
       src={getFaviconUrl(node.url)}

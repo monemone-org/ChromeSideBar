@@ -3,6 +3,7 @@
  */
 
 import { Space } from '../contexts/SpacesContext';
+import { toChromeColor } from './groupColors';
 
 /**
  * Move a tab to a space's Chrome tab group.
@@ -57,7 +58,7 @@ export async function moveTabToSpace(
       });
       await chrome.tabGroups.update(newGroupId, {
         title: space.name,
-        color: space.color,
+        color: toChromeColor(space.color),
       });
     }
 

@@ -1,11 +1,18 @@
 import React from 'react';
 import { LayoutGrid } from 'lucide-react';
 import { getIconUrl } from './iconify';
+import { isEmoji } from './emoji';
 
 // Get icon element by name - uses Iconify CDN for dynamic icons
 // isActive: when true, icon needs to be white (light) or black (dark) for contrast on badge
 export const getIcon = (iconName: string, size: number = 14, isActive: boolean = false): React.ReactNode =>
 {
+  // Emoji icons render as text
+  if (isEmoji(iconName))
+  {
+    return <span style={{ fontSize: size }} className="leading-none">{iconName}</span>;
+  }
+
   // Special case: LayoutGrid is used for the "All" space
   if (iconName === 'LayoutGrid')
   {
