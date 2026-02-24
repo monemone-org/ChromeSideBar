@@ -1,7 +1,7 @@
 ---
 created: 2026-02-23
 after-version: 1.0.277
-status: draft
+status: in-progress
 ---
 
 # Import Arc Browser Sidebar
@@ -129,23 +129,22 @@ Note: Arc uses extendedSRGB which can have values outside 0-1. Clamp to [0, 1] b
 
 ### Import flow
 
-1. User opens Settings > Import/Export
-2. User selects "Import from Arc Browser"
-3. File picker opens, user selects `StorableSidebar.json`
+1. User opens hamburger menu, selects "Import from Arc Browser..." (separate menu item from the existing "Import...")
+2. File picker opens, user selects `StorableSidebar.json`
    - File location: `~/Library/Application Support/Arc/StorableSidebar.json`
-4. Extension parses the file and shows a preview/summary:
-   - Number of Top Apps found -> will become Pinned Sites
-   - Number of Spaces found (with names + emojis)
-   - Number of pinned tabs/folders per space -> will become Bookmarks
-   - Number of unpinned tabs per space (with opt-in toggle)
+   - 10MB file size limit
+3. Extension parses the file and shows a preview/summary:
+   - Number of Top Apps found
+   - Number of Spaces found
+   - Total pinned tabs/folders across all spaces
+   - Total unpinned tabs across all spaces
    - Count of skipped items (live folders, etc.)
-5. User selects what to import:
+4. User selects what to import:
    - [x] Top Apps as Pinned Sites (append / replace)
-   - [x] Spaces (append / replace)
-   - [x] Pinned tabs as Bookmarks (per space, as bookmark folders)
-   - [ ] Unpinned tabs as Chrome tabs (optional, off by default, grouped by space)
-6. User clicks "Import"
-7. Extension creates the data and shows result summary
+   - [x] Spaces + Bookmarks (append / replace) — single combined toggle
+   - [ ] Open unpinned tabs in Chrome (optional, off by default)
+5. User clicks "Import"
+6. Extension creates the data and shows result summary
 
 ### Where imported data goes
 
@@ -208,8 +207,27 @@ Show a helper text in the import dialog:
   - `Space.color` accepting hex strings for Arc theme colors
   - `Space.icon` emoji rendering working end-to-end
 
-## Scope notes
+## Space matching behavior
 
-- This is a one-time import, not ongoing sync
-- Duplicate detection (e.g. same URL already pinned) is nice-to-have but not required for v1
+### Append mode
+- For each Arc space, check if an existing extension space has the same name (case-insensitive)
+- **Match found**: Reuse the existing space. Resolve its bookmark folder via `bookmarkFolderPath`, add Arc's bookmarks there. No new space created.
+- **No match**: Create a new space + new bookmark folder under Other Bookmarks
+
+### Replace mode
+- Replace all spaces with Arc spaces. Create new bookmark folders under Other Bookmarks for each.
+- Existing bookmarks are NOT touched — only spaces are replaced.
+
+### Bookmark folder resolution (for matched spaces)
+- Parse the existing space's `bookmarkFolderPath` (e.g. "Other Bookmarks/Movies")
+- Walk Chrome's bookmark tree to find the folder by path
+- If found, use its ID as parent for new bookmarks
+- If not found (folder was deleted), create a new folder under Other Bookmarks
+
+## Constraints
+
+- One-time import, not ongoing sync
+- No duplicate detection (e.g. same URL already pinned) — may be added later
 - Pinned tabs become bookmarks (not live tabs). Unpinned tabs, if opted in, open as actual Chrome tabs grouped by space.
+- 10MB file size limit on the JSON file
+- Depends on feature 030 (Emoji Icons & Custom Space Colors) for emoji icons on spaces and hex color support
