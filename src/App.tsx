@@ -8,6 +8,7 @@ import { SettingsDialog, SettingsValues, BookmarkOpenMode, TabGroupDisplayOrder 
 import { AboutDialog } from './components/AboutDialog';
 import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
+import { ArcImportDialog } from './components/ArcImportDialog';
 import { WelcomeDialog } from './components/WelcomeDialog';
 import { AudioTabsDropdown } from './components/AudioTabsDropdown';
 import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
@@ -448,6 +449,20 @@ const ImportDialogWrapper: React.FC<ImportDialogWrapperProps> = (props) =>
   );
 };
 
+// Wrapper for ArcImportDialog that uses spaces from context
+const ArcImportDialogWrapper: React.FC<ImportDialogWrapperProps> = (props) =>
+{
+  const { spaces, replaceSpaces, appendSpaces } = useSpacesContext();
+  return (
+    <ArcImportDialog
+      {...props}
+      replaceSpaces={replaceSpaces}
+      appendSpaces={appendSpaces}
+      existingSpaces={spaces}
+    />
+  );
+};
+
 function App() {
   const [fontSize, setFontSize] = useLocalStorage('sidebar-font-size-px', 14, {
     parse: (v) => parseInt(v, 10),
@@ -518,6 +533,7 @@ function App() {
   const [showAbout, setShowAbout] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showArcImport, setShowArcImport] = useState(false);
   const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage(
     'sidebar-has-seen-welcome',
     false,
@@ -791,6 +807,13 @@ function App() {
         appendPinnedSites={appendPinnedSites}
       />
 
+      <ArcImportDialogWrapper
+        isOpen={showArcImport}
+        onClose={() => setShowArcImport(false)}
+        replacePinnedSites={replacePinnedSites}
+        appendPinnedSites={appendPinnedSites}
+      />
+
       <WelcomeDialog
         isOpen={!hasSeenWelcome || showWelcome}
         onClose={() => {
@@ -866,6 +889,13 @@ function App() {
             }}>
               <Download size={14} className="mr-2" />
               Import...
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => {
+              setShowArcImport(false);
+              setTimeout(() => setShowArcImport(true), 0);
+            }}>
+              <Download size={14} className="mr-2" />
+              Import from Arc Browser...
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <DropdownMenu.Item onSelect={() => setShowAbout(true)}>

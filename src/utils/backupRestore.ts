@@ -1,5 +1,43 @@
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { Space } from '../contexts/SpacesContext';
+import { isEmoji } from './emoji';
+
+// Convert PascalCase to kebab-case — used only for v1 backup migration
+function toKebabCase(name: string): string
+{
+  return name
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+}
+
+// Migrate v1 backup: convert PascalCase icon names to kebab-case
+function migrateV1Backup(backup: FullBackup): void
+{
+  if (backup.spaces)
+  {
+    for (const space of backup.spaces)
+    {
+      if (space.icon && space.icon !== 'LayoutGrid' && !isEmoji(space.icon))
+      {
+        space.icon = toKebabCase(space.icon);
+      }
+    }
+  }
+
+  if (backup.pinnedSites)
+  {
+    for (const site of backup.pinnedSites)
+    {
+      if (site.customIconName)
+      {
+        site.customIconName = toKebabCase(site.customIconName);
+      }
+    }
+  }
+
+  backup.version = 2;
+}
 
 export interface TabGroupBackup {
   title: string;
@@ -12,7 +50,7 @@ export interface TabGroupBackup {
 }
 
 export interface FullBackup {
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   pinnedSites?: PinnedSite[];
   bookmarks?: chrome.bookmarks.BookmarkTreeNode[];
@@ -53,7 +91,7 @@ export async function exportFullBackup(
   }));
 
   const backup: FullBackup = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     pinnedSites,
     bookmarks,
@@ -76,7 +114,7 @@ export type TabGroupsImportMode = 'replace' | 'append';
 export type SpacesImportMode = 'replace' | 'append';
 
 // Import bookmarks recursively, returns count of bookmarks created
-async function importBookmarkNode(
+export async function importBookmarkNode(
   node: chrome.bookmarks.BookmarkTreeNode,
   parentId: string
 ): Promise<number> {
@@ -209,6 +247,12 @@ export async function importFullBackup(
   appendSpaces: (spaces: Space[]) => void,
   existingSpaceNames: string[]
 ): Promise<ImportResult> {
+  // Migrate v1 backups to v2 (PascalCase → kebab-case icon names)
+  if (backup.version === 1)
+  {
+    migrateV1Backup(backup);
+  }
+
   const result: ImportResult = {
     pinnedSitesCount: 0,
     bookmarksCount: 0,

@@ -3,21 +3,11 @@
 const ICONIFY_API_BASE = 'https://api.iconify.design';
 const ICONIFY_COLLECTION_API = `${ICONIFY_API_BASE}/collection?prefix=lucide`;
 
-// Convert PascalCase or camelCase to kebab-case (for Iconify API)
-// e.g., "LayoutGrid" -> "layout-grid", "ShoppingCart" -> "shopping-cart"
-function toKebabCase(name: string): string
-{
-  return name
-    .replace(/([a-z])([A-Z])/g, '$1-$2')
-    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
-    .toLowerCase();
-}
-
 // Get icon URL from Iconify CDN
+// Icon names are expected in kebab-case (e.g., "shopping-cart", "layout-grid")
 export function getIconUrl(name: string): string
 {
-  const kebabName = toKebabCase(name);
-  return `${ICONIFY_API_BASE}/lucide/${kebabName}.svg`;
+  return `${ICONIFY_API_BASE}/lucide/${name}.svg`;
 }
 
 // Result type for icon fetching

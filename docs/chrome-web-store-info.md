@@ -13,7 +13,7 @@ Finally, Spaces are here! Create workspaces that link a bookmark folder to a Chr
 - One click to switch contexts
 - Give each space its own color and icon
 - Swipe with two fingers to jump between spaces
-- Included in import/export
+- Import/export for backup/restore
 
 ## Key Features
 

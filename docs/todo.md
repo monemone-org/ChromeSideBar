@@ -5,6 +5,9 @@
 
 ## Pending
 
+- [ ] inactive space bar icon that displays emoji should be in black and white (support light and dark theme)
+- [ ] allow typing emoji to choose emoji in Icon picker
+
 - Review Code:
    - [ ] Check for memory, resource leak, e.g. global collections that keep growing but never gets clean up.
 
@@ -306,4 +309,3 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
       1. Show Groups before ungrouped tabs in "All" space
       2. Show Groups after ungrouped tabs in "All" space
       3. Show Groups and ungroup tabs in Chrome's native order.
-
