@@ -38,9 +38,17 @@ Finally, Spaces are here! Create workspaces that link a bookmark folder to a Chr
 
 - Search & Filter - Filter by text, live tabs, or audio. Save frequent searches. Export/import as JSON.
 
+- Arc Browser Import - Migrate from Arc by importing your pinned sites, spaces, and bookmarks from Arc's `StorableSidebar.json`.
+
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
+
+## 1.0.280
+
+- Import from Arc Browser: import your pinned sites, spaces, and bookmarks from Arc's `StorableSidebar.json`
+- Emoji icons: use any emoji as the icon for spaces and pinned sites
+- Custom hex colors for spaces (no longer limited to Chrome's built-in color set)
 
 ## 1.0.277
 
