@@ -20,6 +20,7 @@ Finally, Spaces are here! Create workspaces that link a bookmark folder to a Chr
 - One click to switch contexts
 - Give each space its own color and icon
 - Swipe with two fingers to jump between spaces
+- Import top apps, spaces and bookmarks from Arc's `StorableSidebar.json`.
 - Import/export for backup/restore
 
 ## Key Features
