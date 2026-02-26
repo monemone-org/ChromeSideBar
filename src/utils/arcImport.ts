@@ -2,8 +2,6 @@ import { PinnedSite } from '../hooks/usePinnedSites';
 import { Space } from '../contexts/SpacesContext';
 import { importBookmarkNode, ImportResult } from './backupRestore';
 import { toChromeColor } from './groupColors';
-import { getFaviconUrl, fetchFaviconAsBase64 } from './favicon';
-import { iconToDataUrl } from './iconify';
 
 // =============================================================================
 // Types
@@ -675,42 +673,15 @@ export async function importArcData(
   // ─── Step 1: Top Apps → Pinned Sites ───
   if (options.importTopApps && data.topApps.length > 0)
   {
-    const sites: PinnedSite[] = await Promise.all(
-      data.topApps.map(async (tab) =>
-      {
-        // If tab has a custom icon, render it as a data URL
-        // If tab has an emoji, use that directly (no favicon needed)
-        // Otherwise fall back to fetching the site's favicon
-        let favicon: string | undefined;
-        if (tab.iconName)
-        {
-          favicon = await iconToDataUrl(tab.iconName);
-        }
-        else if (!tab.emoji)
-        {
-          const chromeFaviconUrl = getFaviconUrl(tab.url);
-          favicon = await fetchFaviconAsBase64(chromeFaviconUrl);
-          if (!favicon)
-          {
-            try
-            {
-              const origin = new URL(tab.url).origin;
-              favicon = await fetchFaviconAsBase64(`${origin}/favicon.ico`);
-            }
-            catch { /* ignore invalid URLs */ }
-          }
-        }
-
-        return {
-          id: generatePinId(),
-          url: tab.url,
-          title: tab.title,
-          favicon,
-          ...(tab.emoji ? { emoji: tab.emoji } : {}),
-          ...(tab.iconName ? { customIconName: tab.iconName } : {}),
-        };
-      })
-    );
+    // Favicon/icon resolution is handled lazily by usePinnedSites hook.
+    // Just store metadata here.
+    const sites: PinnedSite[] = data.topApps.map((tab) => ({
+      id: generatePinId(),
+      url: tab.url,
+      title: tab.title,
+      ...(tab.emoji ? { emoji: tab.emoji } : {}),
+      ...(tab.iconName ? { customIconName: tab.iconName } : {}),
+    }));
 
     if (options.topAppsMode === 'replace')
     {

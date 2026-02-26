@@ -1,6 +1,7 @@
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
 import { isPinnedManagedTab } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
+import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -772,13 +773,67 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
   tabSpaceRegistry.unregister(removeInfo.windowId, tabId);
 });
 
-// Track when a tab stops being audible
+// Favicon loading Scenario 5 — see docs/favicon-loading-strategy.md
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
 {
   if (changeInfo.audible === false)
   {
     await stateReady;
     lastAudibleTracker.setLastAudibleTabId(tabId);
+  }
+
+  // Scenario 5: update pinned site favicon when Chrome reports a new favIconUrl
+  if (changeInfo.favIconUrl)
+  {
+    try
+    {
+      const tab = await chrome.tabs.get(tabId);
+      if (!tab.url) return;
+
+      let tabHostname: string;
+      try { tabHostname = new URL(tab.url).hostname; }
+      catch { return; }
+
+      const PINNED_KEY = 'pinnedSites';
+      const result = await chrome.storage.local.get([PINNED_KEY]);
+      const sites = (result[PINNED_KEY] || []) as Array<{
+        id: string; url: string; favicon?: string;
+        customIconName?: string; emoji?: string;
+      }>;
+
+      // Match by hostname, only sites without favicon and no custom icon/emoji
+      const matchingSites = sites.filter(site =>
+      {
+        if (site.favicon || site.customIconName || site.emoji) return false;
+        try { return new URL(site.url).hostname === tabHostname; }
+        catch { return false; }
+      });
+
+      if (matchingSites.length > 0)
+      {
+        // Use Chrome's internal _favicon API instead of fetching favIconUrl directly.
+        // This avoids CORS errors on private/local servers (e.g. homeassistant, proxmox).
+        // Chrome has just cached the favicon (it just fired favIconUrl), so this will work.
+        const favicon = await fetchFaviconAsBase64(getFaviconUrl(tab.url));
+        if (favicon)
+        {
+          const updatedSites = sites.map(site =>
+            matchingSites.some(m => m.id === site.id)
+              ? { ...site, favicon }
+              : site
+          );
+
+          await chrome.storage.local.set({ [PINNED_KEY]: updatedSites });
+
+          if (import.meta.env.DEV)
+          {
+            console.log('[Background] updated favicon for pinned sites:',
+              matchingSites.map(s => s.url));
+          }
+        }
+      }
+    }
+    catch { /* tab may have been closed */ }
   }
 });
 

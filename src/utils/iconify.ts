@@ -60,7 +60,7 @@ export async function fetchIconNames(): Promise<IconFetchResult>
 export async function iconToDataUrl(
   iconName: string,
   color: string = '#6b7280'
-): Promise<string>
+): Promise<string | undefined>
 {
   try
   {
@@ -73,7 +73,7 @@ export async function iconToDataUrl(
   catch (error)
   {
     console.warn(`Failed to load icon "${iconName}":`, error);
-    return '';
+    return undefined;
   }
 }
 
