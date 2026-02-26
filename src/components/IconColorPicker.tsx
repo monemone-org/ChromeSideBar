@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Globe } from 'lucide-react';
 import clsx from 'clsx';
 import { getIconUrl, getIconNames } from '../utils/iconify';
+import { isEmoji } from '../utils/emoji';
 import { COLOR_CIRCLE_SIZE } from '../utils/groupColors';
 import { EMOJI_DATA, EMOJI_CATEGORIES } from '../data/emojiData';
 import { LayoutGrid } from 'lucide-react';
@@ -263,7 +264,35 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
             <input
               type="text"
               value={activeTab === 'icons' ? iconSearch : emojiSearch}
-              onChange={(e) => activeTab === 'icons' ? setIconSearch(e.target.value) : setEmojiSearch(e.target.value)}
+              onChange={(e) =>
+              {
+                const val = e.target.value;
+                // Detect emoji typed/pasted in either tab
+                // Use Intl.Segmenter to keep compound emojis intact (e.g. 🧒🏻)
+                const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+                const segments = [...segmenter.segment(val)];
+                const char = segments.find(s => isEmoji(s.segment))?.segment;
+                if (char && onEmojiSelect)
+                {
+                  onEmojiSelect(char);
+                  if (activeTab === 'icons')
+                  {
+                    setIconSearch('');
+                  }
+                  else
+                  {
+                    setEmojiSearch('');
+                  }
+                }
+                else if (activeTab === 'icons')
+                {
+                  setIconSearch(val);
+                }
+                else
+                {
+                  setEmojiSearch(val);
+                }
+              }}
               placeholder={activeTab === 'icons' ? 'Search icons...' : 'Search emoji...'}
               className="w-full pl-7 pr-2 py-1 border rounded-md dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none text-[0.85em]"
             />
