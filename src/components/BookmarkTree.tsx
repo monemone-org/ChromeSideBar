@@ -574,9 +574,14 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 <Edit size={14} className="mr-2" /> Edit Bookmark...
               </ContextMenu.Item>
               {isLoaded && !isFolder && onCloseBookmark ? (
-                <ContextMenu.Item onSelect={() => onCloseBookmark(node.id)}>
-                  <X size={14} className="mr-2" /> Close
-                </ContextMenu.Item>
+                <>
+                  <ContextMenu.Item onSelect={() => onCloseBookmark(node.id)}>
+                    <X size={14} className="mr-2" /> Close
+                  </ContextMenu.Item>
+                  <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
+                    <Trash size={14} className="mr-2" /> Close and Delete
+                  </ContextMenu.Item>
+                </>
               ) : (
                 <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
                   <Trash size={14} className="mr-2" /> Delete
@@ -764,7 +769,6 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
-
   // Build lookup: folderId → Space (only when in "All" space)
   const folderIdToSpace = useMemo(() =>
   {
