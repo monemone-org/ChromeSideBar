@@ -45,7 +45,7 @@ Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
 
-## 1.0.280
+## 1.0.281
 
 - Import from Arc Browser: import your pinned sites, spaces, and bookmarks from Arc's `StorableSidebar.json`
 - Emoji icons: use any emoji as the icon for spaces and pinned sites
