@@ -1,4 +1,4 @@
-import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcw, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
+import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, FilterX, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
 import { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
 import * as DropdownMenu from './menu/DropdownMenu';
 
@@ -566,7 +566,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
                   : 'text-gray-300 dark:text-gray-600'
               }`}
             >
-              <RotateCcw size={16} />
+              <FilterX size={16} />
             </button>
           )}
         </div>

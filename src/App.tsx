@@ -32,7 +32,7 @@ import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
 import { GROUP_COLORS } from './utils/groupColors';
-import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid } from 'lucide-react';
+import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2 } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
 import * as DropdownMenu from './components/menu/DropdownMenu';
@@ -874,6 +874,15 @@ function App() {
           anchorRef={buttonRef}
         >
           <DropdownMenu.Content align="end">
+            {lastAction && (
+              <>
+                <DropdownMenu.Item onSelect={handleUndo}>
+                  <Undo2 size={14} className="mr-2" />
+                  Undo: {lastAction.description}
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+              </>
+            )}
             <DropdownMenu.Item onSelect={() => setShowSettings(true)}>
               <Settings size={14} className="mr-2" />
               Settings

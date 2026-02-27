@@ -55,6 +55,7 @@ import { getFaviconUrl } from '../utils/favicon';
 import { saveTabGroupAsBookmarkFolder } from '../utils/bookmarkOperations';
 import { UndoableAction } from '../actions/types';
 import { DeleteBookmarkAction } from '../actions/deleteBookmarkAction';
+import { CloseTabAction } from '../actions/closeTabAction';
 
 // Standard Chrome bookmark folder IDs
 const BOOKMARKS_BAR_ID = '1';
@@ -761,7 +762,7 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
   const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark } = useBookmarkTabsContext();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
 
   // Build lookup: folderId → Space (only when in "All" space)
@@ -1557,19 +1558,53 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     return bookmarkItems.every(item => isBookmarkLoaded(item.id));
   }, [getSelectedItems, isBookmarkLoaded]);
 
-  // Close tabs for all selected bookmarks
+  // Close a single bookmark's tab (undoable via CloseTabAction when onPerformAction is available)
+  const handleCloseBookmarkTab = useCallback((bookmarkId: string) =>
+  {
+    const tabId = getTabIdForBookmark(bookmarkId);
+    if (!tabId || !windowId)
+    {
+      closeBookmarkTab(bookmarkId); // fallback
+      return;
+    }
+    const action = new CloseTabAction([tabId], windowId, getItemKeyForTab, restoreItemAssociation);
+    if (onPerformAction)
+    {
+      onPerformAction(action);
+    }
+    else
+    {
+      action.do();
+    }
+  }, [getTabIdForBookmark, windowId, getItemKeyForTab, restoreItemAssociation, onPerformAction, closeBookmarkTab]);
+
+  // Close tabs for all selected bookmarks (undoable as a single batch action)
   const handleCloseSelectedBookmarks = useCallback(() =>
   {
     const selectedItems = getSelectedItems();
+    const tabIds: number[] = [];
     for (const item of selectedItems)
     {
       if (item.type === 'bookmark')
       {
-        closeBookmarkTab(item.id);
+        const tabId = getTabIdForBookmark(item.id);
+        if (tabId) tabIds.push(tabId);
+      }
+    }
+    if (tabIds.length > 0 && windowId)
+    {
+      const action = new CloseTabAction(tabIds, windowId, getItemKeyForTab, restoreItemAssociation);
+      if (onPerformAction)
+      {
+        onPerformAction(action);
+      }
+      else
+      {
+        action.do();
       }
     }
     clearSelection();
-  }, [getSelectedItems, closeBookmarkTab, clearSelection]);
+  }, [getSelectedItems, getTabIdForBookmark, windowId, getItemKeyForTab, restoreItemAssociation, onPerformAction, clearSelection]);
 
   // Copy single URL to clipboard
   const handleCopyUrl = useCallback(async (url: string) =>
@@ -2016,7 +2051,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               checkIsActive={isBookmarkActive}
               getLiveTitle={getBookmarkLiveTitle}
               onOpenBookmark={(bookmarkId, url) => openBookmarkTab(bookmarkId, url, activeSpace?.id)}
-              onCloseBookmark={closeBookmarkTab}
+              onCloseBookmark={handleCloseBookmarkTab}
               onOpenAsTabGroup={!useSpaces ? handleOpenAsTabGroup : undefined}
               onOpenAllTabs={handleOpenAllTabs}
               onOpenAllTabsInNewWindow={handleOpenAllTabsInNewWindow}

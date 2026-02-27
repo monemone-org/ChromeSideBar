@@ -24,7 +24,7 @@ export const Toast = ({
 {
   const fontSize = useFontSize();
   const [slideState, setSlideState] = useState<SlideState>('hidden');
-  const effectiveDuration = duration ?? (onUndo ? 5000 : 2500);
+  const effectiveDuration = duration ?? 2500;
 
   const startExit = useCallback(() =>
   {
