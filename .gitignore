@@ -20,3 +20,4 @@ docs/.obsidian
 sidebar-backup-2026-01-31.json
 docs/test/sidebar-backup
 docs/test/feat-029
+.claude/settings.local.json
