@@ -366,7 +366,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
     if (url !== undefined && index !== undefined)
     {
-      saveTabAssociationBackup(currentWindowId, itemKey, { url, tabIndex: index });
+      saveTabAssociationBackup(currentWindowId, itemKey, { tabId, url, tabIndex: index });
     }
   }, [currentWindowId]);
 

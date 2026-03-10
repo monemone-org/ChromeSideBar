@@ -1,5 +1,5 @@
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
-import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup } from './utils/tabAssociations';
+import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup, restoreTabAssociationBackup } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
 import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
 
@@ -708,6 +708,7 @@ Promise.all([
 ]).then(() =>
 {
   stateReadyResolve();
+  restoreTabAssociationBackup();
 });
 
 // =============================================================================
@@ -848,7 +849,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
       const itemKey = associations[tabId];
       if (itemKey)
       {
-        saveTabAssociationBackup(tab.windowId, itemKey, { url: changeInfo.url, tabIndex: tab.index });
+        saveTabAssociationBackup(tab.windowId, itemKey, { tabId, url: changeInfo.url, tabIndex: tab.index });
       }
     }
     catch { /* tab may have been closed */ }

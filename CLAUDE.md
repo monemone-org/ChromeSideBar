@@ -26,6 +26,8 @@ Do not run `git add` or `git commit`. Notify the user to add and commit.
 
 - Use TypeScript strict mode
 - Follow existing patterns in the codebase
+- Before loops and sizable `if` blocks, add a short comment explaining what the loop/block is for
+- Prefer classes with descriptive methods over raw data structures (Records, Maps, plain objects). If code skips a high-level concept and directly manipulates low-level primitives (e.g. `Object.entries(x).filter(...)`, `map.get(key)!.field`), wrap it in a class that expresses the intent
 
 ## Shared Utilities
 
