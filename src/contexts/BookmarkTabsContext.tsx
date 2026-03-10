@@ -5,6 +5,8 @@ import {
   storeTabAssociation,
   removeTabAssociation as removeStoredAssociation,
   setTabAssociations,
+  saveTabAssociationBackup,
+  removeTabAssociationBackup,
 } from '../utils/tabAssociations';
 
 // Helper to create item keys
@@ -200,8 +202,9 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           return newMap;
         });
 
-        // Clean up from session storage
+        // Clean up from session storage and local backup
         removeStoredAssociation(windowId, tabId);
+        removeTabAssociationBackup(windowId, itemKey);
 
         const newMap = new Map(prev);
         newMap.delete(tabId);
@@ -331,14 +334,40 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     };
   }, []);
 
-  // Store association in session storage (wrapper around shared utility)
-  const storeAssociation = useCallback(async (tabId: number, itemKey: string): Promise<void> =>
+  // Store association in session storage and local backup
+  // tabUrl and tabIndex can be passed directly (e.g. from tab creation callback) to avoid
+  // an extra chrome.tabs.get call and its async yield point
+  const storeAssociation = useCallback(async (
+    tabId: number,
+    itemKey: string,
+    tabUrl?: string,
+    tabIndex?: number
+  ): Promise<void> =>
   {
-    if (currentWindowId === null)
-    {
-      return;
-    }
+    if (currentWindowId === null) return;
+
     await storeTabAssociation(currentWindowId, tabId, itemKey);
+
+    let url = tabUrl;
+    let index = tabIndex;
+
+    if (url === undefined || index === undefined)
+    {
+      const tab = await new Promise<chrome.tabs.Tab | null>((resolve) =>
+      {
+        chrome.tabs.get(tabId, (t) =>
+        {
+          resolve(chrome.runtime.lastError ? null : t);
+        });
+      });
+      url = tab?.url ?? '';
+      index = tab?.index;
+    }
+
+    if (url !== undefined && index !== undefined)
+    {
+      saveTabAssociationBackup(currentWindowId, itemKey, { url, tabIndex: index });
+    }
   }, [currentWindowId]);
 
   // Create a new tab for an item (no grouping)
@@ -362,8 +391,8 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         const tabId = tab.id;
         const windowId = currentWindowId ?? tab.windowId;
 
-        // Store association
-        await storeAssociation(tabId, itemKey);
+        // Store association (pass url+index to avoid extra chrome.tabs.get call)
+        await storeAssociation(tabId, itemKey, tab.url ?? '', tab.index);
 
         setItemToTab((prev) =>
         {

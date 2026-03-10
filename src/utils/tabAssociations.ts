@@ -58,3 +58,140 @@ export async function setTabAssociations(
   const key = getStorageKey(windowId);
   await chrome.storage.session.set({ [key]: associations });
 }
+
+// =============================================================================
+// Local storage backup (persists across browser restarts)
+// One storage entry per window + a separate index of all window IDs.
+// =============================================================================
+
+const BACKUP_KEY_PREFIX = 'tabAssociationsBackup_';
+const BACKUP_WINDOW_IDS_KEY = 'tabAssociationsBackupWindowIds';
+
+export interface TabAssociationBackupEntry
+{
+  url: string;
+  tabIndex: number;
+}
+
+// itemKey → { url, tabIndex } for one window
+export type WindowAssociationBackup = Record<string, TabAssociationBackupEntry>;
+
+const backupKey = (windowId: number) => `${BACKUP_KEY_PREFIX}${windowId}`;
+
+function formatBackup(backup: WindowAssociationBackup): string
+{
+  const entries = Object.entries(backup);
+  if (entries.length === 0) return '  (empty)';
+  return entries.map(([key, e]) => `  ${key}: tabIndex=${e.tabIndex}, url=${e.url}`).join('\n');
+}
+
+// Read the backup for a single window from local storage
+async function getWindowBackup(windowId: number): Promise<WindowAssociationBackup>
+{
+  const key = backupKey(windowId);
+  const result = await chrome.storage.local.get(key);
+  return result[key] ?? {};
+}
+
+async function getBackupWindowIds(): Promise<number[]>
+{
+  const result = await chrome.storage.local.get(BACKUP_WINDOW_IDS_KEY);
+  return result[BACKUP_WINDOW_IDS_KEY] ?? [];
+}
+
+async function addBackupWindowId(windowId: number): Promise<void>
+{
+  const ids = await getBackupWindowIds();
+  if (!ids.includes(windowId))
+  {
+    await chrome.storage.local.set({ [BACKUP_WINDOW_IDS_KEY]: [...ids, windowId] });
+  }
+}
+
+async function removeBackupWindowId(windowId: number): Promise<void>
+{
+  const ids = await getBackupWindowIds();
+  const filtered = ids.filter(id => id !== windowId);
+  if (filtered.length !== ids.length)
+  {
+    await chrome.storage.local.set({ [BACKUP_WINDOW_IDS_KEY]: filtered });
+  }
+}
+
+// Remove all backup entries for a window
+export async function removeWindowAssociationBackup(windowId: number): Promise<void>
+{
+  await Promise.all([
+    chrome.storage.local.remove(backupKey(windowId)),
+    removeBackupWindowId(windowId),
+  ]);
+  if (import.meta.env.DEV)
+  {
+    console.log('[TabAssociationBackup] removeWindow', windowId);
+  }
+}
+
+export async function saveTabAssociationBackup(
+  windowId: number,
+  itemKey: string,
+  entry: TabAssociationBackupEntry
+): Promise<void>
+{
+  const windowBackup = await getWindowBackup(windowId);
+  windowBackup[itemKey] = entry;
+  await chrome.storage.local.set({ [backupKey(windowId)]: windowBackup });
+  await addBackupWindowId(windowId);
+  if (import.meta.env.DEV)
+  {
+    console.log(`[TabAssociationBackup] save window=${windowId} ${itemKey}\n${formatBackup(windowBackup)}`);
+  }
+}
+
+export async function removeTabAssociationBackup(
+  windowId: number,
+  itemKey: string
+): Promise<void>
+{
+  const windowBackup = await getWindowBackup(windowId);
+  if (!(itemKey in windowBackup)) return;
+  delete windowBackup[itemKey];
+  if (Object.keys(windowBackup).length === 0)
+  {
+    await removeWindowAssociationBackup(windowId);
+  }
+  else
+  {
+    await chrome.storage.local.set({ [backupKey(windowId)]: windowBackup });
+  }
+  if (import.meta.env.DEV)
+  {
+    console.log(`[TabAssociationBackup] remove window=${windowId} ${itemKey}\n${formatBackup(windowBackup)}`);
+  }
+}
+
+// Patch tabIndex for multiple entries in one read-modify-write.
+// itemKeyToIndex: itemKey → new tabIndex
+export async function updateTabAssociationBackupIndices(
+  windowId: number,
+  itemKeyToIndex: Record<string, number>
+): Promise<void>
+{
+  const windowBackup = await getWindowBackup(windowId);
+  let changed = false;
+
+  for (const [itemKey, tabIndex] of Object.entries(itemKeyToIndex))
+  {
+    const entry = windowBackup[itemKey];
+    if (!entry || entry.tabIndex === tabIndex) continue;
+    windowBackup[itemKey] = { ...entry, tabIndex };
+    changed = true;
+  }
+
+  if (!changed) return;
+
+  await chrome.storage.local.set({ [backupKey(windowId)]: windowBackup });
+  if (import.meta.env.DEV)
+  {
+    console.log(`[TabAssociationBackup] updateIndices window=${windowId}\n${formatBackup(windowBackup)}`);
+  }
+}

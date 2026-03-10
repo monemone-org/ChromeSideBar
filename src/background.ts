@@ -1,5 +1,5 @@
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
-import { isPinnedManagedTab } from './utils/tabAssociations';
+import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
 import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
 
@@ -764,13 +764,67 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
   }
 });
 
-// Clean up history, last audible tracker, and tab registry when tab is closed
+// Refresh tab indices in local backup for all managed tabs in a window.
+// Called after any tab move or removal that may shift indices.
+async function refreshBackupIndices(windowId: number): Promise<void>
+{
+  const associations = await getTabAssociations(windowId);
+  if (Object.keys(associations).length === 0) return;
+
+  const allTabs = await chrome.tabs.query({ windowId });
+  const tabIndexMap = new Map(allTabs.map(t => [t.id!, t.index]));
+
+  const updates: Record<string, number> = {};
+  for (const [id, itemKey] of Object.entries(associations))
+  {
+    const newIndex = tabIndexMap.get(Number(id));
+    if (newIndex !== undefined)
+    {
+      updates[itemKey] = newIndex;
+    }
+  }
+
+  if (Object.keys(updates).length > 0)
+  {
+    await updateTabAssociationBackupIndices(windowId, updates);
+  }
+}
+
+// Clean up history, last audible tracker, tab registry, and local backup when tab is closed
 chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
 {
   await stateReady;
   historyManager.remove(removeInfo.windowId, tabId);
   lastAudibleTracker.clearIfMatches(tabId);
   tabSpaceRegistry.unregister(removeInfo.windowId, tabId);
+
+  if (!removeInfo.isWindowClosing)
+  {
+    const associations = await getTabAssociations(removeInfo.windowId);
+    const itemKey = associations[tabId];
+    if (itemKey)
+    {
+      await removeTabAssociationBackup(removeInfo.windowId, itemKey);
+    }
+
+    // Any tab removal shifts indices of tabs after it
+    await refreshBackupIndices(removeInfo.windowId);
+  }
+});
+
+// Clean up local backup when a window is closed
+chrome.windows.onRemoved.addListener(async (windowId) =>
+{
+  await removeWindowAssociationBackup(windowId);
+});
+
+// Update tab indices in local backup when any tab is moved.
+// A single move shifts all tabs between fromIndex and toIndex, so we refresh
+// all managed tabs in the window.
+chrome.tabs.onMoved.addListener(async (_tabId, moveInfo) =>
+{
+  await stateReady;
+  await refreshBackupIndices(moveInfo.windowId);
 });
 
 // Favicon loading Scenario 5 — see docs/favicon-loading-strategy.md
@@ -780,6 +834,24 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
   {
     await stateReady;
     lastAudibleTracker.setLastAudibleTabId(tabId);
+  }
+
+  // Update URL in local backup when a managed tab navigates
+  if (changeInfo.url)
+  {
+    try
+    {
+      const tab = await chrome.tabs.get(tabId);
+      if (!tab.windowId) return;
+
+      const associations = await getTabAssociations(tab.windowId);
+      const itemKey = associations[tabId];
+      if (itemKey)
+      {
+        saveTabAssociationBackup(tab.windowId, itemKey, { url: changeInfo.url, tabIndex: tab.index });
+      }
+    }
+    catch { /* tab may have been closed */ }
   }
 
   // Scenario 5: update pinned site favicon when Chrome reports a new favIconUrl
