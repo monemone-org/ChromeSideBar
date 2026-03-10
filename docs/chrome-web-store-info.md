@@ -11,21 +11,14 @@ The latest Chrome has a bug where creating or renaming tab groups via the Chrome
 
 A workaround has been applied to keep things working during your session. However, after Chrome restarts, all Space groups revert to "Unnamed Group". If this happens, simply rename each group back to its corresponding Space name — the extension will recognize them automatically.
 
-## What's New: Arc-Style Spaces
+## What's New: Persistent Tab Associations Across Restarts
 
-Finally, Spaces are here! Create workspaces that link a bookmark folder to a Chrome tab group. Switch between Work, Personal, and whatever else you've got going on - each space shows only its stuff.
-
-- Each space has its own focused bookmark tree
-- Uses Chrome's native tab groups to organize tabs
-- One click to switch contexts
-- Give each space its own color and icon
-- Swipe with two fingers to jump between spaces
-- Import top apps, spaces and bookmarks from Arc's `StorableSidebar.json`.
-- Import/export for backup/restore
+Bookmarks and pinned sites now remember their open tabs across browser restarts. Previously, restarting Chrome broke the link between bookmarks and their tabs — you'd have to re-open everything. Now the extension backs up associations and automatically restores them when Chrome starts up again.
 
 ## Key Features
 
-- Arc-Style Persistent Tabs - Bookmarks act as live tabs. Click to open, click again to jump back. Close tabs freely—bookmarks stay in the sidebar.
+- Arc-Style Persistent Tabs - Bookmarks act as live tabs. Click to open, click again to jump back. Close tabs freely—bookmarks stay in the sidebar. Tab links survive browser restarts and extension reloads.
+
 
 - Arc-Style Spaces - Isolated workspaces linking bookmark folders to tab groups. Switch contexts with one click.
 
@@ -44,6 +37,13 @@ Finally, Spaces are here! Create workspaces that link a bookmark folder to a Chr
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
 ## Changelog
+
+## 1.0.287
+
+- Persistent tab associations: bookmark and pinned site tab links now survive browser restarts and extension reloads
+- "Close and Delete" option in bookmark context menu
+- Undo support for closing tabs
+- Cleaner search toolbar: filter buttons consolidated into the search bar
 
 ## 1.0.281
 

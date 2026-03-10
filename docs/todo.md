@@ -4,6 +4,8 @@
 
 ## Pending
 
+- [ ] add a new feature "Welcome" dialog, display what's new text bundled with the extension after upgrade.
+
 - [ ] inactive space bar icon that displays emoji should be in black and white (support light and dark theme)
 
 - Review Code:
