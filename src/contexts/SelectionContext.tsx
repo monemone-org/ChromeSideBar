@@ -133,18 +133,18 @@ export const SelectionProvider = ({ children }: SelectionProviderProps) =>
     return bookmarkSelection.size;
   }, [bookmarkSelection]);
 
-  if (import.meta.env.DEV)
-  {
-    // Debug logging for selection state changes
-    useEffect(() =>
-    {
-        console.log('[Selection] tabSelection changed:', {
-          count: tabSelection.size,
-          ids: Array.from(tabSelection.keys()),
-          items: Array.from(tabSelection.values()),
-        });
-    }, [tabSelection]);
-  }
+  // if (import.meta.env.DEV)
+  // {
+  //   // Debug logging for selection state changes
+  //   useEffect(() =>
+  //   {
+  //       console.log('[Selection] tabSelection changed:', {
+  //         count: tabSelection.size,
+  //         ids: Array.from(tabSelection.keys()),
+  //         items: Array.from(tabSelection.values()),
+  //       });
+  //   }, [tabSelection]);
+  // }
 
   // useEffect(() =>
   // {

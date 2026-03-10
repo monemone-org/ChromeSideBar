@@ -132,10 +132,10 @@ class TabHistoryManager
   {
     const navId = (this.#navigatingWindows.get(windowId) ?? 0) + 1;
     this.#navigatingWindows.set(windowId, navId);
-    if (import.meta.env.DEV)
-    {
-      console.log(`[TabHistory] setNavigating: windowId=${windowId}, navId=${navId}`);
-    }
+    // if (import.meta.env.DEV)
+    // {
+    //   console.log(`[TabHistory] setNavigating: windowId=${windowId}, navId=${navId}`);
+    // }
     return navId;
   }
 
@@ -144,10 +144,10 @@ class TabHistoryManager
   {
     const currentNavId = this.#navigatingWindows.get(windowId);
     const matches = currentNavId === navId;
-    if (import.meta.env.DEV)
-    {
-      console.log(`[TabHistory] unsetNavigating: windowId=${windowId}, navId=${navId}, currentNavId=${currentNavId}, cleared=${matches}`);
-    }
+    // if (import.meta.env.DEV)
+    // {
+    //   console.log(`[TabHistory] unsetNavigating: windowId=${windowId}, navId=${navId}, currentNavId=${currentNavId}, cleared=${matches}`);
+    // }
     if (!matches) return false;
     this.#navigatingWindows.delete(windowId);
     return true;
@@ -220,7 +220,7 @@ class TabHistoryManager
     }
 
     this.save();
-    if (import.meta.env.DEV) this.dump(windowId, `PUSH tabId=${tabId}`);
+    // if (import.meta.env.DEV) this.dump(windowId, `PUSH tabId=${tabId}`);
   }
 
   remove(windowId: number, tabId: number): void
@@ -244,7 +244,7 @@ class TabHistoryManager
     }
 
     this.save();
-    if (import.meta.env.DEV) this.dump(windowId, `REMOVE tabId=${tabId}`);
+    // if (import.meta.env.DEV) this.dump(windowId, `REMOVE tabId=${tabId}`);
   }
 
   async navigate(windowId: number, direction: number): Promise<void>
@@ -722,10 +722,10 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
 
   const isNavigating = historyManager.isNavigating(activeInfo.windowId);
 
-  if (import.meta.env.DEV)
-  {
-    console.log(`[onActivated] START tabId=${activeInfo.tabId}, isNavigating=${isNavigating}`);
-  }
+  // if (import.meta.env.DEV)
+  // {
+  //   console.log(`[onActivated] START tabId=${activeInfo.tabId}, isNavigating=${isNavigating}`);
+  // }
 
   // Track tab history (skip if this activation was triggered by navigation)
   if (!isNavigating)
@@ -736,10 +736,10 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
   // Lookup destination space for sidebar switch
   const destinationSpaceId = await getSpaceForTab(activeInfo.windowId, activeInfo.tabId);
 
-  if (import.meta.env.DEV)
-  {
-    console.log(`[onActivated] destinationSpaceId=${destinationSpaceId}`);
-  }
+  // if (import.meta.env.DEV)
+  // {
+  //   console.log(`[onActivated] destinationSpaceId=${destinationSpaceId}`);
+  // }
 
   // Switch sidebar to tab's Space (unless in "All" space or pinned tab)
   if (destinationSpaceId && spaceStateManager.getActiveSpace(activeInfo.windowId) !== 'all')

@@ -86,26 +86,26 @@ export const usePinnedSites = () => {
 
     if (needsCustomIcon.length === 0 && needsSiteFavicon.length === 0)
     {
-      if (import.meta.env.DEV)
-      {
-        console.log('[PinnedSites] render — no unresolved icons');
-      }
+      // if (import.meta.env.DEV)
+      // {
+      //   console.log('[PinnedSites] render — no unresolved icons');
+      // }
       return;
     }
 
-    if (import.meta.env.DEV)
-    {
-      if (needsCustomIcon.length > 0)
-      {
-        console.log(`[PinnedSites] resolving ${needsCustomIcon.length} custom icon(s):`,
-          needsCustomIcon.map(s => `"${s.title}" (${s.customIconName})`));
-      }
-      if (needsSiteFavicon.length > 0)
-      {
-        console.log(`[PinnedSites] resolving ${needsSiteFavicon.length} site favicon(s):`,
-          needsSiteFavicon.map(s => `"${s.title}" (${s.url})`));
-      }
-    }
+    // if (import.meta.env.DEV)
+    // {
+    //   if (needsCustomIcon.length > 0)
+    //   {
+    //     console.log(`[PinnedSites] resolving ${needsCustomIcon.length} custom icon(s):`,
+    //       needsCustomIcon.map(s => `"${s.title}" (${s.customIconName})`));
+    //   }
+    //   if (needsSiteFavicon.length > 0)
+    //   {
+    //     console.log(`[PinnedSites] resolving ${needsSiteFavicon.length} site favicon(s):`,
+    //       needsSiteFavicon.map(s => `"${s.title}" (${s.url})`));
+    //   }
+    // }
 
     isResolvingRef.current = true;
 
@@ -157,17 +157,17 @@ export const usePinnedSites = () => {
 
         if (resolvedMap.size === 0)
         {
-          if (import.meta.env.DEV)
-          {
-            console.log('[PinnedSites] no icons could be resolved');
-          }
+          // if (import.meta.env.DEV)
+          // {
+          //   console.log('[PinnedSites] no icons could be resolved');
+          // }
           return;
         }
 
-        if (import.meta.env.DEV)
-        {
-          console.log(`[PinnedSites] resolved ${resolvedMap.size} icon(s), saving back`);
-        }
+        // if (import.meta.env.DEV)
+        // {
+        //   console.log(`[PinnedSites] resolved ${resolvedMap.size} icon(s), saving back`);
+        // }
 
         // Re-read fresh state before writing back to avoid overwriting concurrent changes
         // (e.g. user adds/removes a pin, or background.ts updates a favicon while we were fetching)

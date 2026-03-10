@@ -39,11 +39,11 @@ const fetchDefaultFavicon = async (): Promise<string | undefined> => {
   const invalidUrl = getFaviconUrl('https://invalid.monemone.org');
   defaultFaviconBase64 = await fetchAsBase64(invalidUrl);
 
-  if (import.meta.env.DEV)
-  {
-    console.log('[Favicon] cached default favicon',
-      defaultFaviconBase64 ? `(${defaultFaviconBase64.length} chars)` : '(none)');
-  }
+  // if (import.meta.env.DEV)
+  // {
+  //   console.log('[Favicon] cached default favicon',
+  //     defaultFaviconBase64 ? `(${defaultFaviconBase64.length} chars)` : '(none)');
+  // }
 
   return defaultFaviconBase64;
 };
@@ -62,10 +62,10 @@ export const fetchFaviconAsBase64 = async (url: string): Promise<string | undefi
   // Filter out Chrome's default globe icon
   if (defaultFavicon && base64 === defaultFavicon)
   {
-    if (import.meta.env.DEV)
-    {
-      console.log('[Favicon] filtered out default globe icon for:', url);
-    }
+    // if (import.meta.env.DEV)
+    // {
+    //   console.log('[Favicon] filtered out default globe icon for:', url);
+    // }
     return undefined;
   }
 
