@@ -1,7 +1,7 @@
 ---
 created: 2026-02-06
 after-version: 1.0.259
-status: draft
+status: completed
 ---
 
 # 028 - Undo Toast

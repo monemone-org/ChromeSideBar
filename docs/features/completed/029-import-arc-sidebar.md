@@ -1,7 +1,7 @@
 ---
 created: 2026-02-23
 after-version: 1.0.277
-status: in-progress
+status: completed
 ---
 
 # Import Arc Browser Sidebar
