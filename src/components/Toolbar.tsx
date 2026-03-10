@@ -1,4 +1,4 @@
-import { Settings, Filter, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, FilterX, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
+import { Settings, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
 import { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
 import * as DropdownMenu from './menu/DropdownMenu';
 
@@ -20,7 +20,6 @@ interface ToolbarProps
   onApplyFilter: (text: string) => void;
   onUpdateRecent?: (text: string, existingEntry?: string) => void;
   onShowToast?: (message: string) => void;
-  onResetFilters?: () => void;
   showFilterArea?: boolean;
   onToggleFilterArea?: () => void;
 }
@@ -44,7 +43,6 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   onApplyFilter,
   onUpdateRecent,
   onShowToast,
-  onResetFilters,
   showFilterArea = false,
   onToggleFilterArea,
 }, _ref) =>
@@ -267,9 +265,6 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
     onUpdateRecent(trimmed, sessionRecentEntry ?? undefined);
     setSessionRecentEntry(trimmed);
   }, [inputValue, sessionRecentEntry, onUpdateRecent]);
-
-  // Check if any filter is active
-  const hasActiveFilters = filterLiveTabsActive || inputValue.trim() !== '';
 
   // Close dropdown when clicking outside or pressing Escape
   useEffect(() =>
@@ -530,17 +525,6 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
           {/* Separator */}
           <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-0.5" />
 
-          {/* Filter buttons */}
-          <button
-            onClick={onFilterLiveTabsToggle}
-            title={filterLiveTabsActive ? "Show all items" : "Show only items with open tabs"}
-            className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
-              filterLiveTabsActive ? activeButtonClass : inactiveButtonClass
-            }`}
-          >
-            <Filter size={16} />
-          </button>
-
           {/* Toggle search bar button */}
           {onToggleFilterArea && (
             <button
@@ -554,21 +538,6 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             </button>
           )}
 
-          {/* Reset filters button - always visible, disabled when no filters active */}
-          {onResetFilters && (
-            <button
-              onClick={onResetFilters}
-              disabled={!hasActiveFilters}
-              title="Reset all filters"
-              className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${
-                hasActiveFilters
-                  ? inactiveButtonClass
-                  : 'text-gray-300 dark:text-gray-600'
-              }`}
-            >
-              <FilterX size={16} />
-            </button>
-          )}
         </div>
 
         {/* Right side - Settings gear button */}
@@ -584,6 +553,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
 
       {/* Bottom row - Text filter (conditionally rendered) */}
       {showFilterArea && (
+        <>
         <div className="flex items-center gap-1 px-2 pb-1.5">
           <div className="relative flex-1 flex items-center">
             <input
@@ -745,6 +715,18 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             )}
           </div>
         </div>
+
+        {/* Open tabs only checkbox */}
+        <label className="flex items-center gap-1.5 px-2 pb-1.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={filterLiveTabsActive}
+            onChange={onFilterLiveTabsToggle}
+            className="w-3.5 h-3.5 accent-blue-500"
+          />
+          <span className="text-xs text-gray-500 dark:text-gray-400">Open tabs only</span>
+        </label>
+        </>
       )}
     </div>
   );

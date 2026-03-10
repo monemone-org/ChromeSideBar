@@ -684,12 +684,6 @@ function App() {
     }
   }, [lastAction]);
 
-  // Reset all filters
-  const handleResetFilters = useCallback(() => {
-    setFilterText('');
-    setFilterLiveTabs(false);
-  }, []);
-
   // Space handlers
   const handleCreateSpace = useCallback(() => {
     setSpaceToEdit(null);
@@ -855,7 +849,6 @@ function App() {
           onApplyFilter={handleApplyFilter}
           onUpdateRecent={handleUpdateRecent}
           onShowToast={showToast}
-          onResetFilters={handleResetFilters}
           showFilterArea={showFilterArea}
           onToggleFilterArea={() => {
             const newShowFilterArea = !showFilterArea;
@@ -971,7 +964,7 @@ function App() {
         addPin={addPin}
         iconSize={pinnedIconSize}
         bookmarkOpenMode={bookmarkOpenMode}
-        filterLiveTabs={filterLiveTabs}
+        filterLiveTabs={showFilterArea && filterLiveTabs}
         filterText={filterText}
         onPerformAction={performAction}
       />
@@ -992,7 +985,7 @@ function App() {
         bookmarkOpenMode={bookmarkOpenMode}
         arcSingleClickOpensTab={arcSingleClickOpensTab}
         onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }}
-        filterLiveTabs={filterLiveTabs}
+        filterLiveTabs={showFilterArea && filterLiveTabs}
         filterText={filterText}
         tabGroupDisplayOrder={tabGroupDisplayOrder}
         onTabGroupDisplayOrderChange={setTabGroupDisplayOrder}
