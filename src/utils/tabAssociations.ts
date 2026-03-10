@@ -108,23 +108,41 @@ async function addBackupWindowId(windowId: number): Promise<void>
   }
 }
 
+// Remove backup data for windows that no longer exist and return the cleaned list.
+async function pruneStaleBackupWindowIds(ids: number[]): Promise<number[]>
+{
+  const existingWindows = await chrome.windows.getAll();
+  const existingIds = new Set(existingWindows.map(w => w.id!));
+
+  const staleIds = ids.filter(id => !existingIds.has(id));
+  if (staleIds.length > 0)
+  {
+    await chrome.storage.local.remove(staleIds.map(id => backupKey(id)));
+    if (import.meta.env.DEV)
+    {
+      console.log('[TabAssociationBackup] pruned stale windows:', staleIds);
+    }
+  }
+
+  return ids.filter(id => existingIds.has(id));
+}
+
 async function removeBackupWindowId(windowId: number): Promise<void>
 {
   const ids = await getBackupWindowIds();
-  const filtered = ids.filter(id => id !== windowId);
+  const pruned = await pruneStaleBackupWindowIds(ids);
+  const filtered = pruned.filter(id => id !== windowId);
   if (filtered.length !== ids.length)
   {
     await chrome.storage.local.set({ [BACKUP_WINDOW_IDS_KEY]: filtered });
   }
+  await chrome.storage.local.remove(backupKey(windowId));
 }
 
 // Remove all backup entries for a window
 export async function removeWindowAssociationBackup(windowId: number): Promise<void>
 {
-  await Promise.all([
-    chrome.storage.local.remove(backupKey(windowId)),
-    removeBackupWindowId(windowId),
-  ]);
+  await removeBackupWindowId(windowId);
   if (import.meta.env.DEV)
   {
     console.log('[TabAssociationBackup] removeWindow', windowId);
