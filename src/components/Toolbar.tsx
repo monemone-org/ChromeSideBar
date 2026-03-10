@@ -717,14 +717,17 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
         </div>
 
         {/* Open tabs only checkbox */}
-        <label className="flex items-center gap-1.5 px-2 pb-1.5 cursor-pointer select-none">
+        <label
+          className="flex items-center gap-1.5 px-2 pb-1.5 cursor-pointer select-none"
+          title="When checked, only shows bookmarks and pinned sites that are currently open in a tab"
+        >
           <input
             type="checkbox"
             checked={filterLiveTabsActive}
             onChange={onFilterLiveTabsToggle}
             className="w-3.5 h-3.5 accent-blue-500"
           />
-          <span className="text-xs text-gray-500 dark:text-gray-400">Open tabs only</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">With open tabs</span>
         </label>
         </>
       )}
