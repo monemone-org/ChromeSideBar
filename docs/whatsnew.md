@@ -4,17 +4,21 @@
 
 ### Persistent Tab Associations Across Restarts
 
-Bookmarks and pinned sites now remember their open tabs across browser restarts. Previously, restarting Chrome broke the link between bookmarks and their tabs — you'd have to re-open everything. Now the extension backs up associations and automatically restores them when Chrome starts up again.
+- Extension now remembers Bookmarks' and pinned sites' open tabs across browser restarts
+- Previously restarting Chrome broke the link between bookmarks and their tabs — now it's backed up and tries its best to restore the links.
 
-### Rework of search bar
+### Search Bar Rework
 
-TODO
+- Simplified Search Bar UI and clean up toolbar - fewer buttons
+- Moved the "show tabs only" and "reset filters" buttons into the search bar
+- Hiding the search bar resets all filters automatically
 
-### Close Tab is now undable
+### Close Tab Is Now Undoable
 
-TODO
+- Closing a bookmark's tab can now be undone
+- Add Undo button in the main menu
 
-### News & Updates announcements
+### News & Updates
 
-- News & Updates: see what changed after each extension upgrade
-- News announcements: get notified about important updates between releases
+- See what changed after each extension upgrade in a "What's New" dialog
+- Get notified about important announcements between releases
