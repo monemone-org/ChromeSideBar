@@ -8,6 +8,10 @@ const ABOUT = {
   chromeWebStore: 'https://chromewebstore.google.com/detail/Sidebar%20for%20Arc%20Users/jmmgjadgeeicdbagekohgmaipoekgcbn',
 };
 
+const URLS = {
+  news: 'https://github.com/monemone-org/ChromeSideBar/blob/main/docs/news/news.md',
+};
+
 interface AboutDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -52,6 +56,14 @@ export function AboutDialog({ isOpen, onClose, onShowWelcome }: AboutDialogProps
               Show Welcome
             </button>
           )}
+          <a
+            href={URLS.news}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            News <ExternalLink size={12} />
+          </a>
           <a
             href={ABOUT.github}
             target="_blank"

@@ -10,6 +10,7 @@ import { ExportDialog } from './components/ExportDialog';
 import { ImportDialog } from './components/ImportDialog';
 import { ArcImportDialog } from './components/ArcImportDialog';
 import { WelcomeDialog } from './components/WelcomeDialog';
+import { WhatsNewDialog } from './components/WhatsNewDialog';
 import { AudioTabsDropdown } from './components/AudioTabsDropdown';
 import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
@@ -32,7 +33,7 @@ import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
 import { GROUP_COLORS } from './utils/groupColors';
-import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2 } from 'lucide-react';
+import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkles } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
 import * as DropdownMenu from './components/menu/DropdownMenu';
@@ -534,12 +535,35 @@ function App() {
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showArcImport, setShowArcImport] = useState(false);
-  const [hasSeenWelcome, setHasSeenWelcome] = useLocalStorage(
-    'sidebar-has-seen-welcome',
-    false,
-    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  const currentVersion = chrome.runtime.getManifest().version;
+
+  // Migrate old 'sidebar-has-seen-welcome' boolean to 'sidebar-last-seen-version'.
+  // Runs once before useLocalStorage reads the key.
+  useState(() =>
+  {
+    if (localStorage.getItem('sidebar-last-seen-version') !== null) return;
+    const oldFlag = localStorage.getItem('sidebar-has-seen-welcome');
+    if (oldFlag !== null)
+    {
+      // Existing user who saw welcome: set to "0" so What's New dialog shows
+      // Existing user who hasn't seen welcome: leave empty (new install flow)
+      const migratedValue = oldFlag === 'true' ? '0' : '';
+      localStorage.setItem('sidebar-last-seen-version', migratedValue);
+      localStorage.removeItem('sidebar-has-seen-welcome');
+    }
+  });
+
+  const [lastSeenVersion, setLastSeenVersion] = useLocalStorage(
+    'sidebar-last-seen-version',
+    '',
+    { parse: (v) => v, serialize: (v) => v }
   );
+
+  const isNewInstall = lastSeenVersion === '';
+  const hasVersionChanged = !isNewInstall && lastSeenVersion !== currentVersion;
+
   const [showWelcome, setShowWelcome] = useState(false);
+  const [showWhatsNew, setShowWhatsNew] = useState(hasVersionChanged);
   const [showMenu, setShowMenu] = useState(false);
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
@@ -809,10 +833,18 @@ function App() {
       />
 
       <WelcomeDialog
-        isOpen={!hasSeenWelcome || showWelcome}
+        isOpen={isNewInstall || showWelcome}
         onClose={() => {
-          setHasSeenWelcome(true);
+          setLastSeenVersion(currentVersion);
           setShowWelcome(false);
+        }}
+      />
+
+      <WhatsNewDialog
+        isOpen={showWhatsNew}
+        onClose={() => {
+          setLastSeenVersion(currentVersion);
+          setShowWhatsNew(false);
         }}
       />
 
@@ -900,6 +932,10 @@ function App() {
               Import from Arc Browser...
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
+            <DropdownMenu.Item onSelect={() => setShowWhatsNew(true)}>
+              <Sparkles size={14} className="mr-2" />
+              What's New
+            </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={() => setShowAbout(true)}>
               <Info size={14} className="mr-2" />
               About

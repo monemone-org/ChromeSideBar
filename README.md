@@ -176,6 +176,10 @@ Gear icon in the bottom-left corner:
 - `storage`: Save your settings locally
 - `favicon`: Show website icons
 
+## Full Changelog
+
+[changlog.md](https://github.com/monemone-org/ChromeSideBar/blob/release-1.0.289/docs/changelog.md)
+
 ## Tech Stack
 
 Built with the usual modern web stack:
@@ -235,4 +239,3 @@ Outputs production build to `dist/` folder.
 Or Install via Chrome Extension Store
 
 https://chromewebstore.google.com/detail/jmmgjadgeeicdbagekohgmaipoekgcbn?utm_source=item-share-cb
-
