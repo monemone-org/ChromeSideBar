@@ -5,14 +5,45 @@
 # Build number = git commit count (source-code-only commits)
 #
 # Usage:
-#   ./tools/update-version.sh          # Update build number only
-#   ./tools/update-version.sh major    # Bump major version
-#   ./tools/update-version.sh minor    # Bump minor version
-#   ./tools/update-version.sh 2 1      # Set major=2, minor=1
+#   ./tools/update-version.sh                      # Update build number only
+#   ./tools/update-version.sh --major 2             # Set major version to 2
+#   ./tools/update-version.sh --minor 1             # Set minor version to 1
+#   ./tools/update-version.sh --major 2 --minor 1   # Set both
+#   ./tools/update-version.sh --commit              # Update and commit
+#   ./tools/update-version.sh --major 2 -c          # Set major and commit
 
-set -e
+set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+printHelp()
+{
+    echo "Usage: ./tools/update-version.sh [--major N] [--minor N] [--commit|-c]"
+    echo ""
+    echo "Updates version in package.json and manifest.json."
+    echo "Version format: {major}.{minor}.{build_number}"
+    echo "Build number is the git commit count of source-code-only commits."
+    echo ""
+    echo "Options:"
+    echo "  --major N       Set major version to N"
+    echo "  --minor N       Set minor version to N"
+    echo "  --commit, -c    Stage and commit the version changes"
+    echo "  --help, -h      Show this help message"
+}
+
+# Parse flags
+COMMIT=false
+NEW_MAJOR=""
+NEW_MINOR=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --commit|-c) COMMIT=true ;;
+        --help|-h) printHelp; exit 0 ;;
+        --major) NEW_MAJOR="$2"; shift ;;
+        --minor) NEW_MINOR="$2"; shift ;;
+    esac
+    shift
+done
 
 # Get current version from package.json
 CURRENT_VERSION=$(grep '"version"' package.json | sed 's/.*: "\([^"]*\)".*/\1/')
@@ -26,15 +57,12 @@ else
     MINOR=0
 fi
 
-# Handle arguments
-if [ "$1" = "major" ]; then
-    MAJOR=$((MAJOR + 1))
-    MINOR=0
-elif [ "$1" = "minor" ]; then
-    MINOR=$((MINOR + 1))
-elif [ -n "$1" ] && [ -n "$2" ]; then
-    MAJOR="$1"
-    MINOR="$2"
+# Apply overrides
+if [ -n "$NEW_MAJOR" ]; then
+    MAJOR="$NEW_MAJOR"
+fi
+if [ -n "$NEW_MINOR" ]; then
+    MINOR="$NEW_MINOR"
 fi
 
 # Get build number (count only commits that touch extension source/build files)
@@ -65,6 +93,10 @@ fi
 
 echo "Updated package.json and manifest.json to version ${NEW_VERSION}"
 
-# Commit the version changes
-git add package.json public/manifest.json
-git commit -m "build: Bump version to ${NEW_VERSION}"
+if [ "$COMMIT" = true ]; then
+    git add package.json public/manifest.json
+    git commit -m "build: Bump version to ${NEW_VERSION}"
+
+    # Also update news version
+    tools/update-news-version.sh --commit
+fi

@@ -8,7 +8,8 @@
 # Output:
 #   releases/sidebar-for-arc-users-{version}.zip
 
-set -e
+set -euo pipefail
+# set -x
 
 cd "$(dirname "$0")/.."
 

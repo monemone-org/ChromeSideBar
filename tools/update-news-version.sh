@@ -4,11 +4,33 @@
 # that touched docs/news/news.md
 #
 # Usage:
-#   ./tools/update-news-version.sh
+#   ./tools/update-news-version.sh            # Update version file only
+#   ./tools/update-news-version.sh --commit   # Update and stage
 
-set -e
+set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+printHelp()
+{
+    echo "Usage: ./tools/update-news-version.sh [--commit|-c]"
+    echo ""
+    echo "Updates docs/news/latest.version based on the number of commits"
+    echo "that touched docs/news/news.md."
+    echo ""
+    echo "Options:"
+    echo "  --commit, -c    Stage the updated version file"
+    echo "  --help, -h      Show this help message"
+}
+
+# Parse flags
+COMMIT=false
+for arg in "$@"; do
+    case "$arg" in
+        --commit|-c) COMMIT=true ;;
+        --help|-h) printHelp; exit 0 ;;
+    esac
+done
 
 NEWS_VERSION_FILE="docs/news/latest.version"
 NEWS_MD_FILE="docs/news/news.md"
@@ -26,5 +48,6 @@ echo "$NEWS_VERSION" > "$NEWS_VERSION_FILE"
 
 echo "Updated ${NEWS_VERSION_FILE} to ${NEWS_VERSION}"
 
-# Stage the file
-git add "$NEWS_VERSION_FILE"
+if [ "$COMMIT" = true ]; then
+    git add "$NEWS_VERSION_FILE"
+fi
