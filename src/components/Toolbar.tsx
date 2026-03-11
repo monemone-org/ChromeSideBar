@@ -22,6 +22,7 @@ interface ToolbarProps
   onShowToast?: (message: string) => void;
   showFilterArea?: boolean;
   onToggleFilterArea?: () => void;
+  hasUnreadNews?: boolean;
 }
 
 
@@ -45,6 +46,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   onShowToast,
   showFilterArea = false,
   onToggleFilterArea,
+  hasUnreadNews = false,
 }, _ref) =>
 {
   const activeButtonClass = 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 active:bg-blue-200 dark:active:bg-blue-800';
@@ -541,14 +543,20 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
         </div>
 
         {/* Right side - Settings gear button */}
-        <button
-          ref={menuButtonRef}
-          onClick={onMenuToggle}
-          title="Menu"
-          className={`p-1.5 rounded transition-all duration-150 ${inactiveButtonClass}`}
-        >
-          <Settings size={16} />
-        </button>
+        <div className="relative">
+          <button
+            ref={menuButtonRef}
+            onClick={onMenuToggle}
+            title="Menu"
+            className={`p-1.5 rounded transition-all duration-150 ${inactiveButtonClass}`}
+          >
+            <Settings size={16} />
+          </button>
+          {/* Red dot badge for unread news */}
+          {hasUnreadNews && (
+            <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full" />
+          )}
+        </div>
       </div>
 
       {/* Bottom row - Text filter (conditionally rendered) */}

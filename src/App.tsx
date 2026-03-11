@@ -33,9 +33,10 @@ import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
 import { GROUP_COLORS } from './utils/groupColors';
-import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkles } from 'lucide-react';
+import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkles, Newspaper } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
+import { useNewsCheck } from './hooks/useNewsCheck';
 import * as DropdownMenu from './components/menu/DropdownMenu';
 
 // Inner component that renders content for a single space
@@ -538,7 +539,7 @@ function App() {
   const currentVersion = chrome.runtime.getManifest().version;
 
   // Migrate old 'sidebar-has-seen-welcome' boolean to 'sidebar-last-seen-version'.
-  // Runs once before useLocalStorage reads the key.
+  // Writes to localStorage so useChromeLocalStorage can auto-migrate it to chrome.storage.local.
   useState(() =>
   {
     if (localStorage.getItem('sidebar-last-seen-version') !== null) return;
@@ -553,7 +554,7 @@ function App() {
     }
   });
 
-  const [lastSeenVersion, setLastSeenVersion] = useLocalStorage(
+  const [lastSeenVersion, setLastSeenVersion] = useChromeLocalStorage(
     'sidebar-last-seen-version',
     '',
     { parse: (v) => v, serialize: (v) => v }
@@ -563,7 +564,16 @@ function App() {
   const hasVersionChanged = !isNewInstall && lastSeenVersion !== currentVersion;
 
   const [showWelcome, setShowWelcome] = useState(false);
-  const [showWhatsNew, setShowWhatsNew] = useState(hasVersionChanged);
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+
+  // Trigger What's New dialog once lastSeenVersion loads from async storage
+  useEffect(() =>
+  {
+    if (hasVersionChanged)
+    {
+      setShowWhatsNew(true);
+    }
+  }, [hasVersionChanged]);
   const [showMenu, setShowMenu] = useState(false);
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
@@ -590,6 +600,7 @@ function App() {
   const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null);
   const [showSpaceDeleteDialog, setShowSpaceDeleteDialog] = useState(false);
   const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
+  const newsHoverTimerRef = useRef<number | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null!);
   const audioButtonRef = useRef<HTMLButtonElement>(null!);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -607,6 +618,7 @@ function App() {
   } = usePinnedSites();
   const { bookmarks } = useBookmarks();
   const { tabs, refreshTabs } = useTabs();
+  const { hasUnreadNews, markNewsRead, openNews } = useNewsCheck();
 
   const handleApplySettings = (newSettings: SettingsValues) => {
     setFontSize(newSettings.fontSize);
@@ -890,6 +902,7 @@ function App() {
               setFilterText('');
             }
           }}
+          hasUnreadNews={hasUnreadNews}
         />
 
         {/* Settings popup menu */}
@@ -935,6 +948,28 @@ function App() {
             <DropdownMenu.Item onSelect={() => setShowWhatsNew(true)}>
               <Sparkles size={14} className="mr-2" />
               What's New
+            </DropdownMenu.Item>
+            <DropdownMenu.Item
+              onSelect={openNews}
+              onMouseEnter={() =>
+              {
+                newsHoverTimerRef.current = window.setTimeout(markNewsRead, 1000);
+              }}
+              onMouseLeave={() =>
+              {
+                if (newsHoverTimerRef.current)
+                {
+                  clearTimeout(newsHoverTimerRef.current);
+                  newsHoverTimerRef.current = null;
+                }
+              }}
+            >
+              <Newspaper size={14} className="mr-2" />
+              News
+              {/* Red dot for unread news */}
+              {hasUnreadNews && (
+                <span className="ml-1.5 w-2 h-2 bg-red-500 rounded-full inline-block" />
+              )}
             </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={() => setShowAbout(true)}>
               <Info size={14} className="mr-2" />

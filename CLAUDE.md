@@ -47,6 +47,10 @@ const handleError = useCallback(
 
 This provides consistent error logging and state management across all Chrome API calls.
 
+### Local Storage
+
+Use `chrome.storage.local` (via `useChromeLocalStorage` hook) for new persistent state. Legacy code uses `localStorage` (`useLocalStorage` hook) — don't migrate existing keys, but all new keys should use `chrome.storage.local` for consistency and cross-window sync.
+
 ### debug log with console.log
 
 Only enable logging in debug build:
