@@ -5,12 +5,6 @@ Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
 
 I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, bookmarks, and tabs all in one vertical list and its pinned tab support. So I built this extension to bring that experience to Chrome.
 
-## Known Issue: Spaces Lose Their Groups After Chrome Restart
-
-The latest Chrome has a bug where creating or renaming tab groups via the Chrome API fails — affected groups appear with no name and in white colour. This breaks the Space-to-group association.
-
-A workaround has been applied to keep things working during your session. However, after Chrome restarts, all Space groups revert to "Unnamed Group". If this happens, simply rename each group back to its corresponding Space name — the extension will recognize them automatically.
-
 ## What's New: Persistent Tab Associations Across Restarts
 
 Bookmarks and pinned sites now remember their open tabs across browser restarts. Previously, restarting Chrome broke the link between bookmarks and their tabs — you'd have to re-open everything. Now the extension backs up associations and automatically restores them when Chrome starts up again.
