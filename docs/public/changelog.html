@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Side Bar for Arc Users Changelog</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 24px 16px;
+    line-height: 1.6;
+    color: #374151;
+    background: white;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #d1d5db; background: #1f2937; }
+    a { color: #60a5fa; }
+  }
+  h1 { font-size: 1.5em; font-weight: 700; margin: 0 0 24px 0; }
+  h2 { font-size: 1.2em; font-weight: 600; margin: 32px 0 8px 0; }
+  h3 { font-size: 1.1em; font-weight: 600; margin: 16px 0 4px 0; }
+  p { margin: 8px 0; }
+  ul { margin: 4px 0; padding-left: 20px; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<h2>Changelog</h2>
+<h2>1.0.293</h2>
+<ul>
+<li>Persistent tab associations: bookmark and pinned site tab links now survive browser restarts and extension reloads</li>
+<li>&quot;Close and Delete&quot; option in bookmark context menu</li>
+<li>Undo support for closing tabs</li>
+<li>Cleaner search toolbar: filter buttons consolidated into the search bar</li>
+</ul>
+<h2>1.0.281</h2>
+<ul>
+<li>Import from Arc Browser: import your pinned sites, spaces, and bookmarks from Arc&#39;s <code>StorableSidebar.json</code></li>
+<li>Emoji icons: use any emoji as the icon for spaces and pinned sites</li>
+<li>Custom hex colors for spaces (no longer limited to Chrome&#39;s built-in color set)</li>
+</ul>
+<h2>1.0.277</h2>
+<ul>
+<li>Option+click on bookmarks and pinned sites opens them in a new tab</li>
+<li>Reduced toast notification size for better readability</li>
+</ul>
+<h2>1.0.275</h2>
+<ul>
+<li>Dropping bookmarks/pins with live tabs onto the tab list now moves the existing tab instead of opening a duplicate</li>
+<li>Fixed new tab not assigned to active Space&#39;s tab group when no existing group exists (Chrome bug 52949 workaround <a href="https://github.com/brave/brave-browser/issues/52949">https://github.com/brave/brave-browser/issues/52949</a>)</li>
+</ul>
+<h2>1.0.272</h2>
+<ul>
+<li>Undo support: undo deleting bookmarks, closing tabs, and deleting pinned sites/spaces with a toast notification</li>
+<li>Jump-to-audio-tab keyboard shortcut (Cmd+Shift+A)</li>
+<li>Tab group display order setting with three options</li>
+<li>Fixed audio history tabs not sorted by recency</li>
+</ul>
+<h2>1.0.259</h2>
+<ul>
+<li>Drop bookmarks onto the tab list to open them as new tabs</li>
+<li>Fixed shift-click multi-selection not working in some situations</li>
+</ul>
+<h2>1.0.255</h2>
+<ul>
+<li>Rewrote drag and drop to support more scenarios: drag multiple items at once, drag tabs/bookmarks to spaces, drag tabs to pin bar, auto-expand folders on hover</li>
+<li>Fixed root folder matching in backup restore using folder IDs instead of names</li>
+<li>Fixed bookmark import/export to support mobile bookmarks</li>
+</ul>
+<h2>1.0.235</h2>
+<ul>
+<li>Fixed bookmark folder matching failing on Windows due to case difference in &quot;Other Bookmarks&quot; vs &quot;Other bookmarks&quot;</li>
+</ul>
+<h2>1.0.234</h2>
+<ul>
+<li>Arc-style Spaces:<ul>
+<li>Create isolated workspaces linking bookmark folders to Chrome tab groups</li>
+<li>Switch spaces to show only relevant bookmarks and tabs</li>
+<li>Customize with icons and colors</li>
+<li>Drag to reorder spaces</li>
+<li>Spaces included in import/export</li>
+</ul>
+</li>
+<li>Audio tabs dropdown:<ul>
+<li>Click the audible filter to see tabs recently playing video/audio</li>
+</ul>
+</li>
+<li>Multi-selection for tabs and bookmarks</li>
+<li>Space UI improvements:<ul>
+<li>Space color applied to sidebar title header</li>
+<li>Space indicators shown on linked folders in folder picker</li>
+</ul>
+</li>
+<li>Fixed used tab history being lost when Chrome suspends the background service worker</li>
+<li>Welcome dialog guides first-time users through key features</li>
+</ul>
+<h2>1.0.149</h2>
+<ul>
+<li>Fixed duplicate entries in tab history navigation dropdown</li>
+</ul>
+<h2>1.0.146</h2>
+<ul>
+<li>Advanced search syntax: support for <code>&amp;&amp;</code> (AND), <code>||</code> (OR), <code>!</code> (NOT), parentheses for grouping, and quoted strings for exact phrases</li>
+<li>Search bar toggle button in toolbar (search bar hidden by default)</li>
+</ul>
+<h2>1.0.140</h2>
+<ul>
+<li>Tab history navigation:<ul>
+<li>Keyboard shortcuts: <code>Cmd+Shift+&lt;</code> and <code>Cmd+Shift+&gt;</code> to go back/forward</li>
+<li>Toolbar buttons: Click to navigate, hold to show history dropdown with favicon and title</li>
+</ul>
+</li>
+<li>Toolbar with filter options:<ul>
+<li>Live tabs filter: Show only bookmarks/pins with open tabs</li>
+<li>Audible filter: Show only items playing audio</li>
+</ul>
+</li>
+<li>Tab Search bar:<ul>
+<li>Search by title or URL with saved and recent filters</li>
+<li>Toggle button in toolbar to show/hide the search bar (hidden by default)</li>
+</ul>
+</li>
+<li>New context menu actions:<ul>
+<li>Move to New Window (tabs, pinned sites, bookmarks)</li>
+<li>Close Tabs Before/After/Other Tabs (tabs only)</li>
+<li>Expand All subfolders (bookmark folders)</li>
+</ul>
+</li>
+<li>Tooltips on bookmark and tab rows showing title and URL</li>
+</ul>
+<h2>1.0.123</h2>
+<ul>
+<li>Arc-style bookmarks now stay local to each window - opening a bookmark in one window won&#39;t affect another</li>
+</ul>
+<h2>1.0.116</h2>
+<ul>
+<li>Improved Arc-style persistent tab handling: tabs are no longer placed in a special tab group. If session data is lost (e.g. extension reload), persistent tabs now appear as normal tabs instead of being hidden.</li>
+<li>Added &quot;Add to Bookmarks&quot; / &quot;Move to Bookmarks&quot; menu for tabs</li>
+<li>Dragging a tab to bookmarks now auto-associates it as a persistent tab (Arc style)</li>
+<li>Added delete button on bookmark rows</li>
+<li>Fixed context menu dismiss not blocking clicks on underlying elements</li>
+</ul>
+<h2>1.0.111</h2>
+<ul>
+<li>Moved &quot;+ New Tab&quot; row to the bottom of the Tabs section</li>
+<li>Added duplicate option for bookmarks and pinned sites in context menu</li>
+<li>Tab groups can now be saved to any bookmark folder, not just &quot;Other Bookmarks&quot;</li>
+</ul>
+<h2>1.0.103</h2>
+<ul>
+<li>Arc Style Bookmarks: Bookmarks act as persistent tabs, similar to Arc</li>
+<li>Tab Group Drag-Drop: Reorder groups, move tabs between groups</li>
+<li>Save Tab Group: Save a group as a bookmark folder</li>
+<li>Drag Tab Groups to Bookmarks: Drop a group onto bookmarks to save all tabs as a new folder</li>
+<li>Drag Tabs to Bookmarks: Drop tabs into bookmark folders to create bookmarks</li>
+<li>Full Import/Export: Backup everything as JSON</li>
+<li>Duplicate Tab: Right-click to duplicate tabs</li>
+</ul>
+
+</body>
+</html>
