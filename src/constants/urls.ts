@@ -1,2 +1,2 @@
 export const NEWS_URL =
-  'https://github.com/monemone-org/ChromeSideBar/blob/main/docs/news/news.md';
+  'https://monemone-org.github.io/ChromeSideBar/news/news.html';
