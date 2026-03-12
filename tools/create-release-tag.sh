@@ -8,7 +8,7 @@
 #   ./tools/create-release-tag.sh --push    # Also push tag to remote
 #
 
-set -euo pipefail
+set -eo pipefail
 
 cd "$(dirname "$0")/.."
 
