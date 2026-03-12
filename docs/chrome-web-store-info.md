@@ -9,7 +9,6 @@ I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, book
 
 - Arc-Style Persistent Tabs - Bookmarks act as live tabs. Click to open, click again to jump back. Close tabs freely—bookmarks stay in the sidebar. Tab links survive browser restarts and extension reloads.
 
-
 - Arc-Style Spaces - Isolated workspaces linking bookmark folders to tab groups. Switch contexts with one click.
 
 - Arc-Style Unified Sidebar - Pinned favorites, bookmarks, and tabs in one vertical panel.
