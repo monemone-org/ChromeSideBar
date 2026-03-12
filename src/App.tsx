@@ -571,7 +571,7 @@ function App() {
   const [showWhatsNew, setShowWhatsNew] = useState(false);
 
   // Silent upgrades: [fromVersion, toVersion] pairs with only internal changes
-  const SILENT_UPGRADES: [string, string][] = [['1.0.293', '1.0.294']];
+  const SILENT_UPGRADES: [string, string][] = [['1.0.292', '1.0.294']];
 
   // Trigger What's New dialog once lastSeenVersion loads from async storage
   useEffect(() =>
