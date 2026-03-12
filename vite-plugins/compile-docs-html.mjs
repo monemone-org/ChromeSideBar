@@ -1,6 +1,6 @@
 /**
- * Compiles docs/news/news.md into docs/news/news.html
- * with inline styling for GitHub Pages.
+ * Compiles markdown files in docs/ into HTML for GitHub Pages.
+ * Currently handles: news/news.md, changelog.md
  */
 
 import { readFileSync, writeFileSync } from 'fs';
@@ -11,18 +11,20 @@ import { marked } from 'marked';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
 
-const mdPath = resolve(rootDir, 'docs/news/news.md');
-const htmlPath = resolve(rootDir, 'docs/news/news.html');
+function compileMarkdown(mdRelPath, htmlRelPath, title)
+{
+  const mdPath = resolve(rootDir, mdRelPath);
+  const htmlPath = resolve(rootDir, htmlRelPath);
 
-const md = readFileSync(mdPath, 'utf-8');
-const body = marked.parse(md);
+  const md = readFileSync(mdPath, 'utf-8');
+  const body = marked.parse(md);
 
-const html = `<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Side Bar for Arc Users News</title>
+<title>${title}</title>
 <style>
   body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -50,5 +52,9 @@ ${body}
 </body>
 </html>`;
 
-writeFileSync(htmlPath, html);
-console.log(`Generated ${htmlPath}`);
+  writeFileSync(htmlPath, html);
+  console.log(`Generated ${htmlPath}`);
+}
+
+compileMarkdown('docs/news/news.md', 'docs/news/news.html', 'Side Bar for Arc Users News');
+compileMarkdown('docs/changelog.md', 'docs/changelog.html', 'Side Bar for Arc Users Changelog');
