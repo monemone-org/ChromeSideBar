@@ -570,12 +570,25 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
 
+  // Silent upgrades: [fromVersion, toVersion] pairs with only internal changes
+  const SILENT_UPGRADES: [string, string][] = [['1.0.293', '1.0.294']];
+
   // Trigger What's New dialog once lastSeenVersion loads from async storage
   useEffect(() =>
   {
     if (hasVersionChanged)
     {
-      setShowWhatsNew(true);
+      const isSilent = SILENT_UPGRADES.some(
+        ([from, to]) => lastSeenVersion === from && currentVersion === to
+      );
+      if (isSilent)
+      {
+        setLastSeenVersion(currentVersion);
+      }
+      else
+      {
+        setShowWhatsNew(true);
+      }
     }
   }, [hasVersionChanged]);
   const [showMenu, setShowMenu] = useState(false);
