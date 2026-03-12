@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Dialog } from './Dialog';
+import { NEWS_URL } from '../constants/urls';
 
 const ABOUT = {
   author: 'monehsieh',
   github: 'https://github.com/monemone-org/ChromeSideBar',
   chromeWebStore: 'https://chromewebstore.google.com/detail/Sidebar%20for%20Arc%20Users/jmmgjadgeeicdbagekohgmaipoekgcbn',
-};
-
-const URLS = {
-  news: 'https://github.com/monemone-org/ChromeSideBar/blob/main/docs/news/news.md',
 };
 
 interface AboutDialogProps {
@@ -57,7 +54,7 @@ export function AboutDialog({ isOpen, onClose, onShowWelcome }: AboutDialogProps
             </button>
           )}
           <a
-            href={URLS.news}
+            href={NEWS_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:underline"

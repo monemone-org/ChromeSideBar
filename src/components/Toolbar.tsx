@@ -554,7 +554,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
           </button>
           {/* Red dot badge for unread news */}
           {hasUnreadNews && (
-            <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full" />
+            <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full pointer-events-none" />
           )}
         </div>
       </div>

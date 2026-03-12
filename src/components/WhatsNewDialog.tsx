@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import { Dialog } from './Dialog';
 import { useFontSize } from '../contexts/FontSizeContext';
 
@@ -11,8 +11,9 @@ interface WhatsNewDialogProps
 export function WhatsNewDialog({ isOpen, onClose }: WhatsNewDialogProps)
 {
   const fontSize = useFontSize();
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  // Apply the sidebar's font size to the iframe body once it loads
+  // Apply font size when iframe loads
   const handleIframeLoad = useCallback((e: React.SyntheticEvent<HTMLIFrameElement>) =>
   {
     const doc = e.currentTarget.contentDocument;
@@ -21,6 +22,15 @@ export function WhatsNewDialog({ isOpen, onClose }: WhatsNewDialogProps)
       doc.body.style.fontSize = `${fontSize}px`;
     }
   }, [fontSize]);
+
+  // Re-apply font size when dialog reopens (iframe may already be loaded)
+  useEffect(() =>
+  {
+    if (isOpen && iframeRef.current?.contentDocument?.body)
+    {
+      iframeRef.current.contentDocument.body.style.fontSize = `${fontSize}px`;
+    }
+  }, [isOpen, fontSize]);
 
   return (
     <Dialog
@@ -40,6 +50,7 @@ export function WhatsNewDialog({ isOpen, onClose }: WhatsNewDialogProps)
       }
     >
       <iframe
+        ref={iframeRef}
         src="whatsnew.html"
         className="w-full border-0"
         style={{ height: '300px' }}

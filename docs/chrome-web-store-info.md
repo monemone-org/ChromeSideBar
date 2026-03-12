@@ -5,10 +5,6 @@ Arc Browser like Pinned Sites, Bookmarks and Active Tabs in Side Panel
 
 I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, bookmarks, and tabs all in one vertical list and its pinned tab support. So I built this extension to bring that experience to Chrome.
 
-## What's New: Persistent Tab Associations Across Restarts
-
-Bookmarks and pinned sites now remember their open tabs across browser restarts. Previously, restarting Chrome broke the link between bookmarks and their tabs — you'd have to re-open everything. Now the extension backs up associations and automatically restores them when Chrome starts up again.
-
 ## Key Features
 
 - Arc-Style Persistent Tabs - Bookmarks act as live tabs. Click to open, click again to jump back. Close tabs freely—bookmarks stay in the sidebar. Tab links survive browser restarts and extension reloads.
@@ -30,4 +26,4 @@ Bookmarks and pinned sites now remember their open tabs across browser restarts.
 
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
-[Full Changelog](https://github.com/monemone-org/ChromeSideBar/blob/release-1.0.289/docs/changelog.md)
+[Full Changelog](https://github.com/monemone-org/ChromeSideBar/blob/main/docs/changelog.md)

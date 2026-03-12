@@ -540,8 +540,12 @@ function App() {
 
   // Migrate old 'sidebar-has-seen-welcome' boolean to 'sidebar-last-seen-version'.
   // Writes to localStorage so useChromeLocalStorage can auto-migrate it to chrome.storage.local.
-  useState(() =>
+  const migrationDoneRef = useRef(false);
+  useEffect(() =>
   {
+    if (migrationDoneRef.current) return;
+    migrationDoneRef.current = true;
+
     if (localStorage.getItem('sidebar-last-seen-version') !== null) return;
     const oldFlag = localStorage.getItem('sidebar-has-seen-welcome');
     if (oldFlag !== null)
@@ -552,7 +556,7 @@ function App() {
       localStorage.setItem('sidebar-last-seen-version', migratedValue);
       localStorage.removeItem('sidebar-has-seen-welcome');
     }
-  });
+  }, []);
 
   const [lastSeenVersion, setLastSeenVersion] = useChromeLocalStorage(
     'sidebar-last-seen-version',
@@ -601,6 +605,17 @@ function App() {
   const [showSpaceDeleteDialog, setShowSpaceDeleteDialog] = useState(false);
   const bookmarkDropResolverRef = useRef<ResolveBookmarkDropTarget | null>(null);
   const newsHoverTimerRef = useRef<number | null>(null);
+  // Clean up hover timer on unmount
+  useEffect(() =>
+  {
+    return () =>
+    {
+      if (newsHoverTimerRef.current)
+      {
+        clearTimeout(newsHoverTimerRef.current);
+      }
+    };
+  }, []);
   const buttonRef = useRef<HTMLButtonElement>(null!);
   const audioButtonRef = useRef<HTMLButtonElement>(null!);
   const toolbarRef = useRef<HTMLDivElement>(null);

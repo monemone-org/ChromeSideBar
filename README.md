@@ -178,7 +178,7 @@ Gear icon in the bottom-left corner:
 
 ## Full Changelog
 
-[changlog.md](https://github.com/monemone-org/ChromeSideBar/blob/release-1.0.289/docs/changelog.md)
+[changelog.md](https://github.com/monemone-org/ChromeSideBar/blob/main/docs/changelog.md)
 
 ## Tech Stack
 

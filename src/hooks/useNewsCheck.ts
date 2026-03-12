@@ -1,25 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { NEWS_URL } from '../constants/urls';
 
-const LATEST_VERSION_URL =
-  'https://raw.githubusercontent.com/monemone-org/ChromeSideBar/main/docs/news/latest.version';
-const NEWS_URL =
-  'https://github.com/monemone-org/ChromeSideBar/blob/main/docs/news/news.md';
-
-const STORAGE_KEY_NEWS_VERSION = 'sidebar-last-seen-news-version';
-const STORAGE_KEY_NEWS_CHECK_TIME = 'sidebar-last-news-check-time';
-const CHECK_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
-
-function parseStoredNumber(value: unknown): number
-{
-  if (value === undefined || value === null) return 0;
-  const parsed = parseInt(String(value), 10);
-  return isNaN(parsed) ? 0 : parsed;
-}
+// Written by background.ts NewsVersionChecker
+const STORAGE_KEY_LATEST = 'sidebar-news-latest-version';
+// Written by this hook when user dismisses the badge
+const STORAGE_KEY_LAST_SEEN = 'sidebar-last-seen-news-version';
 
 /**
- * Periodically checks for news announcements hosted on GitHub.
- * Fetches `latest.version` at most once per week.
- * Returns whether there's unread news and a function to mark it read.
+ * Checks for unread news announcements.
+ * The background script fetches and caches the latest news version on a weekly
+ * schedule (triggered by Chrome tab events). This hook reads from
+ * chrome.storage.local and reacts to changes.
  */
 export function useNewsCheck(): {
   hasUnreadNews: boolean;
@@ -28,122 +19,61 @@ export function useNewsCheck(): {
 }
 {
   const [hasUnreadNews, setHasUnreadNews] = useState(false);
-
-  // Refs to hold latest stored values (avoid stale closures)
-  const lastSeenVersionRef = useRef<number>(0);
   const latestVersionRef = useRef<number>(0);
 
-  // Load stored values and check on mount
   useEffect(() =>
   {
     let mounted = true;
 
-    chrome.storage.local.get(
-      [STORAGE_KEY_NEWS_VERSION, STORAGE_KEY_NEWS_CHECK_TIME],
-      (result) =>
+    // Compare latest vs last-seen from storage
+    function checkForNews(): void
+    {
+      chrome.storage.local.get([STORAGE_KEY_LATEST, STORAGE_KEY_LAST_SEEN], (result) =>
       {
         if (!mounted) return;
 
-        const lastSeenVersion = parseStoredNumber(result[STORAGE_KEY_NEWS_VERSION]);
-        const lastCheckTime = parseStoredNumber(result[STORAGE_KEY_NEWS_CHECK_TIME]);
-        lastSeenVersionRef.current = lastSeenVersion;
-
-        const now = Date.now();
-        if (now - lastCheckTime >= CHECK_INTERVAL_MS)
-        {
-          fetchLatestVersion(lastSeenVersion, mounted);
-        }
-      }
-    );
-
-    // Re-check when sidebar becomes visible (e.g. reopened after a while)
-    const handleVisibility = () =>
-    {
-      if (document.visibilityState !== 'visible') return;
-      if (!mounted) return;
-
-      chrome.storage.local.get(
-        [STORAGE_KEY_NEWS_VERSION, STORAGE_KEY_NEWS_CHECK_TIME],
-        (result) =>
-        {
-          if (!mounted) return;
-
-          const lastSeenVersion = parseStoredNumber(result[STORAGE_KEY_NEWS_VERSION]);
-          const lastCheckTime = parseStoredNumber(result[STORAGE_KEY_NEWS_CHECK_TIME]);
-          lastSeenVersionRef.current = lastSeenVersion;
-
-          // Re-evaluate badge from cached fetch result
-          if (latestVersionRef.current > lastSeenVersion)
-          {
-            setHasUnreadNews(true);
-          }
-
-          const now = Date.now();
-          if (now - lastCheckTime >= CHECK_INTERVAL_MS)
-          {
-            fetchLatestVersion(lastSeenVersion, mounted);
-          }
-        }
-      );
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () =>
-    {
-      mounted = false;
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, []);
-
-  // Fetch latest.version from GitHub and update badge state
-  function fetchLatestVersion(lastSeenVersion: number, mounted: boolean): void
-  {
-    fetch(LATEST_VERSION_URL)
-      .then((res) =>
-      {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.text();
-      })
-      .then((text) =>
-      {
-        if (!mounted) return;
-
-        const fetched = parseInt(text.trim(), 10);
-        if (isNaN(fetched)) return;
-
-        latestVersionRef.current = fetched;
+        const latest = parseInt(String(result[STORAGE_KEY_LATEST] ?? 0), 10) || 0;
+        const lastSeen = parseInt(String(result[STORAGE_KEY_LAST_SEEN] ?? 0), 10) || 0;
+        latestVersionRef.current = latest;
 
         if (import.meta.env.DEV)
         {
-          console.log(`[useNewsCheck] Fetched news version: ${fetched}, lastSeen: ${lastSeenVersion}`);
+          console.log(`[useNewsCheck] latest: ${latest}, lastSeen: ${lastSeen}`);
         }
 
-        // Record check time
-        chrome.storage.local.set({
-          [STORAGE_KEY_NEWS_CHECK_TIME]: Date.now()
-        });
-
-        // Show badge if there's new content
-        if (fetched > lastSeenVersion)
-        {
-          setHasUnreadNews(true);
-        }
-      })
-      .catch(() =>
-      {
-        // Silently skip — try again next week
+        setHasUnreadNews(latest > lastSeen);
       });
-  }
+    }
 
-  // Dismiss red dot without opening the page
+    // Read on mount
+    checkForNews();
+
+    // React when background writes a new version or user dismisses in another window
+    const handleStorageChanged = (changes: { [key: string]: chrome.storage.StorageChange }) =>
+    {
+      if (!mounted) return;
+      if (STORAGE_KEY_LATEST in changes || STORAGE_KEY_LAST_SEEN in changes)
+      {
+        checkForNews();
+      }
+    };
+
+    chrome.storage.local.onChanged.addListener(handleStorageChanged);
+    return () =>
+    {
+      mounted = false;
+      chrome.storage.local.onChanged.removeListener(handleStorageChanged);
+    };
+  }, []);
+
+  // Dismiss red dot and persist
   const markNewsRead = useCallback(() =>
   {
     const version = latestVersionRef.current;
+    // Only persist if we know the latest version
     if (version > 0)
     {
-      chrome.storage.local.set({ [STORAGE_KEY_NEWS_VERSION]: version });
-      lastSeenVersionRef.current = version;
+      chrome.storage.local.set({ [STORAGE_KEY_LAST_SEEN]: version });
     }
     setHasUnreadNews(false);
   }, []);

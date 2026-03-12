@@ -582,6 +582,74 @@ class TabSpaceRegistry
 }
 
 // =============================================================================
+// NewsVersionChecker - Fetches latest news version from GitHub (at most once/week)
+// =============================================================================
+
+class NewsVersionChecker
+{
+  static LATEST_VERSION_URL =
+    'https://raw.githubusercontent.com/monemone-org/ChromeSideBar/main/docs/news/latest.version';
+  static STORAGE_KEY_VERSION = 'sidebar-news-latest-version';
+  static STORAGE_KEY_CHECK_TIME = 'sidebar-last-news-check-time';
+  static CHECK_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+  #cachedVersion = 0;
+
+  getCachedVersion(): number
+  {
+    return this.#cachedVersion;
+  }
+
+  async load(): Promise<void>
+  {
+    const result = await chrome.storage.local.get([NewsVersionChecker.STORAGE_KEY_VERSION]);
+    const stored = parseInt(String(result[NewsVersionChecker.STORAGE_KEY_VERSION] ?? 0), 10);
+    this.#cachedVersion = isNaN(stored) ? 0 : stored;
+    await this.checkIfDue();
+  }
+
+  // Fetch from GitHub if enough time has passed since last check
+  async checkIfDue(): Promise<void>
+  {
+    const result = await chrome.storage.local.get([NewsVersionChecker.STORAGE_KEY_CHECK_TIME]);
+    const lastCheckTime = parseInt(String(result[NewsVersionChecker.STORAGE_KEY_CHECK_TIME] ?? 0), 10) || 0;
+    if (Date.now() - lastCheckTime >= NewsVersionChecker.CHECK_INTERVAL_MS)
+    {
+      this.fetchLatestVersion();
+    }
+  }
+
+  private async fetchLatestVersion(): Promise<void>
+  {
+    try
+    {
+      const res = await fetch(NewsVersionChecker.LATEST_VERSION_URL);
+      if (!res.ok) return;
+
+      const text = await res.text();
+      const fetched = parseInt(text.trim(), 10);
+      if (isNaN(fetched)) return;
+
+      this.#cachedVersion = fetched;
+
+      if (import.meta.env.DEV)
+      {
+        console.log(`[NewsVersionChecker] Fetched news version: ${fetched}`);
+      }
+
+      await chrome.storage.local.set({
+        [NewsVersionChecker.STORAGE_KEY_VERSION]: fetched,
+        [NewsVersionChecker.STORAGE_KEY_CHECK_TIME]: Date.now()
+      });
+    }
+    catch
+    {
+      // Silently skip — try again next week
+    }
+  }
+}
+
+// =============================================================================
 // Space-Group Helper Functions
 // =============================================================================
 
@@ -686,6 +754,7 @@ const historyManager = new TabHistoryManager();
 const groupTracker = new TabGroupTracker();
 const lastAudibleTracker = new LastAudibleTracker();
 tabSpaceRegistry = new TabSpaceRegistry();
+const newsVersionChecker = new NewsVersionChecker();
 
 // Promise that resolves when all state managers have loaded.
 // Event handlers must await this before accessing state to prevent race conditions
@@ -704,7 +773,8 @@ Promise.all([
   historyManager.load(),
   groupTracker.load(),
   lastAudibleTracker.load(),
-  tabSpaceRegistry.load()
+  tabSpaceRegistry.load(),
+  newsVersionChecker.load()
 ]).then(() =>
 {
   stateReadyResolve();
@@ -720,6 +790,9 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
 {
   // Wait for state to load (handles service worker restart)
   await stateReady;
+
+  // Check for news updates (throttled to once per week)
+  await newsVersionChecker.checkIfDue();
 
   const isNavigating = historyManager.isNavigating(activeInfo.windowId);
 
