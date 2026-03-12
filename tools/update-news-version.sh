@@ -48,6 +48,11 @@ echo "$NEWS_VERSION" > "$NEWS_VERSION_FILE"
 
 echo "Updated ${NEWS_VERSION_FILE} to ${NEWS_VERSION}"
 
+# Compile news.md to news.html for GitHub Pages
+npm run build:news
+
+NEWS_HTML_FILE="docs/news/news.html"
+
 if [ "$COMMIT" = true ]; then
-    git add "$NEWS_VERSION_FILE"
+    git add "$NEWS_VERSION_FILE" "$NEWS_HTML_FILE"
 fi

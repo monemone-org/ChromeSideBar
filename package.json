@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "build:debug": "tsc && vite build --mode development",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:news": "node vite-plugins/compile-news-html.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.1.0",
