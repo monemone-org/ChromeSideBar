@@ -16,6 +16,7 @@ Run `./tools/update-version.sh` to update the version in `package.json` and `man
 - Focus on user-facing changes: new features, improvements, bug fixes
 - Skip internal/build-only commits (version bumps, CI changes, doc-only updates)
 - Follow the existing format in `docs/changelog.md`
+- Even if there are no user-facing changes, ensure the top version entry in `docs/changelog.md` matches the new version number (add an empty entry if needed)
 
 ### 3. Update chrome-web-store-info.md
 
