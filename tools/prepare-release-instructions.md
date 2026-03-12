@@ -52,4 +52,7 @@ Show the user:
 - The generated changelog entry (for review)
 - Any changes made to any `docs/*.md`
 - Any flagged hardcoded version references
-- Remind the user to review, build, and test before committing
+- Remind the user to:
+  1. Review and check in the changes
+  2. Run `tools/build-release.sh` to build the release
+  3. Submit to the Chrome Web Store
