@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Updates docs/news/latest.version based on the number of commits
+# Updates docs/public/latest.version based on the number of commits
 # that touched docs/news/news.md
 #
 # Usage:
@@ -15,7 +15,7 @@ printHelp()
 {
     echo "Usage: ./tools/update-news-version.sh [--commit|-c]"
     echo ""
-    echo "Updates docs/news/latest.version based on the number of commits"
+    echo "Updates docs/public/latest.version based on the number of commits"
     echo "that touched docs/news/news.md."
     echo ""
     echo "Options:"
@@ -32,7 +32,7 @@ for arg in "$@"; do
     esac
 done
 
-NEWS_VERSION_FILE="docs/news/latest.version"
+NEWS_VERSION_FILE="docs/public/latest.version"
 NEWS_MD_FILE="docs/news/news.md"
 
 # Count commits that touched news.md
@@ -48,11 +48,7 @@ echo "$NEWS_VERSION" > "$NEWS_VERSION_FILE"
 
 echo "Updated ${NEWS_VERSION_FILE} to ${NEWS_VERSION}"
 
-# Compile news.md to news.html for GitHub Pages
-npm run build:news
-
-NEWS_HTML_FILE="docs/news/news.html"
-
+# Commit version changes
 if [ "$COMMIT" = true ]; then
-    git add "$NEWS_VERSION_FILE" "$NEWS_HTML_FILE"
+    git commit -m "build: Bump news version to ${NEWS_VERSION}"
 fi

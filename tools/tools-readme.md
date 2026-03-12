@@ -3,12 +3,10 @@
 ## update-version.sh
 
 - Updates version in `package.json` and `manifest.json`. Version format: `{major}.{minor}.{build_number}` where build_number is the git commit count of source-code-only commits. 
-- When `--commit` is used, it also runs `update-news-version.sh --commit`.
 
 ## update-news-version.sh
 
-- Updates `docs/news/latest.version` based on the number of commits that touched `docs/news/news.md`.
-
+- Updates `docs/public/latest.version` based on the number of commits that touched `docs/news/news.md`.
 
 ## build-release.sh
 

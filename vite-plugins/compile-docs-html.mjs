@@ -60,5 +60,5 @@ ${body}
   console.log(`Generated ${htmlPath}`);
 }
 
-compileMarkdown('docs/news/news.md', 'docs/news/news.html', 'Side Bar for Arc Users News');
-compileMarkdown('docs/changelog.md', 'docs/changelog.html', 'Side Bar for Arc Users Changelog');
+compileMarkdown('docs/news/news.md', 'docs/public/news.html', 'Side Bar for Arc Users News');
+compileMarkdown('docs/changelog.md', 'docs/public/changelog.html', 'Side Bar for Arc Users Changelog');

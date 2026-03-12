@@ -588,7 +588,7 @@ class TabSpaceRegistry
 class NewsVersionChecker
 {
   static LATEST_VERSION_URL =
-    'https://raw.githubusercontent.com/monemone-org/ChromeSideBar/main/docs/news/latest.version';
+    'https://monemone-org.github.io/ChromeSideBar/public/latest.version';
   static STORAGE_KEY_VERSION = 'sidebar-news-latest-version';
   static STORAGE_KEY_CHECK_TIME = 'sidebar-last-news-check-time';
   static CHECK_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // 1 week

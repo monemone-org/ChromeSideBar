@@ -92,17 +92,12 @@ else
 fi
 
 echo "Updated package.json and manifest.json to version ${NEW_VERSION}"
+git add package.json public/manifest.json
 
+# Commit version changes
 if [ "$COMMIT" = true ]; then
-    git add package.json public/manifest.json
     git commit -m "build: Bump version to ${NEW_VERSION}"
 fi
 
-# Also update news version
-COMMIT_ARG=""
-if [ "$COMMIT" = true ]; then
-    COMMIT_ARG="--commit"
-fi
-tools/update-news-version.sh $COMMIT_ARG
 
 

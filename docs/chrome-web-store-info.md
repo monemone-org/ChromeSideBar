@@ -25,4 +25,4 @@ I missed Arc's sidebar after switching to Chrome in how Arc puts favorites, book
 
 Open source on GitHub: https://github.com/monemone-org/ChromeSideBar
 
-Full Changelog: https://monemone-org.github.io/ChromeSideBar/changelog.html
+Full Changelog: https://monemone-org.github.io/ChromeSideBar/public/changelog.html
