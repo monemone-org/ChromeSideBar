@@ -1,6 +1,6 @@
 ## Changelog
 
-## 1.0.293
+## {CURRENT_VERSION}
 
 - Persistent tab associations: bookmark and pinned site tab links now survive browser restarts and extension reloads
 - "Close and Delete" option in bookmark context menu
