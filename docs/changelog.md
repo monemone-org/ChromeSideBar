@@ -1,11 +1,8 @@
 ## Changelog
 
-## {CURRENT_VERSION}
+## 1.0.294
 
 - "What's New" and News content now loaded from GitHub Pages instead of GitHub raw URLs
-
-## 1.0.293
-
 - Persistent tab associations: bookmark and pinned site tab links now survive browser restarts and extension reloads
 - "Close and Delete" option in bookmark context menu
 - Undo support for closing tabs

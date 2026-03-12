@@ -11,11 +11,11 @@ Steps for Claude Code to help user prepare for a new release.
 
 
 ### 2. Update `docs/changelog.md`
-- Draft a new changelog entry at the top of `docs/changelog.md` (below the `# Changelog` heading) using the literal string `## {CURRENT_VERSION}` as the heading (the build scripts substitute this placeholder with the actual version number). If section `## {CURRENT_VERSION}` already exists, append new features to the list.
-- Focus on user-facing changes: new features, UX improvements and serious bug fixes. 
+- Draft a new changelog entry at the top of `docs/changelog.md` (below the `# Changelog` heading) using `## Latest Version` as the heading. If a `## Latest Version` section already exists, append new features to the list.
+- Focus on user-facing changes: new features, UX improvements and serious bug fixes.
 - Skip internal/build-only commits (version bumps, CI changes, doc-only updates) and minor fixes.
 - Follow the existing format in `docs/changelog.md`
-- Even if there are no user-facing changes, ensure there is still an empty `## {CURRENT_VERSION}` section
+- Even if there are no user-facing changes, ensure there is still an empty section for this version
 
 
 ### 3. Update `docs/whatsnew.md`
@@ -27,7 +27,7 @@ Steps for Claude Code to help user prepare for a new release.
 - Read the existing `Key Features` list to help decide if the new changes are qualified. Confirm with developer if unsure
 
 
-### 5. Verify changelog URL references in code
+### 5. Verify doc URL references in code
 - Search the codebase for any hardcoded references to version number, `release-` tags
 - Confirm they use the version dynamically (e.g. from `chrome.runtime.getManifest().version`) rather than a hardcoded version string
 - Flag any hardcoded version references that need updating
@@ -37,11 +37,12 @@ Steps for Claude Code to help user prepare for a new release.
 Run `./tools/update-version.sh` to update the extension version in `package.json`, `manifest.json`.
 
 
-### 7. Compile `docs/public/` documents
+### 7. Compile `docs/public/` documents (only if news changed)
+- Only needed when `docs/news/news.md` has been updated
 - `docs/public/` is served in Github Pages
 - run `npm run build:public-docs` to compile
   - `docs/news/news.md` -> `docs/public/news.html`
-  - `docs/changelog.md` -> `docs/public/changelog.html`
+    - check in `news.md` changes. It's required for `./tools/update-news-version.sh` to update the news version number.
 - run `./tools/update-news-version.sh` to update `docs/public/latest.version`
 
 

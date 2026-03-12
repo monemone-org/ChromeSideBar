@@ -1,6 +1,6 @@
 /**
  * Compiles markdown files in docs/ into HTML for GitHub Pages.
- * Currently handles: news/news.md, changelog.md
+ * Currently handles: news/news.md
  */
 
 import { readFileSync, writeFileSync } from 'fs';
@@ -61,4 +61,3 @@ ${body}
 }
 
 compileMarkdown('docs/news/news.md', 'docs/public/news.html', 'Side Bar for Arc Users News');
-compileMarkdown('docs/changelog.md', 'docs/public/changelog.html', 'Side Bar for Arc Users Changelog');
