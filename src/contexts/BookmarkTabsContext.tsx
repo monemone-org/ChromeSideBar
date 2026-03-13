@@ -202,6 +202,18 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           return newMap;
         });
 
+        // Clean up audible state
+        if (import.meta.env.DEV)
+        {
+          console.log(`[removeLocalTabAssociation] cleaned up audibleTabs for tab=${tabId}`);
+        }
+        setAudibleTabs((prev) =>
+        {
+          const newSet = new Set(prev);
+          newSet.delete(tabId);
+          return newSet;
+        });
+
         // Clean up from session storage and local backup
         removeStoredAssociation(windowId, tabId);
         removeTabAssociationBackup(windowId, itemKey);
