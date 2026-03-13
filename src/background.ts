@@ -74,6 +74,11 @@ class SpaceWindowStateManager
     });
   }
 
+  removeWindow(windowId: number): void
+  {
+    this.#states.delete(windowId);
+  }
+
   async load(): Promise<void>
   {
     // Load all window states from session storage
@@ -369,6 +374,12 @@ class TabHistoryManager
     return { before, after, currentIndex: history.index };
   }
 
+  removeWindow(windowId: number): void
+  {
+    this.#history.delete(windowId);
+    this.#navigatingWindows.delete(windowId);
+  }
+
   async load(): Promise<void>
   {
     const result = await chrome.storage.session.get([TabHistoryManager.STORAGE_KEY]);
@@ -451,6 +462,11 @@ class TabGroupTracker
     chrome.storage.session.set({
       [TabGroupTracker.STORAGE_KEY]: Array.from(this.#activeGroups.entries())
     });
+  }
+
+  removeWindow(windowId: number): void
+  {
+    this.#activeGroups.delete(windowId);
   }
 
   async load(): Promise<void>
@@ -565,6 +581,11 @@ class TabSpaceRegistry
       data.push([windowId, Array.from(tabMap.entries())]);
     }
     chrome.storage.session.set({ [TabSpaceRegistry.STORAGE_KEY]: data });
+  }
+
+  removeWindow(windowId: number): void
+  {
+    this.#registry.delete(windowId);
   }
 
   async load(): Promise<void>
@@ -886,9 +907,19 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
   }
 });
 
-// Clean up local backup when a window is closed
+// Clean up in-memory maps and local backup when a window is closed
 chrome.windows.onRemoved.addListener(async (windowId) =>
 {
+  // TODO: remove after testing
+  if (import.meta.env.DEV)
+  {
+    console.log(`[onRemoved] cleaning up in-memory state for window=${windowId}`);
+  }
+
+  spaceStateManager.removeWindow(windowId);
+  historyManager.removeWindow(windowId);
+  groupTracker.removeWindow(windowId);
+  tabSpaceRegistry.removeWindow(windowId);
   await removeWindowAssociationBackup(windowId);
 });
 

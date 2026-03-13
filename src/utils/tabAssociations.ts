@@ -264,7 +264,10 @@ function matchDirect(ctx: MatchContext, backupIds: number[]): void
     // Skip backups whose window ID no longer exists (needs fuzzy matching in later passes)
     if (!currentIds.has(backupId))
     {
-      console.log(`[matchBackup] pass1: backup=${backupId} — window ID not found`);
+      if (import.meta.env.DEV)
+      {
+        console.log(`[matchBackup] pass1: backup=${backupId} — window ID not found`);
+      }
       continue;
     }
 
@@ -291,7 +294,10 @@ function matchDirect(ctx: MatchContext, backupIds: number[]): void
 
     ctx.result.set(backupId, { currentId: backupId, matchType: 'direct', tabMatches });
     ctx.claimedWindowIds.add(backupId);
-    console.log(`[matchBackup] pass1: backup=${backupId} → direct (${Object.keys(tabMatches).length}/${Object.keys(backup).length} tabs)\n${logLines.join('\n')}`);
+    if (import.meta.env.DEV)
+    {
+      console.log(`[matchBackup] pass1: backup=${backupId} → direct (${Object.keys(tabMatches).length}/${Object.keys(backup).length} tabs)\n${logLines.join('\n')}`);
+    }
   }
 }
 
@@ -353,7 +359,10 @@ function matchByIndexAndDomain(ctx: MatchContext, backupIds: number[]): void
       }
 
       const allMatch = mismatchLines.length === 0;
-      console.log(`[matchBackup] pass2: backup=${backupId} vs window=${winId} — ${allMatch ? 'MATCH' : 'no match'}\n${[...matchLines, ...mismatchLines].join('\n')}`);
+      if (import.meta.env.DEV)
+      {
+        console.log(`[matchBackup] pass2: backup=${backupId} vs window=${winId} — ${allMatch ? 'MATCH' : 'no match'}\n${[...matchLines, ...mismatchLines].join('\n')}`);
+      }
 
       // All entries matched — claim this window and move to next backup
       if (allMatch)
@@ -418,7 +427,10 @@ function matchByDomainOverlap(ctx: MatchContext, backupIds: number[]): void
         if (domainMap.has(domain)) overlap++;
       }
 
-      console.log(`[matchBackup] pass3: backup=${backupId} vs window=${win.id!} — overlap=${overlap}/${backupDomains.size}`);
+      if (import.meta.env.DEV)
+      {
+        console.log(`[matchBackup] pass3: backup=${backupId} vs window=${win.id!} — overlap=${overlap}/${backupDomains.size}`);
+      }
 
       if (overlap > bestScore)
       {
@@ -430,7 +442,10 @@ function matchByDomainOverlap(ctx: MatchContext, backupIds: number[]): void
     // No window had any domain overlap — this backup can't be matched
     if (bestWindowId === -1)
     {
-      console.log(`[matchBackup] pass3: backup=${backupId} — no matching window found`);
+      if (import.meta.env.DEV)
+      {
+        console.log(`[matchBackup] pass3: backup=${backupId} — no matching window found`);
+      }
       continue;
     }
 
@@ -458,7 +473,10 @@ function matchByDomainOverlap(ctx: MatchContext, backupIds: number[]): void
       }
     }
 
-    console.log(`[matchBackup] pass3: backup=${backupId} → window=${bestWindowId} (${bestScore}/${backupDomains.size} domains, ${Object.keys(tabMatches).length}/${entries.length} tabs)\n${logLines.join('\n')}`);
+    if (import.meta.env.DEV)
+    {
+      console.log(`[matchBackup] pass3: backup=${backupId} → window=${bestWindowId} (${bestScore}/${backupDomains.size} domains, ${Object.keys(tabMatches).length}/${entries.length} tabs)\n${logLines.join('\n')}`);
+    }
     ctx.result.set(backupId, { currentId: bestWindowId, matchType: 'domain', tabMatches });
     ctx.claimedWindowIds.add(bestWindowId);
   }
@@ -511,7 +529,10 @@ export async function restoreTabAssociationBackup(): Promise<void>
   const backupWindowIds = await getBackupWindowIds();
   if (backupWindowIds.length === 0)
   {
-    console.log('[TabAssociationBackup] restore — no backup data');
+    if (import.meta.env.DEV)
+    {
+      console.log('[TabAssociationBackup] restore — no backup data');
+    }
     return;
   }
 
@@ -527,7 +548,10 @@ export async function restoreTabAssociationBackup(): Promise<void>
   // Log backup data
   for (const [windowId, backup] of backups)
   {
-    console.log(`[TabAssociationBackup] backup window=${windowId}\n${formatBackup(backup)}`);
+    if (import.meta.env.DEV)
+    {
+      console.log(`[TabAssociationBackup] backup window=${windowId}\n${formatBackup(backup)}`);
+    }
   }
 
   // Log current windows
@@ -535,7 +559,10 @@ export async function restoreTabAssociationBackup(): Promise<void>
   {
     const tabs = win.tabs ?? [];
     const tabLines = tabs.map(t => `  [${t.index}] id=${t.id} ${t.url}`).join('\n');
-    console.log(`[TabAssociationBackup] current window=${win.id} (${tabs.length} tabs)\n${tabLines}`);
+    if (import.meta.env.DEV)
+    {
+      console.log(`[TabAssociationBackup] current window=${win.id} (${tabs.length} tabs)\n${tabLines}`);
+    }
   }
 
   // Match windows and restore associations
@@ -549,7 +576,10 @@ export async function restoreTabAssociationBackup(): Promise<void>
   for (const [backupId, { currentId, matchType, tabMatches }] of matches)
   {
     const matchedCount = Object.keys(tabMatches).length;
-    console.log(`[TabAssociationBackup] restoring: backup=${backupId} → window=${currentId} (${matchType}, ${matchedCount} tabs)`);
+    if (import.meta.env.DEV)
+    {
+      console.log(`[TabAssociationBackup] restoring: backup=${backupId} → window=${currentId} (${matchType}, ${matchedCount} tabs)`);
+    }
 
     // Restore session associations for matched tabs
     const associations: Record<number, string> = {};
@@ -583,7 +613,10 @@ export async function restoreTabAssociationBackup(): Promise<void>
   const unmatched = backupWindowIds.filter(id => !matches.has(id));
   for (const backupId of unmatched)
   {
-    console.log(`[TabAssociationBackup] removing unmatched backup window=${backupId}`);
+    if (import.meta.env.DEV)
+    {
+      console.log(`[TabAssociationBackup] removing unmatched backup window=${backupId}`);
+    }
     storageRemovals.push(backupKey(backupId));
   }
 
