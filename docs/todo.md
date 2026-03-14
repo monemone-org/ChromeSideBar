@@ -2,6 +2,7 @@
 
 ## In-Progress
 
+
 ## Pending
 
 - [ ] in debug build, add a "mem usage" tool in extension. which monitor mem usage, local storage usage, session usage of the extension.  also a history of it, record every hr over the past 7 days (84 hours)

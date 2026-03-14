@@ -570,17 +570,15 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
 
-  // Silent upgrades: [fromVersion, toVersion] pairs with only internal changes
-  const SILENT_UPGRADES: [string, string][] = [['1.0.292', '1.0.294']];
+  // Silent upgrades: versions with only internal changes (skip What's New when upgrading from these)
+  const SILENT_UPGRADES = new Set(['1.0.292', '1.0.293', '1.0.294']);
 
   // Trigger What's New dialog once lastSeenVersion loads from async storage
   useEffect(() =>
   {
     if (hasVersionChanged)
     {
-      const isSilent = SILENT_UPGRADES.some(
-        ([from, to]) => lastSeenVersion === from && currentVersion === to
-      );
+      const isSilent = SILENT_UPGRADES.has(lastSeenVersion ?? '');
       if (isSilent)
       {
         setLastSeenVersion(currentVersion);
@@ -999,13 +997,13 @@ function App() {
                 <span className="ml-1.5 w-2 h-2 bg-red-500 rounded-full inline-block" />
               )}
             </DropdownMenu.Item>
-            <DropdownMenu.Item onSelect={() => setShowAbout(true)}>
-              <Info size={14} className="mr-2" />
-              About
-            </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={() => window.open('mailto:chrome-dev@monemone.org?subject=Sidebar Feedback')}>
               <Mail size={14} className="mr-2" />
               Email Us
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => setShowAbout(true)}>
+              <Info size={14} className="mr-2" />
+              About
             </DropdownMenu.Item>
             {import.meta.env.DEV && (
               <>
