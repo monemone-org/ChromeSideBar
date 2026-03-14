@@ -1,5 +1,12 @@
 ## Changelog
 
+## 1.0.301
+
+- "Email Us" menu item in settings dropdown
+- Fixed potential memory leak: stale state cleaned up when browser windows close
+- Fixed audible tab indicator not clearing when tab association is removed
+- Fixed potential race condition where background handlers could run before extension state was ready
+
 ## 1.0.294
 
 - "What's New" and News content now loaded from GitHub Pages instead of GitHub raw URLs
