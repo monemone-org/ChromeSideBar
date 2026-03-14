@@ -4,10 +4,6 @@
 
 ## Pending
 
-- [ ] remove changelog.html from git after updating chrome-web-store-info.md to Chrome Web Store
-
-- [ ] add a "Email Us" menu item . email to chrome-dev@monemone.org
-
 - [ ] in debug build, add a "mem usage" tool in extension. which monitor mem usage, local storage usage, session usage of the extension.  also a history of it, record every hr over the past 7 days (84 hours)
 
 - [ ] inactive space bar icon that displays emoji should be in black and white (support light and dark theme)
@@ -317,4 +313,6 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 - [x] allow typing emoji to choose emoji in Icon picker
 
 - [x] add a new feature "Welcome" dialog, display what's new text bundled with the extension after upgrade.
+
+- [x] add a "Email Us" menu item . email to chrome-dev@monemone.org
 

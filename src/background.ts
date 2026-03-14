@@ -910,6 +910,8 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
 // Clean up in-memory maps and local backup when a window is closed
 chrome.windows.onRemoved.addListener(async (windowId) =>
 {
+  await stateReady;
+
   // TODO: remove after testing
   if (import.meta.env.DEV)
   {
@@ -935,9 +937,9 @@ chrome.tabs.onMoved.addListener(async (_tabId, moveInfo) =>
 // Favicon loading Scenario 5 — see docs/favicon-loading-strategy.md
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
 {
+  await stateReady;
   if (changeInfo.audible === false)
   {
-    await stateReady;
     lastAudibleTracker.setLastAudibleTabId(tabId);
   }
 
@@ -1209,86 +1211,122 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
   // Get current SpaceWindowState for a window
   if (message.action === SpaceMessageAction.GET_WINDOW_STATE)
   {
-    if (message.windowId)
+    (async () =>
     {
-      const state = spaceStateManager.getState(message.windowId);
-      sendResponse(state);
-    }
-    return true;  // async response
+      await stateReady;
+      if (message.windowId)
+      {
+        const state = spaceStateManager.getState(message.windowId);
+        sendResponse(state);
+      }
+    })();
+    return true;
   }
 
   // Set active space
   if (message.action === SpaceMessageAction.SET_ACTIVE_SPACE)
   {
-    if (message.windowId && message.spaceId)
+    (async () =>
     {
-      spaceStateManager.setActiveSpace(message.windowId, message.spaceId);
-    }
+      await stateReady;
+      if (message.windowId && message.spaceId)
+      {
+        spaceStateManager.setActiveSpace(message.windowId, message.spaceId);
+      }
+    })();
     return;
   }
 
   // Re-queue a tab for grouping check (used by sidebar after storing association)
   if (message.action === 'queue-tab-for-grouping')
   {
-    if (message.tabId && message.windowId)
+    (async () =>
     {
-      queueTabForGrouping({ id: message.tabId, windowId: message.windowId } as chrome.tabs.Tab);
-    }
+      await stateReady;
+      if (message.tabId && message.windowId)
+      {
+        queueTabForGrouping({ id: message.tabId, windowId: message.windowId } as chrome.tabs.Tab);
+      }
+    })();
     return;
   }
 
   if (message.action === 'prev-used-tab' || message.action === 'next-used-tab')
   {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
+    (async () =>
     {
-      if (tabs.length === 0) return;
-      const direction = message.action === 'prev-used-tab' ? -1 : 1;
-      historyManager.navigate(tabs[0].windowId, direction);
-    });
+      await stateReady;
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
+      {
+        if (tabs.length === 0) return;
+        const direction = message.action === 'prev-used-tab' ? -1 : 1;
+        historyManager.navigate(tabs[0].windowId, direction);
+      });
+    })();
   }
   else if (message.action === 'get-tab-history')
   {
-    chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) =>
+    (async () =>
     {
-      if (tabs.length === 0)
+      await stateReady;
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) =>
       {
-        sendResponse({ before: [], after: [], currentIndex: -1 });
-        return;
-      }
+        if (tabs.length === 0)
+        {
+          sendResponse({ before: [], after: [], currentIndex: -1 });
+          return;
+        }
 
-      const result = await historyManager.getHistoryDetails(tabs[0].windowId);
-      sendResponse(result);
-    });
-
+        const result = await historyManager.getHistoryDetails(tabs[0].windowId);
+        sendResponse(result);
+      });
+    })();
     return true;  // async response
   }
   else if (message.action === 'navigate-to-history-index')
   {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
+    (async () =>
     {
-      if (tabs.length === 0) return;
-      historyManager.navigateToIndex(tabs[0].windowId, message.index);
-    });
+      await stateReady;
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
+      {
+        if (tabs.length === 0) return;
+        historyManager.navigateToIndex(tabs[0].windowId, message.index);
+      });
+    })();
   }
   else if (message.action === 'register-tab-space')
   {
-    tabSpaceRegistry.register(message.windowId, message.tabId, message.spaceId);
+    (async () =>
+    {
+      await stateReady;
+      tabSpaceRegistry.register(message.windowId, message.tabId, message.spaceId);
+    })();
     return;
   }
   else if (message.action === 'set-active-tab-and-space')
   {
     if (message.tabId !== undefined)
     {
-      setActiveTabAndSpace(message.tabId).then(sendResponse);
+      (async () =>
+      {
+        await stateReady;
+        const result = await setActiveTabAndSpace(message.tabId);
+        sendResponse(result);
+      })();
       return true;  // async response
     }
   }
   else if (message.action === 'get-last-audible-tab')
   {
-    chrome.tabs.query({ currentWindow: true }, (allTabs) =>
+    (async () =>
     {
-      sendResponse(getAudioTabLists(allTabs));
-    });
+      await stateReady;
+      chrome.tabs.query({ currentWindow: true }, (allTabs) =>
+      {
+        sendResponse(getAudioTabLists(allTabs));
+      });
+    })();
     return true;
   }
 });
@@ -1299,29 +1337,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 
 chrome.commands.onCommand.addListener((command) =>
 {
-  if (command === "prev-used-tab" || command === "next-used-tab")
+  (async () =>
   {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
-    {
-      if (tabs.length === 0) return;
-      const direction = command === "prev-used-tab" ? -1 : 1;
-      historyManager.navigate(tabs[0].windowId, direction);
-    });
-  }
-  else if (command === "jump-to-audio-tab")
-  {
-    chrome.tabs.query({ currentWindow: true }, (allTabs) =>
-    {
-      const { playingTabIds, historyTabIds } = getAudioTabLists(allTabs);
+    await stateReady;
 
-      // Try first playing tab, then fall back to first history tab
-      const targetTabId = playingTabIds[0] ?? historyTabIds[0];
-
-      if (targetTabId !== undefined)
+    if (command === "prev-used-tab" || command === "next-used-tab")
+    {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
       {
-        chrome.tabs.update(targetTabId, { active: true });
-      }
-    });
-  }
-  // Note: focus-filter-input is handled directly in the side panel
+        if (tabs.length === 0) return;
+        const direction = command === "prev-used-tab" ? -1 : 1;
+        historyManager.navigate(tabs[0].windowId, direction);
+      });
+    }
+    else if (command === "jump-to-audio-tab")
+    {
+      chrome.tabs.query({ currentWindow: true }, (allTabs) =>
+      {
+        const { playingTabIds, historyTabIds } = getAudioTabLists(allTabs);
+
+        // Try first playing tab, then fall back to first history tab
+        const targetTabId = playingTabIds[0] ?? historyTabIds[0];
+
+        if (targetTabId !== undefined)
+        {
+          chrome.tabs.update(targetTabId, { active: true });
+        }
+      });
+    }
+    // Note: focus-filter-input is handled directly in the side panel
+  })();
 });
