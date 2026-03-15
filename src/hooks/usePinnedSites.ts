@@ -344,7 +344,7 @@ export const usePinnedSites = () => {
     savePinnedSites(updatedSites);
   }, [pinnedSites, savePinnedSites]);
 
-  const duplicatePin = useCallback((id: string) => {
+  const duplicatePin = useCallback((id: string, liveUrl?: string, liveTitle?: string, liveFavicon?: string) => {
     const index = pinnedSites.findIndex(s => s.id === id);
     if (index === -1) return;
 
@@ -352,7 +352,17 @@ export const usePinnedSites = () => {
     const duplicate: PinnedSite = {
       ...original,
       id: generateId(),
+      // Use live tab URL/title if available (e.g. tab navigated away from pinned URL)
+      url: liveUrl || original.url,
+      title: liveTitle || original.title,
     };
+
+    // Only update favicon if the original uses a favicon (not custom icon or emoji)
+    // and the live tab provides one
+    if (!original.customIconName && !original.emoji && liveFavicon)
+    {
+      duplicate.favicon = liveFavicon;
+    }
 
     const updatedSites = [...pinnedSites];
     updatedSites.splice(index + 1, 0, duplicate);

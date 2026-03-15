@@ -390,12 +390,15 @@ export const useBookmarks = () => {
   }, [getBookmark]);
 
   // Duplicate a bookmark (not folder) right after the original
-  const duplicateBookmark = useCallback(async (bookmarkId: string): Promise<void> =>
+  const duplicateBookmark = useCallback(async (bookmarkId: string, liveUrl?: string, liveTitle?: string): Promise<void> =>
   {
     const original = await getBookmark(bookmarkId);
     if (!original || !original.url || !original.parentId || original.index === undefined) return;
 
-    await createBookmark(original.parentId, original.title, original.url, original.index + 1);
+    // Use live tab URL/title if available (e.g. tab navigated away from bookmarked URL)
+    const url = liveUrl || original.url;
+    const title = liveTitle || original.title;
+    await createBookmark(original.parentId, title, url, original.index + 1);
   }, [getBookmark, createBookmark]);
 
   // Get the actual title of a root folder by its stable ID

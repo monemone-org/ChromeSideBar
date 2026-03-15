@@ -23,7 +23,7 @@ interface PinnedBarProps
               iconColor?: string) => void;
   resetFavicon: (id: string) => void;
   movePin: (activeId: string, overId: string, position?: 'before' | 'after') => void;
-  duplicatePin: (id: string) => void;
+  duplicatePin: (id: string, liveUrl?: string, liveTitle?: string, liveFavicon?: string) => void;
   addPin: (url: string, title: string, faviconUrl?: string, atIndex?: number) => void;
   iconSize: number;
   bookmarkOpenMode?: BookmarkOpenMode;
@@ -59,6 +59,21 @@ export const PinnedBar = ({
       chrome.windows.create({ tabId });
     }
   };
+
+  // Duplicate a pinned site, using the live tab's URL if the pin has an associated tab
+  const handleDuplicatePin = useCallback(async (pinnedId: string) =>
+  {
+    const tabId = getTabIdForPinned(pinnedId);
+    if (tabId !== undefined)
+    {
+      const tab = await chrome.tabs.get(tabId);
+      duplicatePin(pinnedId, tab.url, tab.title, tab.favIconUrl);
+    }
+    else
+    {
+      duplicatePin(pinnedId);
+    }
+  }, [getTabIdForPinned, duplicatePin]);
 
   // Handle unpin: create undoable action and either perform (with undo toast) or just do()
   const handleRemovePin = useCallback((pinnedId: string) =>
@@ -202,7 +217,7 @@ export const PinnedBar = ({
           onRemove={handleRemovePin}
           onUpdate={updatePin}
           onResetFavicon={resetFavicon}
-          onDuplicate={duplicatePin}
+          onDuplicate={handleDuplicatePin}
           onOpen={
             bookmarkOpenMode === 'arc'
               ? (s) => openPinnedTab(s.id, s.url)

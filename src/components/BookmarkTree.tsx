@@ -1582,6 +1582,21 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     }
   }, [getTabIdForBookmark, windowId, getItemKeyForTab, restoreItemAssociation, onPerformAction, closeBookmarkTab]);
 
+  // Duplicate a bookmark, using the live tab's URL if the bookmark has an associated tab
+  const handleDuplicateBookmark = useCallback(async (bookmarkId: string) =>
+  {
+    const tabId = getTabIdForBookmark(bookmarkId);
+    if (tabId !== undefined)
+    {
+      const tab = await chrome.tabs.get(tabId);
+      duplicateBookmark(bookmarkId, tab.url, tab.title);
+    }
+    else
+    {
+      duplicateBookmark(bookmarkId);
+    }
+  }, [getTabIdForBookmark, duplicateBookmark]);
+
   // Close tabs for all selected bookmarks (undoable as a single batch action)
   const handleCloseSelectedBookmarks = useCallback(() =>
   {
@@ -2035,7 +2050,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onCreateFolder={handleCreateFolder}
               onCreateBookmark={handleCreateBookmark}
               onSort={sortBookmarks}
-              onDuplicate={duplicateBookmark}
+              onDuplicate={handleDuplicateBookmark}
               onExpandAll={handleExpandAll}
               onPin={handlePinSelectedBookmarks}
               globalDragActive={!!unifiedActiveId}
