@@ -1,5 +1,10 @@
 ## Changelog
 
+## CURRENT_VERSION
+
+- Drop tabs onto the bookmark tree to associate them with bookmarks
+- "Duplicate" command now uses the tab's current URL instead of the saved URL when the bookmark or pinned site has a live tab
+
 ## 1.0.301
 
 - "Email Us" menu item in settings dropdown
