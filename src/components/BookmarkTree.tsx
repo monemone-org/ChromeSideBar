@@ -629,7 +629,7 @@ const DraggableBookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>((props
       zone: 'bookmarkTree',
       targetId: nodeId,
       canAccept: acceptsFormatsIf(
-        [DragFormat.BOOKMARK, DragFormat.TAB_GROUP, DragFormat.URL],
+        [DragFormat.BOOKMARK, DragFormat.TAB_GROUP, DragFormat.TAB, DragFormat.URL],
         (dragData, format) => {
           // Can't drop bookmark on itself
           const primaryItem = getPrimaryItem(dragData);
@@ -767,7 +767,7 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
   const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation } = useBookmarkTabsContext();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation, associateExistingTab } = useBookmarkTabsContext();
   const { spaces, updateSpace, windowId } = useSpacesContext();
   // Build lookup: folderId → Space (only when in "All" space)
   const folderIdToSpace = useMemo(() =>
@@ -1780,10 +1780,11 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
           break;
         }
 
+        case DragFormat.TAB:
         case DragFormat.URL:
         {
-          // URL dropped on bookmark tree - create bookmarks for all URLs
-          const urlItems = getItemsByFormat(dragData, DragFormat.URL);
+          // Tab or URL dropped on bookmark tree - create bookmarks for all items
+          const urlItems = getItemsByFormat(dragData, acceptedFormat);
           if (urlItems.length === 0) return;
 
           let parentId: string;
@@ -1817,12 +1818,17 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
             }
           }
 
-          // Create bookmark for each URL, incrementing index to maintain order
+          // Create bookmark for each item, incrementing index to maintain order
+          // If dragged from a tab, associate the tab with the new bookmark
           for (const item of urlItems)
           {
             if (item.url)
             {
-              await createBookmark(parentId, item.url.title || item.url.url, item.url.url, index);
+              const result = await createBookmark(parentId, item.url.title || item.url.url, item.url.url, index);
+              if (result.node && item.tab?.tabId)
+              {
+                await associateExistingTab(item.tab.tabId, result.node.id);
+              }
               if (index !== undefined) index++;
             }
           }
@@ -1889,7 +1895,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       console.error('Bookmark drop operation failed:', error);
     }
   }, [bookmarks, spaceFolder, getSelectedItems, moveBookmark, expandedState, setExpandedState,
-    clearSelection, setWasValidDrop, getBookmark, createBookmark]);
+    clearSelection, setWasValidDrop, getBookmark, createBookmark, associateExistingTab]);
 
   // Register drop handler
   useEffect(() =>
