@@ -552,7 +552,7 @@ export const UnifiedDndProvider: React.FC<UnifiedDndProviderProps> = ({ children
         sensors={sensors}
         collisionDetection={pointerWithinThenClosest}
         autoScroll={{
-          threshold: { x: 0.1, y: 0.1 },
+          threshold: { x: 0.15, y: 0.15 },
           acceleration: 7,
           interval: 10,
         }}
