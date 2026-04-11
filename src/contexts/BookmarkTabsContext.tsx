@@ -110,6 +110,11 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
       const newItemToTab = new Map<string, number>();
       const newTabToItem = new Map<number, string>();
+      // Seed live titles/audible state from existing tabs so the UI shows the
+      // tab title (not bookmark name) immediately on sidebar reopen — chrome.tabs.onUpdated
+      // only fires on future changes, so without this the maps stay empty until the tab reloads.
+      const newTabTitles = new Map<number, string>();
+      const newAudibleTabs = new Set<number>();
 
       // Validate each stored tabId still exists
       const tabIds = Object.keys(associations).map(id => parseInt(id, 10));
@@ -138,6 +143,14 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
             const itemKey = associations[tabId];
             newItemToTab.set(itemKey, tabId);
             newTabToItem.set(tabId, itemKey);
+            if (tab.title)
+            {
+              newTabTitles.set(tabId, tab.title);
+            }
+            if (tab.audible)
+            {
+              newAudibleTabs.add(tabId);
+            }
           }
           else
           {
@@ -157,6 +170,8 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
       setItemToTab(newItemToTab);
       setTabToItem(newTabToItem);
+      setTabTitles(newTabTitles);
+      setAudibleTabs(newAudibleTabs);
       setIsInitialized(true);
     }
     catch (err)

@@ -1,0 +1,13 @@
+{
+  "layout": {
+    "v-split": [
+      { "pane": { "focus": true } },
+      {
+        "h-split": [
+          { "pane": { "cmd": "ls" } },
+          { "pane": {} }
+        ]
+      }
+    ]
+  }
+}
