@@ -15,6 +15,7 @@ import { AudioTabsDropdown } from './components/AudioTabsDropdown';
 import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
 import { UndoableAction } from './actions/types';
+import { scrollToTab } from './utils/scrollHelpers';
 import { usePinnedSites, PinnedSite } from './hooks/usePinnedSites';
 import { useTabs } from './hooks/useTabs';
 import { useBookmarks, refreshAllBookmarks } from './hooks/useBookmarks';
@@ -526,6 +527,11 @@ function App() {
     true,
     { parse: (v) => v === 'true', serialize: (v) => v.toString() }
   );
+  const [audioQuickJump, setAudioQuickJump] = useChromeLocalStorage(
+    'sidebar-audio-quick-jump',
+    false,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  );
   const [showFilterArea, setShowFilterArea] = useLocalStorage(
     'sidebar-show-filter-area',
     false,
@@ -654,6 +660,7 @@ function App() {
     setBookmarkOpenMode(newSettings.bookmarkOpenMode);
     setSpacesEnabled(newSettings.useSpaces);
     setArcSingleClickOpensTab(newSettings.arcSingleClickOpensTab);
+    setAudioQuickJump(newSettings.audioQuickJump);
     setShowSettings(false);
   };
 
@@ -762,6 +769,29 @@ function App() {
     setShowSpaceDeleteDialog(true);
   }, []);
 
+  // Audio quick-jump: activates the most recently playing tab (used when audioQuickJump setting is on)
+  const handleJumpToAudioTab = useCallback(async () =>
+  {
+    try
+    {
+      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' });
+      const playingTabIds: number[] = response?.playingTabIds || [];
+      const historyTabIds: number[] = response?.historyTabIds || [];
+      const targetTabId = playingTabIds[0] ?? historyTabIds[0];
+
+      if (targetTabId !== undefined)
+      {
+        await chrome.runtime.sendMessage({
+          action: 'set-active-tab-and-space',
+          tabId: targetTabId,
+          skipHistory: false
+        });
+        scrollToTab(targetTabId);
+      }
+    }
+    catch { /* ignore */ }
+  }, []);
+
   // Audio dialog handler - query for playing and history tabs before opening
   const handleOpenAudioDialog = useCallback(async () => {
     try
@@ -839,6 +869,7 @@ function App() {
           bookmarkOpenMode,
           useSpaces: spacesEnabled,
           arcSingleClickOpensTab,
+          audioQuickJump,
         }}
         onApply={handleApplySettings}
       />
@@ -907,6 +938,7 @@ function App() {
             setFilterLiveTabs(newValue);
           }}
           onAudioDialogOpen={handleOpenAudioDialog}
+          onAudioTabJump={audioQuickJump ? handleJumpToAudioTab : undefined}
           onMenuToggle={() => setShowMenu(!showMenu)}
           menuButtonRef={buttonRef}
           audioButtonRef={audioButtonRef}

@@ -1,5 +1,5 @@
 import { Settings, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
-import { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
+import React, { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
 import * as DropdownMenu from './menu/DropdownMenu';
 
 interface ToolbarProps
@@ -7,6 +7,8 @@ interface ToolbarProps
   filterLiveTabsActive: boolean;
   onFilterLiveTabsToggle: () => void;
   onAudioDialogOpen: () => void;
+  // When defined, enables long-press mode: quick click jumps to the latest audio tab, hold opens the list
+  onAudioTabJump?: () => void;
   onMenuToggle: () => void;
   menuButtonRef: React.RefObject<HTMLButtonElement>;
   audioButtonRef?: React.RefObject<HTMLButtonElement>;
@@ -32,6 +34,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   filterLiveTabsActive,
   onFilterLiveTabsToggle,
   onAudioDialogOpen,
+  onAudioTabJump,
   onMenuToggle,
   menuButtonRef,
   audioButtonRef,
@@ -71,6 +74,44 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevButtonRef = useRef<HTMLButtonElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Long-press state for the audio button (used when onAudioTabJump is provided)
+  const audioHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioIsLongPressRef = useRef(false);
+
+  const handleAudioMouseDown = useCallback((e: React.MouseEvent) =>
+  {
+    if (e.button !== 0 || !onAudioTabJump) return;
+    audioIsLongPressRef.current = false;
+    audioHoldTimerRef.current = setTimeout(() =>
+    {
+      audioIsLongPressRef.current = true;
+      onAudioDialogOpen();
+    }, 400);
+  }, [onAudioDialogOpen, onAudioTabJump]);
+
+  const handleAudioMouseUp = useCallback(() =>
+  {
+    if (!onAudioTabJump) return;
+    if (audioHoldTimerRef.current)
+    {
+      clearTimeout(audioHoldTimerRef.current);
+      audioHoldTimerRef.current = null;
+    }
+    if (!audioIsLongPressRef.current)
+    {
+      onAudioTabJump();
+    }
+  }, [onAudioTabJump]);
+
+  const handleAudioMouseLeave = useCallback(() =>
+  {
+    if (audioHoldTimerRef.current)
+    {
+      clearTimeout(audioHoldTimerRef.current);
+      audioHoldTimerRef.current = null;
+    }
+  }, []);
 
   useEffect(() =>
   {
@@ -517,8 +558,11 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
           {/* Audio dialog button */}
           <button
             ref={audioButtonRef}
-            onClick={onAudioDialogOpen}
-            title="Show tabs playing audio/video"
+            onClick={onAudioTabJump ? undefined : onAudioDialogOpen}
+            onMouseDown={onAudioTabJump ? handleAudioMouseDown : undefined}
+            onMouseUp={onAudioTabJump ? handleAudioMouseUp : undefined}
+            onMouseLeave={onAudioTabJump ? handleAudioMouseLeave : undefined}
+            title={onAudioTabJump ? 'Click to jump to audio tab · Hold to show list' : 'Show tabs playing audio/video'}
             className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
           >
             <Volume2 size={16} />

@@ -12,6 +12,7 @@ export interface SettingsValues {
   bookmarkOpenMode: BookmarkOpenMode;
   useSpaces: boolean;
   arcSingleClickOpensTab: boolean;
+  audioQuickJump: boolean;
 }
 
 interface SettingsDialogProps {
@@ -35,6 +36,7 @@ export function SettingsDialog({
   const [tempBookmarkOpenMode, setTempBookmarkOpenMode] = useState(settings.bookmarkOpenMode);
   const [tempUseSpaces, setTempUseSpaces] = useState(settings.useSpaces);
   const [tempArcSingleClickOpensTab, setTempArcSingleClickOpensTab] = useState(settings.arcSingleClickOpensTab);
+  const [tempAudioQuickJump, setTempAudioQuickJump] = useState(settings.audioQuickJump);
 
   // Track previous isOpen to detect when dialog opens
   const wasOpen = useRef(false);
@@ -58,6 +60,7 @@ export function SettingsDialog({
       setTempBookmarkOpenMode(settings.bookmarkOpenMode);
       setTempUseSpaces(settings.useSpaces);
       setTempArcSingleClickOpensTab(settings.arcSingleClickOpensTab);
+      setTempAudioQuickJump(settings.audioQuickJump);
     }
     wasOpen.current = isOpen;
   }, [isOpen, settings]);
@@ -71,6 +74,7 @@ export function SettingsDialog({
       bookmarkOpenMode: tempBookmarkOpenMode,
       useSpaces: tempUseSpaces,
       arcSingleClickOpensTab: tempArcSingleClickOpensTab,
+      audioQuickJump: tempAudioQuickJump,
     });
   };
 
@@ -191,6 +195,18 @@ export function SettingsDialog({
               </label>
               <p className="text-gray-500 dark:text-gray-400 ml-5">
                 Organize tabs and bookmarks into focused workspaces
+              </p>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tempAudioQuickJump}
+                  onChange={(e) => setTempAudioQuickJump(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                Audio button: click to jump, hold to show list
+              </label>
+              <p className="text-gray-500 dark:text-gray-400 ml-5">
+                Click jumps to the latest playing tab; hold opens the full list
               </p>
               <div>
                 <label className="block text-gray-700 dark:text-gray-300 mb-1">
