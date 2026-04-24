@@ -2,6 +2,14 @@
 
 ## CURRENT_VERSION
 
+## 1.0.306
+
+- Audio button quick-jump mode: optional setting to make single click jump to the latest playing tab, with hold to show the full audio list
+- Fixed stale tab titles and audible indicators after sidebar reopen
+- Fixed auto-scroll not triggering during drag when only the "Tabs" label is visible
+
+## 1.0.303
+
 - Drop tabs onto the bookmark tree to associate them with bookmarks
 - "Duplicate" command now uses the tab's current URL instead of the saved URL when the bookmark or pinned site has a live tab
 
