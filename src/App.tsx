@@ -34,7 +34,7 @@ import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
 import { GROUP_COLORS } from './utils/groupColors';
-import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkles, Newspaper, Mail } from 'lucide-react';
+import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkles, Newspaper, Mail, Heart } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
 import { useNewsCheck } from './hooks/useNewsCheck';
@@ -1032,6 +1032,10 @@ function App() {
             <DropdownMenu.Item onSelect={() => window.open('mailto:chrome-dev@monemone.org?subject=Sidebar Feedback')}>
               <Mail size={14} className="mr-2" />
               Email Us
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onSelect={() => window.open('https://github.com/sponsors/monehsieh', '_blank')}>
+              <Heart size={14} className="mr-2" />
+              Support Us
             </DropdownMenu.Item>
             <DropdownMenu.Item onSelect={() => setShowAbout(true)}>
               <Info size={14} className="mr-2" />
