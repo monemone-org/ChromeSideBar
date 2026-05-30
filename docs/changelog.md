@@ -2,6 +2,10 @@
 
 ## CURRENT_VERSION
 
+## 1.0.307
+
+- "Support Us" menu item in settings dropdown, linking to the GitHub Sponsors page
+
 ## 1.0.306
 
 - Audio button quick-jump mode: optional setting to make single click jump to the latest playing tab, with hold to show the full audio list
