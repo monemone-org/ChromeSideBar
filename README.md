@@ -239,3 +239,11 @@ Outputs production build to `dist/` folder.
 Or Install via Chrome Extension Store
 
 https://chromewebstore.google.com/detail/jmmgjadgeeicdbagekohgmaipoekgcbn?utm_source=item-share-cb
+
+## Support Me
+
+This is a free, open-source hobby project. If you find it useful, consider sponsoring me on GitHub:
+
+[❤️ Sponsor on GitHub](https://github.com/sponsors/monehsieh)
+
+Thanks for the support!
