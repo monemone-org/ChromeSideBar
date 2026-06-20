@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Globe, Edit, Trash, X, RotateCcw, Play, Copy, ExternalLink } from 'lucide-react';
+import { Globe, Pencil, Trash, X, RotateCcw, Play, Copy, ExternalLink } from 'lucide-react';
 import { Dialog } from './Dialog';
 import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePinnedSites';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -344,7 +344,7 @@ export const PinnedIcon = ({
             </ContextMenu.Item>
             <ContextMenu.Separator />
             <ContextMenu.Item onSelect={handleEdit}>
-              <Edit size={14} className="mr-2" /> Edit Pin...
+              <Pencil size={14} className="mr-2" /> Edit
             </ContextMenu.Item>
             <ContextMenu.Item onSelect={() => onDuplicate(site.id)}>
               <Copy size={14} className="mr-2" /> Duplicate

@@ -23,7 +23,7 @@ import { SPEAKER_ICON_SIZE } from '../constants';
 import {
   Globe,
   Trash,
-  Edit,
+  Pencil,
   FolderPlus,
   FilePlus,
   FolderOpen,
@@ -571,7 +571,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             <>
               <ContextMenu.Separator />
               <ContextMenu.Item onSelect={() => onEdit(node)}>
-                <Edit size={14} className="mr-2" /> Edit Bookmark...
+                <Pencil size={14} className="mr-2" /> Edit
               </ContextMenu.Item>
               {isLoaded && !isFolder && onCloseBookmark ? (
                 <>
