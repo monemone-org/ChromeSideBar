@@ -53,6 +53,7 @@ import { moveSingleGroup, moveGroupAfter } from '../utils/groupMove';
 import { DropIndicators } from './DropIndicators';
 import * as ContextMenu from './menu/ContextMenu';
 import { useInView } from '../hooks/useInView';
+import { useChromeLocalStorage } from '../hooks/useChromeLocalStorage';
 import {
   useDraggable,
   useDroppable,
@@ -1043,6 +1044,30 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
   // Bookmarks functions for export and tab-to-bookmark drops
   const { findFolderInParent, findFolderByPath, createFolder, createBookmark, createBookmarksBatch, getChildren, clearFolder, getBookmarkPath } = useBookmarks();
 
+  // Persisted per-space last selected bookmark folder (spaceId → folderId)
+  const [lastSelectedBookmarkFolderPerSpace, setLastSelectedBookmarkFolderPerSpace] = useChromeLocalStorage<Record<string, string>>(
+    'lastSelectedBookmarkFolderPerSpace',
+    {}
+  );
+
+  // Default folder for Add to Bookmark dialogs: remembered folder for this space, or space root bookmark folder
+  const lastSelectedBookmarkFolderDefaultId = useMemo(() =>
+  {
+    if (!activeSpace || activeSpace.id === 'all') return undefined;
+    const remembered = lastSelectedBookmarkFolderPerSpace[activeSpace.id];
+    if (remembered) return remembered;
+    return activeSpace.bookmarkFolderPath
+      ? findFolderByPath(activeSpace.bookmarkFolderPath)?.id
+      : undefined;
+  }, [activeSpace, lastSelectedBookmarkFolderPerSpace, findFolderByPath]);
+
+  // Save the selected bookmark folder for the current space
+  const saveLastSelectedBookmarkFolder = useCallback((folderId: string) =>
+  {
+    if (!activeSpace || activeSpace.id === 'all') return;
+    setLastSelectedBookmarkFolderPerSpace({ ...lastSelectedBookmarkFolderPerSpace, [activeSpace.id]: folderId });
+  }, [activeSpace, lastSelectedBookmarkFolderPerSpace, setLastSelectedBookmarkFolderPerSpace]);
+
   const handleAddToBookmarkFolderSelect = useCallback(async (folderId: string) =>
   {
     const tab = addToBookmarkDialog.tab;
@@ -1057,8 +1082,9 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
       await associateExistingTab(tab.id, newBookmark.id);
     }
 
+    saveLastSelectedBookmarkFolder(folderId);
     closeAddToBookmarkDialog();
-  }, [addToBookmarkDialog.tab, createBookmark, arcStyleEnabled, associateExistingTab, closeAddToBookmarkDialog]);
+  }, [addToBookmarkDialog.tab, createBookmark, arcStyleEnabled, associateExistingTab, saveLastSelectedBookmarkFolder, closeAddToBookmarkDialog]);
 
   const [exportConflictDialog, setExportConflictDialog] = useState<{
     isOpen: boolean;
@@ -2313,10 +2339,11 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
       });
     }
 
+    saveLastSelectedBookmarkFolder(folderId);
     clearSelection();
     setAddToBookmarkMultiDialog({ isOpen: false });
     showToast('Added to bookmarks');
-  }, [getTabSelectionInfo, visibleTabs, createBookmark, createFolder, clearSelection, showToast]);
+  }, [getTabSelectionInfo, visibleTabs, createBookmark, createFolder, saveLastSelectedBookmarkFolder, clearSelection, showToast]);
 
   // Open move to space dialog for multi-selection
   const openMoveSelectedToSpaceDialog = useCallback(() =>
@@ -2391,10 +2418,11 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
         savedCount++;
       }
     }
+    saveLastSelectedBookmarkFolder(folderId);
     clearSelection();
     setSaveGroupsToBookmarksDialog({ isOpen: false });
     showToast('Groups saved to bookmarks');
-  }, [getTabSelectionInfo, visibleTabs, clearSelection, showToast]);
+  }, [getTabSelectionInfo, visibleTabs, saveLastSelectedBookmarkFolder, clearSelection, showToast]);
 
   // Copy single URL to clipboard
   const handleCopyUrl = useCallback(async (url: string) =>
@@ -2752,11 +2780,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
         title="Add Tab to Bookmark Folder"
         onSelect={handleAddToBookmarkFolderSelect}
         onClose={closeAddToBookmarkDialog}
-        defaultFolderId={
-          activeSpace?.bookmarkFolderPath
-            ? findFolderByPath(activeSpace.bookmarkFolderPath)?.id
-            : undefined
-        }
+        defaultFolderId={lastSelectedBookmarkFolderDefaultId}
       />
 
       <ExportConflictDialog
@@ -2781,11 +2805,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
         title="Add to Bookmark Folder"
         onSelect={handleAddSelectedToBookmarkFolder}
         onClose={() => setAddToBookmarkMultiDialog({ isOpen: false })}
-        defaultFolderId={
-          activeSpace?.bookmarkFolderPath
-            ? findFolderByPath(activeSpace.bookmarkFolderPath)?.id
-            : undefined
-        }
+        defaultFolderId={lastSelectedBookmarkFolderDefaultId}
       />
 
       <SpaceNavigatorDialog
@@ -2803,11 +2823,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
         title="Save Groups to Bookmark Folder"
         onSelect={handleSaveGroupsToBookmarksFolder}
         onClose={() => setSaveGroupsToBookmarksDialog({ isOpen: false })}
-        defaultFolderId={
-          activeSpace?.bookmarkFolderPath
-            ? findFolderByPath(activeSpace.bookmarkFolderPath)?.id
-            : undefined
-        }
+        defaultFolderId={lastSelectedBookmarkFolderDefaultId}
       />
 
       <Toast

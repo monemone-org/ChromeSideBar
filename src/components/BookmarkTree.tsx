@@ -940,7 +940,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     isOpen: boolean;
     bookmarkId: string | null;
     isFolder: boolean;
-  }>({ isOpen: false, bookmarkId: null, isFolder: false });
+    parentFolderId: string | null;
+  }>({ isOpen: false, bookmarkId: null, isFolder: false, parentFolderId: null });
 
   // Move multiple bookmarks dialog
   const [moveMultiBookmarkDialog, setMoveMultiBookmarkDialog] = useState({
@@ -1309,14 +1310,15 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   }, []);
 
   // Open move bookmark dialog
-  const openMoveBookmarkDialog = useCallback((bookmarkId: string, isFolder: boolean) =>
+  const openMoveBookmarkDialog = useCallback(async (bookmarkId: string, isFolder: boolean) =>
   {
-    setMoveBookmarkDialog({ isOpen: true, bookmarkId, isFolder });
-  }, []);
+    const node = await getBookmark(bookmarkId);
+    setMoveBookmarkDialog({ isOpen: true, bookmarkId, isFolder, parentFolderId: node?.parentId ?? null });
+  }, [getBookmark]);
 
   const closeMoveBookmarkDialog = useCallback(() =>
   {
-    setMoveBookmarkDialog({ isOpen: false, bookmarkId: null, isFolder: false });
+    setMoveBookmarkDialog({ isOpen: false, bookmarkId: null, isFolder: false, parentFolderId: null });
   }, []);
 
   // Handle moving bookmark/folder to a selected folder
@@ -2187,6 +2189,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         title={moveBookmarkDialog.isFolder ? "Move Folder to..." : "Move Bookmark to..."}
         onSelect={handleMoveBookmarkToFolder}
         onClose={closeMoveBookmarkDialog}
+        defaultFolderId={moveBookmarkDialog.parentFolderId ?? undefined}
       />
 
       <FolderPickerDialog

@@ -238,6 +238,9 @@ export const FolderPickerDialog = ({
             currentId = node.parentId;
           }
 
+          // Also expand the default folder itself so its sub-folders are immediately visible
+          newExpanded[defaultFolderId] = true;
+
           setExpandedState(newExpanded);
           // Schedule scroll after tree re-renders with expanded parents
           setPendingScrollFolderId(defaultFolderId);
