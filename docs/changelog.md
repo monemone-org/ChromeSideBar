@@ -1,6 +1,6 @@
 ## Changelog
 
-## CURRENT_VERSION
+## 1.0.312
 
 - "Add to Bookmark" remembers the last chosen folder per space - re-opening the picker pre-selects where you last saved
 - "Move Bookmark/Folder" picker now pre-selects the bookmark's current parent folder instead of always defaulting to Other Bookmarks

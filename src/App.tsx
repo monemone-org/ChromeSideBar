@@ -11,7 +11,7 @@ import { ImportDialog } from './components/ImportDialog';
 import { ArcImportDialog } from './components/ArcImportDialog';
 import { WelcomeDialog } from './components/WelcomeDialog';
 import { WhatsNewDialog } from './components/WhatsNewDialog';
-import { getWhatsNewSince, getRecentWhatsNew } from './data/changelog';
+import { getWhatsNewSince, getRecentWhatsNew, ChangelogGroup } from './data/changelog';
 import { AudioTabsDropdown } from './components/AudioTabsDropdown';
 import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
@@ -575,7 +575,8 @@ function App() {
 
   const [showWelcome, setShowWelcome] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
-  const [whatsNewDialogItems, setWhatsNewDialogItems] = useState<string[]>([]);
+  const [whatsNewDialogGroups, setWhatsNewDialogGroups] = useState<ChangelogGroup[]>([]);
+  const [whatsNewDialogVersion, setWhatsNewDialogVersion] = useState<string | undefined>(undefined);
 
   // True only for existing users who upgraded - excludes new installs and already-current versions.
   const hasVersionChanged = !isNewInstall && lastSeenVersion !== currentVersion;
@@ -585,10 +586,11 @@ function App() {
   useEffect(() =>
   {
     if (!hasVersionChanged) return;
-    const items = getWhatsNewSince(lastSeenVersion);
-    if (items.length > 0)
+    const groups = getWhatsNewSince(lastSeenVersion);
+    if (groups.length > 0)
     {
-      setWhatsNewDialogItems(items);
+      setWhatsNewDialogGroups(groups);
+      setWhatsNewDialogVersion(currentVersion);
       setShowWhatsNew(true);
     }
   }, [hasVersionChanged]);
@@ -908,7 +910,8 @@ function App() {
 
       <WhatsNewDialog
         isOpen={showWhatsNew}
-        items={whatsNewDialogItems}
+        groups={whatsNewDialogGroups}
+        version={whatsNewDialogVersion}
         onClose={() => {
           setLastSeenVersion(currentVersion);
           setShowWhatsNew(false);
@@ -1002,7 +1005,8 @@ function App() {
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
             <DropdownMenu.Item onSelect={() => {
-              setWhatsNewDialogItems(getRecentWhatsNew(3));
+              setWhatsNewDialogGroups(getRecentWhatsNew(3));
+              setWhatsNewDialogVersion(undefined);
               setShowWhatsNew(true);
             }}>
               <Sparkles size={14} className="mr-2" />

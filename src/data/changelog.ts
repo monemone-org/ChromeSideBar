@@ -37,22 +37,27 @@ function compareVersions(a: string, b: string): number
   return 0;
 }
 
-// Returns all changelog items for versions newer than lastSeenVersion,
-// sorted newest-first and flattened into a single list.
+export interface ChangelogGroup
+{
+  version: string;
+  items: string[];
+}
+
+// Returns changelog groups for versions newer than lastSeenVersion, sorted newest-first.
 // Returns an empty array if nothing is new (dialog should be skipped).
-export function getWhatsNewSince(lastSeenVersion: string): string[]
+export function getWhatsNewSince(lastSeenVersion: string): ChangelogGroup[]
 {
   return Object.entries(CHANGELOG)
     .filter(([version]) => compareVersions(version, lastSeenVersion) > 0)
     .sort(([a], [b]) => compareVersions(b, a))
-    .flatMap(([, items]) => items);
+    .map(([version, items]) => ({ version, items }));
 }
 
-// Returns items from the most recent `versionCount` versions, for manual "What's New" opens.
-export function getRecentWhatsNew(versionCount: number): string[]
+// Returns the most recent `versionCount` changelog groups, for manual "What's New" opens.
+export function getRecentWhatsNew(versionCount: number): ChangelogGroup[]
 {
   return Object.entries(CHANGELOG)
     .sort(([a], [b]) => compareVersions(b, a))
     .slice(0, versionCount)
-    .flatMap(([, items]) => items);
+    .map(([version, items]) => ({ version, items }));
 }
