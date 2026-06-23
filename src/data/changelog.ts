@@ -2,7 +2,7 @@
 // Omit a version entirely if it contains only bug fixes or internal changes.
 // Entries are shown in the "What's New" dialog when the user upgrades past them.
 export const CHANGELOG: Record<string, string[]> = {
-  '1.0.310': [
+  '1.0.313': [
     'Bookmark folder expand/collapse state is now persisted across Chrome restarts',
   ],
   '1.0.306': [
