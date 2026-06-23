@@ -4,6 +4,7 @@
 
 - "Add to Bookmark" remembers the last chosen folder per space - re-opening the picker pre-selects where you last saved
 - "Move Bookmark/Folder" picker now pre-selects the bookmark's current parent folder instead of always defaulting to Other Bookmarks
+- Bookmark folder expand/collapse state is now persisted across Chrome restarts, per space
 
 ## 1.0.307
 

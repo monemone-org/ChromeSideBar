@@ -62,9 +62,9 @@ const BOOKMARKS_BAR_ID = '1';
 const OTHER_BOOKMARKS_ID = '2';
 const MOBILE_BOOKMARKS_ID = '3';
 
-// Storage key for persisting folder expand/collapse state
-const getExpandedStateKey = (windowId: number, spaceId: string) =>
-  `bookmarkExpandedState_${windowId}_${spaceId}`;
+// Storage key for persisting folder expand/collapse state across restarts (keyed by space only)
+const getExpandedStateKey = (spaceId: string) =>
+  `bookmarkExpandedState_${spaceId}`;
 
 // Special folder IDs that cannot be edited/deleted
 const SPECIAL_FOLDER_IDS = [BOOKMARKS_BAR_ID, OTHER_BOOKMARKS_ID, MOBILE_BOOKMARKS_ID];
@@ -1010,14 +1010,12 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     getItemsInRange: getBookmarkItemsInRange
   });
 
-  // Load expanded state from session storage on mount
+  // Load expanded state from local storage on mount and on space switch
   useEffect(() =>
   {
-    if (!windowId) return;
-
     const spaceId = activeSpace?.id || 'all';
-    const storageKey = getExpandedStateKey(windowId, spaceId);
-    chrome.storage.session.get(storageKey, (result) =>
+    const storageKey = getExpandedStateKey(spaceId);
+    chrome.storage.local.get(storageKey, (result) =>
     {
       if (result[storageKey])
       {
@@ -1025,22 +1023,22 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       }
       setExpandedStateLoaded(true);
     });
-  }, [windowId, activeSpace?.id]);
+  }, [activeSpace?.id]);
 
-  // Save expanded state to session storage on change (debounced)
+  // Save expanded state to local storage on change (debounced), persists across restarts
   useEffect(() =>
   {
-    if (!windowId || !expandedStateLoaded) return;
+    if (!expandedStateLoaded) return;
 
     const spaceId = activeSpace?.id || 'all';
     const timeoutId = setTimeout(() =>
     {
-      const storageKey = getExpandedStateKey(windowId, spaceId);
-      chrome.storage.session.set({ [storageKey]: expandedState });
+      const storageKey = getExpandedStateKey(spaceId);
+      chrome.storage.local.set({ [storageKey]: expandedState });
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [expandedState, windowId, expandedStateLoaded, activeSpace?.id]);
+  }, [expandedState, expandedStateLoaded, activeSpace?.id]);
 
   // Auto-expand space folder when it changes (wait for loaded state)
   useEffect(() =>
