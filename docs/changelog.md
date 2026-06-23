@@ -2,6 +2,9 @@
 
 ## CURRENT_VERSION
 
+- "Add to Bookmark" remembers the last chosen folder per space - re-opening the picker pre-selects where you last saved
+- "Move Bookmark/Folder" picker now pre-selects the bookmark's current parent folder instead of always defaulting to Other Bookmarks
+
 ## 1.0.307
 
 - "Support Us" menu item in settings dropdown, linking to the GitHub Sponsors page
