@@ -1,11 +1,10 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
 import react from '@vitejs/plugin-react'
-import { whatsnewPlugin } from './vite-plugins/whatsnew'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react(), whatsnewPlugin()],
+  plugins: [react()],
   build: {
     outDir: 'dist',
     rollupOptions: {

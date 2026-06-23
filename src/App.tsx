@@ -11,6 +11,7 @@ import { ImportDialog } from './components/ImportDialog';
 import { ArcImportDialog } from './components/ArcImportDialog';
 import { WelcomeDialog } from './components/WelcomeDialog';
 import { WhatsNewDialog } from './components/WhatsNewDialog';
+import { getWhatsNewSince, getRecentWhatsNew } from './data/changelog';
 import { AudioTabsDropdown } from './components/AudioTabsDropdown';
 import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
@@ -571,28 +572,24 @@ function App() {
   );
 
   const isNewInstall = lastSeenVersion === '';
-  const hasVersionChanged = !isNewInstall && lastSeenVersion !== currentVersion;
 
   const [showWelcome, setShowWelcome] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [whatsNewDialogItems, setWhatsNewDialogItems] = useState<string[]>([]);
 
-  // Silent upgrades: versions with only internal changes (skip What's New when upgrading from these)
-  const SILENT_UPGRADES = new Set(['1.0.292', '1.0.293', '1.0.294', '1.0.306']);
+  // True only for existing users who upgraded - excludes new installs and already-current versions.
+  const hasVersionChanged = !isNewInstall && lastSeenVersion !== currentVersion;
 
-  // Trigger What's New dialog once lastSeenVersion loads from async storage
+  // Trigger What's New dialog once lastSeenVersion loads from async storage.
+  // hasVersionChanged is false for new installs (welcome handles those) and when already up to date.
   useEffect(() =>
   {
-    if (hasVersionChanged)
+    if (!hasVersionChanged) return;
+    const items = getWhatsNewSince(lastSeenVersion);
+    if (items.length > 0)
     {
-      const isSilent = SILENT_UPGRADES.has(lastSeenVersion ?? '');
-      if (isSilent)
-      {
-        setLastSeenVersion(currentVersion);
-      }
-      else
-      {
-        setShowWhatsNew(true);
-      }
+      setWhatsNewDialogItems(items);
+      setShowWhatsNew(true);
     }
   }, [hasVersionChanged]);
   const [showMenu, setShowMenu] = useState(false);
@@ -911,6 +908,7 @@ function App() {
 
       <WhatsNewDialog
         isOpen={showWhatsNew}
+        items={whatsNewDialogItems}
         onClose={() => {
           setLastSeenVersion(currentVersion);
           setShowWhatsNew(false);
@@ -1003,7 +1001,10 @@ function App() {
               Import from Arc Browser...
             </DropdownMenu.Item>
             <DropdownMenu.Separator />
-            <DropdownMenu.Item onSelect={() => setShowWhatsNew(true)}>
+            <DropdownMenu.Item onSelect={() => {
+              setWhatsNewDialogItems(getRecentWhatsNew(3));
+              setShowWhatsNew(true);
+            }}>
               <Sparkles size={14} className="mr-2" />
               What's New
             </DropdownMenu.Item>

@@ -1,13 +1,12 @@
 # How the Docs Files Are Used
 
-## whatsnew.md
+## changelog.ts (`src/data/changelog.ts`)
 
 Shows users what changed after an extension upgrade, displayed inside the extension itself.
 
-- **Build**: 
-  - Vite plugin (`vite-plugins/whatsnew.ts`) compiles `docs/whatsnew.md` into `whatsnew.html` substituting `{CURRENT_VERSION}` with the version from `manifest.json`. 
-  - The HTML is emitted as a bundled asset in the extension build output.
-- **Runtime**: `WhatsNewDialog` (`src/components/WhatsNewDialog.tsx`) loads `whatsnew.html` in an iframe. Shown automatically on first open after an upgrade, and available from the config menu's "What's New" item.
+- **Data**: `CHANGELOG` is a `Record<string, string[]>` mapping version numbers to lists of user-facing feature descriptions. Versions with only bug fixes are simply omitted - no entry means no dialog for that upgrade.
+- **Runtime**: On launch, `getWhatsNewSince(lastSeenVersion)` collects all feature items from versions newer than the user's last seen version. `WhatsNewDialog` (`src/components/WhatsNewDialog.tsx`) renders them as a flat bullet list. Shown automatically on first open after an upgrade with new features, and available from the config menu's "What's New" item.
+- **To add entries**: When releasing a version with notable features, add a new key to `CHANGELOG` with the new version number and a list of short feature strings.
 
 ## news.md
 

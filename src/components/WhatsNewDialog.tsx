@@ -1,37 +1,14 @@
-import { useCallback, useRef, useEffect } from 'react';
 import { Dialog } from './Dialog';
-import { useFontSize } from '../contexts/FontSizeContext';
 
 interface WhatsNewDialogProps
 {
   isOpen: boolean;
   onClose: () => void;
+  items: string[];
 }
 
-export function WhatsNewDialog({ isOpen, onClose }: WhatsNewDialogProps)
+export function WhatsNewDialog({ isOpen, onClose, items }: WhatsNewDialogProps)
 {
-  const fontSize = useFontSize();
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // Apply font size when iframe loads
-  const handleIframeLoad = useCallback((e: React.SyntheticEvent<HTMLIFrameElement>) =>
-  {
-    const doc = e.currentTarget.contentDocument;
-    if (doc?.body)
-    {
-      doc.body.style.fontSize = `${fontSize}px`;
-    }
-  }, [fontSize]);
-
-  // Re-apply font size when dialog reopens (iframe may already be loaded)
-  useEffect(() =>
-  {
-    if (isOpen && iframeRef.current?.contentDocument?.body)
-    {
-      iframeRef.current.contentDocument.body.style.fontSize = `${fontSize}px`;
-    }
-  }, [isOpen, fontSize]);
-
   return (
     <Dialog
       isOpen={isOpen}
@@ -49,14 +26,20 @@ export function WhatsNewDialog({ isOpen, onClose }: WhatsNewDialogProps)
         </div>
       }
     >
-      <iframe
-        ref={iframeRef}
-        src="whatsnew.html"
-        className="w-full border-0"
-        style={{ height: '300px' }}
-        title="What's New"
-        onLoad={handleIframeLoad}
-      />
+      {items.length > 0 ? (
+        <ul className="p-4 space-y-2 text-sm text-gray-700 dark:text-gray-300">
+          {items.map((item, i) => (
+            <li key={i} className="flex gap-2">
+              <span className="text-blue-500 mt-0.5 select-none">•</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="p-4 text-sm text-gray-500 dark:text-gray-400">
+          You're up to date - no new features since your last update.
+        </p>
+      )}
     </Dialog>
   );
 }

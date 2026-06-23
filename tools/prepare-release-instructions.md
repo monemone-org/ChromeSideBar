@@ -21,8 +21,10 @@ Run `./tools/update-version.sh` to update the extension version in `package.json
 - Even if there are no user-facing changes, ensure there is still an empty section for this version
 
 
-### 4. Update `docs/whatsnew.md`
-- Update `whatsnew.md` to list what user needs to know to help them adopt the new features and the new improvements in this release, 
+### 4. Update `src/data/changelog.ts`
+- If the release has notable user-facing features, add a new entry to the `CHANGELOG` map in `src/data/changelog.ts` with the new version number as the key.
+- Each entry is a list of short strings - one per feature. Write them from the user's perspective (what they can now do), not as technical descriptions.
+- Skip this step entirely if the release contains only bug fixes or internal changes. Missing entries are how silent upgrades work - no entry means no What's New dialog.
 
 
 ### 5. Update `docs/chrome-web-store-info.md`
