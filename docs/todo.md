@@ -2,8 +2,12 @@
 
 ## In-Progress
 
+- [-] hotkey to jump between spaces
+- [-] space title doesn't show emoji on the left
 
 ## Pending
+
+- [ ] background colour for space
 
 - [ ] in debug build, add a "mem usage" tool in extension. which monitor mem usage, local storage usage, session usage of the extension.  also a history of it, record every hr over the past 7 days (84 hours)
 

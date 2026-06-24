@@ -34,6 +34,7 @@ import { UnifiedDragOverlay } from './components/UnifiedDragOverlay';
 import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
+import { isEmoji } from './utils/emoji';
 import { GROUP_COLORS } from './utils/groupColors';
 import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkles, Newspaper, Mail, Heart } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
@@ -222,10 +223,14 @@ const SpaceTitle: React.FC<SpaceTitleProps> = ({ onEditSpace, onDeleteSpace, onC
   const isAllSpace = activeSpace.id === 'all';
   const colorStyle = GROUP_COLORS[activeSpace.color] ?? GROUP_COLORS.grey;
 
-  // Build icon element - both Lucide and img icons use currentColor (inherited from text color)
-  const iconElement = activeSpace.icon === 'LayoutGrid' ? (
+  // Build icon element based on icon type
+  const iconElement = isEmoji(activeSpace.icon) ? (
+    // Emoji icons render as text
+    <span style={{ fontSize: iconSize }} className="leading-none">{activeSpace.icon}</span>
+  ) : activeSpace.icon === 'LayoutGrid' ? (
     <LayoutGrid size={iconSize} />
   ) : (
+    // Lucide/Iconify icons use CSS mask so they inherit currentColor from the title text
     <span
       style={{
         display: 'inline-block',
