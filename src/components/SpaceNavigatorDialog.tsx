@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState, useMemo } from 'react';
+import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import { QuickDismissDialog } from './QuickDismissDialog';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { LayoutGrid } from 'lucide-react';
@@ -35,6 +35,7 @@ export const SpaceNavigatorDialog = ({
   const { allSpaces, spaces, switchToSpace, activeSpaceId } = useSpacesContext();
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   // Filter spaces based on options
   const filteredSpaces = useMemo(() =>
@@ -47,14 +48,20 @@ export const SpaceNavigatorDialog = ({
     return result;
   }, [allSpaces, spaces, hideAllSpace, excludeSpaceId]);
 
-  // Reset highlighted index and error when dialog opens
+  // Reset highlighted index and scroll to it when dialog opens
   useEffect(() =>
   {
     if (isOpen)
     {
       const currentIndex = filteredSpaces.findIndex(s => s.id === activeSpaceId);
-      setHighlightedIndex(currentIndex >= 0 ? currentIndex : 0);
+      const idx = currentIndex >= 0 ? currentIndex : 0;
+      setHighlightedIndex(idx);
       setErrorMessage(null);
+      // Use rAF so refs are populated after the portal renders
+      requestAnimationFrame(() =>
+      {
+        itemRefs.current[idx]?.scrollIntoView({ block: 'nearest' });
+      });
     }
   }, [isOpen, filteredSpaces, activeSpaceId]);
 
@@ -90,7 +97,7 @@ export const SpaceNavigatorDialog = ({
 
     const handleKeyDown = (e: KeyboardEvent) =>
     {
-      // Number keys 1-9 for quick selection
+      // Number keys 1-9 for quick selection (spaces 1-9)
       const num = parseInt(e.key, 10);
       if (num >= 1 && num <= 9)
       {
@@ -105,20 +112,34 @@ export const SpaceNavigatorDialog = ({
         return;
       }
 
-      // Arrow keys for navigation
+      // Letter keys a-z for quick selection (spaces 10+)
+      if (e.key.length === 1 && e.key >= 'a' && e.key <= 'z')
+      {
+        const index = 9 + (e.key.charCodeAt(0) - 'a'.charCodeAt(0));
+        if (index < filteredSpaces.length)
+        {
+          e.preventDefault();
+          const space = filteredSpaces[index];
+          const isDisabled = requireBookmarkFolder && !space.bookmarkFolderPath;
+          handleSelectSpace(space.id, space.name, isDisabled);
+        }
+        return;
+      }
+
+      // Arrow keys for navigation - compute next index synchronously so we can scroll immediately
       if (e.key === 'ArrowDown')
       {
         e.preventDefault();
-        setHighlightedIndex(prev =>
-          prev < filteredSpaces.length - 1 ? prev + 1 : 0
-        );
+        const next = highlightedIndex < filteredSpaces.length - 1 ? highlightedIndex + 1 : 0;
+        setHighlightedIndex(next);
+        itemRefs.current[next]?.scrollIntoView({ block: 'nearest' });
       }
       else if (e.key === 'ArrowUp')
       {
         e.preventDefault();
-        setHighlightedIndex(prev =>
-          prev > 0 ? prev - 1 : filteredSpaces.length - 1
-        );
+        const next = highlightedIndex > 0 ? highlightedIndex - 1 : filteredSpaces.length - 1;
+        setHighlightedIndex(next);
+        itemRefs.current[next]?.scrollIntoView({ block: 'nearest' });
       }
       // Enter to select highlighted space
       else if (e.key === 'Enter')
@@ -184,6 +205,7 @@ export const SpaceNavigatorDialog = ({
             return (
               <button
                 key={space.id}
+                ref={(el) => { itemRefs.current[index] = el; }}
                 onClick={() => handleSelectSpace(space.id, space.name, isDisabled)}
                 onMouseEnter={() => setHighlightedIndex(index)}
                 className={clsx(
@@ -201,7 +223,9 @@ export const SpaceNavigatorDialog = ({
                     ? "text-gray-300 dark:text-gray-600"
                     : "text-gray-400 dark:text-gray-500"
                 )}>
-                  {displayIndex <= 9 ? displayIndex : ''}
+                  {displayIndex <= 9
+                    ? displayIndex
+                    : String.fromCharCode('a'.charCodeAt(0) + displayIndex - 10)}
                 </span>
 
                 {/* Space icon */}

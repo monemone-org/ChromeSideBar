@@ -52,12 +52,12 @@
       },
       "description": "Next Used Tab"
     },
-    "jump-to-audio-tab": {
+    "open-space-navigator": {
       "suggested_key": {
-        "default": "Ctrl+Shift+A",
-        "mac": "Command+Shift+A"
+        "default": "Ctrl+J",
+        "mac": "Command+J"
       },
-      "description": "Jump to Audio/Video Tab"
+      "description": "Open Space Navigator"
     }
   }
 }

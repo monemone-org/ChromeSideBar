@@ -1350,21 +1350,6 @@ chrome.commands.onCommand.addListener((command) =>
         historyManager.navigate(tabs[0].windowId, direction);
       });
     }
-    else if (command === "jump-to-audio-tab")
-    {
-      chrome.tabs.query({ currentWindow: true }, (allTabs) =>
-      {
-        const { playingTabIds, historyTabIds } = getAudioTabLists(allTabs);
-
-        // Try first playing tab, then fall back to first history tab
-        const targetTabId = playingTabIds[0] ?? historyTabIds[0];
-
-        if (targetTabId !== undefined)
-        {
-          chrome.tabs.update(targetTabId, { active: true });
-        }
-      });
-    }
-    // Note: focus-filter-input is handled directly in the side panel
+    // Note: focus-filter-input and open-space-navigator are handled directly in the side panel
   })();
 });

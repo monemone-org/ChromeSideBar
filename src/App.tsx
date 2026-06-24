@@ -833,6 +833,21 @@ function App() {
   // DropdownMenu handles click-outside and escape key automatically
 
   // Refresh data when sidepanel becomes visible
+  // Open space navigator via keyboard shortcut
+  useEffect(() =>
+  {
+    const handleCommand = (command: string) =>
+    {
+      if (command === 'open-space-navigator')
+      {
+        setShowSpaceNavigator(true);
+      }
+    };
+
+    chrome.commands.onCommand.addListener(handleCommand);
+    return () => chrome.commands.onCommand.removeListener(handleCommand);
+  }, []);
+
   useEffect(() =>
   {
     const handleVisibilityChange = () =>
