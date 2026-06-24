@@ -87,6 +87,7 @@ interface SpacesContextValue
     bookmarkFolderPath: string
   ) => Space;
   updateSpace: (id: string, updates: Partial<Omit<Space, 'id'>>) => void;
+  updateSpaceFolderPaths: (updates: { id: string; bookmarkFolderPath: string }[]) => void;
   deleteSpace: (id: string) => Promise<void>;
   moveSpace: (activeId: string, overId: string) => void;
   getSpaceById: (id: string) => Space | undefined;
@@ -327,6 +328,19 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     }
   }, [spaces, saveSpaces, getSpaceById, windowId]);
+
+  // Batch-update bookmarkFolderPath for multiple spaces at once (e.g. after a folder rename)
+  const updateSpaceFolderPaths = useCallback((updates: { id: string; bookmarkFolderPath: string }[]) =>
+  {
+    if (updates.length === 0) return;
+    const updatedSpaces = spaces.map(s =>
+    {
+      const update = updates.find(u => u.id === s.id);
+      return update ? { ...s, bookmarkFolderPath: update.bookmarkFolderPath } : s;
+    });
+    setSpaces(updatedSpaces);
+    saveSpaces(updatedSpaces);
+  }, [spaces, saveSpaces]);
 
   const deleteSpaceBase = useCallback((id: string) =>
   {
@@ -614,6 +628,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     windowId,
     createSpace,
     updateSpace,
+    updateSpaceFolderPaths,
     deleteSpace,
     moveSpace,
     getSpaceById,
@@ -634,6 +649,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     windowId,
     createSpace,
     updateSpace,
+    updateSpaceFolderPaths,
     deleteSpace,
     moveSpace,
     getSpaceById,

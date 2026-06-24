@@ -412,30 +412,41 @@ export const useBookmarks = () => {
   // Find a folder by its path (e.g., "Bookmarks Bar/Home")
   // Returns the folder node if found, null otherwise
   // Note: First path segment (root folder) is matched case-insensitively to handle
-  // platform differences (e.g., "Other Bookmarks" vs "Other bookmarks")
+  // platform differences (e.g., "Other Bookmarks" vs "Other bookmarks").
+  // Walks the tree by matching node titles as prefixes of the remaining path to
+  // correctly handle folder names that contain '/'.
   const findFolderByPath = useCallback((path: string): chrome.bookmarks.BookmarkTreeNode | null =>
   {
     if (!path) return null;
 
-    const pathParts = path.split('/');
-    let currentNodes = bookmarks;
-
-    for (let i = 0; i < pathParts.length; i++)
+    const walk = (
+      nodes: chrome.bookmarks.BookmarkTreeNode[],
+      remaining: string,
+      isRoot: boolean
+    ): chrome.bookmarks.BookmarkTreeNode | null =>
     {
-      const part = pathParts[i];
-      // First segment is a root folder - match case-insensitively
-      const found = i === 0
-        ? currentNodes.find(node => node.title.toLowerCase() === part.toLowerCase() && !node.url)
-        : currentNodes.find(node => node.title === part && !node.url);
-      if (!found) return null;
-      currentNodes = found.children || [];
-      if (i === pathParts.length - 1)
+      for (const node of nodes)
       {
-        return found;
-      }
-    }
+        if (node.url) continue;
 
-    return null;
+        // Root-level folders matched case-insensitively for platform differences
+        const matches = isRoot
+          ? remaining.toLowerCase().startsWith(node.title.toLowerCase())
+          : remaining.startsWith(node.title);
+        if (!matches) continue;
+
+        const after = remaining.slice(node.title.length);
+        // Ensure the match is a complete segment, not a prefix of a longer name
+        if (after !== '' && !after.startsWith('/')) continue;
+
+        if (after === '') return node;
+
+        return walk(node.children || [], after.slice(1), false);
+      }
+      return null;
+    };
+
+    return walk(bookmarks, path, true);
   }, [bookmarks]);
 
   // Get all bookmarks recursively from a folder (including nested subfolders)

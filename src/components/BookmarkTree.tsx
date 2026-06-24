@@ -98,6 +98,7 @@ const isDescendant = (
   return sourceNode ? checkDescendants(sourceNode) : false;
 };
 
+
 // --- Bookmark Row (Pure UI) ---
 interface BookmarkRowProps {
   node: chrome.bookmarks.BookmarkTreeNode;
@@ -768,7 +769,7 @@ interface BookmarkTreeProps {
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
   const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation, associateExistingTab } = useBookmarkTabsContext();
-  const { spaces, updateSpace, windowId } = useSpacesContext();
+  const { spaces, updateSpace, updateSpaceFolderPaths, windowId } = useSpacesContext();
   // Build lookup: folderId → Space (only when in "All" space)
   const folderIdToSpace = useMemo(() =>
   {
@@ -928,6 +929,27 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
   const [expandedStateLoaded, setExpandedStateLoaded] = useState(false);
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
+
+  // Wrap updateBookmark so folder renames also update any space bookmarkFolderPath
+  const handleSaveBookmark = useCallback(async (id: string, title: string, url?: string) =>
+  {
+    // Only folder renames (no url, title actually changed) need to update space paths
+    if (url === undefined && editingNode && !editingNode.url && editingNode.title !== title)
+    {
+      const oldPath = await getBookmarkPath(id);
+      updateBookmark(id, title, url);
+      const newPath = await getBookmarkPath(id);
+      const pathUpdates = spaces
+        .filter(s => s.bookmarkFolderPath === oldPath)
+        .map(s => ({ id: s.id, bookmarkFolderPath: newPath }));
+      updateSpaceFolderPaths(pathUpdates);
+    }
+    else
+    {
+      updateBookmark(id, title, url);
+    }
+  }, [updateBookmark, editingNode, spaces, getBookmarkPath, updateSpaceFolderPaths]);
+
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
   const [creatingBookmarkParentId, setCreatingBookmarkParentId] = useState<string | null>(null);
   const [showSpaceFolderPicker, setShowSpaceFolderPicker] = useState(false);
@@ -2135,7 +2157,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         isOpen={editingNode !== null || creatingBookmarkParentId !== null}
         node={editingNode}
         createInParentId={creatingBookmarkParentId}
-        onSave={updateBookmark}
+        onSave={handleSaveBookmark}
         onCreate={async (parentId, title, url) => {
           const { node: newNode, error } = await createBookmark(parentId, title, url);
           if (error)
