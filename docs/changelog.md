@@ -1,5 +1,13 @@
 ## Changelog
 
+## CURRENT_VERSION
+
+- Keyboard shortcut Cmd+J (Mac) / Ctrl+J (Windows) opens the Space Navigator
+- Space Navigator supports a-z keys for selecting spaces 10 and beyond
+- Fixed: bookmark folders whose names contain '/' are now matched correctly when linked to a space
+- Fixed: renaming a bookmark folder now automatically updates any spaces that link to it
+- Fixed: arrow key navigation in Space Navigator scrolls the list to keep the selected item visible
+
 ## 1.0.313
 
 - "Add to Bookmark" remembers the last chosen folder per space - re-opening the picker pre-selects where you last saved
