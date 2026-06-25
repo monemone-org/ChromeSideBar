@@ -12,6 +12,7 @@ interface SectionHeaderProps
   fontSize?: number;  // Optional custom font size in px
   showMenuButton?: boolean;  // Show "..." button (default true). When false, use right-click for menu.
   textClassName?: string;  // Optional custom text color classes (overrides default gray)
+  labelClassName?: string;  // Optional extra classes for the label span (e.g. font-bold)
 }
 
 export const SectionHeader: React.FC<SectionHeaderProps> = ({
@@ -22,6 +23,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
   fontSize,
   showMenuButton = true,
   textClassName,
+  labelClassName,
 }) =>
 {
   const menuJustClosedRef = useRef(false);
@@ -71,7 +73,7 @@ export const SectionHeader: React.FC<SectionHeaderProps> = ({
           {icon}
         </span>
       )}
-      <span className="flex-1">
+      <span className={`flex-1 ${labelClassName ?? ''}`}>
         {label}
       </span>
     </div>

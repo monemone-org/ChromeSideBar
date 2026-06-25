@@ -35,7 +35,7 @@ import { SpaceDialogs } from './components/SpaceDialogs';
 import { useFontSize } from './contexts/FontSizeContext';
 import { getIconUrl } from './utils/iconify';
 import { isEmoji } from './utils/emoji';
-import { GROUP_COLORS } from './utils/groupColors';
+import { GROUP_COLORS, getSpaceBgColor } from './utils/groupColors';
 import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkles, Newspaper, Mail, Heart } from 'lucide-react';
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
@@ -267,6 +267,7 @@ const SpaceTitle: React.FC<SpaceTitleProps> = ({ onEditSpace, onDeleteSpace, onC
       fontSize={titleFontSize}
       showMenuButton={true}
       textClassName={colorStyle.text}
+      labelClassName="font-bold"
     />
   );
 };
@@ -472,6 +473,46 @@ const ArcImportDialogWrapper: React.FC<ImportDialogWrapperProps> = (props) =>
   );
 };
 
+// Wrapper div that applies the active space's colour as the sidebar background.
+// Must live inside SpacesProvider so it can read activeSpace from context.
+interface AppContainerProps
+{
+  useSpaceColor: boolean;
+  spaceColorAlpha: number;  // 1-100 percent
+  fontSize: number;
+  children: React.ReactNode;
+}
+
+const AppContainer: React.FC<AppContainerProps> = ({ useSpaceColor, spaceColorAlpha, fontSize, children }) =>
+{
+  const { activeSpace } = useSpacesContext();
+  const [isDark, setIsDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  // Keep isDark in sync when the OS theme changes
+  useEffect(() =>
+  {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  const applySpaceColor = useSpaceColor && activeSpace.id !== 'all';
+  const bgStyle = applySpaceColor
+    ? { backgroundColor: getSpaceBgColor(activeSpace.color, isDark, spaceColorAlpha / 100) }
+    : {};
+  const bgClass = applySpaceColor ? '' : 'bg-white dark:bg-gray-900';
+
+  return (
+    <div
+      className={`relative flex flex-col h-screen ${bgClass} text-gray-900 dark:text-gray-100 overflow-hidden`}
+      style={{ fontSize: `${fontSize}px`, ...bgStyle }}
+    >
+      {children}
+    </div>
+  );
+};
+
 function App() {
   const [fontSize, setFontSize] = useLocalStorage('sidebar-font-size-px', 14, {
     parse: (v) => parseInt(v, 10),
@@ -537,6 +578,16 @@ function App() {
     'sidebar-audio-quick-jump',
     false,
     { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  );
+  const [useSpaceColor, setUseSpaceColor] = useChromeLocalStorage(
+    'sidebar-use-space-color',
+    false,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  );
+  const [spaceColorAlpha, setSpaceColorAlpha] = useChromeLocalStorage(
+    'sidebar-space-color-alpha',
+    100,
+    { parse: (v) => parseInt(v, 10), serialize: (v) => v.toString() }
   );
   const [showFilterArea, setShowFilterArea] = useLocalStorage(
     'sidebar-show-filter-area',
@@ -665,6 +716,8 @@ function App() {
     setSpacesEnabled(newSettings.useSpaces);
     setArcSingleClickOpensTab(newSettings.arcSingleClickOpensTab);
     setAudioQuickJump(newSettings.audioQuickJump);
+    setUseSpaceColor(newSettings.useSpaceColor);
+    setSpaceColorAlpha(newSettings.spaceColorAlpha);
     setShowSettings(false);
   };
 
@@ -873,10 +926,7 @@ function App() {
       <SpacesProvider>
       <SelectionProvider>
       <UnifiedDndProvider>
-      <div
-        className="relative flex flex-col h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 overflow-hidden"
-        style={{ fontSize: `${fontSize}px` }}
-      >
+      <AppContainer useSpaceColor={useSpaceColor} spaceColorAlpha={spaceColorAlpha} fontSize={fontSize}>
       <SettingsDialog
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -889,6 +939,8 @@ function App() {
           useSpaces: spacesEnabled,
           arcSingleClickOpensTab,
           audioQuickJump,
+          useSpaceColor,
+          spaceColorAlpha,
         }}
         onApply={handleApplySettings}
       />
@@ -1196,7 +1248,7 @@ function App() {
 
       {/* Unified Drag Overlay for cross-component DnD */}
       <UnifiedDragOverlay pinnedIconSize={pinnedIconSize} yOffset={24} />
-      </div>
+      </AppContainer>
       </UnifiedDndProvider>
       </SelectionProvider>
       </SpacesProvider>

@@ -13,6 +13,8 @@ export interface SettingsValues {
   useSpaces: boolean;
   arcSingleClickOpensTab: boolean;
   audioQuickJump: boolean;
+  useSpaceColor: boolean;
+  spaceColorAlpha: number;  // 1-100 percent
 }
 
 interface SettingsDialogProps {
@@ -37,6 +39,8 @@ export function SettingsDialog({
   const [tempUseSpaces, setTempUseSpaces] = useState(settings.useSpaces);
   const [tempArcSingleClickOpensTab, setTempArcSingleClickOpensTab] = useState(settings.arcSingleClickOpensTab);
   const [tempAudioQuickJump, setTempAudioQuickJump] = useState(settings.audioQuickJump);
+  const [tempUseSpaceColor, setTempUseSpaceColor] = useState(settings.useSpaceColor);
+  const [tempSpaceColorAlpha, setTempSpaceColorAlpha] = useState(settings.spaceColorAlpha);
 
   // Track previous isOpen to detect when dialog opens
   const wasOpen = useRef(false);
@@ -61,6 +65,8 @@ export function SettingsDialog({
       setTempUseSpaces(settings.useSpaces);
       setTempArcSingleClickOpensTab(settings.arcSingleClickOpensTab);
       setTempAudioQuickJump(settings.audioQuickJump);
+      setTempUseSpaceColor(settings.useSpaceColor);
+      setTempSpaceColorAlpha(settings.spaceColorAlpha);
     }
     wasOpen.current = isOpen;
   }, [isOpen, settings]);
@@ -75,6 +81,8 @@ export function SettingsDialog({
       useSpaces: tempUseSpaces,
       arcSingleClickOpensTab: tempArcSingleClickOpensTab,
       audioQuickJump: tempAudioQuickJump,
+      useSpaceColor: tempUseSpaceColor,
+      spaceColorAlpha: tempSpaceColorAlpha,
     });
   };
 
@@ -196,6 +204,38 @@ export function SettingsDialog({
               <p className="text-gray-500 dark:text-gray-400 ml-5">
                 Organize tabs and bookmarks into focused workspaces
               </p>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tempUseSpaceColor}
+                  onChange={(e) => setTempUseSpaceColor(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                Use space colour as sidebar background
+              </label>
+              <p className="text-gray-500 dark:text-gray-400 ml-5">
+                Tints the sidebar with the active space's colour
+              </p>
+              {tempUseSpaceColor && (
+                <div className="ml-5">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-gray-700 dark:text-gray-300">
+                      Intensity
+                    </label>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {tempSpaceColorAlpha}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="100"
+                    value={tempSpaceColorAlpha}
+                    onChange={(e) => setTempSpaceColorAlpha(parseInt(e.target.value, 10))}
+                    className="w-full accent-blue-500"
+                  />
+                </div>
+              )}
               <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
                 <input
                   type="checkbox"
