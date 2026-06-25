@@ -3,11 +3,10 @@
 ## In-Progress
 
 - [-] hotkey to jump between spaces
-- [-] space title doesn't show emoji on the left
 
 ## Pending
 
-- [ ] background colour for space
+- [ ] in settings dialog, the description for "Audion Button" should change based on the checkbox state. In fact, change the subtext description to describe the current selection's effect.
 
 - [ ] in debug build, add a "mem usage" tool in extension. which monitor mem usage, local storage usage, session usage of the extension.  also a history of it, record every hr over the past 7 days (84 hours)
 
@@ -56,6 +55,10 @@
 
 
 ## Done
+
+- [x] background colour for space
+- [x] space title doesn't show emoji on the left
+
 
 - [x] display tab row in full width.  when cursor is hover over, show pin and x button over the row label.
 - [x] speaker icon on the very right end of the row
