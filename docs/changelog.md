@@ -2,7 +2,9 @@
 
 ## CURRENT_VERSION
 
+- Space colour as sidebar background: tints the sidebar with the active space's colour, with adjustable intensity
 - Keyboard shortcut Cmd+J (Mac) / Ctrl+J (Windows) opens the Space Navigator
+- Settings dialog reorganized into Appearance and Behaviour tabs; each setting shows a description of its current effect
 - Space Navigator supports a-z keys for selecting spaces 10 and beyond
 - Fixed: bookmark folders whose names contain '/' are now matched correctly when linked to a space
 - Fixed: renaming a bookmark folder now automatically updates any spaces that link to it

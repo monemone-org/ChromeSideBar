@@ -1,20 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useBookmarkTabsContext } from './BookmarkTabsContext';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE, SPACES_STORAGE_KEY, Space } from '../utils/spaceMessages';
+import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE, SPACES_STORAGE_KEY, Space, ALL_SPACE } from '../utils/spaceMessages';
 import { toChromeColor } from '../utils/groupColors';
 
-// Re-export Space so all existing imports from SpacesContext continue to work
+// Re-export Space and ALL_SPACE so all existing imports from SpacesContext continue to work
 export type { Space } from '../utils/spaceMessages';
-
-// Special "All" space - not stored, always present
-export const ALL_SPACE: Space = {
-  id: 'all',
-  name: 'All',
-  icon: 'LayoutGrid',
-  color: 'grey',
-  bookmarkFolderPath: '',
-};
+export { ALL_SPACE } from '../utils/spaceMessages';
 
 // =============================================================================
 // Helpers

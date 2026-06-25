@@ -1451,6 +1451,37 @@ chrome.commands.onCommand.addListener((command) =>
         historyManager.navigate(tabs[0].windowId, direction);
       });
     }
-    // Note: focus-filter-input and open-space-navigator are handled directly in the side panel
+
+    // Open Space Navigator as a focused popup window so it reliably receives keyboard input
+    if (command === "open-space-navigator")
+    {
+      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) =>
+      {
+        if (tabs.length === 0) return;
+        const windowId = tabs[0].windowId;
+        const win = await chrome.windows.get(windowId);
+
+        // Size the popup to fit all spaces without scrolling (capped at 480px content height)
+        const spaces = spaceManager.getSpaces();
+        const itemCount = spaces.length + 1; // +1 for the "All" space
+        const popupWidth = 300;
+        const contentHeight = 37 + itemCount * 28 + 8; // header + rows + padding
+        const popupHeight = Math.min(contentHeight, 480) + 30; // +30 for OS title bar
+
+        // Center the popup within the browser window
+        const left = Math.round((win.left ?? 0) + ((win.width ?? 1200) - popupWidth) / 2);
+        const top = Math.round((win.top ?? 0) + ((win.height ?? 800) - popupHeight) / 2);
+
+        chrome.windows.create({
+          url: chrome.runtime.getURL(`navigator.html?windowId=${windowId}`),
+          type: 'popup',
+          focused: true,
+          width: popupWidth,
+          height: popupHeight,
+          left,
+          top,
+        });
+      });
+    }
   })();
 });

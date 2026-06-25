@@ -13,7 +13,6 @@ import { WelcomeDialog } from './components/WelcomeDialog';
 import { WhatsNewDialog } from './components/WhatsNewDialog';
 import { getWhatsNewSince, getRecentWhatsNew, ChangelogGroup } from './data/changelog';
 import { AudioTabsDropdown } from './components/AudioTabsDropdown';
-import { SpaceNavigatorDialog } from './components/SpaceNavigatorDialog';
 import { Toast } from './components/Toast';
 import { UndoableAction } from './actions/types';
 import { scrollToTab } from './utils/scrollHelpers';
@@ -653,7 +652,6 @@ function App() {
   const [showMenu, setShowMenu] = useState(false);
   const [filterLiveTabs, setFilterLiveTabs] = useState(false);
   const [showAudioDialog, setShowAudioDialog] = useState(false);
-  const [showSpaceNavigator, setShowSpaceNavigator] = useState(false);
   const [playingTabs, setPlayingTabs] = useState<chrome.tabs.Tab[]>([]);
   const [lastAudibleTabs, setLastAudibleTabs] = useState<chrome.tabs.Tab[]>([]);
   const [filterText, setFilterText] = useState('');
@@ -886,21 +884,6 @@ function App() {
   // DropdownMenu handles click-outside and escape key automatically
 
   // Refresh data when sidepanel becomes visible
-  // Open space navigator via keyboard shortcut
-  useEffect(() =>
-  {
-    const handleCommand = (command: string) =>
-    {
-      if (command === 'open-space-navigator')
-      {
-        setShowSpaceNavigator(true);
-      }
-    };
-
-    chrome.commands.onCommand.addListener(handleCommand);
-    return () => chrome.commands.onCommand.removeListener(handleCommand);
-  }, []);
-
   useEffect(() =>
   {
     const handleVisibilityChange = () =>
@@ -1220,12 +1203,6 @@ function App() {
         spaceToDelete={spaceToDelete}
         onCloseDeleteDialog={() => setShowSpaceDeleteDialog(false)}
         onPerformAction={performAction}
-      />
-
-      {/* Space Navigator Dialog */}
-      <SpaceNavigatorDialog
-        isOpen={showSpaceNavigator}
-        onClose={() => setShowSpaceNavigator(false)}
       />
 
       {/* Space Bar - only shown when useSpaces is enabled */}

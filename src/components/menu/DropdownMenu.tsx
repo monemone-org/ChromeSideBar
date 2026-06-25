@@ -179,12 +179,12 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
     const { isOpen, triggerRect, close } = useDropdownMenuState();
     const fontSize = useFontSize();
     const menuRef = useRef<HTMLDivElement | null>(null);
-    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const [position, setPosition] = useState({ x: 0, y: 0, maxHeight: 400 });
 
     // Use shared escape key handler
     useEscapeKey(isOpen, close);
 
-    // Position below trigger, adjust to stay in viewport
+    // Position below trigger (or above if space is tight), compute max-height to enable scrolling
     useEffect(() =>
     {
       if (!isOpen || !triggerRect || !menuRef.current) return;
@@ -194,31 +194,32 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 
-      // Start position: below trigger, aligned to start or end
+      // Horizontal position: aligned to start or end of trigger
       let x = align === 'start' ? triggerRect.left : triggerRect.right - rect.width;
-      let y = triggerRect.bottom + 4;
+      if (x + rect.width > viewportWidth) x = viewportWidth - rect.width - 8;
+      if (x < 0) x = 8;
 
-      // Adjust horizontal position to stay in viewport
-      if (x + rect.width > viewportWidth)
+      // Available space above and below the trigger
+      const spaceBelow = viewportHeight - triggerRect.bottom - 4 - 8;
+      const spaceAbove = triggerRect.top - 4 - 8;
+
+      let y: number;
+      let maxHeight: number;
+
+      if (spaceBelow >= Math.min(rect.height, 150) || spaceBelow >= spaceAbove)
       {
-        x = viewportWidth - rect.width - 8;
+        // Place below trigger
+        y = triggerRect.bottom + 4;
+        maxHeight = spaceBelow;
       }
-      if (x < 0)
+      else
       {
-        x = 8;
+        // Flip above trigger when more space is available there
+        maxHeight = spaceAbove;
+        y = Math.max(8, triggerRect.top - 4 - Math.min(rect.height, maxHeight));
       }
 
-      // If not enough space below, position above trigger
-      if (y + rect.height > viewportHeight)
-      {
-        y = triggerRect.top - rect.height - 4;
-      }
-      if (y < 0)
-      {
-        y = 8;
-      }
-
-      setPosition({ x, y });
+      setPosition({ x, y, maxHeight: Math.max(maxHeight, 80) });
     }, [isOpen, triggerRect, align]);
 
     if (!isOpen) return null;
@@ -239,10 +240,11 @@ export const Content = forwardRef<HTMLDivElement, ContentProps>(
               ref.current = node;
             }
           }}
-          className={clsx(menuContainerClass, className)}
+          className={clsx(menuContainerClass, "overflow-y-auto", className)}
           style={{
             left: position.x,
             top: position.y,
+            maxHeight: position.maxHeight,
             fontSize: `${fontSize}px`,
             ...style
           }}

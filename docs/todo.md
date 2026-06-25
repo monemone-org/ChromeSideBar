@@ -2,11 +2,9 @@
 
 ## In-Progress
 
-- [-] hotkey to jump between spaces
+- [x] hotkey to jump between spaces
 
 ## Pending
-
-- [ ] in settings dialog, the description for "Audion Button" should change based on the checkbox state. In fact, change the subtext description to describe the current selection's effect.
 
 - [ ] in debug build, add a "mem usage" tool in extension. which monitor mem usage, local storage usage, session usage of the extension.  also a history of it, record every hr over the past 7 days (84 hours)
 
@@ -55,6 +53,8 @@
 
 
 ## Done
+
+- [x] in settings dialog, the description for "Audion Button" should change based on the checkbox state. In fact, change the subtext description to describe the current selection's effect.
 
 - [x] background colour for space
 - [x] space title doesn't show emoji on the left

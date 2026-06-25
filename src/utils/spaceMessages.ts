@@ -19,6 +19,15 @@ export interface Space
   bookmarkFolderSegments?: string[];      // structured path e.g. ["Bookmarks Bar", "A/B"] - unambiguous
 }
 
+// Special "All" space - not stored, always prepended to allSpaces at runtime
+export const ALL_SPACE: Space = {
+  id: 'all',
+  name: 'All',
+  icon: 'LayoutGrid',
+  color: 'grey',
+  bookmarkFolderPath: '',
+};
+
 // =============================================================================
 // Message Actions
 // =============================================================================

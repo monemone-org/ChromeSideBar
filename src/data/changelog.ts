@@ -2,8 +2,10 @@
 // Omit a version entirely if it contains only bug fixes or internal changes.
 // Entries are shown in the "What's New" dialog when the user upgrades past them.
 export const CHANGELOG: Record<string, string[]> = {
-  '1.0.318': [
+  '1.0.322': [
+    'Space colour as sidebar background: tints the sidebar with the active space\'s colour',
     'Keyboard shortcut Cmd+J (Mac) / Ctrl+J (Windows) opens the Space Navigator',
+    'Settings dialog reorganized into Appearance and Behaviour tabs',
     'Space Navigator: press a-z to jump to spaces 10 and beyond',
   ],
   '1.0.313': [

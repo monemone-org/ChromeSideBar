@@ -54,8 +54,8 @@
     },
     "open-space-navigator": {
       "suggested_key": {
-        "default": "Ctrl+J",
-        "mac": "Command+J"
+        "default": "Ctrl+Shift+S",
+        "mac": "Command+Shift+S"
       },
       "description": "Open Space Navigator"
     }

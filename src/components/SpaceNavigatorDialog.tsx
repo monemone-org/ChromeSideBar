@@ -1,11 +1,8 @@
-import { useEffect, useCallback, useState, useMemo, useRef } from 'react';
+import { useCallback, useState, useMemo, useRef } from 'react';
 import { QuickDismissDialog } from './QuickDismissDialog';
+import { SpaceList, useSpaceListKeyboard, useSpaceListHighlight } from './SpaceList';
 import { useSpacesContext } from '../contexts/SpacesContext';
-import { LayoutGrid } from 'lucide-react';
-import { getIconUrl } from '../utils/iconify';
-import { isEmoji } from '../utils/emoji';
-import { GROUP_COLORS, getHexColorStyle } from '../utils/groupColors';
-import clsx from 'clsx';
+import { Space } from '../utils/spaceMessages';
 
 export interface SpaceNavigatorDialogProps
 {
@@ -48,22 +45,9 @@ export const SpaceNavigatorDialog = ({
     return result;
   }, [allSpaces, spaces, hideAllSpace, excludeSpaceId]);
 
-  // Reset highlighted index and scroll to it when dialog opens
-  useEffect(() =>
-  {
-    if (isOpen)
-    {
-      const currentIndex = filteredSpaces.findIndex(s => s.id === activeSpaceId);
-      const idx = currentIndex >= 0 ? currentIndex : 0;
-      setHighlightedIndex(idx);
-      setErrorMessage(null);
-      // Use rAF so refs are populated after the portal renders
-      requestAnimationFrame(() =>
-      {
-        itemRefs.current[idx]?.scrollIntoView({ block: 'nearest' });
-      });
-    }
-  }, [isOpen, filteredSpaces, activeSpaceId]);
+  const isItemDisabled = useCallback((space: Space) =>
+    requireBookmarkFolder && !space.bookmarkFolderPath,
+  [requireBookmarkFolder]);
 
   const handleSelectSpace = useCallback(async (spaceId: string, spaceName: string, isDisabled: boolean) =>
   {
@@ -90,192 +74,51 @@ export const SpaceNavigatorDialog = ({
     onClose();
   }, [switchToSpace, onSelectSpace, onClose]);
 
-  // Handle keyboard navigation
-  useEffect(() =>
+  // Unified select handler used by both SpaceList clicks and keyboard shortcuts
+  const handleSelect = useCallback((spaceId: string) =>
   {
-    if (!isOpen) return;
+    const space = filteredSpaces.find(s => s.id === spaceId);
+    if (!space) return;
+    handleSelectSpace(spaceId, space.name, isItemDisabled(space));
+  }, [filteredSpaces, handleSelectSpace, isItemDisabled]);
 
-    const handleKeyDown = (e: KeyboardEvent) =>
-    {
-      // Number keys 1-9 for quick selection (spaces 1-9)
-      const num = parseInt(e.key, 10);
-      if (num >= 1 && num <= 9)
-      {
-        const index = num - 1;
-        if (index < filteredSpaces.length)
-        {
-          e.preventDefault();
-          const space = filteredSpaces[index];
-          const isDisabled = requireBookmarkFolder && !space.bookmarkFolderPath;
-          handleSelectSpace(space.id, space.name, isDisabled);
-        }
-        return;
-      }
+  // Clears error and scrolls to the active space whenever the dialog opens
+  const clearError = useCallback(() => setErrorMessage(null), []);
+  useSpaceListHighlight({
+    spaces: filteredSpaces,
+    activeSpaceId,
+    setHighlightedIndex,
+    itemRefs,
+    enabled: isOpen,
+    onActivate: clearError,
+  });
 
-      // Letter keys a-z for quick selection (spaces 10+)
-      if (e.key.length === 1 && e.key >= 'a' && e.key <= 'z')
-      {
-        const index = 9 + (e.key.charCodeAt(0) - 'a'.charCodeAt(0));
-        if (index < filteredSpaces.length)
-        {
-          e.preventDefault();
-          const space = filteredSpaces[index];
-          const isDisabled = requireBookmarkFolder && !space.bookmarkFolderPath;
-          handleSelectSpace(space.id, space.name, isDisabled);
-        }
-        return;
-      }
-
-      // Arrow keys for navigation - compute next index synchronously so we can scroll immediately
-      if (e.key === 'ArrowDown')
-      {
-        e.preventDefault();
-        const next = highlightedIndex < filteredSpaces.length - 1 ? highlightedIndex + 1 : 0;
-        setHighlightedIndex(next);
-        itemRefs.current[next]?.scrollIntoView({ block: 'nearest' });
-      }
-      else if (e.key === 'ArrowUp')
-      {
-        e.preventDefault();
-        const next = highlightedIndex > 0 ? highlightedIndex - 1 : filteredSpaces.length - 1;
-        setHighlightedIndex(next);
-        itemRefs.current[next]?.scrollIntoView({ block: 'nearest' });
-      }
-      // Enter to select highlighted space
-      else if (e.key === 'Enter')
-      {
-        e.preventDefault();
-        const space = filteredSpaces[highlightedIndex];
-        if (space)
-        {
-          const isDisabled = requireBookmarkFolder && !space.bookmarkFolderPath;
-          handleSelectSpace(space.id, space.name, isDisabled);
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, filteredSpaces, highlightedIndex, requireBookmarkFolder, handleSelectSpace]);
-
-  const renderIcon = (iconName: string, size: number = 16) =>
-  {
-    if (isEmoji(iconName))
-    {
-      return <span style={{ fontSize: size }} className="leading-none">{iconName}</span>;
-    }
-
-    if (iconName === 'LayoutGrid')
-    {
-      return <LayoutGrid size={size} />;
-    }
-
-    return (
-      <img
-        src={getIconUrl(iconName)}
-        alt={iconName}
-        width={size}
-        height={size}
-        className="dark:invert"
-        onError={(e) =>
-        {
-          e.currentTarget.style.display = 'none';
-        }}
-      />
-    );
-  };
+  // displaySpaces is the search-filtered subset of filteredSpaces
+  const { filteredSpaces: displaySpaces, searchQuery, onSearchChange, searchInputRef } = useSpaceListKeyboard({
+    spaces: filteredSpaces,
+    highlightedIndex,
+    setHighlightedIndex,
+    onSelect: handleSelect,
+    itemRefs,
+    enabled: isOpen,
+  });
 
   return (
     <QuickDismissDialog isOpen={isOpen} onClose={onClose} title={title}>
-      <div className="py-1">
-        {filteredSpaces.length === 0 ? (
-          <div className="px-3 py-2 text-gray-500 dark:text-gray-400">
-            No spaces available
-          </div>
-        ) : (
-          filteredSpaces.map((space, index) =>
-          {
-            const colorStyle = GROUP_COLORS[space.color];
-            const hexStyle = !colorStyle ? getHexColorStyle(space.color) : undefined;
-            const isActive = space.id === activeSpaceId;
-            const isHighlighted = index === highlightedIndex;
-            const isDisabled = requireBookmarkFolder && !space.bookmarkFolderPath;
-            const displayIndex = index + 1;
-
-            return (
-              <button
-                key={space.id}
-                ref={(el) => { itemRefs.current[index] = el; }}
-                onClick={() => handleSelectSpace(space.id, space.name, isDisabled)}
-                onMouseEnter={() => setHighlightedIndex(index)}
-                className={clsx(
-                  "w-full h-7 px-2 text-left flex items-center gap-2",
-                  isDisabled
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-gray-100 dark:hover:bg-gray-700",
-                  isHighlighted && !isDisabled && "bg-blue-50 dark:bg-blue-900/30"
-                )}
-              >
-                {/* Number prefix */}
-                <span className={clsx(
-                  "w-4 font-mono text-xs",
-                  isDisabled
-                    ? "text-gray-300 dark:text-gray-600"
-                    : "text-gray-400 dark:text-gray-500"
-                )}>
-                  {displayIndex <= 9
-                    ? displayIndex
-                    : String.fromCharCode('a'.charCodeAt(0) + displayIndex - 10)}
-                </span>
-
-                {/* Space icon */}
-                <span
-                  className={clsx(
-                    "w-5 h-5 rounded flex items-center justify-center flex-shrink-0",
-                    colorStyle?.bg
-                  )}
-                  style={hexStyle ? { backgroundColor: hexStyle.bg } : undefined}
-                >
-                  <span
-                    className={colorStyle?.text}
-                    style={hexStyle ? { color: hexStyle.text } : undefined}
-                  >
-                    {renderIcon(space.icon, 12)}
-                  </span>
-                </span>
-
-                {/* Space name */}
-                <span className={clsx(
-                  "truncate flex-1",
-                  isDisabled
-                    ? "text-gray-400 dark:text-gray-500 line-through"
-                    : "text-gray-700 dark:text-gray-200"
-                )}>
-                  {space.name}
-                </span>
-
-                {/* Status indicator */}
-                {isDisabled ? (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    No folder
-                  </span>
-                ) : showCurrentIndicator && isActive && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    current
-                  </span>
-                )}
-              </button>
-            );
-          })
-        )}
-
-        {/* Error message */}
-        {errorMessage && (
-          <div className="px-2 py-1.5 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-t border-red-200 dark:border-red-800">
-            {errorMessage}
-          </div>
-        )}
-      </div>
+      <SpaceList
+        spaces={displaySpaces}
+        highlightedIndex={highlightedIndex}
+        activeSpaceId={activeSpaceId}
+        searchQuery={searchQuery}
+        onSearchChange={onSearchChange}
+        searchInputRef={searchInputRef}
+        onSelect={handleSelect}
+        onHighlight={setHighlightedIndex}
+        itemRefs={itemRefs}
+        isDisabled={isItemDisabled}
+        showCurrentIndicator={showCurrentIndicator}
+        errorMessage={errorMessage}
+      />
     </QuickDismissDialog>
   );
 };
