@@ -2,13 +2,13 @@
 
 ## CURRENT_VERSION
 
-- Space colour as sidebar background: tints the sidebar with the active space's colour, with adjustable intensity
-- Keyboard shortcut Cmd+J (Mac) / Ctrl+J (Windows) opens the Space Navigator
-- Settings dialog reorganized into Appearance and Behaviour tabs; each setting shows a description of its current effect
-- Space Navigator supports a-z keys for selecting spaces 10 and beyond
+- New: Space Navigator (Cmd+Shift+S / Ctrl+Shift+S) - type to search spaces or use 0-9 keys to jump directly
+- New: Space colour tints the sidebar background - set intensity in Space settings
+- Settings dialog now has Appearance and Behaviour tabs for easier navigation
 - Fixed: bookmark folders whose names contain '/' are now matched correctly when linked to a space
 - Fixed: renaming a bookmark folder now automatically updates any spaces that link to it
 - Fixed: arrow key navigation in Space Navigator scrolls the list to keep the selected item visible
+- Fixed: settings menu is now scrollable when the list is long
 
 ## 1.0.313
 

@@ -3,10 +3,9 @@
 // Entries are shown in the "What's New" dialog when the user upgrades past them.
 export const CHANGELOG: Record<string, string[]> = {
   '1.0.322': [
-    'Space colour as sidebar background: tints the sidebar with the active space\'s colour',
-    'Keyboard shortcut Cmd+J (Mac) / Ctrl+J (Windows) opens the Space Navigator',
-    'Settings dialog reorganized into Appearance and Behaviour tabs',
-    'Space Navigator: press a-z to jump to spaces 10 and beyond',
+    'New: Space Navigator (Cmd+Shift+S / Ctrl+Shift+S) - type to search spaces or use 0-9 keys to jump directly',
+    'New: Space colour tints the sidebar background - set it in Space settings',
+    'Settings dialog now has Appearance and Behaviour tabs for easier navigation',
   ],
   '1.0.313': [
     'Bookmark folder expand/collapse state is now persisted across Chrome restarts',
