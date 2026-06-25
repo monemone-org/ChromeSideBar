@@ -767,7 +767,7 @@ interface BookmarkTreeProps {
 }
 
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
-  const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderByPath, getAllBookmarksInFolder, getBookmarkPath, getBookmark, error } = useBookmarks();
+  const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderBySegments, getAllBookmarksInFolder, getBookmarkSegments, getBookmark, error } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation, associateExistingTab } = useBookmarkTabsContext();
   const { spaces, updateSpace, updateSpaceFolderPaths, windowId } = useSpacesContext();
   // Build lookup: folderId → Space (only when in "All" space)
@@ -778,9 +778,10 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     const map = new Map<string, Space>();
     spaces.forEach(space =>
     {
-      if (space.bookmarkFolderPath)
+      const segments = space.bookmarkFolderSegments;
+      if (segments && segments.length > 0)
       {
-        const folder = findFolderByPath(space.bookmarkFolderPath);
+        const folder = findFolderBySegments(segments);
         if (folder)
         {
           map.set(folder.id, space);
@@ -788,7 +789,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       }
     });
     return map;
-  }, [activeSpace?.id, spaces, findFolderByPath]);
+  }, [activeSpace?.id, spaces, findFolderBySegments]);
 
   // Lookup function to get matching Space for a folder
   const getMatchingSpace = useCallback((folderId: string): Space | undefined =>
@@ -903,9 +904,11 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     : bookmarks;
 
   // Space folder info - track if folder is found or missing
-  const spaceFolderPath = activeSpace?.id !== 'all' ? activeSpace?.bookmarkFolderPath : null;
-  const spaceFolder = spaceFolderPath ? findFolderByPath(spaceFolderPath) : null;
-  const isSpaceFolderMissing = spaceFolderPath && !spaceFolder;
+  const spaceHasFolder = activeSpace?.id !== 'all' && !!activeSpace?.bookmarkFolderPath;
+  const spaceFolder = (spaceHasFolder && activeSpace?.bookmarkFolderSegments?.length)
+    ? findFolderBySegments(activeSpace.bookmarkFolderSegments)
+    : null;
+  const isSpaceFolderMissing = spaceHasFolder && !spaceFolder;
 
   // Apply space filter if a space (not "all") is active
   // Show the space folder itself (not just children) so it's always a drop target
@@ -930,25 +933,36 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const [expandedStateLoaded, setExpandedStateLoaded] = useState(false);
   const [editingNode, setEditingNode] = useState<chrome.bookmarks.BookmarkTreeNode | null>(null);
 
-  // Wrap updateBookmark so folder renames also update any space bookmarkFolderPath
+  // Wrap updateBookmark so folder renames also update any space bookmarkFolderPath + segments
   const handleSaveBookmark = useCallback(async (id: string, title: string, url?: string) =>
   {
     // Only folder renames (no url, title actually changed) need to update space paths
     if (url === undefined && editingNode && !editingNode.url && editingNode.title !== title)
     {
-      const oldPath = await getBookmarkPath(id);
+      const oldSegments = await getBookmarkSegments(id);
       updateBookmark(id, title, url);
-      const newPath = await getBookmarkPath(id);
+      const newSegments = await getBookmarkSegments(id);
+      // Find spaces whose folder exactly matches the renamed folder
       const pathUpdates = spaces
-        .filter(s => s.bookmarkFolderPath === oldPath)
-        .map(s => ({ id: s.id, bookmarkFolderPath: newPath }));
+        .filter(s =>
+        {
+          const segs = s.bookmarkFolderSegments;
+          return segs &&
+            segs.length === oldSegments.length &&
+            segs.every((seg, i) => seg === oldSegments[i]);
+        })
+        .map(s => ({
+          id: s.id,
+          bookmarkFolderPath: newSegments.join('/'),
+          bookmarkFolderSegments: newSegments,
+        }));
       updateSpaceFolderPaths(pathUpdates);
     }
     else
     {
       updateBookmark(id, title, url);
     }
-  }, [updateBookmark, editingNode, spaces, getBookmarkPath, updateSpaceFolderPaths]);
+  }, [updateBookmark, editingNode, spaces, getBookmarkSegments, updateSpaceFolderPaths]);
 
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
   const [creatingBookmarkParentId, setCreatingBookmarkParentId] = useState<string | null>(null);
@@ -1309,9 +1323,9 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     setShowSpaceFolderPicker(false);
     if (!activeSpace || activeSpace.id === 'all') return;
 
-    const path = await getBookmarkPath(folderId);
-    updateSpace(activeSpace.id, { bookmarkFolderPath: path });
-  }, [activeSpace, getBookmarkPath, updateSpace]);
+    const segments = await getBookmarkSegments(folderId);
+    updateSpace(activeSpace.id, { bookmarkFolderPath: segments.join('/'), bookmarkFolderSegments: segments });
+  }, [activeSpace, getBookmarkSegments, updateSpace]);
 
   // Open move to space dialog
   const openMoveToSpaceDialog = useCallback((bookmarkId: string) =>
@@ -1533,7 +1547,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       return `"${space?.name || 'Space'}" has no bookmark folder configured`;
     }
 
-    const folder = findFolderByPath(space.bookmarkFolderPath);
+    const folder = findFolderBySegments(space.bookmarkFolderSegments ?? []);
     if (!folder)
     {
       return `Folder "${space.bookmarkFolderPath}" no longer exists`;
@@ -1560,7 +1574,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
         return `Failed to move bookmark: ${message}`;
       }
     }
-  }, [moveToSpaceDialog.bookmarkId, moveToSpaceDialog.isMulti, spaces, findFolderByPath,
+  }, [moveToSpaceDialog.bookmarkId, moveToSpaceDialog.isMulti, spaces, findFolderBySegments,
     handleMoveSelectedBookmarksToFolder, moveBookmark, onShowToast]);
 
   // Check if selection has any bookmarks (vs only folders)
@@ -2037,7 +2051,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     return (
       <>
         <div className="p-4 text-gray-500 dark:text-gray-400">
-          <span>Folder "{spaceFolderPath}" not found. </span>
+          <span>Folder "{activeSpace?.bookmarkFolderPath}" not found. </span>
           <button
             className="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 underline"
             onClick={() => setShowSpaceFolderPicker(true)}

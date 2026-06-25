@@ -2,14 +2,36 @@
 // Space-related messages between background.ts and SpacesContext.tsx
 // =============================================================================
 
+// chrome.storage.local key for the array of Space definitions
+export const SPACES_STORAGE_KEY = 'spaces';
+
+// =============================================================================
+// Space Definition (source of truth - shared between background and sidebar)
+// =============================================================================
+
+export interface Space
+{
+  id: string;
+  name: string;
+  icon: string;                           // Lucide icon name or emoji
+  color: string;                          // Chrome color name or hex (e.g. 'blue', '#FF5733')
+  bookmarkFolderPath: string;             // e.g. "Bookmarks Bar/Work" (legacy, may contain '/')
+  bookmarkFolderSegments?: string[];      // structured path e.g. ["Bookmarks Bar", "A/B"] - unambiguous
+}
+
+// =============================================================================
+// Message Actions
+// =============================================================================
+
 /**
  * Message action types for space-related communication.
  *
  * SpaceWindowState is managed in background.ts (source of truth).
- * SpacesContext.tsx holds a read-only copy that syncs via messages.
+ * Space definitions are managed by SpaceManager in background.ts.
+ * SpacesContext.tsx holds read-only copies that sync via messages.
  *
  * Communication flow:
- *   sidebar → background: GET_WINDOW_STATE, SET_ACTIVE_SPACE
+ *   sidebar → background: GET_WINDOW_STATE, SET_ACTIVE_SPACE, GET_SPACES, UPDATE_SPACES
  *   background → sidebar: STATE_CHANGED
  */
 export const SpaceMessageAction = {
@@ -35,6 +57,24 @@ export const SpaceMessageAction = {
    * Payload: { windowId: number, spaceId: string }
    */
   SET_ACTIVE_SPACE: 'set-active-space',
+
+  /**
+   * SpacesContext.tsx → background.ts
+   *
+   * Request all Space definitions on sidebar mount.
+   *
+   * Response: { spaces: Space[] }
+   */
+  GET_SPACES: 'get-spaces',
+
+  /**
+   * SpacesContext.tsx → background.ts
+   *
+   * Persist updated Space definitions (any CRUD operation).
+   *
+   * Payload: { spaces: Space[] }
+   */
+  UPDATE_SPACES: 'update-spaces',
 
   // ─────────────────────────────────────────────────────────────────────────
   // Background → Sidebar

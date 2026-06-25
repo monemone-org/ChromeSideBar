@@ -1,4 +1,4 @@
-import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from './utils/spaceMessages';
+import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE, SPACES_STORAGE_KEY, Space } from './utils/spaceMessages';
 import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup, restoreTabAssociationBackup } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
 import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
@@ -405,7 +405,7 @@ class TabHistoryManager
 
   //   const uniqueSpaceIds = [...new Set(history.stack.map(e => e.spaceId))];
   //   const spaceNameMap: Record<string, string> = { all: 'All' };
-  //   const result = await chrome.storage.local.get(['spaces']);
+  //   const result = await chrome.storage.local.get([SPACES_STORAGE_KEY]);
   //   const spaces = result.spaces || [];
   //   for (const spaceId of uniqueSpaceIds)
   //   {
@@ -671,15 +671,93 @@ class NewsVersionChecker
 }
 
 // =============================================================================
-// Space-Group Helper Functions
+// SpaceManager - Manages Space definitions (load, migrate, save)
 // =============================================================================
 
-interface Space
+// Walk bookmark tree matching path string as a prefix chain to build segment array.
+// Returns the title segments (one per folder level) or null if not found.
+// Handles folder names containing '/' by treating each node title as an atomic segment.
+function findFolderSegmentsByPath(
+  nodes: chrome.bookmarks.BookmarkTreeNode[],
+  path: string,
+  isRoot: boolean = true
+): string[] | null
 {
-  id: string;
-  name: string;
-  color: string;
+  for (const node of nodes)
+  {
+    if (node.url) continue;
+
+    // Root-level folders matched case-insensitively for platform differences
+    const matches = isRoot
+      ? path.toLowerCase().startsWith(node.title.toLowerCase())
+      : path.startsWith(node.title);
+    if (!matches) continue;
+
+    const after = path.slice(node.title.length);
+    // Ensure match is a complete segment boundary, not a partial name match
+    if (after !== '' && !after.startsWith('/')) continue;
+
+    if (after === '') return [node.title];
+
+    const childSegments = findFolderSegmentsByPath(node.children || [], after.slice(1), false);
+    if (childSegments) return [node.title, ...childSegments];
+  }
+  return null;
 }
+
+class SpaceManager
+{
+  private spaces: Space[] = [];
+
+  async load(): Promise<void>
+  {
+    const result = await chrome.storage.local.get([SPACES_STORAGE_KEY]);
+    let spaces: Space[] = result[SPACES_STORAGE_KEY] || [];
+    spaces = await this.migrate(spaces);
+    this.spaces = spaces;
+  }
+
+  // Populate bookmarkFolderSegments for spaces that only have bookmarkFolderPath
+  private async migrate(spaces: Space[]): Promise<Space[]>
+  {
+    const needsMigration = spaces.some(s => s.bookmarkFolderPath && !s.bookmarkFolderSegments);
+    if (!needsMigration) return spaces;
+
+    const tree = await chrome.bookmarks.getTree();
+    const roots = tree[0]?.children || [];
+
+    const migrated = spaces.map(space =>
+    {
+      if (!space.bookmarkFolderPath || space.bookmarkFolderSegments) return space;
+      const segments = findFolderSegmentsByPath(roots, space.bookmarkFolderPath);
+      return segments ? { ...space, bookmarkFolderSegments: segments } : space;
+    });
+
+    // Only write back if anything changed
+    const hasChanges = migrated.some((s, i) => s !== spaces[i]);
+    if (hasChanges)
+    {
+      await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: migrated });
+    }
+
+    return migrated;
+  }
+
+  getSpaces(): Space[]
+  {
+    return this.spaces;
+  }
+
+  async update(spaces: Space[]): Promise<void>
+  {
+    this.spaces = spaces;
+    await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: spaces });
+  }
+}
+
+// =============================================================================
+// Space-Group Helper Functions
+// =============================================================================
 
 // Find Chrome group by name in a window
 async function findGroupByName(windowId: number, name: string): Promise<number | undefined>
@@ -688,21 +766,17 @@ async function findGroupByName(windowId: number, name: string): Promise<number |
   return groups[0]?.id;
 }
 
-// Get a space by ID from storage
+// Get a space by ID from the in-memory SpaceManager cache
 async function getSpaceById(spaceId: string): Promise<Space | undefined>
 {
-  const result = await chrome.storage.local.get(['spaces']);
-  const spaces: Space[] = result.spaces || [];
-  return spaces.find(s => s.id === spaceId);
+  return spaceManager.getSpaces().find(s => s.id === spaceId);
 }
 
-// Find a space by name from storage
+// Find a space by name from the in-memory SpaceManager cache
 async function findSpaceByName(name: string | undefined): Promise<Space | undefined>
 {
   if (!name) return undefined;
-  const result = await chrome.storage.local.get(['spaces']);
-  const spaces: Space[] = result.spaces || [];
-  return spaces.find(s => s.name === name);
+  return spaceManager.getSpaces().find(s => s.name === name);
 }
 
 // Forward declaration - will be initialized below
@@ -771,6 +845,7 @@ async function setActiveTabAndSpace(
 // =============================================================================
 
 const spaceStateManager = new SpaceWindowStateManager();
+const spaceManager = new SpaceManager();
 const historyManager = new TabHistoryManager();
 const groupTracker = new TabGroupTracker();
 const lastAudibleTracker = new LastAudibleTracker();
@@ -791,6 +866,7 @@ const stateReady = new Promise<void>((resolve) =>
 // Load persisted state
 Promise.all([
   spaceStateManager.load(),
+  spaceManager.load(),
   historyManager.load(),
   groupTracker.load(),
   lastAudibleTracker.load(),
@@ -1221,6 +1297,31 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
       }
     })();
     return true;
+  }
+
+  // Return all Space definitions (loaded + migrated at startup)
+  if (message.action === SpaceMessageAction.GET_SPACES)
+  {
+    (async () =>
+    {
+      await stateReady;
+      sendResponse({ spaces: spaceManager.getSpaces() });
+    })();
+    return true;
+  }
+
+  // Persist updated Space definitions from the sidebar
+  if (message.action === SpaceMessageAction.UPDATE_SPACES)
+  {
+    (async () =>
+    {
+      await stateReady;
+      if (Array.isArray(message.spaces))
+      {
+        await spaceManager.update(message.spaces);
+      }
+    })();
+    return;
   }
 
   // Set active space

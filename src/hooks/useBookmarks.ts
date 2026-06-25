@@ -366,10 +366,11 @@ export const useBookmarks = () => {
     }
   }, [createBookmark]);
 
-  // Get the full path of a bookmark/folder (e.g., "Other Bookmarks/FolderA/FolderB")
-  const getBookmarkPath = useCallback(async (bookmarkId: string): Promise<string> =>
+  // Get the folder path as an array of title segments (e.g. ["Other Bookmarks", "FolderA", "FolderB"])
+  // Each segment is the exact folder title, so folder names containing '/' are unambiguous
+  const getBookmarkSegments = useCallback(async (bookmarkId: string): Promise<string[]> =>
   {
-    const pathParts: string[] = [];
+    const segments: string[] = [];
     let currentId: string | undefined = bookmarkId;
 
     while (currentId)
@@ -380,13 +381,13 @@ export const useBookmarks = () => {
       // Skip the root node (id "0") which has no title
       if (node.id !== '0' && node.title)
       {
-        pathParts.unshift(node.title);
+        segments.unshift(node.title);
       }
 
       currentId = node.parentId;
     }
 
-    return pathParts.join('/');
+    return segments;
   }, [getBookmark]);
 
   // Duplicate a bookmark (not folder) right after the original
@@ -409,44 +410,34 @@ export const useBookmarks = () => {
     return folder?.title || '';
   }, [bookmarks]);
 
-  // Find a folder by its path (e.g., "Bookmarks Bar/Home")
-  // Returns the folder node if found, null otherwise
-  // Note: First path segment (root folder) is matched case-insensitively to handle
-  // platform differences (e.g., "Other Bookmarks" vs "Other bookmarks").
-  // Walks the tree by matching node titles as prefixes of the remaining path to
-  // correctly handle folder names that contain '/'.
-  const findFolderByPath = useCallback((path: string): chrome.bookmarks.BookmarkTreeNode | null =>
+  // Find a folder by its segment array (e.g. ["Bookmarks Bar", "A/B"])
+  // Handles folder names containing '/' correctly since each segment is matched as a whole title
+  const findFolderBySegments = useCallback((segments: string[]): chrome.bookmarks.BookmarkTreeNode | null =>
   {
-    if (!path) return null;
+    if (!segments || segments.length === 0) return null;
 
     const walk = (
       nodes: chrome.bookmarks.BookmarkTreeNode[],
-      remaining: string,
+      remaining: string[],
       isRoot: boolean
     ): chrome.bookmarks.BookmarkTreeNode | null =>
     {
+      const [head, ...tail] = remaining;
       for (const node of nodes)
       {
         if (node.url) continue;
-
-        // Root-level folders matched case-insensitively for platform differences
+        // Root-level matched case-insensitively for platform differences
         const matches = isRoot
-          ? remaining.toLowerCase().startsWith(node.title.toLowerCase())
-          : remaining.startsWith(node.title);
+          ? node.title.toLowerCase() === head.toLowerCase()
+          : node.title === head;
         if (!matches) continue;
-
-        const after = remaining.slice(node.title.length);
-        // Ensure the match is a complete segment, not a prefix of a longer name
-        if (after !== '' && !after.startsWith('/')) continue;
-
-        if (after === '') return node;
-
-        return walk(node.children || [], after.slice(1), false);
+        if (tail.length === 0) return node;
+        return walk(node.children || [], tail, false);
       }
       return null;
     };
 
-    return walk(bookmarks, path, true);
+    return walk(bookmarks, segments, true);
   }, [bookmarks]);
 
   // Get all bookmarks recursively from a folder (including nested subfolders)
@@ -484,14 +475,14 @@ export const useBookmarks = () => {
     sortBookmarks,
     moveBookmark,
     findFolderInParent,
-    findFolderByPath,
+    findFolderBySegments,
     getRootFolderTitle,
     createBookmark,
     createBookmarksBatch,
     getBookmark,
     getChildren,
     clearFolder,
-    getBookmarkPath,
+    getBookmarkSegments,
     duplicateBookmark,
     getAllBookmarksInFolder,
     error

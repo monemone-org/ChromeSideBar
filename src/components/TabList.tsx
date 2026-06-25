@@ -1042,7 +1042,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
   }, []);
 
   // Bookmarks functions for export and tab-to-bookmark drops
-  const { findFolderInParent, findFolderByPath, createFolder, createBookmark, createBookmarksBatch, getChildren, clearFolder, getBookmarkPath } = useBookmarks();
+  const { findFolderInParent, findFolderBySegments, createFolder, createBookmark, createBookmarksBatch, getChildren, clearFolder, getBookmarkSegments } = useBookmarks();
 
   // Persisted per-space last selected bookmark folder (spaceId → folderId)
   const [lastSelectedBookmarkFolderPerSpace, setLastSelectedBookmarkFolderPerSpace] = useChromeLocalStorage<Record<string, string>>(
@@ -1056,10 +1056,10 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
     if (!activeSpace || activeSpace.id === 'all') return undefined;
     const remembered = lastSelectedBookmarkFolderPerSpace[activeSpace.id];
     if (remembered) return remembered;
-    return activeSpace.bookmarkFolderPath
-      ? findFolderByPath(activeSpace.bookmarkFolderPath)?.id
+    return (activeSpace.bookmarkFolderSegments?.length)
+      ? findFolderBySegments(activeSpace.bookmarkFolderSegments)?.id
       : undefined;
-  }, [activeSpace, lastSelectedBookmarkFolderPerSpace, findFolderByPath]);
+  }, [activeSpace, lastSelectedBookmarkFolderPerSpace, findFolderBySegments]);
 
   // Save the selected bookmark folder for the current space
   const saveLastSelectedBookmarkFolder = useCallback((folderId: string) =>
@@ -1166,11 +1166,11 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
       createFolder(parentFolderId, folderName, async (newFolder) =>
       {
         await createBookmarksInFolderBatch(newFolder.id, groupTabs);
-        const folderPath = await getBookmarkPath(newFolder.id);
-        showToast(`Bookmark folder "${folderPath}" is created`);
+        const segments = await getBookmarkSegments(newFolder.id);
+        showToast(`Bookmark folder "${segments.join('/')}" is created`);
       });
     }
-  }, [folderPickerDialog, findFolderInParent, createFolder, createBookmarksInFolderBatch, getBookmarkPath, showToast]);
+  }, [folderPickerDialog, findFolderInParent, createFolder, createBookmarksInFolderBatch, getBookmarkSegments, showToast]);
 
   const closeFolderPickerDialog = useCallback(() =>
   {
@@ -1184,7 +1184,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
     if (!existingFolder) return;
 
     // Get the full path for toast messages
-    const folderPath = await getBookmarkPath(existingFolder.id);
+    const folderPath = (await getBookmarkSegments(existingFolder.id)).join('/');
 
     if (mode === 'overwrite')
     {
@@ -1215,7 +1215,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
         showToast('All tabs already exist in folder');
       }
     }
-  }, [exportConflictDialog, clearFolder, createBookmarksInFolderBatch, getChildren, getBookmarkPath, showToast]);
+  }, [exportConflictDialog, clearFolder, createBookmarksInFolderBatch, getChildren, getBookmarkSegments, showToast]);
 
   const closeExportConflictDialog = useCallback(() =>
   {

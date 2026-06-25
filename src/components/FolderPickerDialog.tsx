@@ -163,7 +163,7 @@ export const FolderPickerDialog = ({
   defaultFolderId
 }: FolderPickerDialogProps) =>
 {
-  const { bookmarks, createFolder, getBookmark, findFolderByPath } = useBookmarks();
+  const { bookmarks, createFolder, getBookmark, findFolderBySegments } = useBookmarks();
   const { spaces } = useSpacesContext();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -173,9 +173,10 @@ export const FolderPickerDialog = ({
     const map = new Map<string, Space>();
     spaces.forEach(space =>
     {
-      if (space.bookmarkFolderPath)
+      const segments = space.bookmarkFolderSegments;
+      if (segments && segments.length > 0)
       {
-        const folder = findFolderByPath(space.bookmarkFolderPath);
+        const folder = findFolderBySegments(segments);
         if (folder)
         {
           map.set(folder.id, space);
@@ -183,7 +184,7 @@ export const FolderPickerDialog = ({
       }
     });
     return map;
-  }, [spaces, findFolderByPath]);
+  }, [spaces, findFolderBySegments]);
 
   // Lookup function to get matching Space for a folder
   const getMatchingSpace = useCallback((folderId: string): Space | undefined =>

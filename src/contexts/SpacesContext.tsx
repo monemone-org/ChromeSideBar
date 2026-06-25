@@ -1,21 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useBookmarkTabsContext } from './BookmarkTabsContext';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE } from '../utils/spaceMessages';
+import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE, SPACES_STORAGE_KEY, Space } from '../utils/spaceMessages';
 import { toChromeColor } from '../utils/groupColors';
 
-// =============================================================================
-// Types
-// =============================================================================
-
-export interface Space
-{
-  id: string;
-  name: string;
-  icon: string;                         // Lucide icon name or emoji
-  color: string;                         // Chrome color name or hex (e.g. 'blue', '#FF5733')
-  bookmarkFolderPath: string;           // e.g. "Bookmarks Bar/Work"
-}
+// Re-export Space so all existing imports from SpacesContext continue to work
+export type { Space } from '../utils/spaceMessages';
 
 // Special "All" space - not stored, always present
 export const ALL_SPACE: Space = {
@@ -25,12 +15,6 @@ export const ALL_SPACE: Space = {
   color: 'grey',
   bookmarkFolderPath: '',
 };
-
-// =============================================================================
-// Constants
-// =============================================================================
-
-const SPACES_STORAGE_KEY = 'spaces';
 
 // =============================================================================
 // Helpers
@@ -84,10 +68,11 @@ interface SpacesContextValue
     name: string,
     icon: string,
     color: string,
-    bookmarkFolderPath: string
+    bookmarkFolderPath: string,
+    bookmarkFolderSegments: string[]
   ) => Space;
   updateSpace: (id: string, updates: Partial<Omit<Space, 'id'>>) => void;
-  updateSpaceFolderPaths: (updates: { id: string; bookmarkFolderPath: string }[]) => void;
+  updateSpaceFolderPaths: (updates: { id: string; bookmarkFolderPath: string; bookmarkFolderSegments: string[] }[]) => void;
   deleteSpace: (id: string) => Promise<void>;
   moveSpace: (activeId: string, overId: string) => void;
   getSpaceById: (id: string) => Space | undefined;
@@ -124,84 +109,59 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Dependencies for closeAllTabsInSpace
   // ---------------------------------------------------------------------------
   const { getTabIdForBookmark } = useBookmarkTabsContext();
-  const { findFolderByPath, getAllBookmarksInFolder } = useBookmarks();
+  const { findFolderBySegments, getAllBookmarksInFolder } = useBookmarks();
 
   // ---------------------------------------------------------------------------
-  // Space definitions state (chrome.storage.local)
+  // Space definitions state - loaded from background.ts (SpaceManager)
   // ---------------------------------------------------------------------------
   const [spaces, setSpaces] = useState<Space[]>([]);
 
-  const handleSpacesError = useCallback((operation: string) =>
+  // Send updated spaces to background for persistence
+  const sendSpacesUpdate = useCallback((newSpaces: Space[]) =>
   {
-    const err = chrome.runtime.lastError;
-    if (err)
-    {
-      console.error(`Spaces ${operation} error:`, err.message);
-      return true;
-    }
-    return false;
+    chrome.runtime.sendMessage({ action: SpaceMessageAction.UPDATE_SPACES, spaces: newSpaces });
   }, []);
 
-  const loadSpaces = useCallback(() =>
-  {
-    if (typeof chrome !== 'undefined' && chrome.storage)
-    {
-      chrome.storage.local.get([SPACES_STORAGE_KEY], (result) =>
-      {
-        if (!handleSpacesError('load'))
-        {
-          let loadedSpaces = result[SPACES_STORAGE_KEY] || [];
-
-          // Initialize with debug spaces if empty (dev mode only)
-          if (loadedSpaces.length === 0)
-          {
-            const debugSpaces = getDebugSpaces();
-            if (debugSpaces.length > 0)
-            {
-              loadedSpaces = debugSpaces;
-              chrome.storage.local.set({ [SPACES_STORAGE_KEY]: loadedSpaces });
-            }
-          }
-
-          setSpaces(loadedSpaces);
-        }
-      });
-    }
-  }, [handleSpacesError]);
-
-  const saveSpaces = useCallback((newSpaces: Space[]) =>
-  {
-    if (typeof chrome !== 'undefined' && chrome.storage)
-    {
-      chrome.storage.local.set({ [SPACES_STORAGE_KEY]: newSpaces }, () =>
-      {
-        handleSpacesError('save');
-      });
-    }
-  }, [handleSpacesError]);
-
-  // Load spaces on mount and listen for changes
+  // Load spaces on mount - request from background (which may have run migration)
+  // Also listen for storage changes to stay in sync across windows
   useEffect(() =>
   {
-    loadSpaces();
+    chrome.runtime.sendMessage({ action: SpaceMessageAction.GET_SPACES }, (response: { spaces: Space[] }) =>
+    {
+      if (chrome.runtime.lastError)
+      {
+        console.error('Failed to load spaces:', chrome.runtime.lastError.message);
+        return;
+      }
+      let loadedSpaces: Space[] = response?.spaces || [];
 
+      // Initialize with debug spaces if empty (dev mode only)
+      if (loadedSpaces.length === 0)
+      {
+        const debugSpaces = getDebugSpaces();
+        if (debugSpaces.length > 0)
+        {
+          loadedSpaces = debugSpaces;
+          sendSpacesUpdate(loadedSpaces);
+        }
+      }
+
+      setSpaces(loadedSpaces);
+    });
+
+    // Listen for storage changes so other windows stay in sync when background saves
     const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) =>
     {
       if (areaName !== 'local') return;
       if (changes[SPACES_STORAGE_KEY])
       {
-        const newSpaces = changes[SPACES_STORAGE_KEY].newValue || [];
-        setSpaces(newSpaces);
+        setSpaces(changes[SPACES_STORAGE_KEY].newValue || []);
       }
     };
 
     chrome.storage?.onChanged.addListener(handleStorageChange);
-
-    return () =>
-    {
-      chrome.storage?.onChanged.removeListener(handleStorageChange);
-    };
-  }, [loadSpaces]);
+    return () => chrome.storage?.onChanged.removeListener(handleStorageChange);
+  }, [sendSpacesUpdate]);
 
   // ---------------------------------------------------------------------------
   // Per-window state (read-only copy, synced from background.ts)
@@ -269,22 +229,29 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     name: string,
     icon: string,
     color: string,
-    bookmarkFolderPath: string
+    bookmarkFolderPath: string,
+    bookmarkFolderSegments: string[]
   ): Space =>
   {
+    if (bookmarkFolderPath && bookmarkFolderSegments.length === 0)
+    {
+      console.error('[createSpace] bookmarkFolderSegments required when bookmarkFolderPath is set');
+    }
+
     const newSpace: Space = {
       id: generateId(),
       name,
       icon,
       color,
       bookmarkFolderPath,
+      bookmarkFolderSegments,
     };
 
     const updatedSpaces = [...spaces, newSpace];
     setSpaces(updatedSpaces);
-    saveSpaces(updatedSpaces);
+    sendSpacesUpdate(updatedSpaces);
     return newSpace;
-  }, [spaces, saveSpaces]);
+  }, [spaces, sendSpacesUpdate]);
 
   const getSpaceById = useCallback((id: string): Space | undefined =>
   {
@@ -300,12 +267,20 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const space = getSpaceById(id);
     if (!space || id === 'all') return;
 
+    // Fail fast if caller sets bookmarkFolderPath without segments
+    if (updates.bookmarkFolderPath !== undefined &&
+        updates.bookmarkFolderPath !== '' &&
+        (!updates.bookmarkFolderSegments || updates.bookmarkFolderSegments.length === 0))
+    {
+      console.error('[updateSpace] bookmarkFolderSegments required when bookmarkFolderPath is set');
+    }
+
     // Update Space in storage
     const updatedSpaces = spaces.map(s =>
       s.id === id ? { ...s, ...updates } : s
     );
     setSpaces(updatedSpaces);
-    saveSpaces(updatedSpaces);
+    sendSpacesUpdate(updatedSpaces);
 
     // Sync name/color changes to Chrome group
     if (windowId && (updates.name || updates.color))
@@ -327,28 +302,30 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (import.meta.env.DEV) console.error('[updateSpace] Failed to sync to Chrome group:', error);
       }
     }
-  }, [spaces, saveSpaces, getSpaceById, windowId]);
+  }, [spaces, sendSpacesUpdate, getSpaceById, windowId]);
 
-  // Batch-update bookmarkFolderPath for multiple spaces at once (e.g. after a folder rename)
-  const updateSpaceFolderPaths = useCallback((updates: { id: string; bookmarkFolderPath: string }[]) =>
+  // Batch-update folder path + segments for multiple spaces at once (e.g. after a folder rename)
+  const updateSpaceFolderPaths = useCallback((updates: { id: string; bookmarkFolderPath: string; bookmarkFolderSegments: string[] }[]) =>
   {
     if (updates.length === 0) return;
     const updatedSpaces = spaces.map(s =>
     {
       const update = updates.find(u => u.id === s.id);
-      return update ? { ...s, bookmarkFolderPath: update.bookmarkFolderPath } : s;
+      return update
+        ? { ...s, bookmarkFolderPath: update.bookmarkFolderPath, bookmarkFolderSegments: update.bookmarkFolderSegments }
+        : s;
     });
     setSpaces(updatedSpaces);
-    saveSpaces(updatedSpaces);
-  }, [spaces, saveSpaces]);
+    sendSpacesUpdate(updatedSpaces);
+  }, [spaces, sendSpacesUpdate]);
 
   const deleteSpaceBase = useCallback((id: string) =>
   {
     if (id === 'all') return; // Cannot delete "All" space
     const updatedSpaces = spaces.filter(s => s.id !== id);
     setSpaces(updatedSpaces);
-    saveSpaces(updatedSpaces);
-  }, [spaces, saveSpaces]);
+    sendSpacesUpdate(updatedSpaces);
+  }, [spaces, sendSpacesUpdate]);
 
   const moveSpace = useCallback((activeId: string, overId: string) =>
   {
@@ -362,8 +339,8 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     updatedSpaces.splice(newIndex, 0, removed);
 
     setSpaces(updatedSpaces);
-    saveSpaces(updatedSpaces);
-  }, [spaces, saveSpaces]);
+    sendSpacesUpdate(updatedSpaces);
+  }, [spaces, sendSpacesUpdate]);
 
   // Replace all spaces (for import with "Replace" option)
   const replaceSpaces = useCallback((newSpaces: Space[]) =>
@@ -373,8 +350,8 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       id: generateId(),
     }));
     setSpaces(spacesWithNewIds);
-    saveSpaces(spacesWithNewIds);
-  }, [saveSpaces]);
+    sendSpacesUpdate(spacesWithNewIds);
+  }, [sendSpacesUpdate]);
 
   // Append spaces to existing (for import with "Add" option)
   const appendSpaces = useCallback((newSpaces: Space[]) =>
@@ -385,8 +362,8 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }));
     const combined = [...spaces, ...spacesWithNewIds];
     setSpaces(combined);
-    saveSpaces(combined);
-  }, [spaces, saveSpaces]);
+    sendSpacesUpdate(combined);
+  }, [spaces, sendSpacesUpdate]);
 
   // ---------------------------------------------------------------------------
   // Space switch source tracking
@@ -551,7 +528,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     // 2. Also find live bookmark tabs for bookmarks in the space's folder
-    const spaceFolder = findFolderByPath(space.bookmarkFolderPath);
+    const spaceFolder = findFolderBySegments(space.bookmarkFolderSegments ?? []);
     if (spaceFolder)
     {
       const bookmarksInFolder = await getAllBookmarksInFolder(spaceFolder.id);
@@ -568,7 +545,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     return tabIdsToClose;
-  }, [windowId, findFolderByPath, getAllBookmarksInFolder, getTabIdForBookmark]);
+  }, [windowId, findFolderBySegments, getAllBookmarksInFolder, getTabIdForBookmark]);
 
   // Close all tabs in a space (non-undoable fallback)
   const closeAllTabsInSpace = useCallback(async (space: Space) =>
