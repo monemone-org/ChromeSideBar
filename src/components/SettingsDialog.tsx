@@ -15,6 +15,7 @@ export interface SettingsValues {
   audioQuickJump: boolean;
   useSpaceColor: boolean;
   spaceColorAlpha: number;  // 1-100 percent
+  syncActiveTab: boolean;
 }
 
 interface SettingsDialogProps {
@@ -43,6 +44,7 @@ export function SettingsDialog({
   const [tempAudioQuickJump, setTempAudioQuickJump] = useState(settings.audioQuickJump);
   const [tempUseSpaceColor, setTempUseSpaceColor] = useState(settings.useSpaceColor);
   const [tempSpaceColorAlpha, setTempSpaceColorAlpha] = useState(settings.spaceColorAlpha);
+  const [tempSyncActiveTab, setTempSyncActiveTab] = useState(settings.syncActiveTab);
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
 
   // Track previous isOpen to detect when dialog opens
@@ -70,6 +72,7 @@ export function SettingsDialog({
       setTempAudioQuickJump(settings.audioQuickJump);
       setTempUseSpaceColor(settings.useSpaceColor);
       setTempSpaceColorAlpha(settings.spaceColorAlpha);
+      setTempSyncActiveTab(settings.syncActiveTab);
       setActiveTab('appearance');
     }
     wasOpen.current = isOpen;
@@ -87,6 +90,7 @@ export function SettingsDialog({
       audioQuickJump: tempAudioQuickJump,
       useSpaceColor: tempUseSpaceColor,
       spaceColorAlpha: tempSpaceColorAlpha,
+      syncActiveTab: tempSyncActiveTab,
     });
   };
 
@@ -302,6 +306,25 @@ export function SettingsDialog({
                   : "Click opens the audio tabs list"}
               </p>
             </div>
+
+            {/* Follow active tab - disabled for now
+            <div>
+              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={tempSyncActiveTab}
+                  onChange={(e) => setTempSyncActiveTab(e.target.checked)}
+                  className="rounded border-gray-300 dark:border-gray-600"
+                />
+                Follow active tab
+              </label>
+              <p className="mt-0.5 text-gray-500 dark:text-gray-400 ml-5">
+                {tempSyncActiveTab
+                  ? "Sidebar switches space and scrolls to show the active tab"
+                  : "Sidebar stays put when you switch tabs"}
+              </p>
+            </div>
+            */}
 
             {/* Tab group display order */}
             <div>

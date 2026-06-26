@@ -39,6 +39,7 @@ import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkle
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
 import { useNewsCheck } from './hooks/useNewsCheck';
+import { useActiveTabSync } from './hooks/useActiveTabSync';
 import * as DropdownMenu from './components/menu/DropdownMenu';
 
 // Inner component that renders content for a single space
@@ -479,12 +480,14 @@ interface AppContainerProps
   useSpaceColor: boolean;
   spaceColorAlpha: number;  // 1-100 percent
   fontSize: number;
+  syncActiveTab: boolean;
   children: React.ReactNode;
 }
 
-const AppContainer: React.FC<AppContainerProps> = ({ useSpaceColor, spaceColorAlpha, fontSize, children }) =>
+const AppContainer: React.FC<AppContainerProps> = ({ useSpaceColor, spaceColorAlpha, fontSize, syncActiveTab, children }) =>
 {
   const { activeSpace } = useSpacesContext();
+  useActiveTabSync(syncActiveTab);
   const [isDark, setIsDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   // Keep isDark in sync when the OS theme changes
@@ -587,6 +590,11 @@ function App() {
     'sidebar-space-color-alpha',
     100,
     { parse: (v) => parseInt(v, 10), serialize: (v) => v.toString() }
+  );
+  const [syncActiveTab, setSyncActiveTab] = useChromeLocalStorage(
+    'sidebar-sync-active-tab',
+    false,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
   );
   const [showFilterArea, setShowFilterArea] = useLocalStorage(
     'sidebar-show-filter-area',
@@ -716,6 +724,7 @@ function App() {
     setAudioQuickJump(newSettings.audioQuickJump);
     setUseSpaceColor(newSettings.useSpaceColor);
     setSpaceColorAlpha(newSettings.spaceColorAlpha);
+    setSyncActiveTab(newSettings.syncActiveTab);
     setShowSettings(false);
   };
 
@@ -909,7 +918,7 @@ function App() {
       <SpacesProvider>
       <SelectionProvider>
       <UnifiedDndProvider>
-      <AppContainer useSpaceColor={useSpaceColor} spaceColorAlpha={spaceColorAlpha} fontSize={fontSize}>
+      <AppContainer useSpaceColor={useSpaceColor} spaceColorAlpha={spaceColorAlpha} fontSize={fontSize} syncActiveTab={syncActiveTab}>
       <SettingsDialog
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -924,6 +933,7 @@ function App() {
           audioQuickJump,
           useSpaceColor,
           spaceColorAlpha,
+          syncActiveTab,
         }}
         onApply={handleApplySettings}
       />

@@ -912,13 +912,19 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
   //   console.log(`[onActivated] destinationSpaceId=${destinationSpaceId}`);
   // }
 
-  // Switch sidebar to tab's Space (unless in "All" space or pinned tab)
+  // Switch sidebar to tab's Space (unless in "All" space, or the setting is disabled)
   if (destinationSpaceId && spaceStateManager.getActiveSpace(activeInfo.windowId) !== 'all')
   {
-    const currentSpaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
-    if (currentSpaceId !== destinationSpaceId)
+    const result = await chrome.storage.local.get(['sidebar-sync-active-tab']);
+    // Default to true when the key is absent (preserves pre-setting behaviour)
+    const syncEnabled = result['sidebar-sync-active-tab'] !== 'false';
+    if (syncEnabled)
     {
-      spaceStateManager.setActiveSpace(activeInfo.windowId, destinationSpaceId);
+      const currentSpaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
+      if (currentSpaceId !== destinationSpaceId)
+      {
+        spaceStateManager.setActiveSpace(activeInfo.windowId, destinationSpaceId);
+      }
     }
   }
 
