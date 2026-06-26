@@ -1,6 +1,6 @@
 ## Changelog
 
-## CURRENT_VERSION
+## 1.0.322
 
 - New: Space Navigator (Cmd+Shift+S / Ctrl+Shift+S) - type to search spaces or use 0-9 keys to jump directly
 - New: Space colour tints the sidebar background - set intensity in Space settings

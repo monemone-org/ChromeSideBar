@@ -463,7 +463,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   const canSave = inputValue.trim() && !savedFilters.includes(inputValue.trim());
 
   return (
-    <div className="flex flex-col border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+    <div className="flex flex-col border-b border-gray-200 dark:border-gray-700">
       {/* Top row - Filter buttons and settings */}
       <div className="flex items-center justify-between px-2 py-1">
         {/* Left side - Tab history and Filter buttons */}
