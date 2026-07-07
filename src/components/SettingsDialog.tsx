@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Dialog } from './Dialog';
+import { FollowActiveTabMode } from '../utils/followActiveTab';
 
 export type BookmarkOpenMode = 'arc' | 'newTab' | 'activeTab';
 export type TabGroupDisplayOrder = 'groupsFirst' | 'groupsLast' | 'chromeOrder';
@@ -15,7 +16,7 @@ export interface SettingsValues {
   audioQuickJump: boolean;
   useSpaceColor: boolean;
   spaceColorAlpha: number;  // 1-100 percent
-  syncActiveTab: boolean;
+  followActiveTab: FollowActiveTabMode;
 }
 
 interface SettingsDialogProps {
@@ -44,7 +45,7 @@ export function SettingsDialog({
   const [tempAudioQuickJump, setTempAudioQuickJump] = useState(settings.audioQuickJump);
   const [tempUseSpaceColor, setTempUseSpaceColor] = useState(settings.useSpaceColor);
   const [tempSpaceColorAlpha, setTempSpaceColorAlpha] = useState(settings.spaceColorAlpha);
-  const [tempSyncActiveTab, setTempSyncActiveTab] = useState(settings.syncActiveTab);
+  const [tempFollowActiveTab, setTempFollowActiveTab] = useState(settings.followActiveTab);
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
 
   // Track previous isOpen to detect when dialog opens
@@ -72,7 +73,7 @@ export function SettingsDialog({
       setTempAudioQuickJump(settings.audioQuickJump);
       setTempUseSpaceColor(settings.useSpaceColor);
       setTempSpaceColorAlpha(settings.spaceColorAlpha);
-      setTempSyncActiveTab(settings.syncActiveTab);
+      setTempFollowActiveTab(settings.followActiveTab);
       setActiveTab('appearance');
     }
     wasOpen.current = isOpen;
@@ -90,7 +91,7 @@ export function SettingsDialog({
       audioQuickJump: tempAudioQuickJump,
       useSpaceColor: tempUseSpaceColor,
       spaceColorAlpha: tempSpaceColorAlpha,
-      syncActiveTab: tempSyncActiveTab,
+      followActiveTab: tempFollowActiveTab,
     });
   };
 
@@ -307,24 +308,29 @@ export function SettingsDialog({
               </p>
             </div>
 
-            {/* Follow active tab - disabled for now
+            {/* Follow active tab */}
             <div>
-              <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={tempSyncActiveTab}
-                  onChange={(e) => setTempSyncActiveTab(e.target.checked)}
-                  className="rounded border-gray-300 dark:border-gray-600"
-                />
+              <label className="block text-gray-700 dark:text-gray-300 mb-1">
                 Follow active tab
               </label>
+              <select
+                value={tempFollowActiveTab}
+                onChange={(e) => setTempFollowActiveTab(e.target.value as FollowActiveTabMode)}
+                className="w-full px-2 py-1 border rounded dark:bg-gray-900 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="space-and-scroll">Switch space and show the tab</option>
+                <option value="space">Switch to the tab's space</option>
+                <option value="off">Off</option>
+              </select>
               <p className="mt-0.5 text-gray-500 dark:text-gray-400 ml-5">
-                {tempSyncActiveTab
-                  ? "Sidebar switches space and scrolls to show the active tab"
-                  : "Sidebar stays put when you switch tabs"}
+                {tempFollowActiveTab === 'space-and-scroll' &&
+                  "Always scroll to show the active tab, switching space when needed"}
+                {tempFollowActiveTab === 'space' &&
+                  "Switch to the active tab's space; only scroll when the space changes"}
+                {tempFollowActiveTab === 'off' &&
+                  "Sidebar stays put when you switch tabs"}
               </p>
             </div>
-            */}
 
             {/* Tab group display order */}
             <div>

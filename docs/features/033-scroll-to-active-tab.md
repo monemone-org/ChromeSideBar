@@ -4,98 +4,58 @@ after-version: 1.0.322
 status: in-progress
 ---
 
-# 033 - Scroll to Active Tab
+# 033 - Scroll to Active Tab (Follow Active Tab)
 
 ## Feature Goal
 
-When Chrome activates a tab (e.g. after closing a tab, switching via keyboard, or clicking from another window), the sidebar should scroll to make that tab visible. There are two sub-behaviors controlled by the "Active Tab Sync" setting:
+When Chrome activates a tab (closing a tab, keyboard switch, clicking from another window), the sidebar should react per the "Follow active tab" setting:
 
-- **Switch to space** (`activeTabSync == 'space'`): when the activated tab belongs to a different space, switch the sidebar to that space and scroll to show the active tab. No scroll if the tab is in the current space.
-- **Switch to space and show tab** (`activeTabSync == 'space-and-scroll'`): always scroll to show the active tab whenever it changes, regardless of space.
+- **`space-and-scroll`** (default): switch to the tab's space when needed, and always scroll to show the active tab. This matches the pre-setting behaviour.
+- **`space`**: switch to the tab's space when needed; scroll only when the space actually switched. No scroll for same-space tab switches.
+- **`off`**: sidebar stays put - no space switch, no scroll.
 
-A **crosshair toolbar button** was also added so the user can manually trigger "scroll to active tab" on demand, regardless of the setting.
+A **"show active tab" toolbar button** lets the user manually scroll to the active tab on demand, regardless of the setting. Its icon is a custom `TreeGutterIcon` (indented tree rows with a gutter arrow on the active row), defined inline in `Toolbar.tsx`.
+
+Setting stored in `chrome.storage.local` under `sidebar-follow-active-tab` (see `src/utils/followActiveTab.ts`). UI: select in the Settings dialog Behaviour tab.
 
 ## Two Types of Active Tab
 
-This is the core complexity. The sidebar has two kinds of tabs:
+The sidebar has two kinds of tabs:
 
-- **Regular tabs** - rendered in `TabList` with `data-tab-id="..."`, present in `visibleTabs`
-- **Arc-style bookmark tabs** - rendered in `BookmarkTree` with `data-bookmark-id="..."`, filtered OUT of `visibleTabs` because they are managed by `BookmarkTabsContext`
+- **Regular tabs** - rendered in `TabList` with `data-tab-id="..."`
+- **Arc-style bookmark tabs** - rendered in `BookmarkTree` with `data-bookmark-id="..."`, filtered OUT of TabList's `visibleTabs` because they are managed by `BookmarkTabsContext`
 
-This means `scrollToTab(tabId)` (which queries `[data-tab-id="..."]`) silently fails for bookmark tabs. The correct call is `scrollToBookmark(bookmarkId)`. The routing decision requires `getItemKeyForTab(tabId)` from `BookmarkTabsContext` - if the result starts with `"bookmark-"`, it is a bookmark tab.
+So a scroll must be routed: `getItemKeyForTab(tabId)` from `BookmarkTabsContext` returns `"bookmark-{id}"` for bookmark tabs → `scrollToBookmark(id)`; otherwise → `scrollToTab(tabId)`. Bookmark tabs may also sit inside collapsed folders, which must be expanded before the row exists in the DOM.
 
-Additionally, bookmark tabs may be inside collapsed folders, so scrolling alone is not enough - ancestor folders must be expanded first by walking the Chrome bookmarks API parent chain.
+## Why Earlier Attempts Failed
 
-## Bugs Fixed Along the Way
+Several attempts (all reverted) tried to detect "activation caused a space switch" inside React by comparing `activeSpace` / `visibleTabs` across renders with refs. That is unfixable at that layer:
 
-### Tab-close triggered spurious scroll in "Switch to space" mode
+- `activeSpace` (via background STATE_CHANGED message) and tab state (via `chrome.tabs.onActivated`) update in separate renders, in arbitrary order
+- when the active tab is a bookmark tab it never appears in `visibleTabs`, so ref-based edge detection corrupts permanently
+- one-shot `setTimeout` scrolls silently no-op when the target row isn't rendered yet
 
-After closing a tab, Chrome activates another tab in the same space. The `onActivated` event fired, the sidebar detected a "space change" (via a `pendingSpaceScrollRef`) and incorrectly scrolled.
+There was also a live bug: the reverted infrastructure wrote `sidebar-sync-active-tab = 'false'` on every Settings Apply, which background.ts read as "disable space switching". That key is now removed entirely.
 
-**Fix**: removed `pendingSpaceScrollRef`. Reverted to checking `spaceChanged` directly from `prevSpaceIdRef` in the auto-scroll effect.
+## Final Design
 
-### Crosshair button did nothing (element null)
+Single decision point, single scroll owner, self-healing scroll:
 
-`handleScrollToActiveTab` in `App.tsx` called `scrollToTab(tabId)` unconditionally. When the active tab was an Arc-style bookmark tab, `document.querySelector('[data-tab-id="..."]')` returned null. Confirmed via debug tracing in `scrollToDataElement`.
+1. **background.ts announces activations.** `onActivated` already decides whether to switch space (it computes `destinationSpaceId`). After that decision it broadcasts `TAB_ACTIVATED { windowId, tabId, spaceSwitched }` (see `spaceMessages.ts`). No React state inference needed.
+2. **One hook owns all auto-scroll.** `useFollowActiveTab(mode)` (mounted in `AppContainer`, inside all providers) listens for `TAB_ACTIVATED`, filters by window, and applies the mode: always scroll (`space-and-scroll`), scroll only when `spaceSwitched` (`space`), never (`off`). Routing uses the `getItemKeyForTab` pattern proven in `AudioTabsDropdown`. It also scrolls once when the sidebar opens (after bookmark associations load).
+3. **Scroll helpers retry.** `scrollToDataElement` polls every 100ms (up to 2s, newer request cancels older) until the element exists. This absorbs every timing issue in one place: space content still rendering, bookmark folder still expanding, message arriving before React commits.
+4. **Folder expansion is tied to scrolling, not activation.** While the bookmark row is missing, each retry of `scrollToBookmark` dispatches a `REVEAL_BOOKMARK_EVENT` window event; BookmarkTree listens and expands the bookmark's ancestor folders, then the retry loop finds the row. Re-dispatching per retry matters because during a space switch the destination BookmarkTree may not be mounted yet for the first attempts. Tying expansion to the scroll keeps folders untouched when the mode decides not to scroll (e.g. same-space switches in `space` mode), and makes the toolbar button work on manually collapsed folders.
+5. **Old scattered scrolls removed.** TabList's auto-scroll effect is deleted; BookmarkTree's activation-watching expand+scroll effect is replaced by the reveal listener above. `suppressAutoScrollRef` became dead and was removed - the saved-scroll-position restore on user space switches no longer fights an auto-scroll, because user switches don't produce `TAB_ACTIVATED` scrolls.
+6. **"Show active tab" button.** `Toolbar` renders inside the providers, so it directly uses `useScrollToActiveTab()` (queries the window's active tab, routes, scrolls). No forwardRef / imperative handle needed.
 
-**Fix**: route through `getItemKeyForTab` to call the correct scroll function.
+## Files
 
-## Changes Made
-
-### `src/utils/scrollHelpers.ts`
-
-- Added debug tracing (`console.log` in DEV mode) to `scrollToDataElement` to diagnose the null element issue.
-
-### `src/components/BookmarkTree.tsx`
-
-- **Extracted `scrollToActiveBookmark(activeItemKey, force?)`** from the `useEffect` body into a `useCallback`. The `force` parameter bypasses the `prevActiveItemKeyRef` change guard so external callers (crosshair button) can trigger scroll even when the active item key hasn't changed.
-- **Wrapped component with `forwardRef`** and exported `BookmarkTreeHandle` interface.
-- **Added `useImperativeHandle`** to expose `scrollToActiveBookmark` to the parent via a ref.
-
-### `src/components/TabList.tsx`
-
-- **Extracted `scrollToActiveRegularTab(currentSpaceId)`** from the `useEffect` body into a `useCallback`. The function closes over `visibleTabs` (which already filters out bookmark tabs) so no explicit bookmark check is needed.
-- `visibleTabs.find(t => t.active)` is called inside the function, not passed as a parameter, making it safe by construction.
-
-### `src/App.tsx`
-
-- **`SidebarContentProps`**: added `onScrollHandlerReady?: (fn: () => void) => void`
-- **`SidebarContent`**: 
-  - Added `bookmarkTreeRef` and `useBookmarkTabsContext()` usage
-  - Created unified `handleScrollToActiveTab`: queries active tab, uses `getItemKeyForTab` to route to `bookmarkTreeRef.current.scrollToActiveBookmark(key, force=true)` or `scrollToTab(tabId)` directly
-  - Registers the handler with parent via `onScrollHandlerReady` effect
-  - Passes `ref={bookmarkTreeRef}` to `<BookmarkTree>`
-- **`App()`**:
-  - Removed old broken `handleScrollToActiveTab` (called `scrollToTab` unconditionally, was outside providers)
-  - Added `scrollToActiveTabFn` state to hold the registered handler
-  - Wired `onScrollHandlerReady={(fn) => setScrollToActiveTabFn(() => fn)}` into `SwipeableContainer` (note: `() => fn` wrapper required because React `useState` treats a function argument as an updater)
-  - Toolbar now gets `onScrollToActiveTab={scrollToActiveTabFn}`
-
-## Ongoing Issues
-
-### "Switch to space" mode - scroll after space switch
-
-**Expected**: after selecting a tab in a different space with `activeTabSync == 'space'`, the sidebar switches space then scrolls to show the active tab.
-
-**Problem**: this is a race between two async React state updates:
-
-1. `activeSpace` updates first - `spaceChanged = true`, but `visibleTabs` hasn't updated yet so `activeTab = undefined`. The guard `if (activeTab && spaceChanged)` does not fire. `prevSpaceIdRef.current` is updated.
-2. `visibleTabs` updates - `activeTab` is now found, but `spaceChanged = false` (ref was already advanced in step 1). In `'space'` mode `scrollToActiveTab` is false so the `tabChanged` branch also doesn't fire. No scroll.
-
-**Attempted fix**: defer updating `prevSpaceIdRef.current` until an `activeTab` is found, so the `spaceChanged` signal persists across renders:
-
-```typescript
-if (activeTab)
-{
-  prevSpaceIdRef.current = currentSpaceId;
-  prevActiveTabIdRef.current = activeTab.id ?? null;
-}
-```
-
-**Status**: still not working. The race condition may be more complex - unclear whether `visibleTabs` and `activeSpace` updates land in the same render or separate renders, and whether the deferred ref update correctly preserves the `spaceChanged` signal long enough.
-
-### Things to investigate next
-
-- Add DEV logging to `scrollToActiveRegularTab` to trace what `spaceChanged`, `tabChanged`, and `activeTab` values are when the effect fires after a space switch
-- Check if `onActivated` in background.ts fires the space switch synchronously or if there are additional async gaps
-- Consider whether the auto-scroll for "Switch to space" mode should be driven by the background message response rather than a React effect watching state changes
+- `src/utils/followActiveTab.ts` - mode type, storage key, default, parser (shared by background and sidebar)
+- `src/utils/scrollHelpers.ts` - retrying scroll + `REVEAL_BOOKMARK_EVENT` dispatch
+- `src/utils/spaceMessages.ts` - `TAB_ACTIVATED` message
+- `src/background.ts` - mode-gated space switch + activation broadcast
+- `src/hooks/useFollowActiveTab.ts` - central scroll logic + crosshair helper
+- `src/App.tsx` - setting plumbing (`useChromeLocalStorage`)
+- `src/components/SettingsDialog.tsx` - mode select in Behaviour tab
+- `src/components/TabList.tsx`, `src/components/BookmarkTree.tsx` - old scroll paths removed
+- `src/components/Toolbar.tsx` - "show active tab" button with custom `TreeGutterIcon`

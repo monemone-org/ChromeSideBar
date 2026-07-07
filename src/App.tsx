@@ -39,7 +39,8 @@ import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkle
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
 import { useNewsCheck } from './hooks/useNewsCheck';
-import { useActiveTabSync } from './hooks/useActiveTabSync';
+import { useFollowActiveTab } from './hooks/useFollowActiveTab';
+import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY, DEFAULT_FOLLOW_ACTIVE_TAB_MODE, parseFollowActiveTabMode } from './utils/followActiveTab';
 import * as DropdownMenu from './components/menu/DropdownMenu';
 
 // Inner component that renders content for a single space
@@ -92,7 +93,6 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const lastScrollTopRef = useRef(0);
   const prevSpaceIdRef = useRef(activeSpaceId);
-  const suppressAutoScrollRef = useRef(false);
   const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Debounced onScroll handler — saves scroll position to session storage
@@ -139,15 +139,12 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         const savedScrollTop = result[restoreKey];
         if (savedScrollTop !== undefined && scrollContainerRef.current)
         {
-          suppressAutoScrollRef.current = true;
           setTimeout(() =>
           {
             if (scrollContainerRef.current)
             {
               scrollContainerRef.current.scrollTop = savedScrollTop;
             }
-            // Clear suppress flag after auto-scroll would have fired
-            setTimeout(() => { suppressAutoScrollRef.current = false; }, 300);
           }, 50);
         }
       });
@@ -186,7 +183,6 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         onShowToast={onShowToast}
         onPerformAction={onPerformAction}
         useSpaces={useSpaces}
-        suppressAutoScrollRef={suppressAutoScrollRef}
       />
       <TabList
         onPin={onPin}
@@ -480,14 +476,14 @@ interface AppContainerProps
   useSpaceColor: boolean;
   spaceColorAlpha: number;  // 1-100 percent
   fontSize: number;
-  syncActiveTab: boolean;
+  followActiveTab: FollowActiveTabMode;
   children: React.ReactNode;
 }
 
-const AppContainer: React.FC<AppContainerProps> = ({ useSpaceColor, spaceColorAlpha, fontSize, syncActiveTab, children }) =>
+const AppContainer: React.FC<AppContainerProps> = ({ useSpaceColor, spaceColorAlpha, fontSize, followActiveTab, children }) =>
 {
   const { activeSpace } = useSpacesContext();
-  useActiveTabSync(syncActiveTab);
+  useFollowActiveTab(followActiveTab);
   const [isDark, setIsDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches);
 
   // Keep isDark in sync when the OS theme changes
@@ -591,10 +587,10 @@ function App() {
     100,
     { parse: (v) => parseInt(v, 10), serialize: (v) => v.toString() }
   );
-  const [syncActiveTab, setSyncActiveTab] = useChromeLocalStorage(
-    'sidebar-sync-active-tab',
-    false,
-    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  const [followActiveTab, setFollowActiveTab] = useChromeLocalStorage<FollowActiveTabMode>(
+    FOLLOW_ACTIVE_TAB_KEY,
+    DEFAULT_FOLLOW_ACTIVE_TAB_MODE,
+    { parse: parseFollowActiveTabMode, serialize: (v) => v }
   );
   const [showFilterArea, setShowFilterArea] = useLocalStorage(
     'sidebar-show-filter-area',
@@ -724,7 +720,7 @@ function App() {
     setAudioQuickJump(newSettings.audioQuickJump);
     setUseSpaceColor(newSettings.useSpaceColor);
     setSpaceColorAlpha(newSettings.spaceColorAlpha);
-    setSyncActiveTab(newSettings.syncActiveTab);
+    setFollowActiveTab(newSettings.followActiveTab);
     setShowSettings(false);
   };
 
@@ -918,7 +914,7 @@ function App() {
       <SpacesProvider>
       <SelectionProvider>
       <UnifiedDndProvider>
-      <AppContainer useSpaceColor={useSpaceColor} spaceColorAlpha={spaceColorAlpha} fontSize={fontSize} syncActiveTab={syncActiveTab}>
+      <AppContainer useSpaceColor={useSpaceColor} spaceColorAlpha={spaceColorAlpha} fontSize={fontSize} followActiveTab={followActiveTab}>
       <SettingsDialog
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
@@ -933,7 +929,7 @@ function App() {
           audioQuickJump,
           useSpaceColor,
           spaceColorAlpha,
-          syncActiveTab,
+          followActiveTab,
         }}
         onApply={handleApplySettings}
       />

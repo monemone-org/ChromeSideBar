@@ -1,6 +1,7 @@
 import { Settings, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
 import React, { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
 import * as DropdownMenu from './menu/DropdownMenu';
+import { useScrollToActiveTab } from '../hooks/useFollowActiveTab';
 
 interface ToolbarProps
 {
@@ -28,6 +29,28 @@ interface ToolbarProps
 }
 
 
+// Custom icon for the "show active tab" button: indented tree rows with a
+// gutter arrow pointing at the active child row. Same 24x24 stroke-2 rounded
+// style as the lucide icons around it (design notes in docs/features/033).
+const TreeGutterIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M4 5h16" />
+    <path d="M11 12h9" />
+    <path d="M11 19h9" />
+    <path d="M3 12h3" />
+    <path d="m4.5 9.5 2.5 2.5-2.5 2.5" />
+  </svg>
+);
+
 const DEBOUNCE_MS = 300;
 
 export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
@@ -54,6 +77,9 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
 {
   const activeButtonClass = 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 active:bg-blue-200 dark:active:bg-blue-800';
   const inactiveButtonClass = 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 active:bg-gray-300 dark:active:bg-gray-500';
+
+  // "Show active tab" button: scroll the sidebar to the window's active tab
+  const scrollToActiveTab = useScrollToActiveTab();
 
   // Tab history navigation shortcuts
   const [prevTabShortcut, setPrevTabShortcut] = useState<string>('');
@@ -566,6 +592,15 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
             className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
           >
             <Volume2 size={16} />
+          </button>
+
+          {/* Scroll to active tab button */}
+          <button
+            onClick={scrollToActiveTab}
+            title="Show active tab"
+            className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
+          >
+            <TreeGutterIcon size={16} />
           </button>
 
           {/* Separator */}

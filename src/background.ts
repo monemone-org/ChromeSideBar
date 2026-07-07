@@ -1,4 +1,5 @@
 import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE, SPACES_STORAGE_KEY, Space } from './utils/spaceMessages';
+import { FOLLOW_ACTIVE_TAB_KEY, parseFollowActiveTabMode } from './utils/followActiveTab';
 import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup, restoreTabAssociationBackup } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
 import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
@@ -912,21 +913,34 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
   //   console.log(`[onActivated] destinationSpaceId=${destinationSpaceId}`);
   // }
 
-  // Switch sidebar to tab's Space (unless in "All" space, or the setting is disabled)
-  if (destinationSpaceId && spaceStateManager.getActiveSpace(activeInfo.windowId) !== 'all')
+  // Read the "Follow active tab" mode - 'off' disables space switching (and the
+  // sidebar skips scrolling)
+  const followResult = await chrome.storage.local.get([FOLLOW_ACTIVE_TAB_KEY]);
+  const followMode = parseFollowActiveTabMode(followResult[FOLLOW_ACTIVE_TAB_KEY]);
+
+  // Switch sidebar to tab's Space (unless in "All" space, or following is off)
+  let spaceSwitched = false;
+  const currentSpaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
+  if (followMode !== 'off' && destinationSpaceId && currentSpaceId !== 'all')
   {
-    const result = await chrome.storage.local.get(['sidebar-sync-active-tab']);
-    // Default to true when the key is absent (preserves pre-setting behaviour)
-    const syncEnabled = result['sidebar-sync-active-tab'] !== 'false';
-    if (syncEnabled)
+    if (currentSpaceId !== destinationSpaceId)
     {
-      const currentSpaceId = spaceStateManager.getActiveSpace(activeInfo.windowId);
-      if (currentSpaceId !== destinationSpaceId)
-      {
-        spaceStateManager.setActiveSpace(activeInfo.windowId, destinationSpaceId);
-      }
+      spaceStateManager.setActiveSpace(activeInfo.windowId, destinationSpaceId);
+      spaceSwitched = true;
     }
   }
+
+  // Announce the activation so the sidebar can scroll the tab into view.
+  // The sidebar decides whether to scroll based on the follow mode and spaceSwitched.
+  chrome.runtime.sendMessage({
+    action: SpaceMessageAction.TAB_ACTIVATED,
+    windowId: activeInfo.windowId,
+    tabId: activeInfo.tabId,
+    spaceSwitched
+  }).catch(() =>
+  {
+    // Sidepanel may not be open - ignore error
+  });
 
   // Track tab group (for auto-grouping feature)
   if (ENABLE_AUTO_GROUP_NEW_TABS)

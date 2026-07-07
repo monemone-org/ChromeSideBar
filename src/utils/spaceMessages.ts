@@ -98,6 +98,17 @@ export const SpaceMessageAction = {
    * Payload: { windowId: number, state: SpaceWindowState }
    */
   STATE_CHANGED: 'state-changed',
+
+  /**
+   * background.ts → useFollowActiveTab.ts
+   *
+   * Announce every tab activation, including whether it caused the sidebar
+   * to switch space. The sidebar decides whether to scroll the tab into view
+   * based on the "Follow active tab" setting.
+   *
+   * Payload: { windowId: number, tabId: number, spaceSwitched: boolean }
+   */
+  TAB_ACTIVATED: 'tab-activated',
 } as const;
 
 // Type for the action values

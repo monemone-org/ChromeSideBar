@@ -15,7 +15,6 @@ export type { DropPosition };
 import { useExternalUrlDropForTabs, TabDropTarget } from '../hooks/useExternalUrlDropForTabs';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SPEAKER_ICON_SIZE } from '../constants';
-import { scrollToTab } from '../utils/scrollHelpers';
 import { moveTabToSpace as moveTabToSpaceUtil } from '../utils/tabOperations';
 import { filterBookmarkableTabs, saveTabGroupAsBookmarkFolder } from '../utils/bookmarkOperations';
 
@@ -1413,30 +1412,8 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
   // Ref for end-of-list drop zone detection
   const endOfListRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to active tab when it changes or when space changes
-  const prevActiveTabIdRef = useRef<number | null>(null);
-  const prevSpaceIdRef = useRef<string | undefined>(undefined);
-  useEffect(() =>
-  {
-    const activeTab = visibleTabs.find(t => t.active);
-    const currentSpaceId = activeSpace?.id;
-    const spaceChanged = currentSpaceId !== prevSpaceIdRef.current;
-    const tabChanged = activeTab && activeTab.id !== prevActiveTabIdRef.current;
-
-    // Update refs
-    prevSpaceIdRef.current = currentSpaceId;
-    if (activeTab)
-    {
-      prevActiveTabIdRef.current = activeTab.id ?? null;
-    }
-
-    // Scroll if tab changed or space changed (and there's an active tab to scroll to)
-    if (activeTab && (tabChanged || spaceChanged))
-    {
-      // Scroll after DOM updates
-      scrollToTab(activeTab.id!, 50);
-    }
-  }, [visibleTabs, activeSpace]);
+  // Auto-scroll to the active tab is handled centrally by useFollowActiveTab
+  // (driven by TAB_ACTIVATED messages from background.ts)
 
   // Sensors are now configured in UnifiedDndContext
 

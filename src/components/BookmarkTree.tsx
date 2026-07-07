@@ -8,7 +8,7 @@ import { FolderPickerDialog } from './FolderPickerDialog';
 import { SpaceNavigatorDialog } from './SpaceNavigatorDialog';
 import { useExternalLinkDrop } from '../hooks/useExternalLinkDrop';
 import { getIndentPadding } from '../utils/indent';
-import { scrollToBookmark } from '../utils/scrollHelpers';
+import { scrollToBookmark, REVEAL_BOOKMARK_EVENT, RevealBookmarkDetail } from '../utils/scrollHelpers';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
 import { matchesFilter } from '../utils/searchParser';
 import { DropIndicators } from './DropIndicators';
@@ -763,12 +763,11 @@ interface BookmarkTreeProps {
   onShowToast?: (message: string) => void;
   onPerformAction?: (action: UndoableAction) => Promise<void>;
   useSpaces?: boolean;
-  suppressAutoScrollRef?: React.RefObject<boolean>;
 }
 
-export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true, suppressAutoScrollRef }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderBySegments, getAllBookmarksInFolder, getBookmarkSegments, getBookmark, error } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getActiveItemKey, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation, associateExistingTab } = useBookmarkTabsContext();
+  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation, associateExistingTab } = useBookmarkTabsContext();
   const { spaces, updateSpace, updateSpaceFolderPaths, windowId } = useSpacesContext();
   // Build lookup: folderId → Space (only when in "All" space)
   const folderIdToSpace = useMemo(() =>
@@ -1090,18 +1089,19 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     });
   }, [spaceFolder?.id, expandedStateLoaded]);
 
-  // Auto-expand and scroll to active bookmark when it changes
-  const prevActiveItemKeyRef = useRef<string | null>(null);
+  // Expand ancestor folders of a bookmark so its row exists in the DOM.
+  // Triggered by scrollToBookmark via REVEAL_BOOKMARK_EVENT whenever the row is
+  // missing; the scroll's retry loop then finds the row once expansion renders.
+  // Expansion is tied to scrolling (not tab activation) so the tree stays
+  // untouched when the "Follow active tab" mode decides not to scroll.
   useEffect(() =>
   {
-    const activeItemKey = getActiveItemKey();
-    // Only handle bookmark keys (not pinned sites)
-    if (activeItemKey?.startsWith('bookmark-') && activeItemKey !== prevActiveItemKeyRef.current)
+    const handleReveal = (event: Event) =>
     {
-      prevActiveItemKeyRef.current = activeItemKey;
-      const bookmarkId = activeItemKey.replace('bookmark-', '');
+      const bookmarkId = (event as CustomEvent<RevealBookmarkDetail>).detail?.bookmarkId;
+      if (!bookmarkId) return;
 
-      // Walk up parentId chain to collect ancestor folder IDs, then expand and scroll
+      // Walk up parentId chain to collect ancestor folder IDs, then expand
       (async () =>
       {
         const ancestorIds: string[] = [];
@@ -1135,20 +1135,12 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
             return next;
           });
         }
-
-        // Scroll after DOM updates from expansion (skip if scroll position is being restored)
-        if (!suppressAutoScrollRef?.current)
-        {
-          scrollToBookmark(bookmarkId, 150);
-        }
       })();
-    }
-    else if (!activeItemKey?.startsWith('bookmark-'))
-    {
-      // Reset ref when not a bookmark
-      prevActiveItemKeyRef.current = null;
-    }
-  }, [getActiveItemKey]);
+    };
+
+    window.addEventListener(REVEAL_BOOKMARK_EVENT, handleReveal);
+    return () => window.removeEventListener(REVEAL_BOOKMARK_EVENT, handleReveal);
+  }, []);
 
   // Unified DnD context
   const {

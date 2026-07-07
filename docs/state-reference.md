@@ -135,6 +135,15 @@ Array<{
 - Consumers: `src/contexts/SpacesContext.tsx`, `src/background.ts` (debug)
 - Instances: 1 per extension (shared across windows)
 
+### `sidebar-follow-active-tab`
+"Follow active tab" mode: how the sidebar reacts when Chrome activates a tab
+```typescript
+'off' | 'space' | 'space-and-scroll'  // default 'space-and-scroll'
+```
+- Owner: `src/App.tsx` (via `useChromeLocalStorage`)
+- Consumers: `src/background.ts` (space switching), `src/hooks/useFollowActiveTab.ts` (scrolling), `src/components/SettingsDialog.tsx`
+- Instances: 1 per extension (shared across windows)
+
 ### `pinnedSites`
 Pinned sites list
 ```typescript
