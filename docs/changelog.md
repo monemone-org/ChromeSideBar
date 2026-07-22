@@ -1,5 +1,10 @@
 ## Changelog
 
+## 1.0.326
+
+- New: "Follow active tab" setting (Settings > Behaviour) - choose whether switching tabs follows the sidebar to the tab's space, scrolls it into view, or does nothing
+- New: "Show active tab" toolbar button - jump to the currently active tab on demand
+
 ## 1.0.322
 
 - New: Space Navigator (Cmd+Shift+S / Ctrl+Shift+S) - type to search spaces or use 0-9 keys to jump directly

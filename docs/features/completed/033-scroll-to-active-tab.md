@@ -1,7 +1,7 @@
 ---
 created: 2026-07-05
 after-version: 1.0.322
-status: in-progress
+status: completed
 ---
 
 # 033 - Scroll to Active Tab (Follow Active Tab)
