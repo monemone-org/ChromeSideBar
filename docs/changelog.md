@@ -1,5 +1,10 @@
 ## Changelog
 
+## Latest Version
+
+- Fixed: tab history navigation (including keyboard shortcuts) and audio quick-jump now always take you to the tab, even when "Follow active tab" is Off
+- Fixed: "Show active tab" button now works when the active tab is in another space
+
 ## 1.0.326
 
 - New: "Follow active tab" setting (Settings > Behaviour) - choose whether switching tabs follows the sidebar to the tab's space, scrolls it into view, or does nothing

@@ -5,14 +5,16 @@ import { SpaceMessageAction } from '../utils/spaceMessages';
 import { FollowActiveTabMode } from '../utils/followActiveTab';
 import { scrollToBookmark, scrollToTab } from '../utils/scrollHelpers';
 
-// Shape of the TAB_ACTIVATED message broadcast by background.ts on every
-// tab activation (see spaceMessages.ts).
+// Shape of the TAB_ACTIVATED message broadcast by background.ts on tab
+// activation (see spaceMessages.ts). `explicit` marks activations the user
+// asked for directly, which always scroll.
 interface TabActivatedMessage
 {
   action?: string;
   windowId?: number;
   tabId?: number;
   spaceSwitched?: boolean;
+  explicit?: boolean;
 }
 
 // Returns a function that scrolls the sidebar row for a tab into view,
@@ -36,8 +38,9 @@ export function useScrollToTabItem(): (tabId: number) => void
   }, [getItemKeyForTab]);
 }
 
-// Returns a function that scrolls the sidebar to the window's currently
-// active tab. Used by the crosshair toolbar button.
+// Returns a function that scrolls the sidebar to the window's currently active
+// tab without changing the space. Used for the one-time scroll on sidebar open,
+// where switching space would override the space the user last chose.
 export function useScrollToActiveTab(): () => void
 {
   const { windowId } = useSpacesContext();
@@ -56,13 +59,45 @@ export function useScrollToActiveTab(): () => void
   }, [windowId, scrollToTabItem]);
 }
 
-// Implements the "Follow active tab" setting. background.ts announces every
-// tab activation with a TAB_ACTIVATED message that says whether the activation
-// switched the sidebar's space; this hook decides whether to scroll:
+// Returns a function that switches the sidebar to the active tab's space and
+// scrolls the tab into view. Used by the "show active tab" toolbar button, so it
+// works from any space and in any follow mode.
+//
+// Sends the same background message the audio quick-jump and history navigation
+// use; the scroll then arrives as an explicit TAB_ACTIVATED broadcast, so this
+// does not scroll by hand.
+export function useShowActiveTab(): () => void
+{
+  const { windowId } = useSpacesContext();
+
+  return useCallback(() =>
+  {
+    if (!windowId) return;
+    chrome.tabs.query({ active: true, windowId }, (tabs) =>
+    {
+      const tabId = tabs[0]?.id;
+      if (tabId === undefined) return;
+
+      chrome.runtime.sendMessage({ action: 'set-active-tab-and-space', tabId }).catch(() =>
+      {
+        // Background may be restarting - nothing useful to do
+      });
+    });
+  }, [windowId]);
+}
+
+// Implements the "Follow active tab" setting, and owns all auto-scrolling.
+// background.ts announces tab activations with a TAB_ACTIVATED message saying
+// whether the activation switched the sidebar's space, and whether the user
+// asked for it directly.
+//
+// Explicit activations (history navigation and its keyboard shortcuts, audio
+// quick-jump, "show active tab" button) always scroll. For passive ones, where
+// Chrome switched tabs on its own, the mode decides:
 // - 'space-and-scroll': scroll on every activation
 // - 'space': scroll only when the activation switched the space
 // - 'off': never scroll
-// Space switching itself is handled by background.ts (same setting).
+// Space switching itself is handled by background.ts.
 export function useFollowActiveTab(mode: FollowActiveTabMode): void
 {
   const { windowId } = useSpacesContext();
@@ -70,17 +105,24 @@ export function useFollowActiveTab(mode: FollowActiveTabMode): void
   const scrollToTabItem = useScrollToTabItem();
   const scrollToActiveTab = useScrollToActiveTab();
 
-  // Scroll on tab activation, per the mode
+  // Scroll on tab activation. Registered in every mode, including 'off',
+  // because explicit activations must still scroll.
   useEffect(() =>
   {
-    if (mode === 'off' || !windowId) return;
+    if (!windowId) return;
 
     const handleMessage = (message: TabActivatedMessage) =>
     {
       if (message.action !== SpaceMessageAction.TAB_ACTIVATED) return;
       if (message.windowId !== windowId || message.tabId === undefined) return;
 
-      if (mode === 'space-and-scroll' || message.spaceSwitched)
+      // The mode governs passive activations only; anything the user asked for
+      // directly (history navigation, audio jump, toolbar button) always scrolls
+      const shouldScroll = message.explicit
+        || mode === 'space-and-scroll'
+        || (mode === 'space' && message.spaceSwitched);
+
+      if (shouldScroll)
       {
         scrollToTabItem(message.tabId);
       }

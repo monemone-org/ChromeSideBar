@@ -1,7 +1,7 @@
 import { Settings, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, RotateCcwSquare, RotateCwSquare, HelpCircle, Search } from 'lucide-react';
 import React, { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
 import * as DropdownMenu from './menu/DropdownMenu';
-import { useScrollToActiveTab } from '../hooks/useFollowActiveTab';
+import { useShowActiveTab } from '../hooks/useFollowActiveTab';
 
 interface ToolbarProps
 {
@@ -78,8 +78,8 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   const activeButtonClass = 'bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 active:bg-blue-200 dark:active:bg-blue-800';
   const inactiveButtonClass = 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-700 active:bg-gray-300 dark:active:bg-gray-500';
 
-  // "Show active tab" button: scroll the sidebar to the window's active tab
-  const scrollToActiveTab = useScrollToActiveTab();
+  // "Show active tab" button: switch to the active tab's space and scroll to it
+  const showActiveTab = useShowActiveTab();
 
   // Tab history navigation shortcuts
   const [prevTabShortcut, setPrevTabShortcut] = useState<string>('');
@@ -596,7 +596,7 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
 
           {/* Scroll to active tab button */}
           <button
-            onClick={scrollToActiveTab}
+            onClick={showActiveTab}
             title="Show active tab"
             className={`p-1.5 rounded transition-all duration-150 focus:outline-none ${inactiveButtonClass}`}
           >

@@ -102,11 +102,18 @@ export const SpaceMessageAction = {
   /**
    * background.ts → useFollowActiveTab.ts
    *
-   * Announce every tab activation, including whether it caused the sidebar
-   * to switch space. The sidebar decides whether to scroll the tab into view
-   * based on the "Follow active tab" setting.
+   * Announce a tab activation so the sidebar can scroll the tab into view.
    *
-   * Payload: { windowId: number, tabId: number, spaceSwitched: boolean }
+   * Sent from two places:
+   * - the onActivated listener, for passive activations (Chrome switched tabs on
+   *   its own). The sidebar applies the "Follow active tab" setting to these.
+   * - setActiveTabAndSpace, for explicit user actions (history navigation and its
+   *   keyboard shortcuts, audio quick-jump, "show active tab" button), flagged
+   *   with explicit: true. The sidebar always scrolls for these, whatever the
+   *   setting says. This is the only scroll signal hotkey-driven navigation has,
+   *   since chrome.commands never reaches the sidebar.
+   *
+   * Payload: { windowId: number, tabId: number, spaceSwitched: boolean, explicit?: boolean }
    */
   TAB_ACTIVATED: 'tab-activated',
 } as const;

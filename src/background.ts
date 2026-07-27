@@ -811,11 +811,20 @@ async function getSpaceForTab(windowId: number, tabId: number): Promise<string |
 }
 
 /**
- * Activates a tab and switches to its space.
+ * Activates a tab and switches the sidebar to its space.
+ *
+ * Used by explicit user actions (audio quick-jump, audio tabs list, the
+ * "show active tab" toolbar button), so it always switches space regardless of
+ * the "Follow active tab" setting - that setting only governs passive following
+ * in the onActivated listener.
+ *
+ * The space switch is performed here rather than left to onActivated: when the
+ * requested tab is already the active one, Chrome fires no onActivated event, so
+ * relying on that side effect would silently do nothing. When the tab really
+ * does change, onActivated still fires but finds the space already correct.
  *
  * @param tabId - The tab to activate
- * @param skipHistory - If true, don't add to tab history
- * @returns Object with success status, spaceId, and optional error
+ * @returns Object with success status and optional error
  */
 async function setActiveTabAndSpace(
   tabId: number
@@ -823,15 +832,40 @@ async function setActiveTabAndSpace(
 {
   try
   {
-    // Activate the tab
-    // Our chrome.tabs.onActivatelistener will bring up its active space
-    // and add to history.
+    // Activate the tab. Our chrome.tabs.onActivated listener adds it to history.
     const tab = await chrome.tabs.update(tabId, { active: true });
 
     if (!tab.windowId)
     {
       return { success: false, error: 'Tab has no window' };
     }
+
+    // Switch the sidebar to the tab's space (unless in "All" space, where every
+    // tab is already visible)
+    const destinationSpaceId = await getSpaceForTab(tab.windowId, tabId);
+    const currentSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
+    let spaceSwitched = false;
+    if (destinationSpaceId && currentSpaceId !== 'all' && currentSpaceId !== destinationSpaceId)
+    {
+      spaceStateManager.setActiveSpace(tab.windowId, destinationSpaceId);
+      spaceSwitched = true;
+    }
+
+    // Tell the sidebar to scroll the tab into view. Flagged explicit so it
+    // scrolls regardless of the "Follow active tab" setting - callers here are
+    // deliberate user actions. This is the only scroll signal for keyboard
+    // shortcuts, which never reach the sidebar, and for the "show active tab"
+    // button, whose target is already active so onActivated never fires.
+    chrome.runtime.sendMessage({
+      action: SpaceMessageAction.TAB_ACTIVATED,
+      windowId: tab.windowId,
+      tabId,
+      spaceSwitched,
+      explicit: true
+    }).catch(() =>
+    {
+      // Sidepanel may not be open - ignore error
+    });
 
     return { success: true };
   }

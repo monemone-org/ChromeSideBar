@@ -46,7 +46,16 @@ Single decision point, single scroll owner, self-healing scroll:
 3. **Scroll helpers retry.** `scrollToDataElement` polls every 100ms (up to 2s, newer request cancels older) until the element exists. This absorbs every timing issue in one place: space content still rendering, bookmark folder still expanding, message arriving before React commits.
 4. **Folder expansion is tied to scrolling, not activation.** While the bookmark row is missing, each retry of `scrollToBookmark` dispatches a `REVEAL_BOOKMARK_EVENT` window event; BookmarkTree listens and expands the bookmark's ancestor folders, then the retry loop finds the row. Re-dispatching per retry matters because during a space switch the destination BookmarkTree may not be mounted yet for the first attempts. Tying expansion to the scroll keeps folders untouched when the mode decides not to scroll (e.g. same-space switches in `space` mode), and makes the toolbar button work on manually collapsed folders.
 5. **Old scattered scrolls removed.** TabList's auto-scroll effect is deleted; BookmarkTree's activation-watching expand+scroll effect is replaced by the reveal listener above. `suppressAutoScrollRef` became dead and was removed - the saved-scroll-position restore on user space switches no longer fights an auto-scroll, because user switches don't produce `TAB_ACTIVATED` scrolls.
-6. **"Show active tab" button.** `Toolbar` renders inside the providers, so it directly uses `useScrollToActiveTab()` (queries the window's active tab, routes, scrolls). No forwardRef / imperative handle needed.
+6. **Explicit user actions go through `setActiveTabAndSpace`.** That background function is the single funnel for every deliberate navigation: history prev/next (buttons *and* keyboard shortcuts), the history dropdown, audio quick-jump, the audio tabs list, and the "show active tab" toolbar button. It now does two things it used to leave to `onActivated`:
+
+   - **Switches the space itself.** Relying on the `onActivated` side effect was broken two ways: when the requested tab is already active (the toolbar button) Chrome fires no `onActivated` at all, so nothing happened; and `onActivated` is gated on the follow setting, so `off` silently disabled space switching for the audio jump and history navigation too.
+   - **Broadcasts `TAB_ACTIVATED` with `explicit: true`.** The sidebar always scrolls for these, whatever the mode. This is the only scroll signal keyboard-driven history navigation can get, because `chrome.commands` never reaches the sidebar - no amount of app-side code in `Toolbar.tsx` could cover it.
+
+   So the setting now governs *passive* activations only, and `useFollowActiveTab`'s listener stays registered even in `off` mode to receive explicit broadcasts.
+
+   Because the scroll is driven from the background, the hand-rolled scrolls in `App.tsx` (`handleJumpToAudioTab`) and `AudioTabsDropdown` were deleted. That also fixes a latent bug: `handleJumpToAudioTab` called `scrollToTab` directly with no bookmark routing, so jumping to an Arc-style bookmark audio tab never scrolled in any mode - `App()` sits outside the providers and cannot reach `getItemKeyForTab`.
+
+   `Toolbar` renders inside the providers and uses `useShowActiveTab()` - no forwardRef / imperative handle needed. The one-time scroll on sidebar open keeps using the scroll-only `useScrollToActiveTab()`: if the user manually switched to another space before closing the sidebar, reopening should not yank them back to the active tab's space.
 
 ## Files
 
@@ -54,7 +63,7 @@ Single decision point, single scroll owner, self-healing scroll:
 - `src/utils/scrollHelpers.ts` - retrying scroll + `REVEAL_BOOKMARK_EVENT` dispatch
 - `src/utils/spaceMessages.ts` - `TAB_ACTIVATED` message
 - `src/background.ts` - mode-gated space switch + activation broadcast
-- `src/hooks/useFollowActiveTab.ts` - central scroll logic + crosshair helper
+- `src/hooks/useFollowActiveTab.ts` - central scroll logic + `useShowActiveTab` for the toolbar button
 - `src/App.tsx` - setting plumbing (`useChromeLocalStorage`)
 - `src/components/SettingsDialog.tsx` - mode select in Behaviour tab
 - `src/components/TabList.tsx`, `src/components/BookmarkTree.tsx` - old scroll paths removed

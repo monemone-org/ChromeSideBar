@@ -1,8 +1,6 @@
 import { useCallback } from 'react';
 import { Globe, Volume2 } from 'lucide-react';
 import * as DropdownMenu from './menu/DropdownMenu';
-import { useBookmarkTabsContext } from '../contexts/BookmarkTabsContext';
-import { scrollToBookmark, scrollToTab } from '../utils/scrollHelpers';
 import { useFontSize } from '../contexts/FontSizeContext';
 
 export interface AudioTabsDropdownProps
@@ -16,33 +14,22 @@ export const AudioTabsDropdown = ({
   historyTabs
 }: AudioTabsDropdownProps) =>
 {
-  const { getItemKeyForTab } = useBookmarkTabsContext();
   const fontSize = useFontSize();
 
   const handleSelectTab = useCallback(async (tab: chrome.tabs.Tab) =>
   {
     if (tab.id === undefined) return;
 
-    // Use the new unified message to activate tab and switch space atomically
+    // Use the unified message to activate tab and switch space atomically
     // This handles: tab activation, space lookup, space switching, and history
-    // The background will send STATE_CHANGED message to update SpacesContext automatically
+    // The background sends STATE_CHANGED to update SpacesContext, and an
+    // explicit TAB_ACTIVATED that scrolls the tab (or bookmark) into view
     await chrome.runtime.sendMessage({
       action: 'set-active-tab-and-space',
       tabId: tab.id,
       skipHistory: false
     });
-
-    // Scroll to the tab/bookmark after space switch renders
-    const itemKey = getItemKeyForTab(tab.id!);
-    if (itemKey && itemKey.startsWith('bookmark-'))
-    {
-      scrollToBookmark(itemKey.substring('bookmark-'.length));
-    }
-    else
-    {
-      scrollToTab(tab.id!);
-    }
-  }, [getItemKeyForTab]);
+  }, []);
 
   // Render a tab row as dropdown item
   const renderTabItem = (tab: chrome.tabs.Tab, showSpeakerIcon: boolean) =>

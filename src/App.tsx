@@ -15,7 +15,6 @@ import { getWhatsNewSince, getRecentWhatsNew, ChangelogGroup } from './data/chan
 import { AudioTabsDropdown } from './components/AudioTabsDropdown';
 import { Toast } from './components/Toast';
 import { UndoableAction } from './actions/types';
-import { scrollToTab } from './utils/scrollHelpers';
 import { usePinnedSites, PinnedSite } from './hooks/usePinnedSites';
 import { useTabs } from './hooks/useTabs';
 import { useBookmarks, refreshAllBookmarks } from './hooks/useBookmarks';
@@ -841,12 +840,14 @@ function App() {
 
       if (targetTabId !== undefined)
       {
+        // Background switches space and sends an explicit TAB_ACTIVATED, which
+        // scrolls the tab (or its bookmark row) into view - App() sits outside
+        // the providers, so it cannot route the scroll itself
         await chrome.runtime.sendMessage({
           action: 'set-active-tab-and-space',
           tabId: targetTabId,
           skipHistory: false
         });
-        scrollToTab(targetTabId);
       }
     }
     catch { /* ignore */ }
