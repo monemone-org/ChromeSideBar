@@ -136,7 +136,7 @@ interface BookmarkRowProps {
   onOpenAsTabGroup?: (folderId: string, folderName: string) => void;
   onOpenAllTabs?: (folderId: string) => void;
   onOpenAllTabsInNewWindow?: (folderId: string) => void;
-  onMoveToSpace?: (bookmarkId: string) => void;
+  onMoveToSpace?: (bookmarkId: string, isFolder: boolean) => void;
   onMoveToTabs?: (bookmarkId: string) => void;
   onMoveBookmark?: (bookmarkId: string, isFolder: boolean) => void;
   getMatchingSpace?: (folderId: string) => Space | undefined;
@@ -462,7 +462,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               )}
               {onMoveSelectedToSpace && (
                 <ContextMenu.Item onSelect={onMoveSelectedToSpace}>
-                  <SquareStack size={14} className="mr-2" /> Move To Space...
+                  <SquareStack size={14} className="mr-2" /> Move Bookmarks to Space...
                 </ContextMenu.Item>
               )}
               <ContextMenu.Separator />
@@ -524,8 +524,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 </ContextMenu.Item>
               )}
               {onMoveToSpace && !isSpecialFolder && (
-                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
-                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id, true)}>
+                  <SquareStack size={14} className="mr-2" /> Move Folder to Space...
                 </ContextMenu.Item>
               )}
             </>
@@ -557,8 +557,8 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                 </ContextMenu.Item>
               )}
               {onMoveToSpace && (
-                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id)}>
-                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                <ContextMenu.Item onSelect={() => onMoveToSpace(node.id, false)}>
+                  <SquareStack size={14} className="mr-2" /> Move Bookmark to Space...
                 </ContextMenu.Item>
               )}
               {isLoaded && onMoveToTabs && (
@@ -970,7 +970,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     isOpen: boolean;
     bookmarkId: string | null;
     isMulti: boolean;
-  }>({ isOpen: false, bookmarkId: null, isMulti: false });
+    isFolder: boolean;
+  }>({ isOpen: false, bookmarkId: null, isMulti: false, isFolder: false });
   const [moveBookmarkDialog, setMoveBookmarkDialog] = useState<{
     isOpen: boolean;
     bookmarkId: string | null;
@@ -1320,19 +1321,19 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   }, [activeSpace, getBookmarkSegments, updateSpace]);
 
   // Open move to space dialog
-  const openMoveToSpaceDialog = useCallback((bookmarkId: string) =>
+  const openMoveToSpaceDialog = useCallback((bookmarkId: string, isFolder: boolean) =>
   {
-    setMoveToSpaceDialog({ isOpen: true, bookmarkId, isMulti: false });
+    setMoveToSpaceDialog({ isOpen: true, bookmarkId, isMulti: false, isFolder });
   }, []);
 
   const openMoveSelectedToSpaceDialog = useCallback(() =>
   {
-    setMoveToSpaceDialog({ isOpen: true, bookmarkId: null, isMulti: true });
+    setMoveToSpaceDialog({ isOpen: true, bookmarkId: null, isMulti: true, isFolder: false });
   }, []);
 
   const closeMoveToSpaceDialog = useCallback(() =>
   {
-    setMoveToSpaceDialog({ isOpen: false, bookmarkId: null, isMulti: false });
+    setMoveToSpaceDialog({ isOpen: false, bookmarkId: null, isMulti: false, isFolder: false });
   }, []);
 
   // Open move bookmark dialog
@@ -2202,7 +2203,11 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       <SpaceNavigatorDialog
         isOpen={moveToSpaceDialog.isOpen}
         onClose={closeMoveToSpaceDialog}
-        title="Move to Space"
+        title={moveToSpaceDialog.isMulti
+          ? "Move Bookmarks to Space"
+          : moveToSpaceDialog.isFolder
+            ? "Move Folder to Space"
+            : "Move Bookmark to Space"}
         hideAllSpace
         excludeSpaceId={activeSpace?.id}
         requireBookmarkFolder

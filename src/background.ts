@@ -784,19 +784,23 @@ async function findSpaceByName(name: string | undefined): Promise<Space | undefi
 let tabSpaceRegistry: TabSpaceRegistry;
 
 // Get space ID for a tab at navigation time
-// Priority: Tab registry > pending > Chrome group > 'all' for ungrouped
+// Priority: live Chrome group > tab registry > 'all' for ungrouped
 // Returns undefined for pinned tabs (don't switch space)
+//
+// The Chrome group is checked first because it's the tab's current ground
+// truth. The registry is a cache written once when an Arc-style bookmark tab
+// is created (see 'register-tab-space' in background.ts) and nothing updates
+// it if the tab is later moved to a different group - so it can only be
+// trusted as a fallback for tabs with no live group (pinned-site tabs, which
+// processGroupingRequest deliberately keeps ungrouped, and the brief window
+// right after a bookmark tab is created before auto-grouping completes).
 async function getSpaceForTab(windowId: number, tabId: number): Promise<string | undefined>
 {
-  // 1. Check tab registry
-  const registeredSpace = tabSpaceRegistry.getSpace(windowId, tabId);
-  if (registeredSpace) return registeredSpace;
-
   try
   {
     const tab = await chrome.tabs.get(tabId);
 
-    // 4. Check Chrome group
+    // 1. Check live Chrome group
     if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
     {
       const group = await chrome.tabGroups.get(tab.groupId);
@@ -806,7 +810,11 @@ async function getSpaceForTab(windowId: number, tabId: number): Promise<string |
   }
   catch { /* Tab may not exist */ }
 
-  // 5. Ungrouped normal tab → 'all'
+  // 2. Fall back to tab registry (no live group to consult)
+  const registeredSpace = tabSpaceRegistry.getSpace(windowId, tabId);
+  if (registeredSpace) return registeredSpace;
+
+  // 3. Ungrouped normal tab → 'all'
   return undefined;
 }
 
@@ -1073,14 +1081,20 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
     lastAudibleTracker.setLastAudibleTabId(tabId);
   }
 
+  // The url/groupId/favIconUrl handlers below all need the tab - fetch it once
+  // and share it, instead of each handler independently re-fetching
+  let tab: chrome.tabs.Tab | undefined;
+  if (changeInfo.url !== undefined || changeInfo.groupId !== undefined || changeInfo.favIconUrl !== undefined)
+  {
+    try { tab = await chrome.tabs.get(tabId); }
+    catch { /* tab may have been closed */ }
+  }
+
   // Update URL in local backup when a managed tab navigates
-  if (changeInfo.url)
+  if (changeInfo.url && tab?.windowId)
   {
     try
     {
-      const tab = await chrome.tabs.get(tabId);
-      if (!tab.windowId) return;
-
       const associations = await getTabAssociations(tab.windowId);
       const itemKey = associations[tabId];
       if (itemKey)
@@ -1091,14 +1105,45 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
     catch { /* tab may have been closed */ }
   }
 
-  // Scenario 5: update pinned site favicon when Chrome reports a new favIconUrl
-  if (changeInfo.favIconUrl)
+  // If a tracked Arc-style bookmark/pinned tab is dragged into a Chrome group
+  // for a different space than the one it's associated with, break the
+  // association - equivalent to the user choosing "Move to Tabs" and then
+  // moving a regular tab to that space, since the tab no longer lives in its
+  // bookmark's space. Once deassociated it's a regular tab, which gets its
+  // space from its live Chrome group directly (see getSpaceForTab), so there
+  // is nothing left in tabSpaceRegistry to keep in sync - just remove it.
+  if (changeInfo.groupId !== undefined && changeInfo.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && tab?.windowId)
   {
     try
     {
-      const tab = await chrome.tabs.get(tabId);
-      if (!tab.url) return;
+      const registeredSpaceId = tabSpaceRegistry.getSpace(tab.windowId, tabId);
+      if (registeredSpaceId)
+      {
+        const group = await chrome.tabGroups.get(changeInfo.groupId);
+        const space = await findSpaceByName(group.title);
 
+        if (space?.id !== registeredSpaceId)
+        {
+          tabSpaceRegistry.unregister(tab.windowId, tabId);
+          chrome.runtime.sendMessage({
+            action: SpaceMessageAction.DEASSOCIATE_TAB,
+            windowId: tab.windowId,
+            tabId
+          }).catch(() =>
+          {
+            // Sidepanel may not be open - ignore error
+          });
+        }
+      }
+    }
+    catch { /* tab may have been closed */ }
+  }
+
+  // Scenario 5: update pinned site favicon when Chrome reports a new favIconUrl
+  if (changeInfo.favIconUrl && tab?.url)
+  {
+    try
+    {
       let tabHostname: string;
       try { tabHostname = new URL(tab.url).hostname; }
       catch { return; }

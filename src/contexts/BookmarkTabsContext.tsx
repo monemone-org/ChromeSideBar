@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
+import { SpaceMessageAction } from '../utils/spaceMessages';
 import {
   getTabAssociations,
   storeTabAssociation,
@@ -279,6 +280,29 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return () =>
     {
       chrome.tabs?.onDetached?.removeListener(handleTabDetached);
+    };
+  }, [currentWindowId, removeLocalTabAssociation]);
+
+  // Listen for background telling us a tracked tab was dragged into a
+  // different space's Chrome group - break the association, same as the user
+  // manually choosing "Move to Tabs" (see DEASSOCIATE_TAB in spaceMessages.ts)
+  useEffect(() =>
+  {
+    if (currentWindowId === null) return;
+
+    const handleMessage = (message: { action?: string; windowId?: number; tabId?: number }) =>
+    {
+      if (message.action !== SpaceMessageAction.DEASSOCIATE_TAB) return;
+      if (message.windowId !== currentWindowId || message.tabId === undefined) return;
+
+      removeLocalTabAssociation(message.tabId, currentWindowId);
+    };
+
+    chrome.runtime.onMessage.addListener(handleMessage);
+
+    return () =>
+    {
+      chrome.runtime.onMessage.removeListener(handleMessage);
     };
   }, [currentWindowId, removeLocalTabAssociation]);
 

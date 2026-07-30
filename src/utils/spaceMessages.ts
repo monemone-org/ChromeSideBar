@@ -116,6 +116,19 @@ export const SpaceMessageAction = {
    * Payload: { windowId: number, tabId: number, spaceSwitched: boolean, explicit?: boolean }
    */
   TAB_ACTIVATED: 'tab-activated',
+
+  /**
+   * background.ts → BookmarkTabsContext.tsx
+   *
+   * A tracked Arc-style bookmark/pinned tab was dragged into a Chrome group
+   * belonging to a different space than the one it's associated with. The
+   * sidebar breaks the bookmark association for this tab - equivalent to the
+   * user choosing "Move to Tabs" and then moving a regular tab to that space -
+   * since the tab no longer lives in its bookmark's space.
+   *
+   * Payload: { windowId: number, tabId: number }
+   */
+  DEASSOCIATE_TAB: 'deassociate-tab',
 } as const;
 
 // Type for the action values

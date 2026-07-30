@@ -284,7 +284,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
               )}
               {onMoveSelectedToSpace && (
                 <ContextMenu.Item onSelect={onMoveSelectedToSpace}>
-                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                  <SquareStack size={14} className="mr-2" /> Move Tabs to Space...
                 </ContextMenu.Item>
               )}
               {onMoveSelectedToNewWindow && (
@@ -333,7 +333,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           )}
           {onOpenMoveToSpaceDialog && (
             <ContextMenu.Item onSelect={() => onOpenMoveToSpaceDialog(tab.id!)}>
-              <SquareStack size={14} className="mr-2" /> Move to Space...
+              <SquareStack size={14} className="mr-2" /> Move Tab to Space...
             </ContextMenu.Item>
           )}
           {onMoveToNewWindow && (
@@ -655,7 +655,7 @@ const TabGroupHeader = forwardRef<HTMLDivElement, TabGroupHeaderProps>(({
               )}
               {onMoveSelectedToSpace && (
                 <ContextMenu.Item onSelect={onMoveSelectedToSpace}>
-                  <SquareStack size={14} className="mr-2" /> Move to Space...
+                  <SquareStack size={14} className="mr-2" /> Move Tabs to Space...
                 </ContextMenu.Item>
               )}
               {onMoveSelectedToNewWindow && (
@@ -2724,7 +2724,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
       <SpaceNavigatorDialog
         isOpen={moveToSpaceDialog.isOpen}
         onClose={closeMoveToSpaceDialog}
-        title="Move to Space"
+        title="Move Tab to Space"
         hideAllSpace
         excludeSpaceId={moveToSpaceDialog.currentSpaceId}
         onSelectSpace={handleMoveToSpace}
@@ -2788,7 +2788,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
       <SpaceNavigatorDialog
         isOpen={moveToSpaceMultiDialog.isOpen}
         onClose={() => setMoveToSpaceMultiDialog({ isOpen: false })}
-        title="Move to Space"
+        title="Move Tabs to Space"
         hideAllSpace
         excludeSpaceId={activeSpace?.id}
         onSelectSpace={handleMoveSelectedToSpace}
