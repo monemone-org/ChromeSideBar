@@ -1,0 +1,1574 @@
+{
+  "version": 1,
+  "exportedAt": "2026-07-31T17:57:36.409Z",
+  "pinnedSites": [
+    {
+      "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADFklEQVR4nKyWQWsTQRTH3+xu0mprmloKtlbE0pNg8VREoaAnybVnD9700IOIIGhPrSCIfgLBk19AoQgFRQ9FPPZQkJaKtGIE09TYmDTJ7vj+u9k0yc4mO5s8GHh52Z3ff96bebMWxbSZVTlwmCzMwh+upDa2M+KIYphBMWxqXZ74mygsEYk3GPARoxgmSNMAqhYLj4QQD/hnsh6uSCmfJYZST/auipLGdHoZCIHDkojhP91MRBbQAd6TiEgCIsBji+gqQAMeS4SIC7dl67NmcKZIG1PEgcMuDgm6Puol8EPeoc2iVE3TVYTQhWPlV0YMej5j0dSA9/rekaT72zX6/MfRzoShA4cBsDBuuHAbgvAO+4iZ6nx23BOGDty3k4aIFIsiwtCFowTv9h0qOscx+IjZkrRFGDpwGNK8lrfp5Q/bBWLAR8zs3tgDIgzcaprnnMpc+PWCQ1WGY8BHLKI1RIBt8U22wIHFqHAd80uiyAxELDJ702LnLgdS1GdLJwTNDnnkDe4RuYpsF5IC22JnjvpoWPW5QUHLFyyaG/H2+BfuD0vfarRbDoiYwxN9TT0At86Ybpcc5Nkx4COmKkWsL6JudjYplLGEghYqAKnECxhdznfLO5PcFacGgwK+ltQnxVJNBGhm1KSbpz19aDI451WHOppf+0vDgi8AblA2udLX9m3x+pfynggKwCoAX5625KjlXVbX0oakHRJvf4c3Gx+OegP+6qdN/Lz79FZJhooPCAAAKwfczxj8+bSg1Zx6knE+cncmzRb4i91aI+WdOqSyBP+cYNHDLhtm08PzJk0MiBY4VhyhNQc3IUqwmnMoXyNpQj15V+7lU4IyY2ZgAkAAt9vgUU1Zgk8HDt3bqorMmOGuHHDc+VgpDHuhXXQcuFKAb/jMghDYfNqglWmrIeKQiaUmUFw4LLQPNNcPYh7v1NxPL4iAmBv178EyQ9/ntW7DaALaxbSLuD1huhuwV4OAbJQH20Xgt9m7gCwLECtw6t8WVfYrYYOBlY8HTvXpd5sKfEqw+SqO1+14r3Z81x9NnCzY/wEAAP//ZyD5qAAAAAZJREFUAwBHddqzyyRu8gAAAABJRU5ErkJggg==",
+      "id": "pin_1772083043319_vxhimp4kz",
+      "title": "Overview – Home Assistant",
+      "url": "https://homeassistant.home.flui.ca/lovelace/ac"
+    },
+    {
+      "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAClUlEQVR4nOxVS2gTURS9mSSlsZJaK5ZiIi5sFav4AcG4ip9FF92pdVkqui90p6KtoDtrdxaykC6tWxE/JLhq0JVCo6AQNRMUpVU70EZik/GdmzxIMpNMpmkyCD2LzOTOvHfOPfe+O57wncyIoq9NE7m2URPxPpWsDL3UXblRj6LnJppNXgVhl+5+4BE3e8g5hD3kMDYFVBUQvdpBG4m16DGyJaBV+D8EaKs5in9YodTPLO3e3kYHgu0U7G4re65l8qZrA91eakiAupSl81Of+FqK6ZEADYe6+P7u4+8UiS0Z1kLkq9v7qCEBY7NpJr9yegeF+jvYiUhskW7MfaPBw37yb3HTQvoPvzs+tLNsrd/nttq+tgAQg/CkIJ4c7uXY4BG/+NU54/mPKyxCW83TgCjL+FAP2UVNAbDw+fU+6vQpZXFkXSZU9Eaob33H1rIEBwPthlhCLVgeEAK5AbkJc3RuKkkJUY5OYT3KdetCr0FsJRSyCZTl6VtNuONlccuCGECpEukMlwslmov/otGZL5b72Z4Dl+6n+CrrLTsdotCoAByBGxA1X+yhaqjbAWw6NqtyliCXR1CKkOQAbL98pvA/oWZq7luXA7AdmYMcRKXHbUHEkGmof6tpv2jFElWDpQMgwCCSmcvjKAHym2ImPBI1r4wDA0Ffzf0tHQA57IfNcAKDSQK1vXiiS0zCHxSJLtIyv+flwfTsTaFRMScaEgByAORqPGt4jl54cW2vEJrkzi8Vd0+MaytYCvg6c8jqleJJ2M+ZS7eCFh+hugXYgVkTtlTAeuC8gHd/z5o+OP5wF20knkSOGmK67pp0zAGQ98ReTzgiQJLjvuUCSskBRSf9N7UIleQsIE/5U+L6mZoMM3LgHwAAAP//e4wABwAAAAZJREFUAwC2bRfymEQ1/QAAAABJRU5ErkJggg==",
+      "id": "pin_1772083043319_qmt12yq7y",
+      "title": "Google Calendar - Week of December 28, 2025",
+      "url": "https://calendar.google.com/calendar/u/1/r"
+    },
+    {
+      "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADIElEQVR4nOxXzVITQRDunpkQEpIU4cBFCD6AVR6sssonEHgAn0U85IcLPosPIHjzZpVHy5snNurBUqIkJITd6bZndrNFCAmQxHihi6kGqnb3m6//vjYwxr7srJVyWDrWCKuWmAER4SZjZgQmrZSOLB1sHAWvGEDJgzTuEQXzNAHJcgSvXdJq73inUnUf5wnfmS8AYUBQKMugLpioaHSj+bzSSEDgvwcQh8mRIJFAOLc2ymd09Xi7UkcH75rvTQbgbuRvlfjbnYQJQBI2zolsIaNrzRjECBNjAXTtiUVArfx1UDk/xVECRV9YivImBcFvAHRKmsv2qx/v9zQVslw0auUjKlhlAsu3qYIrhuyrR0lhrLj8zGmle6GtPzgKGo4JBwa/7j5swRXa3ZWlbjrYbT/LG263YHpjhaWsKX3WzEUh32Y1mm5E+5uHQc3lhHF1PvSAHC0IQubMr5OT1sYnOIMZ7PsTCO160fcRYlLnFqIVrarNnYrFw2Df+CYzjFkSSdgDiArrZQMwy/0BeuVyZslXhS9R917Vs0RZpRrN3UrOjHQ4n7/+f3eO+UTz75RskoR2dSIMUwbVSwOLNIa4HbiMFBcJoMUCcDYIR+xh8QAGIBL/fwBcsnsA9wBUMjoh9Qs26YQQz/C0XS7WlPFjGzhtDggLBaFCptcZByKWMuTb5byZmKCs1ObbYK9PVBOxkMjntE1yrtUKYUbr/GhF8jbjpJX7cf7ywYFul/ncyBtV7VuWGQHaIrb70ekjGeKnMKWV5XQjLHK++EG0XyEe9MPT1/8xkEfftiu1XEbXZV5bv2OgOhMmaFo5JmJMS1B/R3T2tNPHdjZnRzSoSVB4oei0mghHdALygigSFEUfmCkygiEusUjY/cM/Tx+/v15ZpYhegAhPwbJ5FNS7ZBuy2UiBgBNMJIfveoRtSrzN6zU9DugQJYPlQRKz3gltY1l2POVVTBI7F4nY33zg8u/jbSQmg+VhyzER2v1lrY1TiJwsG/Mu0WsXk5SJd0GtHdnakuwlop7J94kpEvLOABIQfqvdEuksm82BK1tMG8r87C8AAAD//zhp/7QAAAAGSURBVAMAWmr4npxAH6gAAAAASUVORK5CYII=",
+      "id": "pin_1772083043319_rvur3ii3l",
+      "title": "Login | OPNsense",
+      "url": "https://router.home.flui.ca/"
+    },
+    {
+      "favicon": "data:image/png;base64,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",
+      "id": "pin_1772083043319_z5cligft0",
+      "title": "pve - Proxmox Virtual Environment",
+      "url": "https://pve.home.flui.ca:8006/"
+    },
+    {
+      "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAADFklEQVR4nKyWQWsTQRTH3+xu0mprmloKtlbE0pNg8VREoaAnybVnD9700IOIIGhPrSCIfgLBk19AoQgFRQ9FPPZQkJaKtGIE09TYmDTJ7vj+u9k0yc4mO5s8GHh52Z3ff96bebMWxbSZVTlwmCzMwh+upDa2M+KIYphBMWxqXZ74mygsEYk3GPARoxgmSNMAqhYLj4QQD/hnsh6uSCmfJYZST/auipLGdHoZCIHDkojhP91MRBbQAd6TiEgCIsBji+gqQAMeS4SIC7dl67NmcKZIG1PEgcMuDgm6Puol8EPeoc2iVE3TVYTQhWPlV0YMej5j0dSA9/rekaT72zX6/MfRzoShA4cBsDBuuHAbgvAO+4iZ6nx23BOGDty3k4aIFIsiwtCFowTv9h0qOscx+IjZkrRFGDpwGNK8lrfp5Q/bBWLAR8zs3tgDIgzcaprnnMpc+PWCQ1WGY8BHLKI1RIBt8U22wIHFqHAd80uiyAxELDJ702LnLgdS1GdLJwTNDnnkDe4RuYpsF5IC22JnjvpoWPW5QUHLFyyaG/H2+BfuD0vfarRbDoiYwxN9TT0At86Ybpcc5Nkx4COmKkWsL6JudjYplLGEghYqAKnECxhdznfLO5PcFacGgwK+ltQnxVJNBGhm1KSbpz19aDI451WHOppf+0vDgi8AblA2udLX9m3x+pfynggKwCoAX5625KjlXVbX0oakHRJvf4c3Gx+OegP+6qdN/Lz79FZJhooPCAAAKwfczxj8+bSg1Zx6knE+cncmzRb4i91aI+WdOqSyBP+cYNHDLhtm08PzJk0MiBY4VhyhNQc3IUqwmnMoXyNpQj15V+7lU4IyY2ZgAkAAt9vgUU1Zgk8HDt3bqorMmOGuHHDc+VgpDHuhXXQcuFKAb/jMghDYfNqglWmrIeKQiaUmUFw4LLQPNNcPYh7v1NxPL4iAmBv178EyQ9/ntW7DaALaxbSLuD1huhuwV4OAbJQH20Xgt9m7gCwLECtw6t8WVfYrYYOBlY8HTvXpd5sKfEqw+SqO1+14r3Z81x9NnCzY/wEAAP//ZyD5qAAAAAZJREFUAwBHddqzyyRu8gAAAABJRU5ErkJggg==",
+      "id": "pin_1772083043319_3pu3ely1n",
+      "title": "Overview – Home Assistant",
+      "url": "https://homeassistant.home.flui.ca/lovelace/ac"
+    },
+    {
+      "customIconName": "video",
+      "favicon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%221em%22%20height%3D%221em%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%222%22%3E%3Cpath%20d%3D%22m16%2013l5.223%203.482a.5.5%200%200%200%20.777-.416V7.87a.5.5%200%200%200-.752-.432L16%2010.5%22%2F%3E%3Crect%20width%3D%2214%22%20height%3D%2212%22%20x%3D%222%22%20y%3D%226%22%20rx%3D%222%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E",
+      "id": "pin_1772083043319_hfo1ugsnp",
+      "title": "Live - Frigate",
+      "url": "https://frigate2.home.flui.ca/"
+    },
+    {
+      "emoji": "😀",
+      "id": "pin_1772083043319_0tx3v1hs7",
+      "title": "Chatbot Ollama",
+      "url": "http://localhost:3000/"
+    },
+    {
+      "id": "pin_1772083043319_u792f3pv4",
+      "title": "Backrest",
+      "url": "http://localhost:9898/#/repo/homeapplem1b-pvefileserver"
+    },
+    {
+      "customIconName": "code",
+      "favicon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%221em%22%20height%3D%221em%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cpath%20fill%3D%22none%22%20stroke%3D%22%236b7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%222%22%20d%3D%22m16%2018l6-6l-6-6M8%206l-6%206l6%206%22%2F%3E%3C%2Fsvg%3E",
+      "id": "pin_1772083043319_6eqqcsmza",
+      "title": "Index of /repo/",
+      "url": "https://static.home.flui.ca/repo/"
+    },
+    {
+      "favicon": "data:image/png;base64,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",
+      "id": "pin_1772083043319_gi3szrd6u",
+      "title": "Home - Google Drive",
+      "url": "https://drive.google.com/drive/u/1/home"
+    },
+    {
+      "customIconName": "alarm-clock-check",
+      "favicon": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%221em%22%20height%3D%221em%22%20viewBox%3D%220%200%2024%2024%22%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23ec4899%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%222%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2213%22%20r%3D%228%22%2F%3E%3Cpath%20d%3D%22M5%203L2%206m20%200l-3-3M6.38%2018.7L4%2021m13.64-2.33L20%2021M9%2013l2%202l4-4%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E",
+      "iconColor": "#ec4899",
+      "id": "pin_1772083043319_cijfjxg5v",
+      "title": "Portainer",
+      "url": "https://pvefileserver.home.flui.ca:9443/#!/auth"
+    },
+    {
+      "favicon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAERklEQVR4nMRXbUxbVRh+enspLW2hQKG05aN8xjGEoJvWAJNkiaBMFyMGP4NZjCYmLlF/TOOS/fGnJsb98of/NMQEY/xh40cQP5KtLjgNKiOBrYN0dIUOkNZ+l3rey1q49F56i0yf5Dan57znPM9573vO+14+nU47oABfuW/i069vAsV5DGPAyEANBp01UAIVE5Dey8AXiMLl9sP95zoSyU0oQRHPwXnYhEecFljNWuxLQCy+ic9+WMLEVACpzT01ykLNqXD8iBlPPGhDsYZTLsB3K4rz4x4ssd0fBGzMC68ON8Jaqc0vwOML472xqwhFkjhIGHQ83ni6GY3WElG/yC+04ztBTqA1ae3dXs0KoHdObr8T5DtFEAdx5QgY/35JePdKIQTYvWbhobZSEAdxZcDTz42VKL77JaB4ES2L6JdPOtDdVib872gqxYdfXEc0ruyYEld/txn2Ku2WB7684Fd81EyGIpx5rjVLTqA29dGYEhAXcRK4YDiJqdl1RRPrqnU4O9qWE8kE6jv7QptgowTESdzc9PwG4gpuuHaHEW8+3wqzSSNrYy7T4C1mQ7b5QJzEzc1cD+Y17uuqxOtPNUOvVYv6Q+G48OxECbMhW5qTD8TNL/ojsgYqFtyPH7Pi0Z4aob0TE+5r+OCTn4X26Wfvx3FnU3aMV6twaqgeVcxbn7PrPA3pU0LcXOCvuOQgLfLiiQY81ptLTvj1ig+bLJjoobaUeJp76kSdsJYUiJuLxFKSg4cbjejprEA8kcLcwq2c8ZGHO3Df3XbhofZueP0bwty+riq0WFKQynnErRp957Lk+SPVR9uKMTu3gKMdNjwz1IlC8O2Fq3D9NIem2nJMXvJAxZfAUF7LPCP2BqfVqCUXSKbSuDgTweJyAvvF/OIqvmFCqI6IR0MIrXlFniBuno6Vd1kmEJlaY7kdRcWGnKEfpxbY4vPCjgZ6WtB7Tz3yISMi4wni5hssOnkBt0XwReLLhfYw5vpdeM+EwFoYPUyAkoywUwRxc4ccBhQMpiCR3A5eoV1A0ZQRcahBD66zuZTVcMqz2YEhFWFJzACuVF+EI3eZ8F/D2VUHk/F2Nhx6wLJnTl/wh5EuwMVke8Ujn96J68mBdqEt1AO1LIP1d1diQqYm+G1uA+9+/AfsFdtJ6+9IQtQec01n/3u863BPeyGHwd4WOGxbXs8WpVRMnPtoFv7VmOzESDCAcHAF/wa2aiPePzMInXardsiWZFTlnB5ugl6nlp2sM5qhL7NgvzCUaPD2S8ey5CIBBCqRXhtpFlKqHLT6CuhNVhQKvU6Dc6/0o95aJuqX/DCh0vn8+DVWQMq/jnhkA6H1JaQVRKe9upTtvA91u8hlBRCi8RTGJ32YvCz/aZaIhRBc9cqKoGgf7G3F6MkukdsVCcjAuxKB6+IyLs2sCQlKWsQNJmL7hPBqTsgNww+1o8G29x3zP1yBYvwDAAD//+jnKR4AAAAGSURBVAMAqd7S3tNzfZUAAAAASUVORK5CYII=",
+      "id": "pin_1772083043319_1do4v1lnr",
+      "title": "Welcome to home.flui.ca",
+      "url": "https://home.flui.ca"
+    }
+  ],
+  "bookmarks": [
+    {
+      "children": [],
+      "dateAdded": 1772080987607,
+      "folderType": "bookmarks-bar",
+      "id": "1",
+      "index": 0,
+      "parentId": "0",
+      "syncing": false,
+      "title": "Bookmarks Bar"
+    },
+    {
+      "children": [
+        {
+          "children": [
+            {
+              "dateAdded": 1772081058233,
+              "id": "6",
+              "index": 0,
+              "parentId": "5",
+              "syncing": false,
+              "title": "ChatGPT",
+              "url": "https://chat.openai.com/auth/login"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058237,
+                  "id": "8",
+                  "index": 0,
+                  "parentId": "7",
+                  "syncing": false,
+                  "title": "My Drive > Backups",
+                  "url": "https://drive.google.com/drive/u/1/folders/1M_H_sTrbfcSCNFuq2r0ZD9chGDm03Elp"
+                },
+                {
+                  "dateAdded": 1772081058238,
+                  "id": "9",
+                  "index": 1,
+                  "parentId": "7",
+                  "syncing": false,
+                  "title": "OPNsense",
+                  "url": "https://router.home.flui.ca/ui/diagnostics/log/core/system"
+                },
+                {
+                  "dateAdded": 1772081058238,
+                  "id": "10",
+                  "index": 2,
+                  "parentId": "7",
+                  "syncing": false,
+                  "title": "pve",
+                  "url": "https://pve.home.flui.ca:8006/#v1:0:18:4:=directory::::::21"
+                },
+                {
+                  "dateAdded": 1772081058238,
+                  "id": "11",
+                  "index": 3,
+                  "parentId": "7",
+                  "syncing": false,
+                  "title": "pbs - Proxmox Backup Server",
+                  "url": "https://pbs.home.flui.ca:8007/#pbsXtermJsConsole"
+                },
+                {
+                  "dateAdded": 1772081058238,
+                  "id": "12",
+                  "index": 4,
+                  "parentId": "7",
+                  "syncing": false,
+                  "title": "hass",
+                  "url": "https://homeassistant.home.flui.ca/lovelace/home"
+                },
+                {
+                  "dateAdded": 1772081058238,
+                  "id": "13",
+                  "index": 5,
+                  "parentId": "7",
+                  "syncing": false,
+                  "title": "cockpit",
+                  "url": "https://10.54.81.34:9090/system"
+                },
+                {
+                  "dateAdded": 1772081058238,
+                  "id": "14",
+                  "index": 6,
+                  "parentId": "7",
+                  "syncing": false,
+                  "title": "Restic",
+                  "url": "https://restic.readthedocs.io/en/stable/020_installation.html"
+                },
+                {
+                  "dateAdded": 1772081058238,
+                  "id": "15",
+                  "index": 7,
+                  "parentId": "7",
+                  "syncing": false,
+                  "title": "Frigate",
+                  "url": "http://10.54.81.29:5000/"
+                }
+              ],
+              "dateAdded": 1772081058237,
+              "dateGroupModified": 1772081058238,
+              "id": "7",
+              "index": 1,
+              "parentId": "5",
+              "syncing": false,
+              "title": "HomeServers"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058239,
+                  "id": "17",
+                  "index": 0,
+                  "parentId": "16",
+                  "syncing": false,
+                  "title": "ZFS - ArchWiki",
+                  "url": "https://wiki.archlinux.org/title/ZFS#Encryption_in_ZFS_using_dm-crypt"
+                },
+                {
+                  "dateAdded": 1772081058239,
+                  "id": "18",
+                  "index": 1,
+                  "parentId": "16",
+                  "syncing": false,
+                  "title": "A quick-start guide to OpenZFS native encryption - Ars Technica",
+                  "url": "https://arstechnica.com/gadgets/2021/06/a-quick-start-guide-to-openzfs-native-encryption/"
+                }
+              ],
+              "dateAdded": 1772081058239,
+              "dateGroupModified": 1772081058239,
+              "id": "16",
+              "index": 2,
+              "parentId": "5",
+              "syncing": false,
+              "title": "zfs"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058239,
+                  "id": "20",
+                  "index": 0,
+                  "parentId": "19",
+                  "syncing": false,
+                  "title": "PCI Passthrough - Proxmox VE",
+                  "url": "https://pve.proxmox.com/wiki/PCI_Passthrough#Verifying_IOMMU_parameters"
+                }
+              ],
+              "dateAdded": 1772081058239,
+              "dateGroupModified": 1772081058239,
+              "id": "19",
+              "index": 3,
+              "parentId": "5",
+              "syncing": false,
+              "title": "proxmox"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058239,
+                  "id": "22",
+                  "index": 0,
+                  "parentId": "21",
+                  "syncing": false,
+                  "title": "SMART tests with smartctl - Thomas-Krenn-Wiki-en",
+                  "url": "https://www.thomas-krenn.com/en/wiki/SMART_tests_with_smartctl#Viewing_the_Test_Results"
+                }
+              ],
+              "dateAdded": 1772081058239,
+              "dateGroupModified": 1772081058239,
+              "id": "21",
+              "index": 4,
+              "parentId": "5",
+              "syncing": false,
+              "title": "smartctl"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058240,
+                  "id": "24",
+                  "index": 0,
+                  "parentId": "23",
+                  "syncing": false,
+                  "title": "Mcapplem1 Portainer",
+                  "url": "https://localhost:9443/#!/init/admin"
+                },
+                {
+                  "dateAdded": 1772081058240,
+                  "id": "25",
+                  "index": 1,
+                  "parentId": "23",
+                  "syncing": false,
+                  "title": "Dockerd",
+                  "url": "https://docs.docker.com/engine/reference/commandline/dockerd/"
+                },
+                {
+                  "dateAdded": 1772081058240,
+                  "id": "26",
+                  "index": 2,
+                  "parentId": "23",
+                  "syncing": false,
+                  "title": "Portainer Beginner's Guide",
+                  "url": "https://codeopolis.com/posts/beginners-guide-to-portainer/"
+                },
+                {
+                  "dateAdded": 1772081058240,
+                  "id": "27",
+                  "index": 3,
+                  "parentId": "23",
+                  "syncing": false,
+                  "title": "How to Install and Configure Portainer in Docker - Codeopolis",
+                  "url": "https://codeopolis.com/posts/how-to-install-portainer-on-docker/"
+                },
+                {
+                  "dateAdded": 1772081058240,
+                  "id": "28",
+                  "index": 4,
+                  "parentId": "23",
+                  "syncing": false,
+                  "title": "Docker Utilities",
+                  "url": "https://codeopolis.com/posts/6-docker-utilities-everyone-should-try/"
+                },
+                {
+                  "dateAdded": 1772081058240,
+                  "id": "29",
+                  "index": 5,
+                  "parentId": "23",
+                  "syncing": false,
+                  "title": "Docker Run Anatomy",
+                  "url": "https://codeopolis.com/posts/anatomy-of-a-docker-run-command/"
+                },
+                {
+                  "dateAdded": 1772081058240,
+                  "id": "30",
+                  "index": 6,
+                  "parentId": "23",
+                  "syncing": false,
+                  "title": "",
+                  "url": "http://localhost:9000/"
+                }
+              ],
+              "dateAdded": 1772081058240,
+              "dateGroupModified": 1772081058240,
+              "id": "23",
+              "index": 5,
+              "parentId": "5",
+              "syncing": false,
+              "title": "Docker/Portainer"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058240,
+                  "id": "32",
+                  "index": 0,
+                  "parentId": "31",
+                  "syncing": false,
+                  "title": "Development Environment Setup",
+                  "url": "https://developers.home-assistant.io/docs/development_environment/"
+                }
+              ],
+              "dateAdded": 1772081058240,
+              "dateGroupModified": 1772081058240,
+              "id": "31",
+              "index": 6,
+              "parentId": "5",
+              "syncing": false,
+              "title": "hass dev"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058241,
+                  "id": "34",
+                  "index": 0,
+                  "parentId": "33",
+                  "syncing": false,
+                  "title": "Information Property List | Apple Developer Documentation",
+                  "url": "https://developer.apple.com/documentation/bundleresources/information_property_list"
+                },
+                {
+                  "dateAdded": 1772081058241,
+                  "id": "35",
+                  "index": 1,
+                  "parentId": "33",
+                  "syncing": false,
+                  "title": "Signing a daemon with a restricted entitlement | Apple Developer Documentation",
+                  "url": "https://developer.apple.com/documentation/xcode/signing-a-daemon-with-a-restricted-entitlement"
+                },
+                {
+                  "dateAdded": 1772081058241,
+                  "id": "36",
+                  "index": 2,
+                  "parentId": "33",
+                  "syncing": false,
+                  "title": "What’s new in privacy - WWDC24 - Videos - Apple Developer",
+                  "url": "https://developer.apple.com/videos/play/wwdc2024/10123/?time=1097"
+                },
+                {
+                  "dateAdded": 1772081058241,
+                  "id": "37",
+                  "index": 3,
+                  "parentId": "33",
+                  "syncing": false,
+                  "title": "Local Network Privacy FAQ | Apple Developer Forums",
+                  "url": "https://developer.apple.com/forums/thread/663858"
+                }
+              ],
+              "dateAdded": 1772081058241,
+              "dateGroupModified": 1772081058241,
+              "id": "33",
+              "index": 7,
+              "parentId": "5",
+              "syncing": false,
+              "title": "Xcode"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058241,
+                  "id": "39",
+                  "index": 0,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Build Your Own LLM with LLM Fine-Tuning on macOS Using MLX | by (λx.x)eranga | Effectz.AI | Medium",
+                  "url": "https://medium.com/rahasak/fine-tuning-llms-on-macos-using-mlx-and-run-with-ollama-182a20f1fd2c"
+                },
+                {
+                  "dateAdded": 1772081058241,
+                  "id": "40",
+                  "index": 1,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Fine Tune Large Language Model (LLM) on a Custom Dataset with QLoRA | by Suman Das | Medium",
+                  "url": "https://dassum.medium.com/fine-tune-large-language-model-llm-on-a-custom-dataset-with-qlora-fb60abdeba07"
+                },
+                {
+                  "dateAdded": 1772081058241,
+                  "id": "41",
+                  "index": 2,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Ollama vs LM Studio: What's the Key Differences",
+                  "url": "https://www.gpu-mart.com/blog/ollama-vs-lm-studio"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "42",
+                  "index": 3,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "ivanfioravanti/chatbot-ollama: Chatbot Ollama is an open source chat UI for Ollama.",
+                  "url": "https://github.com/ivanfioravanti/chatbot-ollama?tab=readme-ov-file"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "43",
+                  "index": 4,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "LM Studio - Discover, download, and run local LLMs",
+                  "url": "https://lmstudio.ai/docs/basics/download-model"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "44",
+                  "index": 5,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Llama 3.2: Revolutionizing edge AI and vision with open, customizable models",
+                  "url": "https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "45",
+                  "index": 6,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Running Meta Llama on Mac | Llama Everywhere",
+                  "url": "https://www.llama.com/docs/llama-everywhere/running-meta-llama-on-mac/"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "46",
+                  "index": 7,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Download Ollama on macOS",
+                  "url": "https://ollama.com/download/mac"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "47",
+                  "index": 8,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "library",
+                  "url": "https://ollama.com/library"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "48",
+                  "index": 9,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Pushover: Simple Notifications for Android, iPhone, iPad, and Desktop",
+                  "url": "https://pushover.net/devices/edit/mcapplem4"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "49",
+                  "index": 10,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "mlx-community (MLX Community)",
+                  "url": "https://huggingface.co/mlx-community"
+                },
+                {
+                  "dateAdded": 1772081058242,
+                  "id": "50",
+                  "index": 11,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "mlx-community/whisper-large-v3-turbo · Hugging Face",
+                  "url": "https://huggingface.co/mlx-community/whisper-large-v3-turbo"
+                },
+                {
+                  "dateAdded": 1772081058243,
+                  "id": "51",
+                  "index": 12,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Llama 3.3 - a mlx-community Collection",
+                  "url": "https://huggingface.co/collections/mlx-community/llama-33-67538fce5763675dcb8c4463"
+                },
+                {
+                  "dateAdded": 1772081058243,
+                  "id": "52",
+                  "index": 13,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Hugging Face - Documentation",
+                  "url": "https://huggingface.co/docs"
+                },
+                {
+                  "dateAdded": 1772081058243,
+                  "id": "53",
+                  "index": 14,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Local LLM Fine-tuning on Mac (M1 16GB) - YouTube",
+                  "url": "https://www.youtube.com/watch?v=3PIqhdRzhxE&list=WL&index=16"
+                },
+                {
+                  "dateAdded": 1772081058243,
+                  "id": "54",
+                  "index": 15,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Fine Tune a model with MLX for Ollama - YouTube",
+                  "url": "https://www.youtube.com/watch?v=3UQ7GY9hNwk"
+                },
+                {
+                  "dateAdded": 1772081058243,
+                  "id": "55",
+                  "index": 16,
+                  "parentId": "38",
+                  "syncing": false,
+                  "title": "Local LLM Fine-Tuning on Mac (M1 16GB) | by Shaw Talebi | Towards Data Science",
+                  "url": "https://towardsdatascience.com/local-llm-fine-tuning-on-mac-m1-16gb-f59f4f598be7"
+                }
+              ],
+              "dateAdded": 1772081058241,
+              "dateGroupModified": 1772081058243,
+              "id": "38",
+              "index": 8,
+              "parentId": "5",
+              "syncing": false,
+              "title": "LLM"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058243,
+                  "id": "57",
+                  "index": 0,
+                  "parentId": "56",
+                  "syncing": false,
+                  "title": "Long term Home Assistant data history with InfluxDB1 - Wessel's Blog",
+                  "url": "https://blog.wesselhissink.nl/homeautomation/long-term-home-assistant-data-history-with-influxdb/"
+                },
+                {
+                  "dateAdded": 1772081058243,
+                  "id": "58",
+                  "index": 1,
+                  "parentId": "56",
+                  "syncing": false,
+                  "title": "Data Retention - Configuration - Home Assistant Community",
+                  "url": "https://community.home-assistant.io/t/data-retention/444859"
+                },
+                {
+                  "dateAdded": 1772081058243,
+                  "id": "59",
+                  "index": 2,
+                  "parentId": "56",
+                  "syncing": false,
+                  "title": "Install InfluxDB on Proxmox for Home Assistant - SmartHomeScene",
+                  "url": "https://smarthomescene.com/guides/how-to-keep-home-assistant-history-infinitely-with-influxdb-on-proxmox/"
+                },
+                {
+                  "dateAdded": 1772081058244,
+                  "id": "60",
+                  "index": 3,
+                  "parentId": "56",
+                  "syncing": false,
+                  "title": "HVAC Temperature History | flui.ca | InfluxDB",
+                  "url": "https://influxdb.home.flui.ca/orgs/6582bb0f6e7bd32d/dashboards/0e1b6726493d6000?lower=now%28%29+-+1h"
+                },
+                {
+                  "children": [
+                    {
+                      "dateAdded": 1772081058244,
+                      "id": "62",
+                      "index": 0,
+                      "parentId": "61",
+                      "syncing": false,
+                      "title": "Optimize Your Home Assistant Database - SmartHomeScene",
+                      "url": "https://smarthomescene.com/guides/optimize-your-home-assistant-database/#influxdb"
+                    }
+                  ],
+                  "dateAdded": 1772081058244,
+                  "dateGroupModified": 1772081058244,
+                  "id": "61",
+                  "index": 4,
+                  "parentId": "56",
+                  "syncing": false,
+                  "title": "TEST"
+                }
+              ],
+              "dateAdded": 1772081058243,
+              "dateGroupModified": 1772081058244,
+              "id": "56",
+              "index": 9,
+              "parentId": "5",
+              "syncing": false,
+              "title": "InfluDB+Hass"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058244,
+                  "id": "64",
+                  "index": 0,
+                  "parentId": "63",
+                  "syncing": false,
+                  "title": "combustion-documentation/probe_ble_specification.rst at main · combustion-inc/combustion-documentation · GitHub",
+                  "url": "https://github.com/combustion-inc/combustion-documentation/blob/main/probe_ble_specification.rst#manufacturer-specific-data"
+                },
+                {
+                  "dateAdded": 1772081058244,
+                  "id": "65",
+                  "index": 1,
+                  "parentId": "63",
+                  "syncing": false,
+                  "title": "GitHub - m5stack/M5Core-Ink: M5Stack CoreInk Arduino Library",
+                  "url": "https://github.com/m5stack/M5Core-Ink"
+                },
+                {
+                  "dateAdded": 1772081058244,
+                  "id": "66",
+                  "index": 2,
+                  "parentId": "63",
+                  "syncing": false,
+                  "title": "Adafruit SCD-40 - True CO2, Temperature and Humidity Sensor [STEMMA QT / Qwiic] : ID 5187 : Adafruit Industries, Unique & fun DIY electronics and kits",
+                  "url": "https://www.adafruit.com/product/5187"
+                },
+                {
+                  "dateAdded": 1772081058244,
+                  "id": "67",
+                  "index": 3,
+                  "parentId": "63",
+                  "syncing": false,
+                  "title": "M5Core-Ink | Arduino Documentation",
+                  "url": "https://docs.arduino.cc/libraries/m5core-ink/"
+                },
+                {
+                  "dateAdded": 1772081058244,
+                  "id": "68",
+                  "index": 4,
+                  "parentId": "63",
+                  "syncing": false,
+                  "title": "M5Stack CoreS3 — PlatformIO latest documentation",
+                  "url": "https://docs.platformio.org/en/latest/boards/espressif32/m5stack-cores3.html"
+                },
+                {
+                  "dateAdded": 1772081058245,
+                  "id": "69",
+                  "index": 5,
+                  "parentId": "63",
+                  "syncing": false,
+                  "title": "lang-ship.com/blog/files/LovyanGFX/font/",
+                  "url": "https://lang-ship.com/blog/files/LovyanGFX/font/"
+                },
+                {
+                  "dateAdded": 1772081058245,
+                  "id": "70",
+                  "index": 6,
+                  "parentId": "63",
+                  "syncing": false,
+                  "title": "esp-idf/examples/system/light_sleep/main/gpio_wakeup.c at master · espressif/esp-idf",
+                  "url": "https://github.com/espressif/esp-idf/blob/master/examples/system/light_sleep/main/gpio_wakeup.c"
+                }
+              ],
+              "dateAdded": 1772081058244,
+              "dateGroupModified": 1772081058245,
+              "id": "63",
+              "index": 10,
+              "parentId": "5",
+              "syncing": false,
+              "title": "M5Stack CoreInk"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058245,
+                  "id": "72",
+                  "index": 0,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Build A DIY Space Mouse For A More Efficient CAD Workflow | Hackaday",
+                  "url": "https://hackaday.com/2023/06/29/build-a-diy-space-mouse-for-a-more-efficient-cad-workflow/"
+                },
+                {
+                  "dateAdded": 1772081058245,
+                  "id": "73",
+                  "index": 1,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Search models | Printables.com",
+                  "url": "https://www.printables.com/search/models?ctx=models&q=MagSafe+iPhone+and+Apple+Watch+charging"
+                },
+                {
+                  "dateAdded": 1772081058245,
+                  "id": "74",
+                  "index": 2,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Gridfinity | The modular, open-source grid storage system for your workshop.",
+                  "url": "https://gridfinity.xyz/catalog/"
+                },
+                {
+                  "dateAdded": 1772081058245,
+                  "id": "75",
+                  "index": 3,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Collection - MakerWorld",
+                  "url": "https://makerworld.com/en/collections/4136123"
+                },
+                {
+                  "dateAdded": 1772081058246,
+                  "id": "76",
+                  "index": 4,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Play Conveyor’s Portfolio of 3D Models",
+                  "url": "https://thangs.com/designer/Play%20Conveyor"
+                },
+                {
+                  "dateAdded": 1772081058246,
+                  "id": "77",
+                  "index": 5,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "MakerWorld",
+                  "url": "https://makerworld.com/en/3d-models"
+                },
+                {
+                  "dateAdded": 1772081058246,
+                  "id": "78",
+                  "index": 6,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Ultimate Guide to PA6-GF 3D Printing Filament | Bambu Lab",
+                  "url": "https://bambulab.com/en-ca/filament/pa6-gf"
+                },
+                {
+                  "dateAdded": 1772081058246,
+                  "id": "79",
+                  "index": 7,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Recycle biodegradable plastic | Zero Waste Box™ by TerraCycle",
+                  "url": "https://shop.terracycle.com/en-US/products/biodegradable-plastic-zero-waste-box"
+                },
+                {
+                  "dateAdded": 1772081058246,
+                  "id": "80",
+                  "index": 8,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Fusion Help | Create a lip and groove | Autodesk",
+                  "url": "https://help.autodesk.com/view/fusion360/ENU/?guid=SLD-LIP"
+                },
+                {
+                  "dateAdded": 1772081058246,
+                  "id": "81",
+                  "index": 9,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Gridfinity Generator | Interactive tool",
+                  "url": "https://gridfinitygenerator.com/"
+                },
+                {
+                  "dateAdded": 1772081058246,
+                  "id": "82",
+                  "index": 10,
+                  "parentId": "71",
+                  "syncing": false,
+                  "title": "Create Custom 3D Printable Gears in Fusion 360 | Practical Prints #1 - Product Design Online",
+                  "url": "https://productdesignonline.com/fusion-360-tutorials/create-custom-3d-printable-gears-in-fusion-360/"
+                }
+              ],
+              "dateAdded": 1772081058245,
+              "dateGroupModified": 1772081058246,
+              "id": "71",
+              "index": 11,
+              "parentId": "5",
+              "syncing": false,
+              "title": "3D Print"
+            },
+            {
+              "dateAdded": 1772081058246,
+              "id": "83",
+              "index": 12,
+              "parentId": "5",
+              "syncing": false,
+              "title": "Remote Access - Chrome Remote Desktop",
+              "url": "https://remotedesktop.google.com/access/"
+            },
+            {
+              "dateAdded": 1772081058246,
+              "id": "84",
+              "index": 13,
+              "parentId": "5",
+              "syncing": false,
+              "title": "Machines - Tailscale",
+              "url": "https://login.tailscale.com/admin/machines"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058247,
+                  "id": "86",
+                  "index": 0,
+                  "parentId": "85",
+                  "syncing": false,
+                  "title": "Machine Learning Crash Course: Intro & What's New - YouTube",
+                  "url": "https://www.youtube.com/watch?v=SAUeGtyLsrk"
+                },
+                {
+                  "dateAdded": 1772081058247,
+                  "id": "87",
+                  "index": 1,
+                  "parentId": "85",
+                  "syncing": false,
+                  "title": "Machine Learning Course for Beginners - YouTube",
+                  "url": "https://www.youtube.com/watch?v=NWONeJKn6kc&t=274s"
+                },
+                {
+                  "dateAdded": 1772081058247,
+                  "id": "88",
+                  "index": 2,
+                  "parentId": "85",
+                  "syncing": false,
+                  "title": "Stanford CS229: Machine Learning Full Course taught by Andrew Ng | Autumn 2018 - YouTube",
+                  "url": "https://www.youtube.com/playlist?list=PLoROMvodv4rMiGQp3WXShtMGgzqpfVfbU"
+                },
+                {
+                  "dateAdded": 1772081058247,
+                  "id": "89",
+                  "index": 3,
+                  "parentId": "85",
+                  "syncing": false,
+                  "title": "Hands-on Machine Learning with Scikit-Learn, Keras, and TensorFlow",
+                  "url": "http://14.139.161.31/OddSem-0822-1122/Hands-On_Machine_Learning_with_Scikit-Learn-Keras-and-TensorFlow-2nd-Edition-Aurelien-Geron.pdf"
+                },
+                {
+                  "dateAdded": 1772081058247,
+                  "id": "90",
+                  "index": 4,
+                  "parentId": "85",
+                  "syncing": false,
+                  "title": "Machine Learning  |  Google for Developers",
+                  "url": "https://developers.google.com/machine-learning/crash-course"
+                },
+                {
+                  "dateAdded": 1772081058247,
+                  "id": "91",
+                  "index": 5,
+                  "parentId": "85",
+                  "syncing": false,
+                  "title": "Machine Learning  |  Google for Developers",
+                  "url": "https://developers.google.com/machine-learning/crash-course"
+                },
+                {
+                  "dateAdded": 1772081058251,
+                  "id": "92",
+                  "index": 6,
+                  "parentId": "85",
+                  "syncing": false,
+                  "title": "Introduction to Machine Learning Problem Framing  |  Google for Developers",
+                  "url": "https://developers.google.com/machine-learning/problem-framing"
+                },
+                {
+                  "dateAdded": 1772081058251,
+                  "id": "93",
+                  "index": 7,
+                  "parentId": "85",
+                  "syncing": false,
+                  "title": "People + AI Guidebook - Home",
+                  "url": "https://pair.withgoogle.com/guidebook/"
+                }
+              ],
+              "dateAdded": 1772081058247,
+              "dateGroupModified": 1772081058251,
+              "id": "85",
+              "index": 14,
+              "parentId": "5",
+              "syncing": false,
+              "title": "AI Leanring"
+            }
+          ],
+          "dateAdded": 1772081058216,
+          "dateGroupModified": 1772081058247,
+          "id": "5",
+          "index": 0,
+          "parentId": "2",
+          "syncing": false,
+          "title": "HomeServers"
+        },
+        {
+          "children": [
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058252,
+                  "id": "96",
+                  "index": 0,
+                  "parentId": "95",
+                  "syncing": false,
+                  "title": "Remote Access - Chrome Remote Desktop",
+                  "url": "https://remotedesktop.google.com/access"
+                },
+                {
+                  "dateAdded": 1772081058252,
+                  "id": "97",
+                  "index": 1,
+                  "parentId": "95",
+                  "syncing": false,
+                  "title": "mobapad.com/products/mobapad-m6-hd-black",
+                  "url": "https://www.mobapad.com/products/mobapad-m6-hd-black"
+                },
+                {
+                  "dateAdded": 1772081058252,
+                  "id": "98",
+                  "index": 2,
+                  "parentId": "95",
+                  "syncing": false,
+                  "title": "EmuDeck - Emulators on Steam Deck, SteamOS , Rog Ally and Windows",
+                  "url": "https://www.emudeck.com/"
+                },
+                {
+                  "dateAdded": 1772081058252,
+                  "id": "99",
+                  "index": 3,
+                  "parentId": "95",
+                  "syncing": false,
+                  "title": "BIOS and ROMs Cheat Sheet - EmuDeck Wiki",
+                  "url": "https://emudeck.github.io/cheat-sheet/#nintendo-cheat-sheet"
+                },
+                {
+                  "dateAdded": 1772081058252,
+                  "id": "100",
+                  "index": 4,
+                  "parentId": "95",
+                  "syncing": false,
+                  "title": "Known Issues: EmuDeck for Windows - EmuDeck Wiki",
+                  "url": "https://emudeck.github.io/known-issues/windows/#asus-rog-ally"
+                },
+                {
+                  "dateAdded": 1772081058252,
+                  "id": "101",
+                  "index": 5,
+                  "parentId": "95",
+                  "syncing": false,
+                  "title": "Category:Games - RPCS3 Wiki",
+                  "url": "https://wiki.rpcs3.net/index.php?title=Category:Games"
+                },
+                {
+                  "dateAdded": 1772081058252,
+                  "id": "102",
+                  "index": 6,
+                  "parentId": "95",
+                  "syncing": false,
+                  "title": "You Can Now Replay PS3 Classics With AMD Super Resolution | Digital Trends",
+                  "url": "https://www.digitaltrends.com/gaming/amd-super-resolution-added-ps3-emulator/"
+                },
+                {
+                  "children": [
+                    {
+                      "dateAdded": 1772081058253,
+                      "id": "104",
+                      "index": 0,
+                      "parentId": "103",
+                      "syncing": false,
+                      "title": "ALL Roms - Wowroms.com",
+                      "url": "https://wowroms.com/en/all-roms"
+                    },
+                    {
+                      "dateAdded": 1772081058253,
+                      "id": "105",
+                      "index": 1,
+                      "parentId": "103",
+                      "syncing": false,
+                      "title": "ROMs and ISOs - CoolROM.com",
+                      "url": "https://coolrom.com.au/roms/"
+                    },
+                    {
+                      "dateAdded": 1772081058253,
+                      "id": "106",
+                      "index": 2,
+                      "parentId": "103",
+                      "syncing": false,
+                      "title": "WiiU ROM & WUX - Nintendo Wii U Game Download",
+                      "url": "https://romsfun.com/roms/wii-u/"
+                    }
+                  ],
+                  "dateAdded": 1772081058253,
+                  "dateGroupModified": 1772081058253,
+                  "id": "103",
+                  "index": 7,
+                  "parentId": "95",
+                  "syncing": false,
+                  "title": "roms"
+                }
+              ],
+              "dateAdded": 1772081058252,
+              "dateGroupModified": 1772081058253,
+              "id": "95",
+              "index": 0,
+              "parentId": "94",
+              "syncing": false,
+              "title": "Rog Ally"
+            },
+            {
+              "children": [
+                {
+                  "children": [
+                    {
+                      "dateAdded": 1772081058253,
+                      "id": "109",
+                      "index": 0,
+                      "parentId": "108",
+                      "syncing": false,
+                      "title": "VIA",
+                      "url": "https://www.usevia.app/design"
+                    },
+                    {
+                      "dateAdded": 1772081058253,
+                      "id": "110",
+                      "index": 1,
+                      "parentId": "108",
+                      "syncing": false,
+                      "title": "nuphy.com/pages/via-usage-guide-for-nuphy-keyboards?srsltid=AfmBOopOB3Ed5IiG21hm9TtFiVKdK6N35Hlwy0YF39TCnq3E-PjlX9qN",
+                      "url": "https://nuphy.com/pages/via-usage-guide-for-nuphy-keyboards?srsltid=AfmBOopOB3Ed5IiG21hm9TtFiVKdK6N35Hlwy0YF39TCnq3E-PjlX9qN"
+                    }
+                  ],
+                  "dateAdded": 1772081058253,
+                  "dateGroupModified": 1772081058253,
+                  "id": "108",
+                  "index": 0,
+                  "parentId": "107",
+                  "syncing": false,
+                  "title": "Nuphy Air75 v2"
+                },
+                {
+                  "children": [
+                    {
+                      "dateAdded": 1772081058253,
+                      "id": "112",
+                      "index": 0,
+                      "parentId": "111",
+                      "syncing": false,
+                      "title": "Vial Web",
+                      "url": "https://vial.rocks/"
+                    },
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "113",
+                      "index": 1,
+                      "parentId": "111",
+                      "syncing": false,
+                      "title": "adept-anyball/mod: Trackball mod",
+                      "url": "https://github.com/adept-anyball/mod"
+                    },
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "114",
+                      "index": 2,
+                      "parentId": "111",
+                      "syncing": false,
+                      "title": "Basic Keycodes | QMK Firmware",
+                      "url": "https://docs.qmk.fm/keycodes_basic"
+                    },
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "115",
+                      "index": 3,
+                      "parentId": "111",
+                      "syncing": false,
+                      "title": "Ploopy Adept Trackball – Ploopy",
+                      "url": "https://ploopy.co/product-category/trackball/adept/"
+                    },
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "116",
+                      "index": 4,
+                      "parentId": "111",
+                      "syncing": false,
+                      "title": "adept-trackball/docs/appendices/programming.md at master · ploopyco/adept-trackball",
+                      "url": "https://github.com/ploopyco/adept-trackball/blob/master/docs/appendices/programming.md"
+                    },
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "117",
+                      "index": 5,
+                      "parentId": "111",
+                      "syncing": false,
+                      "title": "Tap Dance: A Single Key Can Do 3, 5, or 100 Different Things | QMK Firmware",
+                      "url": "https://docs.qmk.fm/features/tap_dance#example-4"
+                    },
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "118",
+                      "index": 6,
+                      "parentId": "111",
+                      "syncing": false,
+                      "title": "vial-qmk/keyboards/ploopyco/readme.md at vial · vial-kb/vial-qmk",
+                      "url": "https://github.com/vial-kb/vial-qmk/blob/vial/keyboards/ploopyco/readme.md"
+                    }
+                  ],
+                  "dateAdded": 1772081058253,
+                  "dateGroupModified": 1772081058254,
+                  "id": "111",
+                  "index": 1,
+                  "parentId": "107",
+                  "syncing": false,
+                  "title": "Ploopy"
+                },
+                {
+                  "children": [
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "120",
+                      "index": 0,
+                      "parentId": "119",
+                      "syncing": false,
+                      "title": "Manual – Brand New Model F Keyboards",
+                      "url": "https://www.modelfkeyboards.com/manual/"
+                    },
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "121",
+                      "index": 1,
+                      "parentId": "119",
+                      "syncing": false,
+                      "title": "Flash New Model F with VIAL firmware - deskthority",
+                      "url": "https://deskthority.net/viewtopic.php?t=27260"
+                    },
+                    {
+                      "dateAdded": 1772081058254,
+                      "id": "122",
+                      "index": 2,
+                      "parentId": "119",
+                      "syncing": false,
+                      "title": "F104+SSK+122+62+77+50+Ergo orders now open! New Kishsaver+Industrial Model F Keyboards - Page 242 - deskthority",
+                      "url": "https://deskthority.net/viewtopic.php?p=503356#p503356"
+                    },
+                    {
+                      "dateAdded": 1772081058255,
+                      "id": "123",
+                      "index": 3,
+                      "parentId": "119",
+                      "syncing": false,
+                      "title": "Vial Web",
+                      "url": "https://vial.rocks/"
+                    }
+                  ],
+                  "dateAdded": 1772081058254,
+                  "dateGroupModified": 1772081058255,
+                  "id": "119",
+                  "index": 2,
+                  "parentId": "107",
+                  "syncing": false,
+                  "title": "Model F 77"
+                },
+                {
+                  "dateAdded": 1772081058255,
+                  "id": "124",
+                  "index": 3,
+                  "parentId": "107",
+                  "syncing": false,
+                  "title": "Keyboard Tester",
+                  "url": "https://www.keyboardtester.com/"
+                }
+              ],
+              "dateAdded": 1772081058253,
+              "dateGroupModified": 1772081058255,
+              "id": "107",
+              "index": 1,
+              "parentId": "94",
+              "syncing": false,
+              "title": "Keyboards"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058255,
+                  "id": "126",
+                  "index": 0,
+                  "parentId": "125",
+                  "syncing": false,
+                  "title": "mone h | Collections - MakerWorld",
+                  "url": "https://makerworld.com/en/@moneh/collections/private"
+                },
+                {
+                  "dateAdded": 1772081058255,
+                  "id": "127",
+                  "index": 1,
+                  "parentId": "125",
+                  "syncing": false,
+                  "title": "Collection Mone",
+                  "url": "https://makerworld.com/en/collections/4136123-mone"
+                }
+              ],
+              "dateAdded": 1772081058255,
+              "dateGroupModified": 1772081058255,
+              "id": "125",
+              "index": 2,
+              "parentId": "94",
+              "syncing": false,
+              "title": "3D Print"
+            }
+          ],
+          "dateAdded": 1772081058252,
+          "dateGroupModified": 1772081058255,
+          "id": "94",
+          "index": 1,
+          "parentId": "2",
+          "syncing": false,
+          "title": "Hobby"
+        },
+        {
+          "children": [
+            {
+              "dateAdded": 1772081058255,
+              "id": "129",
+              "index": 0,
+              "parentId": "128",
+              "syncing": false,
+              "title": "YouTube",
+              "url": "https://www.youtube.com/"
+            },
+            {
+              "dateAdded": 1772081058255,
+              "id": "130",
+              "index": 1,
+              "parentId": "128",
+              "syncing": false,
+              "title": "YouTube",
+              "url": "https://www.youtube.com/"
+            },
+            {
+              "dateAdded": 1772081058255,
+              "id": "131",
+              "index": 2,
+              "parentId": "128",
+              "syncing": false,
+              "title": "YouTube",
+              "url": "https://www.youtube.com/"
+            },
+            {
+              "dateAdded": 1772081058256,
+              "id": "132",
+              "index": 3,
+              "parentId": "128",
+              "syncing": false,
+              "title": "YouTube",
+              "url": "https://www.youtube.com/"
+            },
+            {
+              "dateAdded": 1772081058256,
+              "id": "133",
+              "index": 4,
+              "parentId": "128",
+              "syncing": false,
+              "title": "YouTube",
+              "url": "https://www.youtube.com/"
+            },
+            {
+              "dateAdded": 1772081058256,
+              "id": "134",
+              "index": 5,
+              "parentId": "128",
+              "syncing": false,
+              "title": "Google Gemini",
+              "url": "https://gemini.google.com/u/1/app"
+            },
+            {
+              "dateAdded": 1772081058256,
+              "id": "135",
+              "index": 6,
+              "parentId": "128",
+              "syncing": false,
+              "title": "Google Gemini",
+              "url": "https://gemini.google.com/u/1/app"
+            },
+            {
+              "children": [
+                {
+                  "dateAdded": 1772081058256,
+                  "id": "137",
+                  "index": 0,
+                  "parentId": "136",
+                  "syncing": false,
+                  "title": "Crave",
+                  "url": "https://www.crave.ca/en"
+                },
+                {
+                  "dateAdded": 1772081058256,
+                  "id": "138",
+                  "index": 1,
+                  "parentId": "136",
+                  "syncing": false,
+                  "title": "Prime Video",
+                  "url": "https://www.primevideo.com/region/na/storefront"
+                },
+                {
+                  "dateAdded": 1772081058256,
+                  "id": "139",
+                  "index": 2,
+                  "parentId": "136",
+                  "syncing": false,
+                  "title": "Home - Netflix",
+                  "url": "https://www.netflix.com/browse"
+                },
+                {
+                  "dateAdded": 1772081058256,
+                  "id": "140",
+                  "index": 3,
+                  "parentId": "136",
+                  "syncing": false,
+                  "title": "For You | Disney+",
+                  "url": "https://www.disneyplus.com/en-gb/home"
+                }
+              ],
+              "dateAdded": 1772081058256,
+              "dateGroupModified": 1772081058256,
+              "id": "136",
+              "index": 7,
+              "parentId": "128",
+              "syncing": false,
+              "title": "Movies"
+            }
+          ],
+          "dateAdded": 1772081058255,
+          "dateGroupModified": 1772081058256,
+          "id": "128",
+          "index": 2,
+          "parentId": "2",
+          "syncing": false,
+          "title": "Movies"
+        },
+        {
+          "children": [
+            {
+              "dateAdded": 1772081058257,
+              "id": "150",
+              "index": 0,
+              "parentId": "149",
+              "syncing": false,
+              "title": "Apply for OHIP and get a health card | ontario.ca",
+              "url": "https://www.ontario.ca/page/apply-ohip-and-get-health-card"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "151",
+              "index": 1,
+              "parentId": "149",
+              "syncing": false,
+              "title": "Tommy Health Insurance - Google Docs",
+              "url": "https://docs.google.com/document/d/1eYAfoPdlcvKJGyjnojmB5Rbs0goIG_c_ufOJIA6JFYc/edit?tab=t.0"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "152",
+              "index": 2,
+              "parentId": "149",
+              "syncing": false,
+              "title": "First Year Orientation schedule | Welcome Warriors | University of Waterloo",
+              "url": "https://uwaterloo.ca/welcome-warriors/orientation/first-year-orientation/first-year-orientation-schedule"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "153",
+              "index": 3,
+              "parentId": "149",
+              "syncing": false,
+              "title": "Leaving B.C. Temporarily - Province of British Columbia",
+              "url": "https://www2.gov.bc.ca/gov/content/health/health-drug-coverage/msp/bc-residents/managing-your-msp-account/leaving-bc-temporarily"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "154",
+              "index": 4,
+              "parentId": "149",
+              "syncing": false,
+              "title": "B.C. Residents - Contact Health Insurance BC - Province of British Columbia",
+              "url": "https://www2.gov.bc.ca/gov/content/health/health-drug-coverage/msp/bc-residents-contact-us"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "155",
+              "index": 5,
+              "parentId": "149",
+              "syncing": false,
+              "title": "Health and Dental Plan – Waterloo Undergraduate Student Association",
+              "url": "https://wusa.ca/services/student-supports/health-and-dental-plan/"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "156",
+              "index": 6,
+              "parentId": "149",
+              "syncing": false,
+              "title": "Medical Equipment & Services",
+              "url": "https://studentcare.ca/rte/en/IHaveAPlan_WUSA_Health_HealthCoverage_MedicalEquipmentServices"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "157",
+              "index": 7,
+              "parentId": "149",
+              "syncing": false,
+              "title": "Dental Coverage",
+              "url": "https://studentcare.ca/rte/en/IHaveAPlan_WUSA_Dental_DentalCoverage&random=962"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "158",
+              "index": 8,
+              "parentId": "149",
+              "syncing": false,
+              "title": "Out-of-Province Referral",
+              "url": "https://studentcare.ca/rte/en/IHaveAPlan_WUSA_Health_HealthCoverage_OutofProvinceReferral"
+            },
+            {
+              "dateAdded": 1772081058258,
+              "id": "159",
+              "index": 9,
+              "parentId": "149",
+              "syncing": false,
+              "title": "HOW TO CLAIM",
+              "url": "https://studentcare.ca/rte/en/IHaveAPlan_WUSA_Claims_HowtoClaim"
+            }
+          ],
+          "dateAdded": 1772081058257,
+          "dateGroupModified": 1772081058258,
+          "id": "149",
+          "index": 3,
+          "parentId": "2",
+          "syncing": false,
+          "title": "Tommy"
+        },
+        {
+          "children": [
+            {
+              "dateAdded": 1772081058259,
+              "id": "161",
+              "index": 0,
+              "parentId": "160",
+              "syncing": false,
+              "title": "Google Gemini",
+              "url": "https://gemini.google.com/u/1/app/38830e88672d9922"
+            }
+          ],
+          "dateAdded": 1772081058258,
+          "dateGroupModified": 1772081058259,
+          "id": "160",
+          "index": 4,
+          "parentId": "2",
+          "syncing": false,
+          "title": "Workspace"
+        },
+        {
+          "children": [
+            {
+              "dateAdded": 1772081058259,
+              "id": "163",
+              "index": 0,
+              "parentId": "162",
+              "syncing": false,
+              "title": "Built an OLL/PLL iOS app — looking for feedback from cubers : r/Cubers",
+              "url": "https://www.reddit.com/r/Cubers/comments/1p6ztwv/built_an_ollpll_ios_app_looking_for_feedback_from/"
+            }
+          ],
+          "dateAdded": 1772081058259,
+          "dateGroupModified": 1772081058259,
+          "id": "162",
+          "index": 5,
+          "parentId": "2",
+          "syncing": false,
+          "title": "work2"
+        },
+        {
+          "children": [],
+          "dateAdded": 1772081058259,
+          "dateGroupModified": 1772081058259,
+          "id": "164",
+          "index": 6,
+          "parentId": "2",
+          "syncing": false,
+          "title": "Last"
+        }
+      ],
+      "dateAdded": 1772080987607,
+      "dateGroupModified": 1772083043370,
+      "folderType": "other",
+      "id": "2",
+      "index": 1,
+      "parentId": "0",
+      "syncing": false,
+      "title": "Other Bookmarks"
+    }
+  ],
+  "spaces": [
+    {
+      "id": "space_1785520512421_fgru5uqom",
+      "name": "Home",
+      "icon": "house",
+      "color": "blue",
+      "bookmarkFolderPath": "Other Bookmarks/HomeServers",
+      "bookmarkFolderSegments": [
+        "Other Bookmarks",
+        "HomeServers"
+      ]
+    },
+    {
+      "id": "space_1785520534534_txr40olaw",
+      "name": "Hobbies",
+      "icon": "toy-brick",
+      "color": "red",
+      "bookmarkFolderPath": "Other Bookmarks/Hobby",
+      "bookmarkFolderSegments": [
+        "Other Bookmarks",
+        "Hobby"
+      ]
+    },
+    {
+      "id": "space_1785520558058_yn9gesvj3",
+      "name": "Movies",
+      "icon": "film",
+      "color": "yellow",
+      "bookmarkFolderPath": "Other Bookmarks/Movies",
+      "bookmarkFolderSegments": [
+        "Other Bookmarks",
+        "Movies"
+      ]
+    },
+    {
+      "id": "space_1785520620658_t0f3xbfmp",
+      "name": "Workspace",
+      "icon": "computer",
+      "color": "green",
+      "bookmarkFolderPath": "Other Bookmarks/Workspace",
+      "bookmarkFolderSegments": [
+        "Other Bookmarks",
+        "Workspace"
+      ]
+    }
+  ]
+}

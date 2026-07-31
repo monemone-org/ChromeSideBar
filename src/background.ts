@@ -1377,6 +1377,25 @@ function getAudioTabLists(allTabs: chrome.tabs.Tab[]): { playingTabIds: number[]
   return { playingTabIds, historyTabIds };
 }
 
+// DEV-only: reliably detect the test-only panel (see src/tests/testHooks.ts)
+// tearing down, for the e2e driver's close/reopen verification. Port
+// disconnect fires even on abrupt teardown, unlike page lifecycle events
+// (pagehide), whose async storage writes can race with the page's context
+// being destroyed before they finish.
+if (import.meta.env.DEV)
+{
+  chrome.runtime.onConnect.addListener((port) =>
+  {
+    if (port.name === 'testHooksPanel')
+    {
+      port.onDisconnect.addListener(() =>
+      {
+        chrome.storage.session.set({ testHooksClosedAt: Date.now() });
+      });
+    }
+  });
+}
+
 // =============================================================================
 // Message Handlers
 // =============================================================================
