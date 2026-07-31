@@ -33,6 +33,7 @@
     "eslint": "^8.57.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
+    "js-yaml": "^5.2.2",
     "marked": "^17.0.4",
     "playwright-core": "^1.62.1",
     "postcss": "^8.4.35",

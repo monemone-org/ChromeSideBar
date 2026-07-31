@@ -1,0 +1,45 @@
+id: A.3
+title: Bookmark tab moved to a different space's group, sidebar CLOSED (known gap G2)
+section: Section A - Tab moved between spaces
+tags:
+  - "known-gap:G2"
+# Matches the real-world sequence: you can only click a bookmark to open it
+# while the sidebar is open, so it starts open here before the "close_sidebar"
+# step later in this test.
+initial_sidebar: open
+
+fixture:
+  spaces:
+    - name: Work
+      bookmarks:
+        - title: Example Bookmark
+          url: https://example.com/bookmark-a
+          as: bm1
+    - name: Video
+
+steps:
+  - action: open_bookmark_tab
+    bookmark: bm1
+    space: Work
+    as: tab1
+
+  - assert: bookmark_loaded
+    bookmark: bm1
+    tab: tab1
+    expected: true
+
+  - action: close_sidebar
+
+  - action: move_tab_to_group
+    tab: tab1
+    space: Video
+
+  - action: open_sidebar
+
+  # Per G2: the DEASSOCIATE_TAB message is sent while the sidebar is closed,
+  # so nothing is listening to clear the stored association - it survives
+  # even though the tab visibly moved to Space B's group.
+  - assert: bookmark_loaded
+    bookmark: bm1
+    tab: tab1
+    expected: true

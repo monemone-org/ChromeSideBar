@@ -6,21 +6,35 @@ panel to be closed/reopened, span multiple windows, or check real DOM/scroll
 state - they run *inside* the panel's own script, which dies the moment the
 panel closes. This layer drives Chrome from the outside instead.
 
-## Status: mechanism proven
+## Status: real test cases running
 
-`spike-panel-lifecycle.mjs` answers the load-bearing question behind
-automating any "sidebar closed" case in
-`docs/test/tab-space-association-test-cases.md`: can a driver script reliably
-open, close, and reopen the side panel, and confirm its JS context truly
-tears down and remounts each time? **Yes** - all three steps (open/close/
-reopen) pass reliably. See "What we learned" below for the real gotchas hit
-getting there; several cost significant debugging time and are worth reading
-before extending this.
+`spike-panel-lifecycle.mjs` proved the load-bearing mechanism: a driver
+script can reliably open, close, and reopen the side panel, confirming its
+JS context truly tears down and remounts each time. That plumbing now lives
+in `lib/chromeDriver.mjs` and backs `run-test-cases.mjs`, a runner that
+executes test cases written as YAML files (`test-cases/*.yaml`) instead of
+JavaScript, translating cases from
+`docs/test/tab-space-association-test-cases.md`.
+
+Test cases don't simulate UI clicks/drags (right-click menus, drag-and-drop,
+toolbar buttons) - they call `chrome.*` APIs directly (create tabs, move
+groups, remove bookmarks). The background reacts to the same underlying
+Chrome events either way, so this exercises the real `background.ts` logic
+without needing the panel's own page to be scriptable (which we proved it
+isn't, reliably, via Playwright).
 
 ## Running it
 
 ```bash
-npm run build:debug   # dist/ must include the heartbeat writes from src/tests/testHooks.ts
+npm run build:debug
+node e2e/run-test-cases.mjs                    # runs every e2e/test-cases/*.yaml
+node e2e/run-test-cases.mjs e2e/test-cases/A.1.yaml   # or just one
+
+# run one case with narration + a brief pause between steps so you can watch it
+node e2e/run-test-cases.mjs --watch e2e/test-cases/A.1.yaml
+
+# same, but pause and wait for you to press Enter between each step
+node e2e/run-test-cases.mjs --step e2e/test-cases/A.1.yaml
 ```
 
 One-time manual setup (only needed once per profile, or again if
@@ -30,24 +44,54 @@ One-time manual setup (only needed once per profile, or again if
 3. Click "Load unpacked", select the `dist/` folder
 4. Close Chrome
 
-Then:
-
-```bash
-node e2e/spike-panel-lifecycle.mjs
-```
-
-This launches real Chrome against `tools/tmp/chrome-test-profile` (the same
-profile used for manual testing - the extension persists there once loaded,
-so no CLI extension flags are needed on subsequent launches).
-
 **Every time `background.ts` or `testHooks.ts` changes:** rebuild AND reload
 the extension in `chrome://extensions` (click "Reload" on its card), not just
 rebuild. See the stale-service-worker gotcha below - this is the single
 easiest way to waste an hour thinking new code is broken when it's just not
 running yet.
 
-Read the `[open]` / `[close]` / `[reopen]` PASS/FAIL lines in the output -
-whichever one fails first tells you what broke.
+## Writing a test case
+
+```yaml
+id: A.1
+title: Regular tab moved to another space, sidebar open
+section: Section A - Tab moved between spaces
+initial_sidebar: open           # required - "open" or "closed", never assumed
+
+fixture:
+  spaces:
+    - name: Work
+    - name: Video
+      # bookmarks: [{ title, url, as: refName }]  - creates a folder under
+      # "Other Bookmarks" named after the space, with these bookmarks in it
+  # pinnedSites: [{ title, url, as: refName }]
+
+steps:
+  - action: open_regular_tab
+    url: https://example.com/regular-a
+    space: Work
+    as: tab1                    # symbolic ref, used by later steps
+
+  - assert: tab_in_space
+    tab: tab1
+    space: Work
+```
+
+`initial_sidebar` is required and enforced by the runner (`ensureSidebarState()`
+in `lib/chromeDriver.mjs`, using the same open/closed heartbeat mechanism as
+the panel-lifecycle proof) - it's never left to whatever state Chrome or a
+previous test case happened to leave the panel in. Use `open_sidebar`/
+`close_sidebar` steps mid-test for any state changes after that.
+
+`fixture` is seeded fresh before every test case (`lib/fixtures.mjs` resets
+state first: closes all tabs, wipes the bookmark tree, clears
+spaces/pinned sites). See `lib/actions.mjs` for the full list of available
+`action`/`assert` names and their parameters - `open_regular_tab`,
+`open_bookmark_tab`, `open_pinned_tab`, `move_tab_to_group`, `ungroup_tab`,
+`close_tab`, `delete_bookmark`, `close_sidebar`, `open_sidebar`, `wait` /
+`tab_in_space`, `tab_ungrouped`, `bookmark_loaded`, `pinned_loaded`. Add more
+of either as new test cases need them - both are plain functions keyed by
+name, no framework magic.
 
 ## What we learned
 
@@ -92,15 +136,26 @@ whichever one fails first tells you what broke.
   won't register" debugging. Fix: after any `background.ts` change, either
   bump the version (`tools/update-version.sh`) or manually click "Reload" in
   `chrome://extensions` before rerunning the driver.
+- **`chrome.runtime.sendMessage()` called from inside the service worker
+  doesn't loop back to its own `onMessage` listener** - there's no other
+  context receiving it, so it fails with "Could not establish connection."
+  Setup code that needs to invoke background-only logic (like registering a
+  tab's space in `TabSpaceRegistry`) can't reuse the real message action the
+  same way a real sidebar would trigger it.
+- **`TabSpaceRegistry` keeps an in-memory `Map` that's only loaded from
+  `chrome.storage.session` once at service worker startup** - writing to that
+  storage key directly from setup code would NOT affect the actually-running
+  instance's behavior, since nothing re-reads storage after startup. Fix for
+  both of the above: a small DEV-only `globalThis.__testHooks.registerTabSpace()`
+  bridge in `background.ts` that calls the real `tabSpaceRegistry.register()`
+  method directly, rather than trying to fake either the message or the
+  storage write from outside.
 
-## Next: real test cases
+## Extending this
 
-The intended shape: `src/tests/testHooks.ts` grows more functions (setup
-helpers, state-dump helpers written to `chrome.storage.session` and read via
-the service worker, following the pattern above) mirroring the existing
-`src/tests/*Test.ts` pattern. This script's open/close/reopen plumbing
-becomes reusable orchestration that real test files call into, with the
-driver (not any single page's script) coordinating multi-step scenarios like
-"open a bookmark tab, close the panel, move the tab's group via the
-background service worker, reopen the panel, assert whether the association
-went stale."
+Translate more cases from `docs/test/tab-space-association-test-cases.md`
+into `test-cases/*.yaml`. Most of Section A/B/D should be straightforward -
+they're pure `chrome.*` API mechanics. Section C ("Follow active tab" modes)
+will need new assertions that read real DOM/scroll state, which means finally
+solving the "can't reliably attach to the panel's page" problem, or finding
+another storage-bridge workaround like the heartbeat/registry ones above.
