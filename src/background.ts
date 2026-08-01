@@ -784,18 +784,24 @@ async function findSpaceByName(name: string | undefined): Promise<Space | undefi
 let tabSpaceRegistry: TabSpaceRegistry;
 
 // Get space ID for a tab at navigation time
-// Priority: live Chrome group > tab registry > 'all' for ungrouped
+// Priority: pinned check > live Chrome group > tab registry > 'all' for ungrouped
 // Returns undefined for pinned tabs (don't switch space)
 //
-// The Chrome group is checked first because it's the tab's current ground
+// Pinned-site tabs are checked first and unconditionally excluded: pins live in
+// the global pinned bar, not any one space's bookmark folder, and are meant to
+// stay reachable without a space switch even if the underlying tab gets dragged
+// into a space's Chrome group.
+//
+// The Chrome group is checked next because it's the tab's current ground
 // truth. The registry is a cache written once when an Arc-style bookmark tab
 // is created (see 'register-tab-space' in background.ts) and nothing updates
 // it if the tab is later moved to a different group - so it can only be
-// trusted as a fallback for tabs with no live group (pinned-site tabs, which
-// processGroupingRequest deliberately keeps ungrouped, and the brief window
-// right after a bookmark tab is created before auto-grouping completes).
+// trusted as a fallback for tabs with no live group (the brief window right
+// after a bookmark tab is created before auto-grouping completes).
 async function getSpaceForTab(windowId: number, tabId: number): Promise<string | undefined>
 {
+  if (await isPinnedManagedTab(windowId, tabId)) return undefined;
+
   try
   {
     const tab = await chrome.tabs.get(tabId);
