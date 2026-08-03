@@ -18,6 +18,10 @@ Read `READEME.md` for more details about the extension.
 Do not run build after making changes. Notify the user to compile and verify.
 Do not run `git add` or `git commit`. Notify the user to add and commit.
 
+## Design Assumptions
+
+- A bookmark folder belongs to at most one Space. Not enforced in the UI, but code that resolves a bookmark to its Space (e.g. tab/space association logic) assumes this and picks the first matching Space if a folder is somehow shared by more than one.
+
 ## Code Style
 
 - Before loops and sizable `if` blocks, add a short comment explaining what the loop/block is for

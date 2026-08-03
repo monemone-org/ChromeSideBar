@@ -1202,21 +1202,30 @@ interface TabGroupingRequest
 {
   tabId: number;
   windowId: number;
-  activeSpaceId: string;  // Captured at queue time
+  spaceId: string;  // Target space, captured at queue time
+  force: boolean;  // Move even if already in a different group (see queueTabForGrouping)
 }
 const groupingQueue: TabGroupingRequest[] = [];
 let isProcessingGroupingQueue = false;
 
 // Queue a tab for grouping - prevents race condition when multiple tabs created rapidly
-function queueTabForGrouping(tab: chrome.tabs.Tab): void
+// spaceId is the target space to group into. If omitted (e.g. Cmd+T new tabs), falls
+// back to whichever space is currently active in this window, captured at queue time
+// (not processing time).
+//
+// An explicit spaceId means the caller has a definite target (e.g. moving a
+// bookmark's tab to match its new Space) - the request is "forced": the tab moves
+// even if it's already in a different group. Without one, only tabs still
+// ungrouped by processing time are claimed, so a queued new-tab request can't
+// race ahead of - and clobber - a group assigned in the meantime.
+function queueTabForGrouping(tab: chrome.tabs.Tab, spaceId?: string): void
 {
   if (!tab.id || !tab.windowId) return;
 
-  // Capture active space at queue time (not processing time)
-  const activeSpaceId = spaceStateManager.getActiveSpace(tab.windowId);
-  if (!activeSpaceId || activeSpaceId === 'all') return;
+  const targetSpaceId = spaceId ?? spaceStateManager.getActiveSpace(tab.windowId);
+  if (!targetSpaceId || targetSpaceId === 'all') return;
 
-  groupingQueue.push({ tabId: tab.id, windowId: tab.windowId, activeSpaceId });
+  groupingQueue.push({ tabId: tab.id, windowId: tab.windowId, spaceId: targetSpaceId, force: spaceId !== undefined });
   processGroupingQueue();
 }
 
@@ -1243,7 +1252,7 @@ async function processGroupingQueue(): Promise<void>
 // Process a single grouping request
 async function processGroupingRequest(request: TabGroupingRequest): Promise<void>
 {
-  const { tabId, windowId, activeSpaceId } = request;
+  const { tabId, windowId, spaceId, force } = request;
 
   // Check if this is a pinned-site managed tab (keep ungrouped)
   if (await isPinnedManagedTab(windowId, tabId))
@@ -1263,15 +1272,20 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
 
   try
   {
-    // Verify tab still exists and is ungrouped
+    // Verify tab still exists. Skip only if already grouped and this isn't a
+    // forced move (see queueTabForGrouping) - avoids clobbering a group assigned
+    // to a newly-created tab in the gap between queueing and processing.
     const tab = await chrome.tabs.get(tabId);
-    if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return;
+    if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && !force) return;
 
-    const space = await getSpaceById(activeSpaceId);
+    const space = await getSpaceById(spaceId);
     if (!space) return;
 
     // Find existing Chrome group with Space's name
     const existingGroupId = await findGroupByName(windowId, space.name);
+
+    // Already in the right group - nothing to do
+    if (existingGroupId && tab.groupId === existingGroupId) return;
 
     if (existingGroupId)
     {
@@ -1473,7 +1487,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
     return;
   }
 
-  // Re-queue a tab for grouping check (used by sidebar after storing association)
+  // Re-queue a tab for grouping check (used by sidebar after storing association).
+  // spaceId is optional - when given (e.g. associating an existing tab with a
+  // bookmark in a specific Space's folder), it overrides the active-space fallback.
   if (message.action === 'queue-tab-for-grouping')
   {
     (async () =>
@@ -1481,7 +1497,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
       await stateReady;
       if (message.tabId && message.windowId)
       {
-        queueTabForGrouping({ id: message.tabId, windowId: message.windowId } as chrome.tabs.Tab);
+        queueTabForGrouping({ id: message.tabId, windowId: message.windowId } as chrome.tabs.Tab, message.spaceId);
       }
     })();
     return;

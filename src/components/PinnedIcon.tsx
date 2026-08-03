@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Globe, Pencil, Trash, X, RotateCcw, Play, Copy, ExternalLink } from 'lucide-react';
+import { Globe, Pencil, Trash, X, RotateCcw, Play, Copy, ExternalLink, Link, ArrowRightFromLine } from 'lucide-react';
 import { Dialog } from './Dialog';
 import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePinnedSites';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -65,6 +65,7 @@ interface PinnedIconProps
   onOpen: (site: PinnedSite) => void;
   onClose?: (id: string) => void;
   onMoveToNewWindow?: (id: string) => void;
+  onMoveToTabs?: (id: string) => void;
   isLoaded?: boolean;
   isActive?: boolean;
   isAudible?: boolean;
@@ -84,6 +85,7 @@ export const PinnedIcon = ({
   onOpen,
   onClose,
   onMoveToNewWindow,
+  onMoveToTabs,
   isLoaded,
   isActive,
   isAudible,
@@ -234,6 +236,11 @@ export const PinnedIcon = ({
     onRemove(site.id);
   };
 
+  const handleCopyUrl = async () =>
+  {
+    await navigator.clipboard.writeText(site.url);
+  };
+
   // Current icon preview for IconColorPicker
   const currentIconPreview = editEmoji ? (
     <span className="text-xl leading-none">{editEmoji}</span>
@@ -317,19 +324,13 @@ export const PinnedIcon = ({
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content>
-            {isLoaded && onClose && (
-              <>
-                <ContextMenu.Item onSelect={() => onClose(site.id)}>
-                  <X size={14} className="mr-2" /> Close Tab
-                </ContextMenu.Item>
-                {onMoveToNewWindow && (
-                  <ContextMenu.Item onSelect={() => onMoveToNewWindow(site.id)}>
-                    <ExternalLink size={14} className="mr-2" /> Move to New Window
-                  </ContextMenu.Item>
-                )}
-                <ContextMenu.Separator />
-              </>
-            )}
+            <ContextMenu.Item onSelect={() => onDuplicate(site.id)}>
+              <Copy size={14} className="mr-2" /> Duplicate
+            </ContextMenu.Item>
+            <ContextMenu.Item onSelect={handleCopyUrl}>
+              <Link size={14} className="mr-2" /> Copy URL
+            </ContextMenu.Item>
+            <ContextMenu.Separator />
             <ContextMenu.Item onSelect={() =>
             {
               chrome.tabs.create({ url: site.url, windowId }, (tab) =>
@@ -342,15 +343,35 @@ export const PinnedIcon = ({
             }}>
               <ExternalLink size={14} className="mr-2" /> Open in New Tab
             </ContextMenu.Item>
+            <ContextMenu.Item onSelect={() => chrome.windows.create({ url: site.url })}>
+              <ExternalLink size={14} className="mr-2" /> Open in New Window
+            </ContextMenu.Item>
+            {isLoaded && (onMoveToNewWindow || onMoveToTabs) && (
+              <>
+                <ContextMenu.Separator />
+                {onMoveToNewWindow && (
+                  <ContextMenu.Item onSelect={() => onMoveToNewWindow(site.id)}>
+                    <ExternalLink size={14} className="mr-2" /> Move to New Window
+                  </ContextMenu.Item>
+                )}
+                {onMoveToTabs && (
+                  <ContextMenu.Item onSelect={() => onMoveToTabs(site.id)}>
+                    <ArrowRightFromLine size={14} className="mr-2" /> Move to Tabs
+                  </ContextMenu.Item>
+                )}
+              </>
+            )}
             <ContextMenu.Separator />
             <ContextMenu.Item onSelect={handleEdit}>
               <Pencil size={14} className="mr-2" /> Edit
             </ContextMenu.Item>
-            <ContextMenu.Item onSelect={() => onDuplicate(site.id)}>
-              <Copy size={14} className="mr-2" /> Duplicate
-            </ContextMenu.Item>
+            {isLoaded && onClose && (
+              <ContextMenu.Item onSelect={() => onClose(site.id)}>
+                <X size={14} className="mr-2" /> Close Tab
+              </ContextMenu.Item>
+            )}
             <ContextMenu.Item danger onSelect={handleUnpin}>
-              <Trash size={14} className="mr-2" /> Unpin
+              <Trash size={14} className="mr-2" /> {isLoaded ? 'Close Tab and Unpin' : 'Unpin'}
             </ContextMenu.Item>
           </ContextMenu.Content>
         </ContextMenu.Portal>

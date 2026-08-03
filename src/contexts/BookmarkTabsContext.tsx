@@ -24,7 +24,7 @@ interface BookmarkTabsContextValue
   isBookmarkActive: (bookmarkId: string) => boolean;
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
   getBookmarkLiveTitle: (bookmarkId: string) => string | undefined;
-  associateExistingTab: (tabId: number, bookmarkId: string) => Promise<void>;
+  associateExistingTab: (tabId: number, bookmarkId: string, spaceId?: string) => Promise<void>;
   restoreItemAssociation: (tabId: number, itemKey: string) => Promise<void>;
   deassociateBookmarkTab: (bookmarkId: string) => void;
   // Pinned site functions
@@ -35,7 +35,7 @@ interface BookmarkTabsContextValue
   isPinnedActive: (pinnedId: string) => boolean;
   getTabIdForPinned: (pinnedId: string) => number | undefined;
   getPinnedLiveTitle: (pinnedId: string) => string | undefined;
-  deassociatePinnedTab: (pinnedId: string) => void;
+  deassociatePinnedTab: (pinnedId: string) => Promise<void>;
   // Active item tracking
   getActiveItemKey: () => string | null;
   // Tab filtering for sidebar
@@ -577,13 +577,39 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return tabId !== undefined ? tabTitles.get(tabId) : undefined;
   }, [itemToTab, tabTitles]);
 
-  // Associate an existing tab with a bookmark (for drag-drop from tabs to bookmarks)
-  const associateExistingTab = useCallback(async (tabId: number, bookmarkId: string): Promise<void> =>
+  // Associate an existing tab with a bookmark (for drag-drop from tabs to bookmarks,
+  // or "Add to Bookmark"). spaceId is the Space that owns the bookmark's folder -
+  // resolved by the caller, since a folder belongs to at most one Space (see
+  // CLAUDE.md "Design Assumptions"). Mirrors createItemTab's registration +
+  // grouping so a bookmarked tab always matches its bookmark's Space, regardless
+  // of which space the tab happened to be in before it was bookmarked.
+  const associateExistingTab = useCallback(async (
+    tabId: number,
+    bookmarkId: string,
+    spaceId?: string
+  ): Promise<void> =>
   {
     const itemKey = makeBookmarkKey(bookmarkId);
 
     // Store association
     await storeAssociation(tabId, itemKey);
+
+    if (spaceId && currentWindowId !== null)
+    {
+      chrome.runtime.sendMessage({
+        action: 'register-tab-space',
+        windowId: currentWindowId,
+        tabId,
+        spaceId
+      });
+
+      chrome.runtime.sendMessage({
+        action: 'queue-tab-for-grouping',
+        tabId,
+        windowId: currentWindowId,
+        spaceId
+      });
+    }
 
     setItemToTab((prev) =>
     {
@@ -597,7 +623,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
       newMap.set(tabId, itemKey);
       return newMap;
     });
-  }, [storeAssociation]);
+  }, [storeAssociation, currentWindowId]);
 
   // Restore an item association by raw itemKey (for undo — works for both bookmark and pinned)
   const restoreItemAssociation = useCallback(async (tabId: number, itemKey: string): Promise<void> =>
@@ -663,15 +689,21 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     return tabId !== undefined ? tabTitles.get(tabId) : undefined;
   }, [itemToTab, tabTitles]);
 
-  // Deassociate a pinned site from its tab (tab stays alive, becomes unmanaged)
-  const deassociatePinnedTab = useCallback((pinnedId: string): void =>
+  // Deassociate a pinned site from its tab (tab stays alive, becomes unmanaged).
+  // Awaits the storage removal before queueing grouping, so the background's
+  // isPinnedManagedTab check (which reads that same storage) no longer sees this
+  // tab as pin-managed and will group it into the active space instead of leaving
+  // it ungrouped.
+  const deassociatePinnedTab = useCallback(async (pinnedId: string): Promise<void> =>
   {
     if (currentWindowId === null) return;
     const itemKey = makePinnedKey(pinnedId);
     const tabId = itemToTab.get(itemKey);
     if (tabId !== undefined)
     {
+      await removeStoredAssociation(currentWindowId, tabId);
       removeLocalTabAssociation(tabId, currentWindowId);
+      chrome.runtime.sendMessage({ action: 'queue-tab-for-grouping', tabId, windowId: currentWindowId });
     }
   }, [itemToTab, currentWindowId, removeLocalTabAssociation]);
 

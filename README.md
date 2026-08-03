@@ -125,6 +125,7 @@ Organize your browsing by context with Arc-style Spaces—isolated workspaces th
   - Edit (name, icon, color, bookmark folder)
   - Delete (with confirmation)
 - **Multi-window**: Each window has independent Space ↔ group mappings
+- **One folder, one Space**: a bookmark folder is assumed to belong to at most one Space. Picking the same folder for two Spaces is not blocked, but is unsupported - the extension resolves a bookmark to its Space by folder, so a shared folder resolves to whichever Space is found first.
 
 ### Import & Export
 

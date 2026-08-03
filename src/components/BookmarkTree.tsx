@@ -53,6 +53,7 @@ import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
 import { DragData, DragFormat, DragItem, DropData, createBookmarkDragData, createBookmarkDragItem, acceptsFormatsIf, getPrimaryItem, getItemsByFormat, hasFormat } from '../types/dragDrop';
 import { getFaviconUrl } from '../utils/favicon';
 import { saveTabGroupAsBookmarkFolder } from '../utils/bookmarkOperations';
+import { useFindSpaceForFolder } from '../hooks/useFindSpaceForFolder';
 import { UndoableAction } from '../actions/types';
 import { DeleteBookmarkAction } from '../actions/deleteBookmarkAction';
 import { CloseTabAction } from '../actions/closeTabAction';
@@ -577,10 +578,10 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
               {isLoaded && !isFolder && onCloseBookmark ? (
                 <>
                   <ContextMenu.Item onSelect={() => onCloseBookmark(node.id)}>
-                    <X size={14} className="mr-2" /> Close
+                    <X size={14} className="mr-2" /> Close Tab
                   </ContextMenu.Item>
                   <ContextMenu.Item danger onSelect={() => onRemove(node.id)}>
-                    <Trash size={14} className="mr-2" /> Close and Delete
+                    <Trash size={14} className="mr-2" /> Close Tab and Delete
                   </ContextMenu.Item>
                 </>
               ) : (
@@ -769,6 +770,25 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderBySegments, getAllBookmarksInFolder, getBookmarkSegments, getBookmark, error } = useBookmarks();
   const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation, associateExistingTab } = useBookmarkTabsContext();
   const { spaces, updateSpace, updateSpaceFolderPaths, windowId } = useSpacesContext();
+  const findSpaceForFolder = useFindSpaceForFolder(getBookmarkSegments, spaces);
+
+  // Re-group a bookmark's associated live tab (if any) to match its new folder's
+  // Space - mirrors associateExistingTab, keeps "a bookmark tab always lives in
+  // its bookmark's Space" true regardless of how the bookmark got there (created,
+  // dragged in, or moved afterward). No-op if the bookmark has no live tab, or if
+  // the destination folder isn't under any Space.
+  const regroupAssociatedTab = useCallback(async (bookmarkId: string, targetFolderId: string) =>
+  {
+    const tabId = getTabIdForBookmark(bookmarkId);
+    if (tabId === undefined || !windowId) return;
+
+    const targetSpace = await findSpaceForFolder(targetFolderId);
+    if (!targetSpace) return;
+
+    chrome.runtime.sendMessage({ action: 'register-tab-space', windowId, tabId, spaceId: targetSpace.id });
+    chrome.runtime.sendMessage({ action: 'queue-tab-for-grouping', tabId, windowId, spaceId: targetSpace.id });
+  }, [getTabIdForBookmark, windowId, findSpaceForFolder]);
+
   // Build lookup: folderId → Space (only when in "All" space)
   const folderIdToSpace = useMemo(() =>
   {
@@ -1354,9 +1374,10 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     if (moveBookmarkDialog.bookmarkId)
     {
       await moveBookmark(moveBookmarkDialog.bookmarkId, folderId, 'into');
+      await regroupAssociatedTab(moveBookmarkDialog.bookmarkId, folderId);
     }
     closeMoveBookmarkDialog();
-  }, [moveBookmarkDialog.bookmarkId, moveBookmark, closeMoveBookmarkDialog]);
+  }, [moveBookmarkDialog.bookmarkId, moveBookmark, closeMoveBookmarkDialog, regroupAssociatedTab]);
 
   // Delete selected bookmarks (or single bookmark if not in selection)
   const handleDeleteSelectedBookmarks = useCallback((clickedBookmarkId: string) =>
@@ -1524,11 +1545,15 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     for (const item of itemsToMove)
     {
       await moveBookmark(item.id, folderId, 'into');
+      if (item.type === 'bookmark')
+      {
+        await regroupAssociatedTab(item.id, folderId);
+      }
     }
 
     clearSelection();
     setMoveMultiBookmarkDialog({ isOpen: false });
-  }, [getSelectedItems, bookmarks, moveBookmark, clearSelection]);
+  }, [getSelectedItems, bookmarks, moveBookmark, clearSelection, regroupAssociatedTab]);
 
   // Handle moving bookmark to a space's folder
   // Returns error message if failed, undefined if successful
@@ -1559,6 +1584,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       try
       {
         await moveBookmark(bookmarkId, folder.id, 'into');
+        await regroupAssociatedTab(bookmarkId, folder.id);
         onShowToast?.(`Moved to ${space.name}. New location: ${space.bookmarkFolderPath}`);
       }
       catch (err)
@@ -1568,7 +1594,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       }
     }
   }, [moveToSpaceDialog.bookmarkId, moveToSpaceDialog.isMulti, spaces, findFolderBySegments,
-    handleMoveSelectedBookmarksToFolder, moveBookmark, onShowToast]);
+    handleMoveSelectedBookmarksToFolder, moveBookmark, onShowToast, regroupAssociatedTab]);
 
   // Check if selection has any bookmarks (vs only folders)
   const hasSelectedBookmarks = useCallback((): boolean =>
@@ -1847,6 +1873,10 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
             }
           }
 
+          // Resolve which Space owns the drop target folder once - every item in
+          // this loop shares the same parentId
+          const targetSpace = await findSpaceForFolder(parentId);
+
           // Create bookmark for each item, incrementing index to maintain order
           // If dragged from a tab, associate the tab with the new bookmark
           for (const item of urlItems)
@@ -1856,7 +1886,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               const result = await createBookmark(parentId, item.url.title || item.url.url, item.url.url, index);
               if (result.node && item.tab?.tabId)
               {
-                await associateExistingTab(item.tab.tabId, result.node.id);
+                await associateExistingTab(item.tab.tabId, result.node.id, targetSpace?.id);
               }
               if (index !== undefined) index++;
             }
@@ -1924,7 +1954,8 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       console.error('Bookmark drop operation failed:', error);
     }
   }, [bookmarks, spaceFolder, getSelectedItems, moveBookmark, expandedState, setExpandedState,
-    clearSelection, setWasValidDrop, getBookmark, createBookmark, associateExistingTab]);
+    clearSelection, setWasValidDrop, getBookmark, createBookmark, associateExistingTab,
+    findSpaceForFolder]);
 
   // Register drop handler
   useEffect(() =>

@@ -46,7 +46,7 @@ export const PinnedBar = ({
   onPerformAction,
 }: PinnedBarProps) =>
 {
-  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned } = useBookmarkTabsContext();
+  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned, deassociatePinnedTab } = useBookmarkTabsContext();
   const { windowId } = useSpacesContext();
   const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
 
@@ -227,6 +227,7 @@ export const PinnedBar = ({
           }
           onClose={bookmarkOpenMode === 'arc' ? closePinnedTab : undefined}
           onMoveToNewWindow={bookmarkOpenMode === 'arc' ? movePinnedToNewWindow : undefined}
+          onMoveToTabs={bookmarkOpenMode === 'arc' ? deassociatePinnedTab : undefined}
           isLoaded={bookmarkOpenMode === 'arc' ? isPinnedLoaded(site.id) : false}
           isActive={bookmarkOpenMode === 'arc' ? isPinnedActive(site.id) : false}
           isAudible={bookmarkOpenMode === 'arc' ? isPinnedAudible(site.id) : false}

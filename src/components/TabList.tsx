@@ -17,6 +17,7 @@ import { useBookmarks } from '../hooks/useBookmarks';
 import { SPEAKER_ICON_SIZE } from '../constants';
 import { moveTabToSpace as moveTabToSpaceUtil } from '../utils/tabOperations';
 import { filterBookmarkableTabs, saveTabGroupAsBookmarkFolder } from '../utils/bookmarkOperations';
+import { useFindSpaceForFolder } from '../hooks/useFindSpaceForFolder';
 
 // External drop target type for tab → bookmark drops
 export interface ExternalDropTarget
@@ -1042,6 +1043,7 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
 
   // Bookmarks functions for export and tab-to-bookmark drops
   const { findFolderInParent, findFolderBySegments, createFolder, createBookmark, createBookmarksBatch, getChildren, clearFolder, getBookmarkSegments } = useBookmarks();
+  const findSpaceForFolder = useFindSpaceForFolder(getBookmarkSegments, spaces);
 
   // Persisted per-space last selected bookmark folder (spaceId → folderId)
   const [lastSelectedBookmarkFolderPerSpace, setLastSelectedBookmarkFolderPerSpace] = useChromeLocalStorage<Record<string, string>>(
@@ -1075,15 +1077,20 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
     // Create bookmark in the selected folder
     const { node: newBookmark } = await createBookmark(folderId, tab.title, tab.url);
 
-    // If Arc style is enabled, associate the tab with the new bookmark
+    // If Arc style is enabled, associate the tab with the new bookmark - resolve
+    // the folder's owning Space so the tab ends up grouped to match, same as
+    // opening a bookmark tab does (the chosen folder may belong to a different
+    // Space than whichever one is currently active)
     if (arcStyleEnabled && newBookmark && tab.id)
     {
-      await associateExistingTab(tab.id, newBookmark.id);
+      const targetSpace = await findSpaceForFolder(folderId);
+      await associateExistingTab(tab.id, newBookmark.id, targetSpace?.id);
     }
 
     saveLastSelectedBookmarkFolder(folderId);
     closeAddToBookmarkDialog();
-  }, [addToBookmarkDialog.tab, createBookmark, arcStyleEnabled, associateExistingTab, saveLastSelectedBookmarkFolder, closeAddToBookmarkDialog]);
+  }, [addToBookmarkDialog.tab, createBookmark, arcStyleEnabled, associateExistingTab, saveLastSelectedBookmarkFolder,
+    closeAddToBookmarkDialog, findSpaceForFolder]);
 
   const [exportConflictDialog, setExportConflictDialog] = useState<{
     isOpen: boolean;
