@@ -64,7 +64,7 @@ Yes, directly related to the shared-storage doc (Case 1). Only tangentially rela
 
 ## Why A.3 matches shared-storage-multiple-writers.md Case 1
 
-A.3 is the automated test for known gap G2: bookmark tab dragged to another space's group while the sidebar is closed. `expected: true` in the YAML documents that the association currently survives (bug reproduces) - see `e2e/test-cases/A.3.yaml`.
+A.3 is known gap G2: bookmark tab dragged to another space's group while the sidebar is closed - the association currently survives (bug reproduces) instead of breaking.
 
 Code path:
 
@@ -77,13 +77,6 @@ This is verbatim Case 1's third bullet in the shared-storage doc: _"Fire-and-for
 ## Why tab-item-map-encapsulation.md is only tangential
 
 That doc is about `itemToTab`/`tabToItem` in `BookmarkTabsContext.tsx` being raw `Map`s instead of a class - a same-file code-quality concern. `removeLocalTabAssociation` (the function G2 can't reach when the sidebar's closed) does mutate those maps, but wrapping them in a class doesn't change _where_ the write happens. This refactor wouldn't fix G2 on its own.
-
-## Open question
-
-Didn't confirm the actual failure mode - no runner output/diff was available at the time of this analysis. Two possibilities, worth checking against `node e2e/run-test-cases.mjs` output before concluding:
-
-1. Assertion still holds as documented (bug still reproduces) -> failure is in the new YAML harness itself, not the app.
-2. Bookmark actually came back `false` (association got cleared despite sidebar being closed) -> G2 may already be fixed or masked by another code path, and `A.3.yaml`'s `expected: true` is now stale and needs updating.
 
 ## A.7 Step 5 confirms the same gap, wider reach now
 

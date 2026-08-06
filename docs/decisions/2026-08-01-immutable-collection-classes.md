@@ -172,4 +172,4 @@ Independent of [[2026-07-30-shared-storage-multiple-writers]] - that doc is abou
 
 ## Status
 
-Scheduled after the current e2e test-case pass (A.1-F) is finished - not blocking that work, not blocked by it.
+Scheduled after the current manual test pass (`tab-space-association-test-cases.md`, sections A.1-F) is finished - not blocking that work, not blocked by it. (Unrelated to the `e2e/` Playwright harness, which is discontinued separately.)

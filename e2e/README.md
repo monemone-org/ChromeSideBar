@@ -1,12 +1,20 @@
 # E2E driver
 
+**Discontinued, not being finished.** Turned out too fragile in practice to be
+worth the upkeep (see "What we learned" below for the pile of Chrome/Playwright
+quirks it took to get this far). Left in place as-is, disabled, in case it's
+worth revisiting later - not being extended, and `test-cases/*.yaml` isn't
+being kept in sync with the manual test plan going forward.
+`docs/test/tab-space-association-test-cases.md` (run manually) is the actual
+source of truth for test coverage now.
+
 Playwright-driven browser automation, complementing the in-app unit tests in
 `src/tests/`. The in-app tests can't cover anything that requires the side
 panel to be closed/reopened, span multiple windows, or check real DOM/scroll
 state - they run *inside* the panel's own script, which dies the moment the
 panel closes. This layer drives Chrome from the outside instead.
 
-## Status: real test cases running
+## Status: real test cases running (as of when this was frozen)
 
 `spike-panel-lifecycle.mjs` proved the load-bearing mechanism: a driver
 script can reliably open, close, and reopen the side panel, confirming its
@@ -151,11 +159,14 @@ name, no framework magic.
   method directly, rather than trying to fake either the message or the
   storage write from outside.
 
-## Extending this
+## Extending this (not planned)
 
-Translate more cases from `docs/test/tab-space-association-test-cases.md`
-into `test-cases/*.yaml`. Most of Section A/B/D should be straightforward -
-they're pure `chrome.*` API mechanics. Section C ("Follow active tab" modes)
-will need new assertions that read real DOM/scroll state, which means finally
-solving the "can't reliably attach to the panel's page" problem, or finding
-another storage-bridge workaround like the heartbeat/registry ones above.
+This was the plan while the effort was active: translate more cases from
+`docs/test/tab-space-association-test-cases.md` into `test-cases/*.yaml`
+(Section A/B/D are pure `chrome.*` API mechanics; Section C would need new
+assertions reading real DOM/scroll state, meaning finally solving the "can't
+reliably attach to the panel's page" problem, or another storage-bridge
+workaround like the heartbeat/registry ones above). Left here for whoever
+picks this back up, but per the top of this file, that's not happening right
+now - the coverage table in `tab-space-association-test-cases.md` is frozen
+at whatever got translated before this was shelved.
