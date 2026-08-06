@@ -40,8 +40,18 @@ Some cases are simulated in `e2e/test-cases/*.yaml`, run via `node e2e/run-test-
 | B.4       | No        | -                                           |
 | B.5       | Partial*  | [B.5.yaml](../../e2e/test-cases/B.5.yaml)   |
 | B.5b      | Partial*  | [B.5.yaml](../../e2e/test-cases/B.5.yaml)   |
-| C.1       | No        | -                                           |
-| C.2       | No        | -                                           |
+| C.1a      | No        | -                                           |
+| C.1b      | No        | -                                           |
+| C.1c      | No        | -                                           |
+| C.1d      | No        | -                                           |
+| C.1e      | No        | -                                           |
+| C.1f      | No        | -                                           |
+| C.2a      | No        | -                                           |
+| C.2b      | No        | -                                           |
+| C.2c      | No        | -                                           |
+| C.2d      | No        | -                                           |
+| C.2e      | No        | -                                           |
+| C.2f      | No        | -                                           |
 | D.1       | No        | -                                           |
 | D.2       | No        | -                                           |
 | E.1       | No        | -                                           |
@@ -298,34 +308,130 @@ Set via Settings → Behaviour → "Follow active tab": **Off**, **Switch to the
 
 ### C.1 Activation scenarios per mode
 
-| #   | Action                                                                                                                                                  | Off - expected                                                                                     | Space - expected                                                                                                     | Space-and-scroll - expected                                               |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| 1*  | Activate another tab in the **same** space (e.g. via Cmd+click a link, or clicking a different Chrome tab)                                              | No space switch, no scroll                                                                         | No space switch, no scroll                                                                                           | No scroll needed if already visible; no space switch (already same space) |
-| 2*  | Activate a tab in a **different** space (via native Chrome tab click, not the sidebar)                                                                  | Sidebar stays put entirely - does not follow                                                       | Sidebar switches to that space and scrolls to show the tab                                                           | Same as Space mode here                                                   |
-| 3   | Close the active tab, letting Chrome activate another tab in the _same_ space                                                                           | No scroll (no space change)                                                                        | No scroll (no space change - this was the original "close tab causes spurious scroll" bug, confirm it's still fixed) | Scrolls to show the newly-activated tab                                   |
-| 4   | Activate a bookmark tab in another space (tab is inside a collapsed bookmark folder)                                                                    | No switch                                                                                          | Switches space; folder auto-expands; scrolls to the bookmark row                                                     | Same, folder auto-expands and scrolls                                     |
-| 5   | Activate a pinned-site tab from another space                                                                                                           | Pinned tabs don't carry space association - confirm no unexpected space switch happens in any mode |                                                                                                                      |                                                                           |
-| 3b  | Close the active tab, letting Chrome activate another tab in a **different** space (e.g. the previous tab in Chrome's MRU order lives in another space) | No switch, no scroll                                                                               | Switches to that space, no scroll needed unless out of view                                                          | Switches space and scrolls to show the newly-activated tab                |
+"Activate" = make an already-open tab the active one (`chrome.tabs.onActivated`) - not opening a new tab. Each sub-case below is its own step-by-step test, run once per "Follow active tab" mode - the last three columns hold that mode's expected result for each step (setup steps are just "-"). At minimum cover C.1a and C.1b (starred) in all 3 modes.
+
+#### C.1a\* Activate another tab in the same space
+
+| Step | Action                                                                     | Off - expected               | Space - expected | Space-and-scroll - expected                                               |
+| ---- | --------------------------------------------------------------------------- | ----------------------------- | ----------------- | --------------------------------------------------------------------------- |
+| 1    | Switch sidebar to Space A                                                    | -                              | -                  | -                                                                             |
+| 2    | Open a regular tab (lands in Space A)                                        | -                              | -                  | -                                                                             |
+| 3    | Open a second regular tab in Space A (e.g. Cmd+click a link on the first tab's page) | -                       | -                  | -                                                                             |
+| 4    | In Chrome's native tab strip, click the first tab to activate it             | No space switch, no scroll    | No space switch, no scroll | No scroll needed if already visible; no space switch (already same space) |
+
+#### C.1b\* Activate a tab in a different space
+
+| Step | Action                                                                     | Off - expected                          | Space - expected                                          | Space-and-scroll - expected |
+| ---- | --------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------ | ------------------------------ |
+| 1    | Switch sidebar to Space A, open a regular tab there                          | -                                          | -                                                              | -                               |
+| 2    | Switch sidebar to Space B, open a regular tab there                          | -                                          | -                                                              | -                               |
+| 3    | Switch sidebar back to Space A , activate Space A tab                        | -                                          | -                                                              | -                               |
+| 4    | In Chrome's native tab strip (not the sidebar), click the Space B tab to activate it | Sidebar stays on Space A - does not follow | Sidebar switches to Space B and scrolls to show the tab | Same as Space mode here        |
+
+#### C.1c Close the active tab, Chrome activates another tab in the same space
+
+The two tabs need to be far enough apart in the sidebar that "did it scroll" is actually observable - two tabs opened back-to-back usually land next to each other, which can't tell scrolling apart from not. Anchor the first tab at the top (open it from Space A's first bookmark) so it's far from wherever a second, freshly-opened regular tab lands.
+
+| Step | Action                                                                     | Off - expected        | Space - expected                                                                                                     | Space-and-scroll - expected            |
+| ---- | --------------------------------------------------------------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| 1    | Switch sidebar to Space A                                                    | -                         | -                                                                                                                      | -                                          |
+| 2    | Click Space A's first bookmark to open it as a tab ("tab 1") - it loads at the top of the bookmark tree | - | - | - |
+| 3    | Open a second, plain regular tab in Space A ("tab 2") and activate it        | -                         | -                                                                                                                      | -                                          |
+| 4    | Scroll the sidebar so tab 1's bookmark row is out of view (e.g. scrolled down to show the tabs section) | - | - | - |
+| 5    | Close the active tab 2 - Chrome activates tab 1, still in Space A            | No scroll - tab 1's bookmark row stays out of view | No scroll - stays out of view (this was the original "close tab causes spurious scroll" bug, confirm it's still fixed) | Scrolls the bookmark row back into view |
+
+#### C.1d Close the active tab, Chrome activates another tab in a different space
+
+Chrome prefers to keep activation inside the same tab group when closing a tab, if another tab in that group exists - so Space B's group must have **only** the one tab being closed, otherwise Chrome activates a Space B sibling instead of crossing into Space A, and this test doesn't actually exercise the cross-space case.
+
+| Step | Action                                                                                                                    | Off - expected     | Space - expected                                             | Space-and-scroll - expected                                 |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1    | Switch sidebar to Space A, open a regular tab there and activate it                                                           | -                      | -                                                                  | -                                                                  |
+| 2    | Switch sidebar to Space B, open a regular tab there and activate it, making sure it's the **only** tab in Space B's group (so Space A's tab is next in MRU order, and there's no in-group sibling for Chrome to prefer instead) | -                      | -                                                                  | -                                                                  |
+| 3    | Close the active (Space B) tab - Chrome activates the previous tab in its MRU order, which lives in Space A                    | No switch, no scroll  | Switches to that space, no scroll needed unless out of view       | Switches space and scrolls to show the newly-activated tab       |
+
+#### C.1e Activate a bookmark tab in another space
+
+| Step | Action                                                                                                                          | Off - expected | Space - expected                                                  | Space-and-scroll - expected            |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------- | ------------------------------------------ |
+| 1    | Switch sidebar to Space B, expand a folder if needed, and click a bookmark inside it to open its tab                             | -                  | -                                                                      | -                                            |
+| 2    | Collapse that folder, then switch sidebar to Space A and activate a tab in Space A                                                                             | -                  | -                                                                      | -                                            |
+| 3    | In Chrome's native tab strip, click that bookmark's tab to activate it                                                            | No switch          | Switches space; folder auto-expands; scrolls to the bookmark row     | Same, folder auto-expands and scrolls      |
+
+#### C.1f Activate a pinned-site tab from another space
+
+| Step | Action                                                                                       | Off - expected                     | Space - expected                  | Space-and-scroll - expected       |
+| ---- | ----------------------------------------------------------------------------------------------- | ------------------------------------- | ------------------------------------ | ------------------------------------- |
+| 1    | Switch sidebar to Space A                                                                        | -                                       | -                                      | -                                        |
+| 2    | Click a pinned site to open its tab (pinned tabs are never grouped into any space's Chrome group) | -                                       | -                                      | -                                        |
+| 3    | Switch sidebar to Space B and activate a tab in Space B                                                                       | -                                       | -                                      | -                                        |
+| 4    | In Chrome's native tab strip, click the pinned tab to activate it                                | No switch expected (pinned tabs are space-agnostic) | No switch expected (same reason) | No switch expected (same reason) |
 
 ### C.2 Explicit actions bypass the mode (should always scroll/switch regardless of setting)
 
-| #   | Action                                                                                                   | Expected in ALL 3 modes                                                                                              |
-| --- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 1   | Click "Show active tab" toolbar button while active tab is in a different space                          | Switches space, scrolls to the tab                                                                                   |
-| 2   | Click "Show active tab" while active tab is a bookmark tab in a collapsed folder                         | Folder expands, scrolls to it                                                                                        |
-| 3   | Click "Show active tab" with **Off** mode set                                                            | Still works - this was the specific bug reported earlier, confirm it's fixed                                         |
-| 4   | Use tab history Previous/Next toolbar buttons across a space boundary                                    | Switches space and scrolls, in all 3 modes                                                                           |
-| 5   | Use the history keyboard shortcuts (Cmd+Shift+< / Cmd+Shift+>) across a space boundary                   | Same as above - this is the case that has no other way to reach the sidebar, confirm it truly works with **Off** set |
-| 6   | Use the tab-history dropdown (hold the prev/next button) to jump to an older entry in a different space  | Switches space and scrolls                                                                                           |
-| 7   | Audio quick-jump (single click on audio button, if enabled) to a tab in a different space                | Switches space and scrolls, in all 3 modes, including **Off**                                                        |
-| 8   | Audio quick-jump to a tab that is itself a bookmark tab                                                  | Scrolls to the bookmark row (not just tries `data-tab-id` and fails)                                                 |
-| 9   | Select a tab from the audio tabs dropdown list, in a different space                                     | Switches space, scrolls correctly whether it's a regular or bookmark tab                                             |
-| 10  | Use tab history Previous/Next toolbar buttons within the **same** space                                  | No space switch; scrolls to the tab if out of view                                                                   |
-| 11  | Audio quick-jump (single click on audio button, if enabled) to a tab in the **same** space               | No space switch; scrolls to the tab if out of view                                                                   |
-| 12  | Select a tab from the audio tabs dropdown list, in the **same** space                                    | No space switch; scrolls to the tab if out of view                                                                   |
-| 13  | Use the history keyboard shortcuts (Cmd+Shift+< / Cmd+Shift+>) within the **same** space                 | No space switch; scrolls to the tab if out of view                                                                   |
-| 14  | Use the tab-history dropdown (hold the prev/next button) to jump to an older entry in the **same** space | No space switch; scrolls to the tab if out of view                                                                   |
-| 15  | Audio quick-jump to a tab that is itself a bookmark tab, in the **same** space                           | No space switch; scrolls to the bookmark row, folder auto-expands if collapsed                                       |
+Run every sub-case below under all 3 "Follow active tab" modes - expected result is the same in all 3 unless noted. Grouped by trigger mechanism; each group covers cross-space and same-space in one table since the setup is nearly identical.
+
+#### C.2a "Show active tab" toolbar button
+
+| Step | Action                                                                                                  | Expected Result                                                                                                     |
+| ---- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 1    | Switch sidebar to Space A, open a regular tab there and activate it                                       | -                                                                                                                      |
+| 2    | Switch sidebar to Space B, open a regular tab there and activate it                                       | -                                                                                                                      |
+| 3    | Switch sidebar back to Space A (so the active tab is now in Space B, but the sidebar shows Space A)        | -                                                                                                                      |
+| 4    | Click the "Show active tab" toolbar button                                                                | Switches sidebar to Space B, scrolls to the tab - test this specifically under **Off** mode too, since it was previously reported broken there |
+| 5    | Repeat steps 1-4, but make the Space B tab a bookmark tab inside a collapsed folder instead of a regular tab | Folder expands, scrolls to the bookmark row                                                                          |
+
+#### C.2b Tab history Previous/Next toolbar buttons
+
+| Step | Action                                                                                                  | Expected Result                                              |
+| ---- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)                                | -                                                                  |
+| 2    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)                                | -                                                                  |
+| 3    | Click the toolbar's "Previous" button to go back to tab 1                                                  | Switches sidebar to Space A, scrolls to tab 1                    |
+| 4    | Click "Next" to return to tab 2                                                                             | Switches sidebar to Space B, scrolls to tab 2                    |
+| 5    | Repeat steps 1-4, but open both tab 1 and tab 2 in the same Space                                           | No space switch; scrolls to the tab if out of view               |
+
+#### C.2c History keyboard shortcuts (Cmd+Shift+< / Cmd+Shift+>)
+
+Same setup as C.2b, triggered via keyboard instead of the toolbar buttons. Worth testing on its own: this is the one path with **no other way to reach the sidebar**, so it's the strongest confirmation that explicit actions bypass **Off** mode.
+
+| Step | Action                                                                       | Expected Result                                              |
+| ---- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 1    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)      | -                                                                  |
+| 2    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)      | -                                                                  |
+| 3    | Press Cmd+Shift+< (back)                                                        | Switches to Space A, scrolls to tab 1, including under **Off**    |
+| 4    | Press Cmd+Shift+> (forward)                                                     | Switches to Space B, scrolls to tab 2, including under **Off**    |
+| 5    | Repeat steps 1-4, but open both tabs in the same Space                          | No space switch; scrolls to the tab if out of view               |
+
+#### C.2d Tab-history dropdown (press-and-hold Previous/Next)
+
+| Step | Action                                                                                                          | Expected Result                            |
+| ---- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 1    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)                                      | -                                               |
+| 2    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)                                      | -                                               |
+| 3    | Switch sidebar to Space A again, open a third regular tab there and activate it (tab 3) - tab 2 is now a few entries back in history | -                                               |
+| 4    | Press and hold the toolbar's "Previous" button to open the history dropdown, select tab 2's entry               | Switches to Space B, scrolls to tab 2         |
+| 5    | Repeat steps 1-4, but open all three tabs in the same Space                                                       | No space switch; scrolls to the tab if out of view |
+
+#### C.2e Audio quick-jump (single click on audio button)
+
+| Step | Action                                                                                                  | Expected Result                                                                          |
+| ---- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1    | Switch sidebar to Space A                                                                                  | -                                                                                                |
+| 2    | Switch sidebar to Space B, open a tab there playing audio (e.g. a page with autoplay video)                | -                                                                                                |
+| 3    | Switch sidebar back to Space A                                                                             | -                                                                                                |
+| 4    | Click the toolbar's audio quick-jump button                                                                | Switches to Space B, scrolls to the audio tab, including under **Off**                          |
+| 5    | Repeat steps 2-4, but make the audio tab a bookmark tab instead of a regular tab                            | Scrolls to the bookmark row (not just tries `data-tab-id` and fails)                            |
+| 6    | Repeat steps 1-4, but open the audio tab in the same Space the sidebar is already showing                  | No space switch; scrolls to the tab if out of view                                              |
+| 7    | Repeat step 6, but make that same-space audio tab a bookmark tab in a collapsed folder                     | No space switch; scrolls to the bookmark row, folder auto-expands if collapsed                  |
+
+#### C.2f Select a tab from the audio tabs dropdown list
+
+| Step | Action                                                                                                 | Expected Result                                                            |
+| ---- | ---------------------------------------------------------------------------------------------------------| -------------------------------------------------------------------------- |
+| 1    | Have 2+ tabs playing audio, at least one in a different Space than the sidebar is currently showing        | -                                                                            |
+| 2    | Open the audio tabs dropdown (toolbar), select the entry from the other Space                              | Switches space, scrolls correctly whether it's a regular or bookmark tab   |
+| 3    | Repeat step 2, selecting an entry that's already in the Space the sidebar is showing                       | No space switch; scrolls to the tab if out of view                        |
 
 ---
 
@@ -344,10 +450,9 @@ Set via Settings → Behaviour → "Follow active tab": **Off**, **Switch to the
 | Step | Action                                                                       | Expected Result                                                                                                                                                       |
 | ---- | ---------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1    | Open a bookmark tab in Space A, note it's loaded                             | -                                                                                                                                                                     |
-| 2    | Delete Space A (with its tabs open)                                          | Space's tabs should close (per existing delete-space behavior); confirm no leftover/orphaned association or registry state causes issues for any tab reused afterward |
-| 3    | Undo the space deletion (if offered)                                         | Space and tabs restore correctly, associations intact                                                                                                                 |
-| 4    | Repeat steps 1-3 with a pinned tab open in Space A instead of a bookmark tab | Same expected result                                                                                                                                                  |
-| 5    | Repeat steps 1-3 with a plain regular tab open in Space A instead            | Same expected result                                                                                                                                                  |
+| 2    | Also open a pinned site's tab, and a plain regular tab, in Space A - all three tab types now open at once | -                                                                                                                                                                     |
+| 3    | Delete Space A (with all three tabs open)                                    | The bookmark tab and regular tab should close (they're members of Space A's Chrome group, which `DeleteSpaceAction` closes); the pinned tab should stay open and untouched.  Confirm no leftover/orphaned association or registry state for the two closed tabs if reused afterward |
+| 4    | Undo the space deletion (if offered)                                         | Space, the bookmark tab, and the regular tab restore correctly, associations intact; the pinned tab was never affected, so there's nothing to restore for it         |
 
 ---
 

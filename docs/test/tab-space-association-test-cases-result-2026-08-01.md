@@ -7,38 +7,48 @@ status: draft
 
 Source test plan: [tab-space-association-test-cases.md](tab-space-association-test-cases.md). Test Result: Pass / Bugged / Fixed.
 
-| Test case | Name                                                                           | Test Result | Details      |
-| --------- | ------------------------------------------------------------------------------ | ----------- | ------------ |
-| A.1       | Regular tab moved to another space, sidebar open                               | Pass        |              |
-| A.2       | Bookmark tab moved to a different space's group, sidebar open                  | Pass        |              |
-| A.3       | Bookmark tab moved to a different space's group, sidebar CLOSED (known gap G2) | Bugged      | [below](#a3) |
-| A.4       | Pinned tab moved to a different space's group                                  | Fixed       | [below](#a4) |
-| A.5       | Bookmark tab: native "Remove from group" / ungroup (known gap G3)              | Pass        |              |
-| A.5b      | Regular tab: native "Remove from group" / ungroup                              | Pass        |              |
-| A.5c      | Pinned tab: native "Remove from group" / ungroup                               | Pass        |              |
-| A.6       | Tab moved to a different window                                                | Bugged      | [below](#a6) |
-| A.6b      | Regular tab moved to a different window                                        | Passed      |              |
-| A.6c      | Pinned tab moved to a different window                                         | Bugged      | [below](#a6c) |
-| A.7 Step 3 | Regular tab bookmarked via drag-into-tree, then moved to another space        | Fixed       | [below](#a7) |
-| A.7 Step 4 | Regular tab bookmarked via drag-into-tree, then "Move to Space" to another space | Fixed       | [below](#a7) |
-| A.7 Step 5  | Regular tab bookmarked via drag-into-tree, close sidebar. then move tab to tab group B         | Bugged (=G2/A.3)       | [below](#a3) |
-| A.7b      | Bookmarked tab moved via generic "Move Bookmark to..." folder picker           | Pass        |              |
-| A.7c      | Multiple bookmarked tabs moved via multi-select "Move to..."                   | Pass        |              |
-| B.1       | Close a bookmark tab directly (X button / Cmd+W)                               | Pass        |              |
-| B.2       | Close a pinned tab directly                                                    | Pass        |              |
-| B.2b      | Close a regular tab directly                                                   | Pass        |              |
-| B.3       | Close via "Close Tab" in the sidebar's own context menu / multi-close          | Pass        |              |
-| B.4, Step 4 | Close the whole window with tracked tabs open                                  | Pass        |              |
-| B.4, Step 5 | Close the whole window with tracked tabs open                                  | Pass        |              |
-| B.5       | Delete a bookmark while its tab is open (known gap G1)                         | Bugged      | Per G1       |
-| B.5b      | Delete a bookmark via Chrome's native bookmark manager, sidebar closed         | Bugged      | Per G1       |
-| C.1       | Activation scenarios per mode                                                  |             |              |
-| C.2       | Explicit actions bypass the mode                                               |             |              |
-| D.1       | Rename a space while it has tracked tabs                                       |             |              |
-| D.2       | Delete a space with tracked tabs                                               |             |              |
-| E.1       | Reload the extension (chrome://extensions → reload)                            |             |              |
-| E.2       | Full browser restart                                                           |             |              |
-| F         | Regression check on pre-existing behavior                                      |             |              |
+| Test case  | Name                                                                                      | Test Result      | Details       |
+| ---------- | ----------------------------------------------------------------------------------------- | ---------------- | ------------- |
+| A.1        | Regular tab moved to another space, sidebar open                                          | Pass             |               |
+| A.2        | Bookmark tab moved to a different space's group, sidebar open                             | Pass             |               |
+| A.3        | Bookmark tab moved to a different space's group, sidebar CLOSED (known gap G2)            | Bugged           | [below](#a3)  |
+| A.4        | Pinned tab moved to a different space's group                                             | Fixed            | [below](#a4)  |
+| A.5        | Bookmark tab: native "Remove from group" / ungroup (known gap G3)                         | Pass             |               |
+| A.5b       | Regular tab: native "Remove from group" / ungroup                                         | Pass             |               |
+| A.5c       | Pinned tab: native "Remove from group" / ungroup                                          | Pass             |               |
+| A.6        | Tab moved to a different window                                                           | Bugged           | [below](#a6)  |
+| A.6b       | Regular tab moved to a different window                                                   | Passed           |               |
+| A.6c       | Pinned tab moved to a different window                                                    | Bugged           | [below](#a6c) |
+| A.7 Step 3 | Regular tab bookmarked via drag-into-tree, then moved to another space                    | Fixed            | [below](#a7)  |
+| A.7 Step 4 | Regular tab bookmarked via drag-into-tree, then "Move to Space" to another space          | Fixed            | [below](#a7)  |
+| A.7 Step 5 | Regular tab bookmarked via drag-into-tree, close sidebar. then move tab to tab group B    | Bugged (=G2/A.3) | [below](#a3)  |
+| A.7b       | Bookmarked tab moved via generic "Move Bookmark to..." folder picker                      | Pass             |               |
+| A.7c       | Multiple bookmarked tabs moved via multi-select "Move to..."                              | Pass             |               |
+| B.1        | Close a bookmark tab directly (X button / Cmd+W)                                          | Pass             |               |
+| B.2        | Close a pinned tab directly                                                               | Pass             |               |
+| B.2b       | Close a regular tab directly                                                              | Pass             |               |
+| B.3        | Close via "Close Tab" in the sidebar's own context menu / multi-close                     | Pass             |               |
+| B.4 Step 4 | Close the whole window with tracked tabs open                                             | Pass             |               |
+| B.4 Step 5 | Close the whole window with tracked tabs open                                             | Pass             |               |
+| B.5        | Delete a bookmark while its tab is open (known gap G1)                                    | Bugged           | Per G1        |
+| B.5b       | Delete a bookmark via Chrome's native bookmark manager, sidebar closed                    | Bugged           | Per G1        |
+| C.1a       | Activate another tab in the same space (Off/Space/Space-and-scroll)                       | Pass/Pass/Pass   |               |
+| C.1b       | Activate a tab in a different space (Off/Space/Space-and-scroll)                          | Pass/Pass/Pass   |               |
+| C.1c       | Close active tab, activates another tab in the same space (Off/Space/Space-and-scroll)    | Pass/Pass/Pass   |               |
+| C.1d       | Close active tab, activates another tab in a different space (Off/Space/Space-and-scroll) | Pass/Pass/Pass   |               |
+| C.1e       | Activate a bookmark tab in another space (Off/Space/Space-and-scroll)                     | Pass/Pass/Pass   |               |
+| C.1f       | Activate a pinned-site tab from another space (Off/Space/Space-and-scroll)                | Pass/Pass/Pass   |               |
+| C.2a       | "Show active tab" toolbar button                                                          | Pass//           |               |
+| C.2b       | Tab history Previous/Next toolbar buttons                                                 | Pass//           |               |
+| C.2c       | History keyboard shortcuts                                                                | Pass//           |               |
+| C.2d       | Tab-history dropdown                                                                      | Pass             |               |
+| C.2e       | Audio quick-jump                                                                          | Pass             |               |
+| C.2f       | Select a tab from the audio tabs dropdown list                                            | Pass             |               |
+| D.1        | Rename a space while it has tracked tabs                                                  | Bugged (step 3)  | [below](#d1)  |
+| D.2        | Delete a space with tracked tabs                                                          | Passed           |               |
+| E.1        | Reload the extension (chrome://extensions → reload)                                       | Passed           |               |
+| E.2        | Full browser restart                                                                      | Passed           |               |
+| F          | Regression check on pre-existing behavior                                                 | Passed           |               |
 
 ---
 
@@ -79,7 +89,7 @@ Didn't confirm the actual failure mode - no runner output/diff was available at 
 
 A.7 Step 5 (drag-into-tree bookmark, sidebar closed, native cross-group drag) reproduces this exact bug - same `DEASSOCIATE_TAB` fire-and-forget message, same sidebar-only listener. Not a new/separate bug.
 
-Before the A.7 registration fix, drag-into-tree bookmarks were never registered in `tabSpaceRegistry`, so `background.ts:1121-1142`'s `if (registeredSpaceId)` check was always false for them - they never even reached the `DEASSOCIATE_TAB` fire-and-forget code, i.e. they were *accidentally immune* to G2. Now that `associateExistingTab` correctly registers them, they're *correctly exposed* to the same pre-existing gap every other tracked bookmark tab already has. The registration fix was right - it just widened which tabs G2 applies to, rather than introducing anything new.
+Before the A.7 registration fix, drag-into-tree bookmarks were never registered in `tabSpaceRegistry`, so `background.ts:1121-1142`'s `if (registeredSpaceId)` check was always false for them - they never even reached the `DEASSOCIATE_TAB` fire-and-forget code, i.e. they were _accidentally immune_ to G2. Now that `associateExistingTab` correctly registers them, they're _correctly exposed_ to the same pre-existing gap every other tracked bookmark tab already has. The registration fix was right - it just widened which tabs G2 applies to, rather than introducing anything new.
 
 ---
 
@@ -125,7 +135,7 @@ Step 6 failed: after moving a tracked bookmark tab to a different window while w
 Same underlying failure as A.3, different trigger event:
 
 - `chrome.tabs.onDetached` is only listened to in `src/contexts/BookmarkTabsContext.tsx:265-284` - `background.ts` has no equivalent listener. Sidebar closed at detach time -> nothing calls `removeLocalTabAssociation`.
-- The reconciliation pass that runs on sidebar reopen, `rebuildAssociations` (`BookmarkTabsContext.tsx:102-187`), doesn't self-heal this either: it only checks that `chrome.tabs.get(tabId)` succeeds, never that the tab's *current* `windowId` still matches the window being rebuilt. A detached tab still exists (just in another window), so it's silently kept and written back as if nothing happened.
+- The reconciliation pass that runs on sidebar reopen, `rebuildAssociations` (`BookmarkTabsContext.tsx:102-187`), doesn't self-heal this either: it only checks that `chrome.tabs.get(tabId)` succeeds, never that the tab's _current_ `windowId` still matches the window being rebuilt. A detached tab still exists (just in another window), so it's silently kept and written back as if nothing happened.
 
 Logged as a fourth bullet under Case 1 in `docs/decisions/2026-07-30-shared-storage-multiple-writers.md`, with a scope note calling out that the fix needs an explicit new `chrome.tabs.onDetached` listener in `background.ts` - easy to miss since nothing else in that doc names it.
 
@@ -145,9 +155,9 @@ Fails the same way as A.6, just with a pinned site instead of a bookmark: draggi
 
 Pinned tabs are not a separate system from bookmark tabs here - they go through the exact same `tabAssociations` storage and code path, just with a different itemKey prefix:
 
-- `BookmarkTabsContext.tsx:15` - `makePinnedKey = (pinnedId) => \`pinned-${pinnedId}\`` - pinned associations are stored in the same `tabAssociations_{windowId}` record as bookmarks via the same `storeAssociation`.
+- `BookmarkTabsContext.tsx:15` - `makePinnedKey = (pinnedId) => \`pinned-${pinnedId}\``- pinned associations are stored in the same`tabAssociations_{windowId}`record as bookmarks via the same`storeAssociation`.
 - `isPinnedManagedTab()` (`src/utils/tabAssociations.ts:22-27`) exists specifically to distinguish the `pinned-` prefix within that one shared record - confirming there's one storage record and one code path for both.
-- That shared code path is exactly what A.6 is bugged on: `chrome.tabs.onDetached` only listened to in `BookmarkTabsContext.tsx:265-284` (sidebar-only, nothing in `background.ts`), and `rebuildAssociations` (`BookmarkTabsContext.tsx:102-187`) never checks that a tab's *current* `windowId` still matches the window being rebuilt.
+- That shared code path is exactly what A.6 is bugged on: `chrome.tabs.onDetached` only listened to in `BookmarkTabsContext.tsx:265-284` (sidebar-only, nothing in `background.ts`), and `rebuildAssociations` (`BookmarkTabsContext.tsx:102-187`) never checks that a tab's _current_ `windowId` still matches the window being rebuilt.
 
 Confirmed by code inspection, not yet re-verified against a fresh manual repro of A.6c specifically - but the mechanism is identical to A.6's, no separate investigation needed.
 
@@ -165,7 +175,7 @@ Step 4 failed: after bookmarking a tab in Space A, then right-clicking the bookm
 
 ## Root cause
 
-`handleMoveBookmarkToSpace()` in `src/components/BookmarkTree.tsx` (the "Move to Space" dialog's single-bookmark branch) only ever called `moveBookmark(bookmarkId, folder.id, 'into')` - a plain `chrome.bookmarks.move()`. Nothing there checked whether the bookmark had a live associated tab, and nothing sent `register-tab-space`/`queue-tab-for-grouping` to move that tab's Chrome group to match. Same underlying principle as the earlier A.7 step 3/4 fix (a bookmark's Space should drive where its tab lives) - just a different trigger: *moving* an already-associated bookmark, rather than *creating* the association.
+`handleMoveBookmarkToSpace()` in `src/components/BookmarkTree.tsx` (the "Move to Space" dialog's single-bookmark branch) only ever called `moveBookmark(bookmarkId, folder.id, 'into')` - a plain `chrome.bookmarks.move()`. Nothing there checked whether the bookmark had a live associated tab, and nothing sent `register-tab-space`/`queue-tab-for-grouping` to move that tab's Chrome group to match. Same underlying principle as the earlier A.7 step 3/4 fix (a bookmark's Space should drive where its tab lives) - just a different trigger: _moving_ an already-associated bookmark, rather than _creating_ the association.
 
 While fixing this, found the same gap in two more places that also move a bookmark's folder without touching its tab's Chrome group:
 
@@ -187,3 +197,32 @@ Fix: added a `force` flag to `TabGroupingRequest`. `queueTabForGrouping()` now s
 ## New test coverage
 
 The generic-folder-picker and multi-select paths weren't covered by any existing test case - added `A.7b` and `A.7c` to `tab-space-association-test-cases.md` to cover them going forward.
+
+---
+
+<a id="d1"></a>
+
+# D.1 Failure - Renamed Space's Chrome Group Not Updated in Other Windows
+
+Step 3 confirmed the gap the test doc already flagged as likely: with two windows both showing Space A's group, renaming Space A from window 1 does not rename window 2's Chrome group - it's left with the stale title.
+
+## Root cause
+
+`updateSpace()` in `src/contexts/SpacesContext.tsx:255-295` syncs the rename to Chrome's tab group, but only for its own window:
+
+```typescript
+if (windowId && (updates.name || updates.color))
+{
+  const groups = await chrome.tabGroups.query({ windowId, title: space.name });  // current window only
+  if (groups.length > 0)
+  {
+    await chrome.tabGroups.update(groups[0].id, { title: updates.name ?? space.name, ... });
+  }
+}
+```
+
+Window 2 does get the renamed `Space` object - `SpacesContext.tsx:144-155` has a `chrome.storage.onChanged` listener that keeps every window's `spaces` React state in sync, so window 2's own sidebar UI (space list, navigator) correctly shows the new name. But that listener only calls `setSpaces(...)` - it never re-runs the `chrome.tabGroups.update()` side effect. That side effect is tied to the rename _action_ (only fires in whichever window the user actually renamed from), not to the underlying _state change_ every window receives. So window 2's sidebar is correct, but its actual Chrome tab group keeps the stale title.
+
+## Plan
+
+Not fixed yet. A fix would need `handleStorageChange` (or a new effect watching `spaces`) to diff old vs. new `spaces` arrays by `id` to detect a name/color change, then run the same `chrome.tabGroups.query`/`update` sync for its own window - more involved than a one-liner, not applied yet.
