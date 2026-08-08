@@ -13,7 +13,7 @@ Source test plan: [tab-space-association-test-cases.md](tab-space-association-te
 | A.2        | Bookmark tab moved to a different space's group, sidebar open                             | Pass             |               |
 | A.3        | Bookmark tab moved to a different space's group, sidebar CLOSED (known gap G2)            | Bugged           | [below](#a3)  |
 | A.4        | Pinned tab moved to a different space's group                                             | Fixed            | [below](#a4)  |
-| A.5        | Bookmark tab: native "Remove from group" / ungroup (known gap G3)                         | Pass             |               |
+| A.5        | Bookmark tab: native "Remove from group" / ungroup (known gap G3)                         | Bugged           | Per G3        |
 | A.5b       | Regular tab: native "Remove from group" / ungroup                                         | Pass             |               |
 | A.5c       | Pinned tab: native "Remove from group" / ungroup                                          | Pass             |               |
 | A.6        | Tab moved to a different window                                                           | Bugged           | [below](#a6)  |

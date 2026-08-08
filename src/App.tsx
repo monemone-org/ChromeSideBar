@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { BookmarkTree } from './components/BookmarkTree';
 import { TabList, ExternalDropTarget, ResolveBookmarkDropTarget } from './components/TabList';
 import { PinnedBar } from './components/PinnedBar';
@@ -41,6 +41,19 @@ import { useNewsCheck } from './hooks/useNewsCheck';
 import { useFollowActiveTab } from './hooks/useFollowActiveTab';
 import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY, DEFAULT_FOLLOW_ACTIVE_TAB_MODE, parseFollowActiveTabMode } from './utils/followActiveTab';
 import * as DropdownMenu from './components/menu/DropdownMenu';
+
+// DEV-only, code-split so it never ends up in a production bundle - see
+// src/tests/inpanel/TestRunnerPanel.tsx. Lazy (not the dynamic-import-on-click
+// pattern the other "Unit Test ..." menu items use) because it needs to stay
+// mounted at all times in DEV to detect a resumable paused run on every
+// sidebar open, not just after the user opens it from the menu. Guarded by
+// import.meta.env.DEV here too (not just at the render site below) so the
+// dynamic import() call itself is unreachable in a production build,
+// regardless of whether the bundler's tree-shaking would have stripped the
+// chunk anyway.
+const TestRunnerPanel = import.meta.env.DEV
+  ? React.lazy(() => import('./tests/inpanel/TestRunnerPanel').then(m => ({ default: m.TestRunnerPanel })))
+  : null;
 
 // Inner component that renders content for a single space
 interface SidebarContentProps
@@ -598,6 +611,7 @@ function App() {
   );
   const [showSettings, setShowSettings] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [showTestRunner, setShowTestRunner] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showArcImport, setShowArcImport] = useState(false);
@@ -1147,6 +1161,10 @@ function App() {
                   Unit Test Do/Undo Delete Space
                 </DropdownMenu.Item>
                 {/*} add new unit tests here */}
+                <DropdownMenu.Item onSelect={() => setShowTestRunner(true)}>
+                  <span className="w-[14px] mr-2" />
+                  Test Runner…
+                </DropdownMenu.Item>
                 <DropdownMenu.Item onSelect={() => chrome.runtime.reload()}>
                   <RefreshCw size={14} className="mr-2" />
                   Reload Extension
@@ -1232,6 +1250,21 @@ function App() {
 
       {/* Unified Drag Overlay for cross-component DnD */}
       <UnifiedDragOverlay pinnedIconSize={pinnedIconSize} yOffset={24} />
+
+      {/* DEV Test Runner - docked at the bottom of the flex column (not a
+          modal), last child so it renders below the space bar and
+          everything else stays interactive while it's open */}
+      {TestRunnerPanel && (
+        <Suspense fallback={null}>
+          <TestRunnerPanel
+            isOpen={showTestRunner}
+            onOpenChange={setShowTestRunner}
+            pinnedSites={pinnedSites}
+            addPin={addPin}
+            removePin={removePin}
+          />
+        </Suspense>
+      )}
       </AppContainer>
       </UnifiedDndProvider>
       </SelectionProvider>

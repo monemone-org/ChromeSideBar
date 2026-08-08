@@ -10,6 +10,7 @@ import { useExternalLinkDrop } from '../hooks/useExternalLinkDrop';
 import { getIndentPadding } from '../utils/indent';
 import { scrollToBookmark, REVEAL_BOOKMARK_EVENT, RevealBookmarkDetail } from '../utils/scrollHelpers';
 import { DropPosition, calculateDropPosition } from '../utils/dragDrop';
+import { regroupAssociatedTab as regroupAssociatedTabUtil } from '../utils/tabOperations';
 import { matchesFilter } from '../utils/searchParser';
 import { DropIndicators } from './DropIndicators';
 import { ExternalDropTarget, ResolveBookmarkDropTarget } from './TabList';
@@ -775,19 +776,14 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
   // Re-group a bookmark's associated live tab (if any) to match its new folder's
   // Space - mirrors associateExistingTab, keeps "a bookmark tab always lives in
   // its bookmark's Space" true regardless of how the bookmark got there (created,
-  // dragged in, or moved afterward). No-op if the bookmark has no live tab, or if
-  // the destination folder isn't under any Space.
-  const regroupAssociatedTab = useCallback(async (bookmarkId: string, targetFolderId: string) =>
-  {
-    const tabId = getTabIdForBookmark(bookmarkId);
-    if (tabId === undefined || !windowId) return;
-
-    const targetSpace = await findSpaceForFolder(targetFolderId);
-    if (!targetSpace) return;
-
-    chrome.runtime.sendMessage({ action: 'register-tab-space', windowId, tabId, spaceId: targetSpace.id });
-    chrome.runtime.sendMessage({ action: 'queue-tab-for-grouping', tabId, windowId, spaceId: targetSpace.id });
-  }, [getTabIdForBookmark, windowId, findSpaceForFolder]);
+  // dragged in, or moved afterward). Shared with src/tests/inpanel/actions.ts so
+  // the in-panel test runner exercises this exact implementation rather than a
+  // separate copy that could silently drift from it.
+  const regroupAssociatedTab = useCallback(
+    (bookmarkId: string, targetFolderId: string) =>
+      regroupAssociatedTabUtil(bookmarkId, targetFolderId, getTabIdForBookmark, windowId, findSpaceForFolder),
+    [getTabIdForBookmark, windowId, findSpaceForFolder]
+  );
 
   // Build lookup: folderId → Space (only when in "All" space)
   const folderIdToSpace = useMemo(() =>

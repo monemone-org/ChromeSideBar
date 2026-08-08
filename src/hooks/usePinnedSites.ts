@@ -16,7 +16,8 @@ export interface PinnedSite {
   emoji?: string;           // Emoji character (e.g., "😀")
 }
 
-const STORAGE_KEY = 'pinnedSites';
+export const PINNED_SITES_STORAGE_KEY = 'pinnedSites';
+const STORAGE_KEY = PINNED_SITES_STORAGE_KEY;
 
 const generateId = (): string => {
   return `pin_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

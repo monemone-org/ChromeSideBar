@@ -1,0 +1,460 @@
+// DEV-only in-panel test runner UI. Wired into App.tsx's DEV dropdown, next to
+// the existing "Unit Test ..." menu items. Runs the workflow-style cases in
+// ./cases/* (which automate docs/test/tab-space-association-test-cases.md)
+// entirely inside this component's own render tree, using the same hooks the
+// real UI uses - see types.ts's TestContext doc comment for why ctxRef is
+// rebuilt every render instead of captured once.
+//
+// Deliberately NOT the shared modal Dialog component - this renders inline
+// as the last child in AppContainer's flex column (see App.tsx), docked
+// below the rest of the sidebar (space bar included) with no backdrop, so
+// you can keep using tabs/bookmarks/spaces while a run is in progress
+// instead of it blocking the whole UI.
+
+import { useEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
+import { useSpacesContext } from '../../contexts/SpacesContext';
+import { useBookmarkTabsContext } from '../../contexts/BookmarkTabsContext';
+import { useBookmarks } from '../../hooks/useBookmarks';
+import { PinnedSite } from '../../hooks/usePinnedSites';
+import { useFindSpaceForFolder } from '../../hooks/useFindSpaceForFolder';
+import { ResumeState, TestCase, TestContext, TestResult } from './types';
+import {
+  clearAllCaseResults,
+  clearBatchQueue,
+  clearResumeState,
+  readAllCaseResults,
+  readBatchQueue,
+  readResumeState,
+  runFrom,
+  writeBatchQueue,
+  writeCaseResult,
+} from './runner';
+import { resetTestData } from './fixtures';
+import { sleep } from './stepHelpers';
+import { ALL_CASES } from './cases';
+
+// SpacesContext (and the other contexts this panel depends on) start with
+// empty/default state and only populate via an async chrome.runtime message
+// round-trip fired on mount (see SpacesContext.tsx's GET_SPACES effect) -
+// every pause->close->reopen cycle is a fresh mount, racing that load
+// against whatever the resumed run does next. Give it a moment to settle
+// before driving anything, so resetTestData()/setup() don't read
+// still-empty context state right after a remount.
+const RESUME_SETTLE_MS = 800;
+
+interface TestRunnerPanelProps
+{
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  // Passed down from App.tsx's own usePinnedSites() instance rather than
+  // calling the hook again here - usePinnedSites is plain useState-backed,
+  // not a shared context, and this panel is mounted unconditionally in DEV,
+  // so a second instance would run its favicon-resolution effect and
+  // storage writes in parallel with App's, able to race and clobber each
+  // other (see usePinnedSites.ts's removePin/addPin, both snapshot-writing
+  // the full pinnedSites array back to storage).
+  pinnedSites: PinnedSite[];
+  addPin: (url: string, title: string) => Promise<void>;
+  removePin: (id: string) => void;
+}
+
+interface CaseSummary
+{
+  total: number;
+  failed: number;
+}
+
+function summarize(results: TestResult[]): CaseSummary
+{
+  return { total: results.length, failed: results.filter(r => !r.passed).length };
+}
+
+export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, removePin }: TestRunnerPanelProps) =>
+{
+  const spacesCtx = useSpacesContext();
+  const bookmarkTabsCtx = useBookmarkTabsContext();
+  const bookmarksCtx = useBookmarks();
+  const findSpaceForFolder = useFindSpaceForFolder(bookmarksCtx.getBookmarkSegments, spacesCtx.spaces);
+
+  const refsMapRef = useRef<Map<string, unknown>>(new Map());
+  const ctxRef = useRef<TestContext | null>(null);
+
+  ctxRef.current = spacesCtx.windowId === null ? null : {
+    windowId: spacesCtx.windowId,
+    spaces: spacesCtx.spaces,
+    pinnedSites,
+    refs: refsMapRef.current,
+    switchToSpace: spacesCtx.switchToSpace,
+    createSpace: spacesCtx.createSpace,
+    getSpaceById: spacesCtx.getSpaceById,
+    deleteSpace: spacesCtx.deleteSpace,
+    activeSpaceId: spacesCtx.activeSpaceId,
+    createFolder: (parentId, title) => chrome.bookmarks.create({ parentId, title }),
+    createBookmark: async (parentId, title, url) =>
+    {
+      const { node, error } = await bookmarksCtx.createBookmark(parentId, title, url);
+      if (error || !node) throw new Error(error ?? 'createBookmark failed');
+      return node;
+    },
+    moveBookmark: bookmarksCtx.moveBookmark,
+    getBookmarkSegments: bookmarksCtx.getBookmarkSegments,
+    findSpaceForFolder,
+    openBookmarkTab: bookmarkTabsCtx.openBookmarkTab,
+    openPinnedTab: bookmarkTabsCtx.openPinnedTab,
+    isBookmarkLoaded: bookmarkTabsCtx.isBookmarkLoaded,
+    isPinnedLoaded: bookmarkTabsCtx.isPinnedLoaded,
+    getTabIdForBookmark: bookmarkTabsCtx.getTabIdForBookmark,
+    getItemKeyForTab: bookmarkTabsCtx.getItemKeyForTab,
+    restoreItemAssociation: bookmarkTabsCtx.restoreItemAssociation,
+    associateExistingTab: bookmarkTabsCtx.associateExistingTab,
+    addPin,
+    removePin,
+  };
+
+  const [pausedState, setPausedState] = useState<ResumeState | null>(null);
+  const [runningCaseId, setRunningCaseId] = useState<string | null>(null);
+  // Per-case, not a single flat log - each case keeps its own last (or
+  // in-progress) step results, so running case B doesn't erase case A's
+  // history from view. Keyed by TestCase.id.
+  const [caseResults, setCaseResults] = useState<Record<string, TestResult[]>>({});
+  const [expandedCaseIds, setExpandedCaseIds] = useState<Set<string>>(new Set());
+  const [panelError, setPanelError] = useState<string | null>(null);
+  const [runningAll, setRunningAll] = useState(false);
+  // Case ids still to run after whichever case is currently paused/running as
+  // part of a "Run All" batch - null when there's no batch in progress. See
+  // runQueue()/runner.ts's writeBatchQueue for why this needs to be
+  // persisted rather than just a local variable in runAll()'s loop.
+  const [batchQueue, setBatchQueue] = useState<string[] | null>(null);
+
+  function toggleExpanded(caseId: string)
+  {
+    setExpandedCaseIds(prev =>
+    {
+      const next = new Set(prev);
+      if (next.has(caseId)) next.delete(caseId);
+      else next.add(caseId);
+      return next;
+    });
+  }
+
+  // Runs on every mount of the sidebar (this component is always mounted in
+  // DEV, regardless of `isOpen`) - restores every case's last persisted
+  // result (see CaseResultsMap's doc comment in runner.ts) and detects a
+  // checkpoint left by a manual-pause step in a previous session.
+  useEffect(() =>
+  {
+    (async () =>
+    {
+      const [resume, allResults, queue] = await Promise.all([readResumeState(), readAllCaseResults(), readBatchQueue()]);
+
+      const merged = { ...allResults };
+      if (resume) merged[resume.caseId] = resume.results;
+      setCaseResults(merged);
+
+      const failedCaseIds = Object.entries(allResults)
+        .filter(([, results]) => results.some(r => !r.passed))
+        .map(([id]) => id);
+
+      if (resume)
+      {
+        setPausedState(resume);
+        setBatchQueue(queue ?? null);
+        setExpandedCaseIds(new Set([resume.caseId, ...failedCaseIds]));
+        onOpenChange(true);
+      }
+      else if (failedCaseIds.length > 0)
+      {
+        // Only force the dialog open for a failure; a clean pass can just
+        // wait to be seen next time you open the panel yourself.
+        setExpandedCaseIds(new Set(failedCaseIds));
+        onOpenChange(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Returns whether a caller running a batch (runAll) should continue on to
+  // the next case - false on a pause (needs your manual step before anything
+  // else can run) or an error, true otherwise.
+  async function runCase(testCase: TestCase, resume?: ResumeState): Promise<boolean>
+  {
+    const ctx = ctxRef.current;
+    if (!ctx)
+    {
+      setPanelError('Window not ready yet - try again in a moment.');
+      return false;
+    }
+
+    setPanelError(null);
+    setRunningCaseId(testCase.id);
+    setPausedState(null);
+    setCaseResults(prev => ({ ...prev, [testCase.id]: resume?.results ?? [] }));
+    setExpandedCaseIds(prev => new Set(prev).add(testCase.id));
+
+    const getCtx = () => ctxRef.current ?? ctx;
+
+    try
+    {
+      if (resume)
+      {
+        Object.entries(resume.refs).forEach(([key, value]) => ctx.refs.set(key, value));
+      }
+      else
+      {
+        await resetTestData(getCtx);
+        await testCase.setup?.(getCtx);
+      }
+
+      const fromIndex = resume ? resume.stepIndex + 1 : 0;
+      const priorResults = resume ? resume.results : [];
+
+      const outcome = await runFrom(
+        testCase,
+        fromIndex,
+        priorResults,
+        getCtx,
+        (result) => setCaseResults(prev => ({ ...prev, [testCase.id]: [...(prev[testCase.id] ?? []), result] }))
+      );
+
+      if (outcome.pausedAt)
+      {
+        const stored = await readResumeState();
+        setPausedState(stored ?? null);
+        return false;
+      }
+
+      await clearResumeState();
+      await writeCaseResult(testCase.id, outcome.results);
+      setCaseResults(prev => ({ ...prev, [testCase.id]: outcome.results }));
+      return true;
+    }
+    catch (err)
+    {
+      setPanelError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+    finally
+    {
+      setRunningCaseId(null);
+    }
+  }
+
+  // Runs the given case ids in order, from scratch, persisting the
+  // remaining queue before each one so a pause (which closes the whole
+  // panel, unmounting this component and any in-memory loop state with it)
+  // can pick the batch back up afterward - see the mount effect and
+  // handleResume(), the other two places that touch the persisted queue.
+  async function runQueue(caseIds: string[])
+  {
+    setRunningAll(true);
+    try
+    {
+      for (let i = 0; i < caseIds.length; i++)
+      {
+        const testCase = ALL_CASES.find(c => c.id === caseIds[i]);
+        if (!testCase) continue;
+
+        const remaining = caseIds.slice(i + 1);
+        await writeBatchQueue(remaining);
+        setBatchQueue(remaining);
+
+        const completed = await runCase(testCase);
+        if (!completed) return; // paused or errored - queue stays persisted, resumed from handleResume() or a fresh Run All
+      }
+      await clearBatchQueue();
+      setBatchQueue(null);
+    }
+    finally
+    {
+      setRunningAll(false);
+    }
+  }
+
+  function runAll()
+  {
+    return runQueue(ALL_CASES.map(c => c.id));
+  }
+
+  // Resumes the paused case, then - if it was part of a "Run All" batch and
+  // didn't pause/error again - continues the rest of that batch. Without
+  // this, resuming only ever advanced the one case the run happened to
+  // pause on, leaving every later case in the batch un-run until you
+  // manually clicked Run All again.
+  async function handleResume()
+  {
+    if (!pausedCase || !pausedState) return;
+
+    // setRunningAll (not runningCaseId - runCase hasn't started yet) so the
+    // buttons are already disabled during the settle wait below, not just
+    // once runCase begins.
+    setRunningAll(true);
+    try
+    {
+      await sleep(RESUME_SETTLE_MS);
+
+      if (batchQueue === null)
+      {
+        await runCase(pausedCase, pausedState);
+        return;
+      }
+
+      const completed = await runCase(pausedCase, pausedState);
+      if (completed) await runQueue(batchQueue);
+    }
+    finally
+    {
+      setRunningAll(false);
+    }
+  }
+
+  async function discardPausedRun()
+  {
+    await clearResumeState();
+    await clearBatchQueue();
+    setPausedState(null);
+    setBatchQueue(null);
+  }
+
+  async function clearResults()
+  {
+    await clearAllCaseResults();
+    setCaseResults({});
+    setExpandedCaseIds(new Set());
+  }
+
+  const pausedCase = pausedState ? ALL_CASES.find(c => c.id === pausedState.caseId) : undefined;
+  const pausedStep = pausedCase && pausedState ? pausedCase.steps[pausedState.stepIndex] : undefined;
+  const pausedInstruction = pausedStep?.kind === 'pause' ? pausedStep.instruction : '';
+  const hasAnyResults = Object.keys(caseResults).length > 0;
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="flex-shrink-0 flex flex-col border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+      style={{ height: '45vh' }}
+    >
+      <div className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+        <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100">Test Runner (dev)</h3>
+        <button
+          onClick={() => onOpenChange(false)}
+          aria-label="Close test runner"
+          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+        >
+          <X size={16} />
+        </button>
+      </div>
+      <div className="overflow-y-auto flex-1 p-3 space-y-3 text-sm text-gray-900 dark:text-gray-100">
+        {panelError && (
+          <div className="p-2 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200">
+            {panelError}
+          </div>
+        )}
+
+        {pausedState && pausedCase && (
+          <div className="p-2 rounded border border-amber-400 bg-amber-50 dark:bg-amber-900/30">
+            <div className="font-medium mb-1">
+              Paused at step {pausedState.stepIndex + 1} of {pausedCase.id} - {pausedCase.title}
+            </div>
+            {batchQueue !== null && (
+              <div className="mb-1 text-xs text-amber-700 dark:text-amber-400">
+                Part of a Run All batch - {batchQueue.length} more case{batchQueue.length === 1 ? '' : 's'} queued after this one.
+              </div>
+            )}
+            <div className="mb-2 whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+              {pausedInstruction}
+            </div>
+            <div className="flex gap-2">
+              <button
+                className="px-2 py-1 rounded bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                onClick={handleResume}
+                disabled={runningCaseId !== null || runningAll}
+              >
+                I've done it - Resume{batchQueue !== null ? ' & Continue Batch' : ''}
+              </button>
+              <button
+                className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
+                onClick={discardPausedRun}
+                disabled={runningCaseId !== null || runningAll}
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-2">
+          <button
+            className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
+            onClick={clearResults}
+            disabled={runningCaseId !== null || runningAll || !hasAnyResults}
+            title="Several cases have a known-gap assertion that's expected to currently fail - clear results here once you've seen it, so the panel stops auto-opening for it on every sidebar open."
+          >
+            Clear Results
+          </button>
+          <button
+            className="px-2 py-1 rounded bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50"
+            onClick={runAll}
+            disabled={runningCaseId !== null || runningAll}
+          >
+            {runningAll ? `Running all… (${runningCaseId ?? ''})` : 'Run All'}
+          </button>
+        </div>
+
+        <div className="space-y-0.5">
+          {ALL_CASES.map(testCase =>
+          {
+            const results = caseResults[testCase.id];
+            const summary = results ? summarize(results) : null;
+            const isExpanded = expandedCaseIds.has(testCase.id);
+            const isPausedHere = pausedState?.caseId === testCase.id;
+
+            return (
+              <div key={testCase.id} className="border-b border-gray-100 dark:border-gray-700 py-1">
+                <div className="flex items-center justify-between gap-2">
+                  <div
+                    className={`flex-1 flex items-center gap-1 ${results ? 'cursor-pointer select-none' : ''}`}
+                    onClick={() => results && toggleExpanded(testCase.id)}
+                    role={results ? 'button' : undefined}
+                    tabIndex={results ? 0 : undefined}
+                  >
+                    <span className="text-gray-400 w-3 inline-block flex-shrink-0">
+                      {results ? (isExpanded ? '▾' : '▸') : ''}
+                    </span>
+                    <span className="font-mono text-xs text-gray-500 mr-1">{testCase.id}</span>
+                    <span>{testCase.title}</span>
+                    {isPausedHere ? (
+                      <span className="ml-2 text-amber-600">paused</span>
+                    ) : summary && (
+                      <span className={summary.failed === 0 ? 'ml-2 text-green-600' : 'ml-2 text-red-600'}>
+                        {summary.failed === 0 ? `${summary.total}/${summary.total} passed` : `${summary.failed}/${summary.total} failed`}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    className="px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex-shrink-0"
+                    onClick={() => runCase(testCase)}
+                    disabled={runningCaseId !== null || runningAll}
+                  >
+                    {runningCaseId === testCase.id ? 'Running…' : 'Run'}
+                  </button>
+                </div>
+                {isExpanded && results && results.length > 0 && (
+                  <ul className="mt-1 ml-4 space-y-0.5 font-mono text-xs max-h-48 overflow-y-auto">
+                    {results.map((result, i) => (
+                      <li key={i} className={result.passed ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>
+                        {result.passed ? '✓' : '✗'} {result.name}
+                        {result.error && <span className="block pl-4 text-gray-500">{result.error}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};

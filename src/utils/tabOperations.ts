@@ -6,6 +6,33 @@ import { Space } from '../contexts/SpacesContext';
 import { toChromeColor } from './groupColors';
 
 /**
+ * Add a tab to a space's Chrome tab group, finding the existing group by
+ * name or creating a new one (titled and colored to match the space) if
+ * none exists yet in this window.
+ */
+export async function getOrCreateSpaceGroup(tabId: number, space: Space, windowId: number): Promise<void>
+{
+  const groups = await chrome.tabGroups.query({ windowId, title: space.name });
+
+  if (groups.length > 0)
+  {
+    await chrome.tabs.group({ tabIds: [tabId], groupId: groups[0].id });
+  }
+  else
+  {
+    const tab = await chrome.tabs.get(tabId);
+    const newGroupId = await chrome.tabs.group({
+      tabIds: [tabId],
+      createProperties: { windowId: tab.windowId }
+    });
+    await chrome.tabGroups.update(newGroupId, {
+      title: space.name,
+      color: toChromeColor(space.color),
+    });
+  }
+}
+
+/**
  * Move a tab to a space's Chrome tab group.
  *
  * - If spaceId is 'all', ungroups the tab
@@ -40,27 +67,7 @@ export async function moveTabToSpace(
       return { success: false, error: 'Space not found' };
     }
 
-    // Find existing Chrome group with Space's name in this window
-    const groups = await chrome.tabGroups.query({ windowId, title: space.name });
-
-    if (groups.length > 0)
-    {
-      // Add to existing group
-      await chrome.tabs.group({ tabIds: [tabId], groupId: groups[0].id });
-    }
-    else
-    {
-      // Create new group with this tab
-      const tab = await chrome.tabs.get(tabId);
-      const newGroupId = await chrome.tabs.group({
-        tabIds: [tabId],
-        createProperties: { windowId: tab.windowId }
-      });
-      await chrome.tabGroups.update(newGroupId, {
-        title: space.name,
-        color: toChromeColor(space.color),
-      });
-    }
+    await getOrCreateSpaceGroup(tabId, space, windowId);
 
     return { success: true, message: `Moved to ${space.name}` };
   }
@@ -75,6 +82,37 @@ export async function moveTabToSpace(
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
+}
+
+/**
+ * Re-group a bookmark's associated live tab (if any) to match its new
+ * folder's Space - keeps "a bookmark tab always lives in its bookmark's
+ * Space" true regardless of how the bookmark got there (created, dragged
+ * in, or moved afterward). No-op if the bookmark has no live tab, or if the
+ * destination folder isn't under any Space.
+ *
+ * @param bookmarkId - The bookmark whose live tab (if any) should follow
+ * @param targetFolderId - The folder the bookmark just moved into
+ * @param getTabIdForBookmark - From useBookmarkTabsContext()
+ * @param windowId - From useSpacesContext()
+ * @param findSpaceForFolder - From useFindSpaceForFolder()
+ */
+export async function regroupAssociatedTab(
+  bookmarkId: string,
+  targetFolderId: string,
+  getTabIdForBookmark: (bookmarkId: string) => number | undefined,
+  windowId: number | null,
+  findSpaceForFolder: (folderId: string) => Promise<Space | undefined>
+): Promise<void>
+{
+  const tabId = getTabIdForBookmark(bookmarkId);
+  if (tabId === undefined || !windowId) return;
+
+  const targetSpace = await findSpaceForFolder(targetFolderId);
+  if (!targetSpace) return;
+
+  chrome.runtime.sendMessage({ action: 'register-tab-space', windowId, tabId, spaceId: targetSpace.id });
+  chrome.runtime.sendMessage({ action: 'queue-tab-for-grouping', tabId, windowId, spaceId: targetSpace.id });
 }
 
 /**

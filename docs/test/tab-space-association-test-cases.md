@@ -105,7 +105,7 @@ Two ways to move a tab's Chrome group - test both, they may behave differently s
 | ---- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | 1    | Open a regular tab, let it land in Space A's group                                          | Tab shows in Space A's tab list                                                             |
 | 2    | With sidebar open, right-click the tab in Chrome's tab strip → "Remove from group"          | Tab is now ungrouped; tab list updates (tab no longer under Space A, or shown as ungrouped) |
-| 3    | Close the sidebar panel, open another regular tab in Space A, then remove it from its group | -                                                                                           |
+| 3    | Close the sidebar panel, press Cmd+T to open a new tab (lands in Space A), then right-click it in Chrome's tab strip → "Remove from group" | -                                                                                           |
 | 4    | Reopen the sidebar                                                                          | Tab reflects its ungrouped state correctly (tab no longer under Space A, or shown as ungrouped) |
 
 ### A.5c Pinned tab: native "Remove from group" / ungroup
