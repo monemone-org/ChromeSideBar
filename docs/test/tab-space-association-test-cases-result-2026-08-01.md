@@ -12,15 +12,15 @@ Source test plan: [tab-space-association-test-cases.md](tab-space-association-te
 | A.1        | Regular tab moved to another space, sidebar open                                          | Pass             |               |
 | A.2        | Bookmark tab moved to a different space's group, sidebar open                             | Pass             |               |
 | A.3        | Bookmark tab moved to a different space's group, sidebar CLOSED (known gap G2)            | Bugged           | [below](#a3)  |
-| A.4        | Pinned tab moved to a different space's group                                             | Fixed            | [below](#a4)  |
+| A.4        | Pinned tab moved to a different space's group                                             | Pass             | [below](#a4)  |
 | A.5        | Bookmark tab: native "Remove from group" / ungroup (known gap G3)                         | Bugged           | Per G3        |
 | A.5b       | Regular tab: native "Remove from group" / ungroup                                         | Pass             |               |
 | A.5c       | Pinned tab: native "Remove from group" / ungroup                                          | Pass             |               |
 | A.6        | Tab moved to a different window                                                           | Bugged           | [below](#a6)  |
 | A.6b       | Regular tab moved to a different window                                                   | Passed           |               |
 | A.6c       | Pinned tab moved to a different window                                                    | Bugged           | [below](#a6c) |
-| A.7 Step 3 | Regular tab bookmarked via drag-into-tree, then moved to another space                    | Fixed            | [below](#a7)  |
-| A.7 Step 4 | Regular tab bookmarked via drag-into-tree, then "Move to Space" to another space          | Fixed            | [below](#a7)  |
+| A.7 Step 3 | Regular tab bookmarked via drag-into-tree, then moved to another space                    | Pass             | [below](#a7)  |
+| A.7 Step 4 | Regular tab bookmarked via drag-into-tree, then "Move to Space" to another space          | Pass             | [below](#a7)  |
 | A.7 Step 5 | Regular tab bookmarked via drag-into-tree, close sidebar. then move tab to tab group B    | Bugged (=G2/A.3) | [below](#a3)  |
 | A.7b       | Bookmarked tab moved via generic "Move Bookmark to..." folder picker                      | Pass             |               |
 | A.7c       | Multiple bookmarked tabs moved via multi-select "Move to..."                              | Pass             |               |
@@ -38,9 +38,9 @@ Source test plan: [tab-space-association-test-cases.md](tab-space-association-te
 | C.1d       | Close active tab, activates another tab in a different space (Off/Space/Space-and-scroll) | Pass/Pass/Pass   |               |
 | C.1e       | Activate a bookmark tab in another space (Off/Space/Space-and-scroll)                     | Pass/Pass/Pass   |               |
 | C.1f       | Activate a pinned-site tab from another space (Off/Space/Space-and-scroll)                | Pass/Pass/Pass   |               |
-| C.2a       | "Show active tab" toolbar button                                                          | Pass//           |               |
-| C.2b       | Tab history Previous/Next toolbar buttons                                                 | Pass//           |               |
-| C.2c       | History keyboard shortcuts                                                                | Pass//           |               |
+| C.2a       | "Show active tab" toolbar button                                                          | Pass             |               |
+| C.2b       | Tab history Previous/Next toolbar buttons                                                 | Pass             |               |
+| C.2c       | History keyboard shortcuts                                                                | Pass             |               |
 | C.2d       | Tab-history dropdown                                                                      | Pass             |               |
 | C.2e       | Audio quick-jump                                                                          | Pass             |               |
 | C.2f       | Select a tab from the audio tabs dropdown list                                            | Pass             |               |

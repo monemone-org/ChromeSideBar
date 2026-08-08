@@ -1397,36 +1397,6 @@ function getAudioTabLists(allTabs: chrome.tabs.Tab[]): { playingTabIds: number[]
   return { playingTabIds, historyTabIds };
 }
 
-// DEV-only: reliably detect the test-only panel (see src/tests/testHooks.ts)
-// tearing down, for the e2e driver's close/reopen verification. Port
-// disconnect fires even on abrupt teardown, unlike page lifecycle events
-// (pagehide), whose async storage writes can race with the page's context
-// being destroyed before they finish.
-if (import.meta.env.DEV)
-{
-  // tabSpaceRegistry keeps an in-memory Map that's only loaded from
-  // chrome.storage.session once at service worker startup - writing to that
-  // storage key directly from the e2e driver (e2e/lib/actions.mjs) wouldn't
-  // affect the actually-running instance the way calling .register() does,
-  // so expose the real method directly instead.
-  (globalThis as typeof globalThis & {
-    __testHooks?: { registerTabSpace: (windowId: number, tabId: number, spaceId: string) => void };
-  }).__testHooks = {
-    registerTabSpace: (windowId, tabId, spaceId) => tabSpaceRegistry.register(windowId, tabId, spaceId),
-  };
-
-  chrome.runtime.onConnect.addListener((port) =>
-  {
-    if (port.name === 'testHooksPanel')
-    {
-      port.onDisconnect.addListener(() =>
-      {
-        chrome.storage.session.set({ testHooksClosedAt: Date.now() });
-      });
-    }
-  });
-}
-
 // =============================================================================
 // Message Handlers
 // =============================================================================

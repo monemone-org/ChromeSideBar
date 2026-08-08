@@ -1,7 +1,8 @@
 // Types for the in-panel test runner. Automates the workflow scenarios in
 // docs/test/tab-space-association-test-cases.md by running entirely inside the
 // panel's own React app (real chrome.* calls, real hooks/context, real DOM) -
-// see e2e/README.md for why an external Playwright/CDP driver was abandoned.
+// an external Playwright/CDP driver was tried first and abandoned because the
+// side panel's own page never reliably surfaced as a Playwright `page` target.
 
 import { Space } from '../../contexts/SpacesContext';
 import { PinnedSite } from '../../hooks/usePinnedSites';
