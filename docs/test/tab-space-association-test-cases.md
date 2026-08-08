@@ -64,8 +64,8 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | B.4  | No      |
 | B.5  | Yes     |
 | B.5b | Yes     |
-| C.1a | No      |
-| C.1b | No      |
+| C.1a | Yes     |
+| C.1b | Yes     |
 | C.1c | No      |
 | C.1d | No      |
 | C.1e | No      |

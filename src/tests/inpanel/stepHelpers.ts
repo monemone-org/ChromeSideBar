@@ -30,3 +30,19 @@ export function resolveSpace(ctx: TestContext, spaceRef: string)
   if (!space) throw new Error(`resolveSpace: space ref "${spaceRef}" (id ${spaceId}) not found in ctx.spaces`);
   return space;
 }
+
+/** The sidebar's main scroll container (App.tsx), used by scroll-position actions/assertions in Section C. */
+export function getScrollContainer(): Element
+{
+  const container = document.querySelector('[data-testid="sidebar-scroll-container"]');
+  if (!container) throw new Error('sidebar scroll container not found in DOM');
+  return container;
+}
+
+/** Routes a tab id the same way useScrollToTabItem() does: bookmark-associated tabs render under data-bookmark-id in BookmarkTree, everything else under data-tab-id in TabList. */
+export function resolveTabRowSelector(ctx: TestContext, tabId: number): string
+{
+  const itemKey = ctx.getItemKeyForTab(tabId);
+  if (itemKey?.startsWith('bookmark-')) return `[data-bookmark-id="${itemKey.substring('bookmark-'.length)}"]`;
+  return `[data-tab-id="${tabId}"]`;
+}

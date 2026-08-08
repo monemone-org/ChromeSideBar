@@ -453,6 +453,10 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
                         {result.error && <span className="block pl-4 text-gray-500">{result.error}</span>}
                       </li>
                     ))}
+                    {/* Only shown once the case has actually stopped running (not mid-run, not paused on a manual step) - marks the log as complete rather than possibly still in progress. */}
+                    {!isPausedHere && runningCaseId !== testCase.id && (
+                      <li className="text-gray-400">— done —</li>
+                    )}
                   </ul>
                 )}
               </div>

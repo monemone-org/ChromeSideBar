@@ -178,6 +178,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   return (
     <div
       ref={scrollContainerRef}
+      data-testid="sidebar-scroll-container"
       className="h-full overflow-y-auto overflow-x-hidden p-2"
       onScroll={handleScroll}
     >

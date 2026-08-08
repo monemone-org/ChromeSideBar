@@ -6,6 +6,7 @@
 
 import { Space } from '../../contexts/SpacesContext';
 import { PINNED_SITES_STORAGE_KEY } from '../../hooks/usePinnedSites';
+import { DEFAULT_FOLLOW_ACTIVE_TAB_MODE, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
 import { TestContext } from './types';
 import { sleep } from './stepHelpers';
 
@@ -277,4 +278,14 @@ export async function resetTestData(getCtx: () => TestContext): Promise<void>
   }
 
   getCtx().refs.clear();
+
+  // Section C cases (setFollowActiveTabMode) mutate a real, non-test-tagged
+  // user setting rather than disposable test data - there's nothing to
+  // "find and delete" for it the way there is for spaces/bookmarks/pins.
+  // Reset it to the app's own documented default so a case that sets 'off'
+  // doesn't silently leave every OTHER case (and the user's real sidebar)
+  // running in 'off' afterward. Not a restore of whatever the user's own
+  // prior preference was - same as the manual test doc already requires
+  // testers to flip this in Settings and expect to reset it back by hand.
+  await chrome.storage.local.set({ [FOLLOW_ACTIVE_TAB_KEY]: DEFAULT_FOLLOW_ACTIVE_TAB_MODE });
 }

@@ -6,9 +6,93 @@
 // intro in docs/test/tab-space-association-test-cases.md.
 
 import { getOrCreateSpaceGroup, moveTabToSpace, regroupAssociatedTab } from '../../utils/tabOperations';
+import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
 import { TestStep } from './types';
-import { resolveSpace, resolveStringRef, resolveTabId } from './stepHelpers';
+import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId } from './stepHelpers';
 import { assertSidebarShowsSpace } from './assertions';
+import { testUrl } from './fixtures';
+
+/** Set the "Follow active tab" mode via the same chrome.storage.local key Settings writes - background.ts (space-switch) and useFollowActiveTab (scroll) both read this key directly, so this is the real setting, not a UI simulation. */
+export function setFollowActiveTabMode(mode: FollowActiveTabMode): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Set "Follow active tab" to "${mode}"`,
+    run: async () =>
+    {
+      await chrome.storage.local.set({ [FOLLOW_ACTIVE_TAB_KEY]: mode });
+    },
+  };
+}
+
+/** Activate a tab via the raw chrome.tabs API - fires the same chrome.tabs.onActivated event a native tab-strip click would, no simulated click needed. */
+export function activateTabNative(tabRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Activate tab "${tabRef}" (native)`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      await chrome.tabs.update(tabId, { active: true });
+    },
+  };
+}
+
+/**
+ * Opens filler tabs in spaceRef, in small parallel batches, until the
+ * sidebar's scroll container actually has overflow. Without this, a
+ * scroll-into-view assertion right after would trivially pass even with
+ * scrolling completely broken, since everything already fits on screen -
+ * see assertTabRowVisible's own caveat about needing an off-screen setup to
+ * mean anything.
+ */
+export function openFillerTabsUntilScrollable(spaceRef: string): TestStep
+{
+  const BATCH_SIZE = 10;
+  const MAX_BATCHES = 6;
+
+  return {
+    kind: 'action',
+    label: `Open filler tabs in space "${spaceRef}" until the sidebar scrolls`,
+    run: async (ctx) =>
+    {
+      const space = resolveSpace(ctx, spaceRef);
+      const container = getScrollContainer();
+
+      let opened = 0;
+      for (let batch = 0; batch < MAX_BATCHES && container.scrollHeight <= container.clientHeight; batch++)
+      {
+        await Promise.all(Array.from({ length: BATCH_SIZE }, async (_unused, i) =>
+        {
+          const tab = await chrome.tabs.create({ url: testUrl(`filler-${batch}-${i}`), active: false, windowId: ctx.windowId });
+          if (tab.id === undefined) throw new Error('chrome.tabs.create did not return an id');
+          await getOrCreateSpaceGroup(tab.id, space, ctx.windowId);
+        }));
+        opened += BATCH_SIZE;
+      }
+
+      if (container.scrollHeight <= container.clientHeight)
+      {
+        throw new Error(`sidebar still not scrollable after ${opened} filler tabs - increase MAX_BATCHES or check the scroll container`);
+      }
+    },
+  };
+}
+
+/** Forces the sidebar's scroll position to the bottom - deterministic setup for "push a row off-screen", not something to assert on directly (see scrollToTabItem, the feature under test, for the real scroll-to-a-specific-row behavior). */
+export function scrollSidebarToBottom(): TestStep
+{
+  return {
+    kind: 'action',
+    label: 'Scroll the sidebar to the bottom',
+    run: async () =>
+    {
+      const container = getScrollContainer();
+      container.scrollTop = container.scrollHeight;
+    },
+  };
+}
 
 /** Create a plain tab and (native chrome.tabs.group, not moveTabToSpace) drop it into a space's Chrome group. */
 export function openRegularTab(opts: { url: string; spaceRef: string; tabRef: string }): TestStep

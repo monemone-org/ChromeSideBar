@@ -3,7 +3,7 @@
 // expectation isn't met - the runner turns that into a failed TestResult.
 
 import { TestStep } from './types';
-import { resolveSpace, resolveStringRef, resolveTabId } from './stepHelpers';
+import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector } from './stepHelpers';
 
 async function tabGroupTitle(tabId: number): Promise<string | undefined>
 {
@@ -145,6 +145,48 @@ export function assertSpaceExists(spaceRef: string, expected: boolean): TestStep
       if (exists !== expected)
       {
         throw new Error(`expected space to ${expected ? 'exist' : 'not exist'}, but it ${exists ? 'exists' : "doesn't"}`);
+      }
+    },
+  };
+}
+
+/**
+ * Confirms a tab's sidebar row is (or isn't) within the visible bounds of
+ * the sidebar's scroll container - the real DOM effect of scrollHelpers.ts's
+ * scrollToTab/scrollToBookmark (element.scrollIntoView()). The row must
+ * exist in the DOM either way (TabList/BookmarkTree don't virtualize - a
+ * row missing entirely means something's actually broken, not just scrolled
+ * away), so a missing row is always an error regardless of `expected`.
+ *
+ * Caveat: expected=true only proves the row IS visible right now, not that a
+ * scroll HAD to happen to get there - a row already in view before the
+ * activation passes trivially regardless of follow mode. Telling "scrolled"
+ * apart from "was already visible" needs the row pushed off-screen first
+ * (see openFillerTabsUntilScrollable/scrollSidebarToBottom in actions.ts,
+ * and the manual doc's C.1c note on anchoring tabs far apart) - callers
+ * relying on this to distinguish scroll-vs-no-scroll modes must set that up
+ * first and should assert expected=false as a precondition check.
+ */
+export function assertTabRowVisible(tabRef: string, expected: boolean): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Tab "${tabRef}"'s sidebar row is ${expected ? '' : 'not '}visible`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      const selector = resolveTabRowSelector(ctx, tabId);
+      const container = getScrollContainer();
+
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`row ${selector} not found in DOM - should be rendered (just possibly scrolled out of view), not absent`);
+
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      const visible = elementRect.top >= containerRect.top && elementRect.bottom <= containerRect.bottom;
+      if (visible !== expected)
+      {
+        throw new Error(`expected row ${selector} to be ${expected ? '' : 'not '}visible, but it ${visible ? 'is' : "isn't"}`);
       }
     },
   };
