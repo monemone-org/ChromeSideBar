@@ -40,6 +40,7 @@ export interface TestContext
   ) => Space;
   getSpaceById: (id: string) => Space | undefined;
   deleteSpace: (id: string) => Promise<void>;
+  updateSpace: (id: string, updates: Partial<Omit<Space, 'id'>>) => Promise<void>;
   activeSpaceId: string;
 
   // Bookmarks (useBookmarks)
@@ -89,7 +90,7 @@ export interface TestCase
   steps: TestStep[];
 }
 
-// Persisted to chrome.storage.session across a manual-pause step so the run
+// Persisted to chrome.storage.local across a manual-pause step so the run
 // can pick back up once the panel remounts. `refs` snapshots ctx.refs's
 // string/number entries (tab/bookmark/space ids) - the live Map itself lives
 // in a React ref and doesn't survive the panel's context tearing down, so

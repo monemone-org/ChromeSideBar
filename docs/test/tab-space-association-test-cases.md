@@ -76,9 +76,9 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | C.2d | No      |
 | C.2e | No      |
 | C.2f | No      |
-| D.1  | No      |
+| D.1  | Yes     |
 | D.2  | Yes     |
-| E.1  | No      |
+| E.1  | Yes     |
 | E.2  | No      |
 | F.1  | No      |
 | F.2  | No      |

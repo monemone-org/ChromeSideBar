@@ -4,9 +4,38 @@
 import { DeleteSpaceAction } from '../../../actions/deleteSpaceAction';
 import { TestCase, TestStep } from '../types';
 import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { openBookmarkTab, openPinnedTab, openRegularTab, switchSpaceVerified } from '../actions';
-import { assertBookmarkLoaded, assertPinnedLoaded, assertSpaceExists, assertTabExists, assertTabUngrouped } from '../assertions';
+import { openBookmarkTab, openPinnedTab, openRegularTab, renameSpace, switchSpaceVerified } from '../actions';
+import { assertBookmarkLoaded, assertPinnedLoaded, assertSpaceExists, assertTabExists, assertTabInSpace, assertTabUngrouped } from '../assertions';
 import { resolveStringRef } from '../stepHelpers';
+
+// D.1's doc step 3 (renaming from a second window and checking whether a
+// FIRST window's own Chrome group also picks it up) needs a second live
+// sidebar/window to observe - out of scope here, same reason B.4/E.2 are
+// left manual (see docs/test/tab-space-association-test-cases.md). This case
+// only covers steps 1-2 (single window: rename syncs the Chrome group,
+// association survives).
+export const D1_RENAME_SPACE_WITH_TRACKED_TABS: TestCase = {
+  id: 'D.1',
+  title: 'Rename a space while it has tracked tabs',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'D1 bookmark', testUrl('d1-bookmark'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('d1-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    assertBookmarkLoaded('bm', true),
+    assertTabInSpace('tab1', 'spaceA'),
+
+    renameSpace('spaceA', 'Work renamed (inpanel-test)'),
+    // resolveSpace() inside assertTabInSpace looks up spaceA's CURRENT name
+    // via getSpaceById, so this only passes if the Chrome group's title was
+    // actually updated to match the rename, not just the Space object.
+    assertTabInSpace('tab1', 'spaceA'),
+    assertBookmarkLoaded('bm', true),
+  ],
+};
 
 // D.2 exercises the same UndoableAction the "Delete Space" menu item uses
 // (SpaceDialogs.tsx), not SpacesContext.deleteSpace() directly, so this test
@@ -93,5 +122,6 @@ export const D2_DELETE_SPACE_WITH_TRACKED_TABS: TestCase = {
 };
 
 export const SECTION_D_CASES: TestCase[] = [
+  D1_RENAME_SPACE_WITH_TRACKED_TABS,
   D2_DELETE_SPACE_WITH_TRACKED_TABS,
 ];

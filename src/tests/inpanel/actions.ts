@@ -127,6 +127,20 @@ export function switchSpaceVerified(spaceRef: string): TestStep[]
   return [switchSpace(spaceRef), assertSidebarShowsSpace(spaceRef)];
 }
 
+/** Rename a space - same updateSpace() call Settings/"Edit Space" uses, which also syncs the Chrome group's title. */
+export function renameSpace(spaceRef: string, newName: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Rename space "${spaceRef}" to "${newName}"`,
+    run: async (ctx) =>
+    {
+      const space = resolveSpace(ctx, spaceRef);
+      await ctx.updateSpace(space.id, { name: newName });
+    },
+  };
+}
+
 export function closeTab(tabRef: string): TestStep
 {
   return {

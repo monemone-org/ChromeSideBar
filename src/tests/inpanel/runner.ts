@@ -1,7 +1,11 @@
 // Executes a TestCase's steps in order, persisting a checkpoint to
-// chrome.storage.session when it hits a manual-pause step so a later panel
-// mount can resume where it left off. See types.ts for the step shapes and
-// TestRunnerPanel.tsx for how this is driven from the UI.
+// chrome.storage.local when it hits a manual-pause step so a later panel
+// mount can resume where it left off. chrome.storage.session was tried
+// first, but doesn't survive a "Reload" from chrome://extensions (E.1's own
+// manual step) - only local storage does, so every case's
+// resume/results/batch-queue state lives there, not just E.1's. See types.ts
+// for the step shapes and TestRunnerPanel.tsx for how this is driven from
+// the UI.
 
 import { ResumeState, TestCase, TestContext, TestResult, TestStep } from './types';
 import { sleep } from './stepHelpers';
@@ -76,7 +80,7 @@ export async function runFrom(
         if (typeof value === 'string' || typeof value === 'number') refs[key] = value;
       }
 
-      await chrome.storage.session.set({
+      await chrome.storage.local.set({
         [RESUME_STORAGE_KEY]: {
           caseId: testCase.id,
           stepIndex: i,
@@ -110,13 +114,13 @@ export async function runFrom(
 
 export async function readResumeState(): Promise<ResumeState | undefined>
 {
-  const stored = await chrome.storage.session.get([RESUME_STORAGE_KEY]);
+  const stored = await chrome.storage.local.get([RESUME_STORAGE_KEY]);
   return stored[RESUME_STORAGE_KEY] as ResumeState | undefined;
 }
 
 export async function clearResumeState(): Promise<void>
 {
-  await chrome.storage.session.remove([RESUME_STORAGE_KEY]);
+  await chrome.storage.local.remove([RESUME_STORAGE_KEY]);
 }
 
 /** Record one case's result into the persisted map, leaving every other case's entry untouched. */
@@ -124,12 +128,12 @@ export async function writeCaseResult(caseId: string, results: TestResult[]): Pr
 {
   const all = await readAllCaseResults();
   all[caseId] = results;
-  await chrome.storage.session.set({ [CASE_RESULTS_STORAGE_KEY]: all });
+  await chrome.storage.local.set({ [CASE_RESULTS_STORAGE_KEY]: all });
 }
 
 export async function readAllCaseResults(): Promise<CaseResultsMap>
 {
-  const stored = await chrome.storage.session.get([CASE_RESULTS_STORAGE_KEY]);
+  const stored = await chrome.storage.local.get([CASE_RESULTS_STORAGE_KEY]);
   return (stored[CASE_RESULTS_STORAGE_KEY] as CaseResultsMap | undefined) ?? {};
 }
 
@@ -139,7 +143,7 @@ export async function readAllCaseResults(): Promise<CaseResultsMap>
 // forever, since "at least one case has a failure" stays permanently true.
 export async function clearAllCaseResults(): Promise<void>
 {
-  await chrome.storage.session.remove([CASE_RESULTS_STORAGE_KEY]);
+  await chrome.storage.local.remove([CASE_RESULTS_STORAGE_KEY]);
 }
 
 // "Run All"'s queue of case ids still to run, persisted for the same reason
@@ -149,16 +153,16 @@ export async function clearAllCaseResults(): Promise<void>
 // batch in progress or what was left to run after it.
 export async function writeBatchQueue(remainingCaseIds: string[]): Promise<void>
 {
-  await chrome.storage.session.set({ [BATCH_QUEUE_STORAGE_KEY]: remainingCaseIds });
+  await chrome.storage.local.set({ [BATCH_QUEUE_STORAGE_KEY]: remainingCaseIds });
 }
 
 export async function readBatchQueue(): Promise<string[] | undefined>
 {
-  const stored = await chrome.storage.session.get([BATCH_QUEUE_STORAGE_KEY]);
+  const stored = await chrome.storage.local.get([BATCH_QUEUE_STORAGE_KEY]);
   return stored[BATCH_QUEUE_STORAGE_KEY] as string[] | undefined;
 }
 
 export async function clearBatchQueue(): Promise<void>
 {
-  await chrome.storage.session.remove([BATCH_QUEUE_STORAGE_KEY]);
+  await chrome.storage.local.remove([BATCH_QUEUE_STORAGE_KEY]);
 }

@@ -89,6 +89,11 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
     createSpace: spacesCtx.createSpace,
     getSpaceById: spacesCtx.getSpaceById,
     deleteSpace: spacesCtx.deleteSpace,
+    // SpacesContext types updateSpace as returning void even though its
+    // implementation is async (syncs the Chrome group's title/color before
+    // resolving) - await the real underlying promise here so callers that
+    // need the Chrome-group sync to finish (e.g. D.1) can rely on it.
+    updateSpace: async (id, updates) => { await spacesCtx.updateSpace(id, updates); },
     activeSpaceId: spacesCtx.activeSpaceId,
     createFolder: (parentId, title) => chrome.bookmarks.create({ parentId, title }),
     createBookmark: async (parentId, title, url) =>
