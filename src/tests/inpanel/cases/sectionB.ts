@@ -4,8 +4,8 @@
 import { CloseTabAction } from '../../../actions/closeTabAction';
 import { TestCase, TestStep } from '../types';
 import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { closeTab, openBookmarkTab, openPinnedTab, openRegularTab, pause, switchSpaceVerified } from '../actions';
-import { assertBookmarkLoaded, assertPinnedLoaded, assertTabExists, assertTabInSpace } from '../assertions';
+import { closeTab, deleteBookmarkNative, openBookmarkTab, openPinnedTab, openRegularTab, pause, switchSpaceVerified } from '../actions';
+import { assertBookmarkExists, assertBookmarkLoaded, assertPinnedLoaded, assertTabExists, assertTabInSpace } from '../assertions';
 
 export const B1_CLOSE_BOOKMARK_TAB: TestCase = {
   id: 'B.1',
@@ -170,9 +170,74 @@ export const B3_MULTI_CLOSE_TABS: TestCase = {
   ],
 };
 
+// B.5's own intro in the doc calls this "a same-sidebar-state variant of
+// B.5b" - deliberately no pause step here (unlike B.5b). deleteBookmarkNative
+// fires the same chrome.bookmarks.onRemoved event the native chrome://bookmarks
+// manager would, so there's nothing a pause would add for this half of the
+// gap; B.5b below is what actually needs the sidebar closed.
+export const B5_DELETE_BOOKMARK_TAB_OPEN: TestCase = {
+  id: 'B.5',
+  title: 'Delete a bookmark while its tab is open (known gap G1)',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'B5 bookmark', testUrl('b5-bookmark'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('b5-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    assertBookmarkLoaded('bm', true),
+
+    deleteBookmarkNative('bm'),
+    assertBookmarkExists('bm', false),
+    // Tab is left running - there's no code path that closes it, since
+    // DeleteBookmarkAction (which does close the tab) isn't what fired here.
+    assertTabExists('tab1', true),
+    // Correct behavior: once the bookmark it's tied to is gone, the tab's
+    // association should clear too. Per known gap G1, there's no
+    // chrome.bookmarks.onRemoved listener anywhere in the extension to catch
+    // a native deletion, so this is expected to currently FAIL.
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+export const B5B_DELETE_BOOKMARK_SIDEBAR_CLOSED: TestCase = {
+  id: 'B.5b',
+  title: 'Delete a bookmark via Chrome\'s native bookmark manager, sidebar closed',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'B5b bookmark', testUrl('b5b-bookmark'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('b5b-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    assertBookmarkLoaded('bm', true),
+    pause(
+      'Manual step: delete the bookmark via chrome://bookmarks while the panel is closed',
+      [
+        'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
+        'Open chrome://bookmarks, find "B5b bookmark", and delete it there (not via the extension\'s own tree).',
+        'Reopen the sidebar panel to resume.',
+      ]
+    ),
+    assertBookmarkExists('bm', false),
+    assertTabExists('tab1', true),
+    // Same gap as B.5 (G1), reproduced with the sidebar actually closed this
+    // time - the doc's point here is that this is NOT a sidebar-open/closed
+    // race like G2 (there's simply no listener at all), so the outcome
+    // should be identical to B.5's. Expected to currently FAIL, same reason.
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
 export const SECTION_B_CASES: TestCase[] = [
   B1_CLOSE_BOOKMARK_TAB,
   B2_CLOSE_PINNED_TAB,
   B2B_CLOSE_REGULAR_TAB,
   B3_MULTI_CLOSE_TABS,
+  B5_DELETE_BOOKMARK_TAB_OPEN,
+  B5B_DELETE_BOOKMARK_SIDEBAR_CLOSED,
 ];

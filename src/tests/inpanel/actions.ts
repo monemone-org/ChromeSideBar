@@ -202,6 +202,28 @@ export function bookmarkExistingTab(opts: { tabRef: string; spaceRef: string; ti
   };
 }
 
+/**
+ * Delete a bookmark via the raw chrome.bookmarks API, not the extension's own
+ * DeleteBookmarkAction - mirrors deleting it through Chrome's native
+ * chrome://bookmarks manager. Honest, not a shortcut: the native manager's
+ * delete button calls this exact same browser API under the hood (there's no
+ * separate "native deletion" code path to simulate), so this fires the same
+ * chrome.bookmarks.onRemoved event a real click would, without needing a
+ * pause step.
+ */
+export function deleteBookmarkNative(bookmarkRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Delete bookmark "${bookmarkRef}" (native chrome.bookmarks.remove)`,
+    run: async (ctx) =>
+    {
+      const bookmarkId = resolveStringRef(ctx, bookmarkRef);
+      await chrome.bookmarks.remove(bookmarkId);
+    },
+  };
+}
+
 /** Pop a tab out into its own new Chrome window - mirrors dragging a tab out of the tab strip. resetTestData() finds and closes the new window itself by scanning for test-tagged tabs, not via a ref, so nothing needs to be recorded here. */
 export function moveTabToNewWindow(opts: { tabRef: string }): TestStep
 {

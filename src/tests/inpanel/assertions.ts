@@ -99,6 +99,24 @@ export function assertTabExists(tabRef: string, expected: boolean): TestStep
   };
 }
 
+/** Confirms a bookmark node itself is gone/present in chrome.bookmarks - distinct from assertBookmarkLoaded, which checks the extension's own (possibly stale) association map rather than the real bookmark tree. */
+export function assertBookmarkExists(bookmarkRef: string, expected: boolean): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Bookmark "${bookmarkRef}" ${expected ? 'still exists' : 'is deleted'}`,
+    run: async (ctx) =>
+    {
+      const bookmarkId = resolveStringRef(ctx, bookmarkRef);
+      const exists = await chrome.bookmarks.get(bookmarkId).then(() => true, () => false);
+      if (exists !== expected)
+      {
+        throw new Error(`expected bookmark to ${expected ? 'exist' : 'be deleted'}, but it ${exists ? 'exists' : "doesn't"}`);
+      }
+    },
+  };
+}
+
 export function assertSidebarShowsSpace(spaceRef: string): TestStep
 {
   return {
