@@ -38,6 +38,56 @@ Terminology used below:
 
 ---
 
+## Automated coverage
+
+Which cases below are automated by the DEV-only in-panel test runner (`src/tests/inpanel/`, sidebar's DEV dropdown → "Test Runner…"). Everything marked "No" is still manual-only.
+
+| Case | Covered |
+| ---- | ------- |
+| A.1  | Yes     |
+| A.2  | Yes     |
+| A.3  | Yes     |
+| A.4  | Yes     |
+| A.5  | Yes     |
+| A.5b | Yes     |
+| A.5c | Yes     |
+| A.6  | Yes     |
+| A.6b | Yes     |
+| A.6c | Yes     |
+| A.7  | Yes     |
+| A.7b | Yes     |
+| A.7c | Yes     |
+| B.1  | Yes     |
+| B.2  | Yes     |
+| B.2b | Yes     |
+| B.3  | Yes     |
+| B.4  | No      |
+| B.5  | No      |
+| B.5b | No      |
+| C.1a | No      |
+| C.1b | No      |
+| C.1c | No      |
+| C.1d | No      |
+| C.1e | No      |
+| C.1f | No      |
+| C.2a | No      |
+| C.2b | No      |
+| C.2c | No      |
+| C.2d | No      |
+| C.2e | No      |
+| C.2f | No      |
+| D.1  | No      |
+| D.2  | Yes     |
+| E.1  | No      |
+| E.2  | No      |
+| F.1  | No      |
+| F.2  | No      |
+| F.3  | No      |
+| F.4  | No      |
+| F.5  | No      |
+
+---
+
 ## Section A - Tab moved between spaces
 
 Two ways to move a tab's Chrome group - test both, they may behave differently since only one may be instrumented:
