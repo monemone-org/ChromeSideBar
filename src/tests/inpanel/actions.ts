@@ -8,7 +8,7 @@
 import { getOrCreateSpaceGroup, moveTabToSpace, regroupAssociatedTab } from '../../utils/tabOperations';
 import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
 import { TestStep } from './types';
-import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId } from './stepHelpers';
+import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, sleep } from './stepHelpers';
 import { assertSidebarShowsSpace } from './assertions';
 import { testUrl } from './fixtures';
 
@@ -41,16 +41,31 @@ export function activateTabNative(tabRef: string): TestStep
 
 /**
  * Opens filler tabs in spaceRef, in small parallel batches, until the
- * sidebar's scroll container actually has overflow. Without this, a
- * scroll-into-view assertion right after would trivially pass even with
- * scrolling completely broken, since everything already fits on screen -
- * see assertTabRowVisible's own caveat about needing an off-screen setup to
- * mean anything.
+ * sidebar's scroll container has at least OVERFLOW_FACTOR viewports of
+ * content. Without this, a scroll-into-view assertion right after would
+ * trivially pass even with scrolling completely broken, since everything
+ * already fits on screen - see assertTabRowVisible's own caveat about
+ * needing an off-screen setup to mean anything.
+ *
+ * OVERFLOW_FACTOR (not merely "any overflow at all"): scrollRowOutOfView
+ * below can only honor its contract if SOME scroll position actually hides
+ * the target row, and a container overflowing by a single pixel has none.
+ * Two full viewports guarantees a row at either extreme can be scrolled
+ * clear of the opposite edge.
+ *
+ * Opens the very first filler tab on its own, awaited, before parallelizing
+ * the rest - getOrCreateSpaceGroup now coalesces concurrent create-race
+ * callers into one creation (see tabOperations.ts's resolveGroupId), so this
+ * isn't required for correctness anymore, but seeding the group with a known
+ * single tab first keeps this function's own intent unambiguous and avoids
+ * every tab in the first batch hitting the "does this group exist yet" race
+ * at once for no benefit (they'd all just wait on the same promise anyway).
  */
 export function openFillerTabsUntilScrollable(spaceRef: string): TestStep
 {
   const BATCH_SIZE = 10;
   const MAX_BATCHES = 6;
+  const OVERFLOW_FACTOR = 2;
 
   return {
     kind: 'action',
@@ -59,37 +74,141 @@ export function openFillerTabsUntilScrollable(spaceRef: string): TestStep
     {
       const space = resolveSpace(ctx, spaceRef);
       const container = getScrollContainer();
+      const needsMoreContent = () => container.scrollHeight < container.clientHeight * OVERFLOW_FACTOR;
+
+      const openFiller = async (label: string) =>
+      {
+        const tab = await chrome.tabs.create({ url: testUrl(label), active: false, windowId: ctx.windowId });
+        if (tab.id === undefined) throw new Error('chrome.tabs.create did not return an id');
+        await getOrCreateSpaceGroup(tab.id, space, ctx.windowId);
+      };
 
       let opened = 0;
-      for (let batch = 0; batch < MAX_BATCHES && container.scrollHeight <= container.clientHeight; batch++)
+      await openFiller('filler-seed');
+      opened++;
+
+      for (let batch = 0; batch < MAX_BATCHES && needsMoreContent(); batch++)
       {
-        await Promise.all(Array.from({ length: BATCH_SIZE }, async (_unused, i) =>
-        {
-          const tab = await chrome.tabs.create({ url: testUrl(`filler-${batch}-${i}`), active: false, windowId: ctx.windowId });
-          if (tab.id === undefined) throw new Error('chrome.tabs.create did not return an id');
-          await getOrCreateSpaceGroup(tab.id, space, ctx.windowId);
-        }));
+        await Promise.all(Array.from({ length: BATCH_SIZE }, (_unused, i) => openFiller(`filler-${batch}-${i}`)));
         opened += BATCH_SIZE;
       }
 
-      if (container.scrollHeight <= container.clientHeight)
+      if (needsMoreContent())
       {
-        throw new Error(`sidebar still not scrollable after ${opened} filler tabs - increase MAX_BATCHES or check the scroll container`);
+        throw new Error(`sidebar content still under ${OVERFLOW_FACTOR}x viewport after ${opened} filler tabs (scrollHeight=${container.scrollHeight}, clientHeight=${container.clientHeight}) - increase MAX_BATCHES or check the scroll container`);
       }
     },
   };
 }
 
-/** Forces the sidebar's scroll position to the bottom - deterministic setup for "push a row off-screen", not something to assert on directly (see scrollToTabItem, the feature under test, for the real scroll-to-a-specific-row behavior). */
-export function scrollSidebarToBottom(): TestStep
+/**
+ * Creates filler bookmarks at the TOP of a space's own bookmark folder,
+ * until the sidebar has OVERFLOW_FACTOR viewports of content - pushing
+ * whatever already lives in that folder (e.g. C.1e's target subfolder) below
+ * the fold.
+ *
+ * Prepends (index: 0) rather than appending, so it pushes existing siblings
+ * DOWN regardless of when it runs relative to their creation - the target
+ * subfolder is made in the case's setup(), before this step ever executes,
+ * so appending would leave the target above the fillers and change nothing.
+ *
+ * Exists because a bookmark row lands near the TOP of BookmarkTree, so
+ * unlike a tab row at the bottom of a long TabList (C.1b/C.1d), it would be
+ * trivially visible at scroll position 0 - making a later "did it scroll to
+ * the bookmark" assertion pass whether or not any scrolling happened.
+ * Creates serially, with a settle between batches, because each batch's
+ * effect on scrollHeight is only measurable once BookmarkTree has re-rendered.
+ */
+export function openFillerBookmarksUntilScrollable(spaceRef: string): TestStep
+{
+  const BATCH_SIZE = 10;
+  const MAX_BATCHES = 6;
+  const OVERFLOW_FACTOR = 2;
+  const RENDER_SETTLE_MS = 200;
+
+  return {
+    kind: 'action',
+    label: `Create filler bookmarks in space "${spaceRef}" until the sidebar scrolls`,
+    run: async (ctx) =>
+    {
+      const folderId = resolveStringRef(ctx, `${spaceRef}:folderId`);
+      const container = getScrollContainer();
+      const needsMoreContent = () => container.scrollHeight < container.clientHeight * OVERFLOW_FACTOR;
+
+      let created = 0;
+      for (let batch = 0; batch < MAX_BATCHES && needsMoreContent(); batch++)
+      {
+        for (let i = 0; i < BATCH_SIZE; i++)
+        {
+          await chrome.bookmarks.create({
+            parentId: folderId,
+            title: `Filler bookmark ${batch}-${i}`,
+            url: testUrl(`filler-bookmark-${batch}-${i}`),
+            index: 0,
+          });
+        }
+        created += BATCH_SIZE;
+        await sleep(RENDER_SETTLE_MS);
+      }
+
+      if (needsMoreContent())
+      {
+        throw new Error(`sidebar content still under ${OVERFLOW_FACTOR}x viewport after ${created} filler bookmarks (scrollHeight=${container.scrollHeight}, clientHeight=${container.clientHeight}) - increase MAX_BATCHES or check the scroll container`);
+      }
+    },
+  };
+}
+
+/**
+ * Scrolls the sidebar so a specific row ends up OUT of view - the
+ * deterministic "anchor" setup every scroll assertion needs to mean
+ * anything (see assertTabRowVisible's caveat).
+ *
+ * Picks the direction itself rather than exposing scroll-to-top and
+ * scroll-to-bottom variants for the caller to choose between. That choice
+ * depends on where the row rendered, which depends on tab open order, which
+ * is in turn dictated by Chrome's tab-strip adjacency rules (see C.1c/C.1d)
+ * - two constraints a case author would otherwise have to keep in sync by
+ * hand, and reordering tabs for an adjacency fix silently inverted the
+ * anchoring exactly once already. Deriving it from the live layout removes
+ * that coupling.
+ *
+ * Verifies the result instead of assuming it: a row that's still visible
+ * afterward fails HERE, at the actual cause, rather than surfacing later as
+ * a confusing precondition failure.
+ */
+export function scrollRowOutOfView(tabRef: string): TestStep
 {
   return {
     kind: 'action',
-    label: 'Scroll the sidebar to the bottom',
-    run: async () =>
+    label: `Scroll tab "${tabRef}"'s row out of view`,
+    run: async (ctx) =>
     {
+      const tabId = resolveTabId(ctx, tabRef);
+      const selector = resolveTabRowSelector(ctx, tabId);
       const container = getScrollContainer();
-      container.scrollTop = container.scrollHeight;
+
+      const element = document.querySelector(selector);
+      if (!element) throw new Error(`row ${selector} not found in DOM - can't scroll it out of view`);
+
+      // Scroll AWAY from whichever half the row sits in: a row in the top
+      // half is hidden by scrolling down, one in the bottom half by
+      // scrolling up.
+      const containerRect = container.getBoundingClientRect();
+      const elementRect = element.getBoundingClientRect();
+      const rowOffsetInContent = (elementRect.top - containerRect.top) + container.scrollTop;
+      const rowIsInTopHalf = rowOffsetInContent < container.scrollHeight / 2;
+      container.scrollTop = rowIsInTopHalf ? container.scrollHeight : 0;
+
+      // Re-measure after the scroll (getBoundingClientRect is live, but the
+      // reference above was taken pre-scroll) to confirm it actually worked.
+      const movedRect = element.getBoundingClientRect();
+      const movedMidpoint = (movedRect.top + movedRect.bottom) / 2;
+      const stillVisible = movedMidpoint >= containerRect.top && movedMidpoint <= containerRect.bottom;
+      if (stillVisible)
+      {
+        throw new Error(`row ${selector} is still visible after scrolling ${rowIsInTopHalf ? 'down' : 'up'} - not enough content to push it off-screen?`);
+      }
     },
   };
 }

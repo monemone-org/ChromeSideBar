@@ -66,10 +66,10 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | B.5b | Yes     |
 | C.1a | Yes     |
 | C.1b | Yes     |
-| C.1c | No      |
-| C.1d | No      |
-| C.1e | No      |
-| C.1f | No      |
+| C.1c | Yes     |
+| C.1d | Yes     |
+| C.1e | Yes     |
+| C.1f | Yes     |
 | C.2a | No      |
 | C.2b | No      |
 | C.2c | No      |
@@ -352,7 +352,7 @@ Chrome prefers to keep activation inside the same tab group when closing a tab, 
 | 2    | Switch sidebar to Space B, open a regular tab there and activate it, making sure it's the **only** tab in Space B's group (so Space A's tab is next in MRU order, and there's no in-group sibling for Chrome to prefer instead) | -                      | -                                                                  | -                                                                  |
 | 3    | Close the active (Space B) tab - Chrome activates the previous tab in its MRU order, which lives in Space A                    | No switch, no scroll  | Switches to that space, no scroll needed unless out of view       | Switches space and scrolls to show the newly-activated tab       |
 
-#### C.1e Activate a bookmark tab in another space
+#### C.1e Activate a bookmark tab in another space (collapsed folder auto-expands)
 
 | Step | Action                                                                                                                          | Off - expected | Space - expected                                                  | Space-and-scroll - expected            |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------- | ------------------------------------------ |

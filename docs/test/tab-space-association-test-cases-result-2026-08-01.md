@@ -36,7 +36,7 @@ Source test plan: [tab-space-association-test-cases.md](tab-space-association-te
 | C.1b       | Activate a tab in a different space (Off/Space/Space-and-scroll)                          | Pass/Pass/Pass   |               |
 | C.1c       | Close active tab, activates another tab in the same space (Off/Space/Space-and-scroll)    | Pass/Pass/Pass   |               |
 | C.1d       | Close active tab, activates another tab in a different space (Off/Space/Space-and-scroll) | Pass/Pass/Pass   |               |
-| C.1e       | Activate a bookmark tab in another space (Off/Space/Space-and-scroll)                     | Pass/Pass/Pass   |               |
+| C.1e       | Activate a bookmark tab in another space - collapsed folder auto-expands (Off/Space/Space-and-scroll)                     | Pass/Pass/Pass   |               |
 | C.1f       | Activate a pinned-site tab from another space (Off/Space/Space-and-scroll)                | Pass/Pass/Pass   |               |
 | C.2a       | "Show active tab" toolbar button                                                          | Pass             |               |
 | C.2b       | Tab history Previous/Next toolbar buttons                                                 | Pass             |               |

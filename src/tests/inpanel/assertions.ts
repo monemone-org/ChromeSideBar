@@ -3,7 +3,7 @@
 // expectation isn't met - the runner turns that into a failed TestResult.
 
 import { TestStep } from './types';
-import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector } from './stepHelpers';
+import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, sleep } from './stepHelpers';
 
 async function tabGroupTitle(tabId: number): Promise<string | undefined>
 {
@@ -151,24 +151,65 @@ export function assertSpaceExists(spaceRef: string, expected: boolean): TestStep
 }
 
 /**
+ * Confirms a bookmark's row exists in the DOM at all - distinct from
+ * assertTabRowVisible, which treats a missing row as always an error.
+ * BookmarkTree only renders a bookmark's row while ALL of its ancestor
+ * folders are expanded (collapsed folders don't render their children), so
+ * "missing" is a legitimate, expected state here, not a bug - used as the
+ * precondition check for C.1e's "folder auto-expands" scenario, before the
+ * real activation is expected to expand it. Only meaningful for
+ * bookmark-associated tabs (data-bookmark-id); TabList's own rows (regular
+ * tabs) are always rendered regardless of scroll position, so use
+ * assertTabRowVisible for those instead.
+ */
+export function assertBookmarkRowExists(tabRef: string, expected: boolean): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Tab "${tabRef}"'s bookmark row ${expected ? 'exists' : "doesn't exist"} in the DOM`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      const selector = resolveTabRowSelector(ctx, tabId);
+      const exists = document.querySelector(selector) !== null;
+      if (exists !== expected)
+      {
+        throw new Error(`expected row ${selector} to ${expected ? 'exist' : 'not exist'} in the DOM, but it ${exists ? 'does' : "doesn't"}`);
+      }
+    },
+  };
+}
+
+/**
  * Confirms a tab's sidebar row is (or isn't) within the visible bounds of
  * the sidebar's scroll container - the real DOM effect of scrollHelpers.ts's
  * scrollToTab/scrollToBookmark (element.scrollIntoView()). The row must
- * exist in the DOM either way (TabList/BookmarkTree don't virtualize - a
- * row missing entirely means something's actually broken, not just scrolled
- * away), so a missing row is always an error regardless of `expected`.
+ * exist in the DOM either way (TabList doesn't virtualize, and by this point
+ * any collapsed BookmarkTree ancestor should already have auto-expanded -
+ * see assertBookmarkRowExists for checking that on its own), so a missing
+ * row is always an error regardless of `expected`.
  *
  * Caveat: expected=true only proves the row IS visible right now, not that a
  * scroll HAD to happen to get there - a row already in view before the
  * activation passes trivially regardless of follow mode. Telling "scrolled"
  * apart from "was already visible" needs the row pushed off-screen first
- * (see openFillerTabsUntilScrollable/scrollSidebarToBottom in actions.ts,
+ * (see openFillerTabsUntilScrollable/scrollRowOutOfView in actions.ts,
  * and the manual doc's C.1c note on anchoring tabs far apart) - callers
  * relying on this to distinguish scroll-vs-no-scroll modes must set that up
  * first and should assert expected=false as a precondition check.
+ *
+ * Polls for up to POLL_TIMEOUT_MS rather than checking once: scrollHelpers.ts's
+ * scrollIntoView() call uses `behavior: 'smooth'`, an animation with no
+ * completion callback, so checking immediately after the settle delay can
+ * catch it mid-scroll (especially over the long distance
+ * openFillerTabsUntilScrollable creates) and see a false "not visible" even
+ * though the scroll is genuinely in progress toward the right answer.
  */
 export function assertTabRowVisible(tabRef: string, expected: boolean): TestStep
 {
+  const POLL_TIMEOUT_MS = 1500;
+  const POLL_INTERVAL_MS = 100;
+
   return {
     kind: 'assert',
     label: `Tab "${tabRef}"'s sidebar row is ${expected ? '' : 'not '}visible`,
@@ -176,17 +217,34 @@ export function assertTabRowVisible(tabRef: string, expected: boolean): TestStep
     {
       const tabId = resolveTabId(ctx, tabRef);
       const selector = resolveTabRowSelector(ctx, tabId);
-      const container = getScrollContainer();
 
-      const element = document.querySelector(selector);
-      if (!element) throw new Error(`row ${selector} not found in DOM - should be rendered (just possibly scrolled out of view), not absent`);
-
-      const containerRect = container.getBoundingClientRect();
-      const elementRect = element.getBoundingClientRect();
-      const visible = elementRect.top >= containerRect.top && elementRect.bottom <= containerRect.bottom;
-      if (visible !== expected)
+      const startTime = Date.now();
+      for (;;)
       {
-        throw new Error(`expected row ${selector} to be ${expected ? '' : 'not '}visible, but it ${visible ? 'is' : "isn't"}`);
+        const container = getScrollContainer();
+        const element = document.querySelector(selector);
+        if (!element) throw new Error(`row ${selector} not found in DOM - should be rendered (just possibly scrolled out of view), not absent`);
+
+        // Midpoint rather than full-containment: scrollIntoView({block: 'nearest'})
+        // routinely lands the target row flush against the container's edge,
+        // and a strict top/bottom containment check has no tolerance for the
+        // container's own padding (p-2 in App.tsx) or ordinary sub-pixel
+        // rounding - both produce a false "not visible" for a row a human
+        // looking at the same screen would call clearly visible.
+        const containerRect = container.getBoundingClientRect();
+        const elementRect = element.getBoundingClientRect();
+        const elementMidpoint = (elementRect.top + elementRect.bottom) / 2;
+        const visible = elementMidpoint >= containerRect.top && elementMidpoint <= containerRect.bottom;
+        if (visible === expected) return;
+
+        if (Date.now() - startTime >= POLL_TIMEOUT_MS)
+        {
+          throw new Error(
+            `expected row ${selector} to be ${expected ? '' : 'not '}visible, but it ${visible ? 'is' : "isn't"} (waited ${POLL_TIMEOUT_MS}ms) - ` +
+            `container=[${containerRect.top.toFixed(1)}, ${containerRect.bottom.toFixed(1)}] element=[${elementRect.top.toFixed(1)}, ${elementRect.bottom.toFixed(1)}] midpoint=${elementMidpoint.toFixed(1)}`
+          );
+        }
+        await sleep(POLL_INTERVAL_MS);
       }
     },
   };

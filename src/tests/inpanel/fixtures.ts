@@ -116,6 +116,22 @@ export async function createTestBookmark(
   return bookmark;
 }
 
+/** Create a bookmark inside an arbitrary folder ref (e.g. one from createTestSubfolder) - unlike createTestBookmark, which is anchored to a space's own root folder via its "${spaceRef}:folderId" ref convention. */
+export async function createTestBookmarkInFolder(
+  ctx: TestContext,
+  folderRef: string,
+  title: string,
+  url: string,
+  bookmarkRef: string
+): Promise<chrome.bookmarks.BookmarkTreeNode>
+{
+  const folderId = ctx.refs.get(folderRef);
+  if (typeof folderId !== 'string') throw new Error(`createTestBookmarkInFolder: no folder ref "${folderRef}" - call createTestSubfolder first`);
+  const bookmark = await ctx.createBookmark(folderId, title, url);
+  ctx.refs.set(bookmarkRef, bookmark.id);
+  return bookmark;
+}
+
 /** Create a subfolder nested inside a space's own folder (for A.7b's generic "Move to..." picker, which targets an arbitrary folder rather than a space's root folder directly). */
 export async function createTestSubfolder(
   ctx: TestContext,

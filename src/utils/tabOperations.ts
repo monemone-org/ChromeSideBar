@@ -5,6 +5,52 @@
 import { Space } from '../contexts/SpacesContext';
 import { toChromeColor } from './groupColors';
 
+// Keyed by "windowId:spaceName" - deduplicates concurrent getOrCreateSpaceGroup
+// calls for a group that doesn't exist yet (see resolveGroupId). Cleared once
+// resolved, so it only matters for calls that genuinely overlap in time, not
+// a long-lived cache of every group ever created.
+const pendingGroupCreation = new Map<string, Promise<number>>();
+
+/**
+ * Resolves (creating if needed) the Chrome group id for a space, coalescing
+ * concurrent callers racing to create the SAME not-yet-existing group into
+ * one creation instead of each seeing "no group" and creating their own.
+ * The check-then-claim below has no `await` between reading and writing
+ * pendingGroupCreation, so it's atomic with respect to other JS execution -
+ * JS is single-threaded, so nothing else can run in that gap.
+ */
+async function resolveGroupId(space: Space, windowId: number, seedTabId: number): Promise<number>
+{
+  const key = `${windowId}:${space.name}`;
+
+  let promise = pendingGroupCreation.get(key);
+  if (!promise)
+  {
+    promise = (async () =>
+    {
+      const groups = await chrome.tabGroups.query({ windowId, title: space.name });
+      if (groups.length > 0) return groups[0].id;
+
+      // Chrome has no "create an empty group" call - creating a group and
+      // adding its first tab happen together, so whichever call wins this
+      // race seeds the new group with its own tab.
+      const newGroupId = await chrome.tabs.group({
+        tabIds: [seedTabId],
+        createProperties: { windowId },
+      });
+      await chrome.tabGroups.update(newGroupId, {
+        title: space.name,
+        color: toChromeColor(space.color),
+      });
+      return newGroupId;
+    })();
+    pendingGroupCreation.set(key, promise);
+    promise.finally(() => pendingGroupCreation.delete(key));
+  }
+
+  return promise;
+}
+
 /**
  * Add a tab to a space's Chrome tab group, finding the existing group by
  * name or creating a new one (titled and colored to match the space) if
@@ -12,24 +58,8 @@ import { toChromeColor } from './groupColors';
  */
 export async function getOrCreateSpaceGroup(tabId: number, space: Space, windowId: number): Promise<void>
 {
-  const groups = await chrome.tabGroups.query({ windowId, title: space.name });
-
-  if (groups.length > 0)
-  {
-    await chrome.tabs.group({ tabIds: [tabId], groupId: groups[0].id });
-  }
-  else
-  {
-    const tab = await chrome.tabs.get(tabId);
-    const newGroupId = await chrome.tabs.group({
-      tabIds: [tabId],
-      createProperties: { windowId: tab.windowId }
-    });
-    await chrome.tabGroups.update(newGroupId, {
-      title: space.name,
-      color: toChromeColor(space.color),
-    });
-  }
+  const groupId = await resolveGroupId(space, windowId, tabId);
+  await chrome.tabs.group({ tabIds: [tabId], groupId });
 }
 
 /**

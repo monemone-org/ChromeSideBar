@@ -70,6 +70,18 @@ function summarize(results: TestResult[]): CaseSummary
   return { total: results.length, failed: results.filter(r => !r.passed).length };
 }
 
+/**
+ * Whether a case can't run start-to-finish on its own - it has at least one
+ * pause step, meaning it stops partway and needs the tester to do something
+ * in Chrome's own UI (usually with the panel closed) before resuming. Worth
+ * surfacing in the list: it's the difference between a case you can kick off
+ * and walk away from and one that will sit waiting for you.
+ */
+function requiresManualSteps(testCase: TestCase): boolean
+{
+  return testCase.steps.some(step => step.kind === 'pause');
+}
+
 export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, removePin }: TestRunnerPanelProps) =>
 {
   const spacesCtx = useSpacesContext();
@@ -429,6 +441,14 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
                     </span>
                     <span className="font-mono text-xs text-gray-500 mr-1">{testCase.id}</span>
                     <span>{testCase.title}</span>
+                    {requiresManualSteps(testCase) && (
+                      <span
+                        className="ml-1 px-1 rounded text-[10px] leading-4 flex-shrink-0 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                        title="Pauses partway and needs you to do something in Chrome (usually with the panel closed), then reopen to resume"
+                      >
+                        ✋
+                      </span>
+                    )}
                     {isPausedHere ? (
                       <span className="ml-2 text-amber-600">paused</span>
                     ) : summary && (
