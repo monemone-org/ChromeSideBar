@@ -15,6 +15,35 @@ export const TEST_ROOT_FOLDER_TITLE = 'InPanel Test Data (safe to delete)';
 export const TEST_PINNED_PREFIX = 'InPanelTest: ';
 const OTHER_BOOKMARKS_ID = '2';
 
+/**
+ * A page that can actually produce sound, for C.2e/C.2f. Every other fixture
+ * uses a synthetic example.com URL, but those can't be made audible, and
+ * chrome.tabs' `audible` flag (which the audio quick-jump and audio dropdown
+ * are built on) only gets set by genuine playback - autoplay is blocked
+ * without a user gesture, and muted playback doesn't count. Hence the real
+ * video, plus a manual "press play" step in those two cases.
+ *
+ * Swap this for any video with sound. Keep it a bare watch?v= link: a
+ * &list=... playlist auto-advances to the next video when this one ends,
+ * rewriting the tab's URL mid-run and defeating the cleanup match below.
+ */
+export const TEST_AUDIO_URL = 'https://www.youtube.com/watch?v=-W2JdSl1v48';
+
+/**
+ * Whether a tab belongs to the test suite and is safe to close during
+ * cleanup. Deliberately matches TEST_AUDIO_URL as a full-URL prefix rather
+ * than something loose like "any youtube.com tab" - cleanup closes whatever
+ * it matches, and a broad pattern would take the user's own tabs with it
+ * (same collision hazard the namespaced test space names avoid). The
+ * tradeoff: if the page navigates somewhere else entirely, that tab is
+ * leaked rather than closed, which is the safe direction to fail.
+ */
+function isTestTabUrl(url: string | undefined): boolean
+{
+  if (!url) return false;
+  return url.startsWith(TEST_URL_PREFIX) || url.startsWith(TEST_AUDIO_URL);
+}
+
 export function testUrl(label: string): string
 {
   return `${TEST_URL_PREFIX}${label}`;
@@ -235,13 +264,13 @@ export async function resetTestData(getCtx: () => TestContext): Promise<void>
   // so run them concurrently rather than one at a time.
   const allWindows = await chrome.windows.getAll({ populate: true });
   const otherWindowsWithTestTabs = allWindows.filter(win =>
-    win.id !== undefined && win.id !== ctx.windowId && (win.tabs ?? []).some(t => t.url?.startsWith(TEST_URL_PREFIX))
+    win.id !== undefined && win.id !== ctx.windowId && (win.tabs ?? []).some(t => isTestTabUrl(t.url))
   );
 
   await Promise.all(otherWindowsWithTestTabs.map(async win =>
   {
     const winTabs = win.tabs ?? [];
-    const testTabsInWindow = winTabs.filter(t => t.url?.startsWith(TEST_URL_PREFIX));
+    const testTabsInWindow = winTabs.filter(t => isTestTabUrl(t.url));
 
     // The doc's A.6/A.6b/A.6c manual steps permit dropping a tab into an
     // EXISTING second window, not just a freshly-popped-out one - if this
@@ -260,7 +289,7 @@ export async function resetTestData(getCtx: () => TestContext): Promise<void>
 
   const tabs = await chrome.tabs.query({ windowId: ctx.windowId });
   const testTabIds = tabs
-    .filter(t => t.url?.startsWith(TEST_URL_PREFIX))
+    .filter(t => isTestTabUrl(t.url))
     .map(t => t.id)
     .filter((id): id is number => id !== undefined);
   if (testTabIds.length > 0)

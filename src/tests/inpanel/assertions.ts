@@ -250,6 +250,94 @@ export function assertTabRowVisible(tabRef: string, expected: boolean): TestStep
   };
 }
 
+/**
+ * Confirms a tab really is producing sound, per chrome.tabs' own `audible`
+ * flag - the same signal the audio quick-jump and audio dropdown are built
+ * on. Used as the precondition right after C.2e/C.2f's "press play" pause:
+ * without it, forgetting to press play would either fail somewhere confusing
+ * later or, worse, quietly pass by locking onto some unrelated audible tab
+ * elsewhere in the browser.
+ */
+export function assertTabAudible(tabRef: string, expected: boolean): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Tab "${tabRef}" is ${expected ? '' : 'not '}playing audio`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      const tab = await chrome.tabs.get(tabId);
+      if ((tab.audible ?? false) !== expected)
+      {
+        throw new Error(`expected tab to be ${expected ? '' : 'not '}audible, but it ${tab.audible ? 'is' : "isn't"}`);
+      }
+    },
+  };
+}
+
+/** Confirms a tab is the window's active tab - what an explicit jump action is ultimately supposed to achieve, separately from where the sidebar ended up. */
+export function assertTabActive(tabRef: string): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Tab "${tabRef}" is the active tab`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      const tab = await chrome.tabs.get(tabId);
+      if (!tab.active) throw new Error(`expected tab ${tabId} to be active, but it isn't`);
+    },
+  };
+}
+
+/** Confirms every named tab is one the audio dropdown would list (i.e. the background is tracking them all as audible), which is what makes C.2f's "pick a specific entry" meaningful rather than a one-entry menu. */
+export function assertAudioListIncludes(tabRefs: string[]): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Audio tab list includes [${tabRefs.join(', ')}]`,
+    run: async (ctx) =>
+    {
+      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' }) as {
+        playingTabIds?: number[];
+        historyTabIds?: number[];
+      } | undefined;
+      const listed = [...(response?.playingTabIds ?? []), ...(response?.historyTabIds ?? [])];
+
+      const missing = tabRefs.filter(ref => !listed.includes(resolveTabId(ctx, ref)));
+      if (missing.length > 0)
+      {
+        throw new Error(`expected the audio tab list to include [${missing.join(', ')}], but it only has ids [${listed.join(', ')}]`);
+      }
+    },
+  };
+}
+
+/**
+ * Confirms a keyboard command is registered AND actually bound to a key.
+ *
+ * Catches the failure modes a message-driven test structurally cannot see:
+ * the command renamed or dropped from public/manifest.json's "commands"
+ * block, or its shortcut left unassigned / lost to a conflict with another
+ * extension. Does NOT prove chrome.commands.onCommand is wired up or that
+ * pressing the key does anything - only a real keypress shows that, which is
+ * why C.2c still has manual steps.
+ */
+export function assertCommandShortcutBound(commandName: string): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Keyboard command "${commandName}" is bound to a shortcut`,
+    run: async () =>
+    {
+      const commands = await chrome.commands.getAll();
+      const command = commands.find(c => c.name === commandName);
+      if (!command) throw new Error(`command "${commandName}" is not registered - check public/manifest.json's "commands" block`);
+      if (!command.shortcut) throw new Error(`command "${commandName}" is registered but has no key bound - unassigned, or conflicting with another extension (see chrome://extensions/shortcuts)`);
+    },
+  };
+}
+
 /** Confirms a tab has actually left the test window (e.g. after moveTabToNewWindow) - used for regular tabs, which have no bookmark/pinned association to check instead. */
 export function assertTabInOtherWindow(tabRef: string): TestStep
 {

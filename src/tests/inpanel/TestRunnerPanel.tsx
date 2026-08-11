@@ -349,7 +349,7 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
 
   return (
     <div
-      className="flex-shrink-0 flex flex-col border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+      className="relative flex-shrink-0 flex flex-col border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
       style={{ height: '45vh' }}
     >
       <div className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -366,38 +366,6 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
         {panelError && (
           <div className="p-2 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200">
             {panelError}
-          </div>
-        )}
-
-        {pausedState && pausedCase && (
-          <div className="p-2 rounded border border-amber-400 bg-amber-50 dark:bg-amber-900/30">
-            <div className="font-medium mb-1">
-              Paused at step {pausedState.stepIndex + 1} of {pausedCase.id} - {pausedCase.title}
-            </div>
-            {batchQueue !== null && (
-              <div className="mb-1 text-xs text-amber-700 dark:text-amber-400">
-                Part of a Run All batch - {batchQueue.length} more case{batchQueue.length === 1 ? '' : 's'} queued after this one.
-              </div>
-            )}
-            <div className="mb-2 whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-              {pausedInstruction}
-            </div>
-            <div className="flex gap-2">
-              <button
-                className="px-2 py-1 rounded bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
-                onClick={handleResume}
-                disabled={runningCaseId !== null || runningAll}
-              >
-                I've done it - Resume{batchQueue !== null ? ' & Continue Batch' : ''}
-              </button>
-              <button
-                className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
-                onClick={discardPausedRun}
-                disabled={runningCaseId !== null || runningAll}
-              >
-                Discard
-              </button>
-            </div>
           </div>
         )}
 
@@ -484,6 +452,46 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
           })}
         </div>
       </div>
+
+      {/*
+        Floats over the panel rather than sitting in the scrolling list: a
+        paused run halts everything until you act on it, but the case it
+        belongs to can be anywhere in a list that's now long enough to scroll
+        (all of Section C sits well below the fold), so an in-flow banner
+        scrolls out of sight exactly when it's the only thing that matters.
+        Rendered after the scroll container so it paints on top.
+      */}
+      {pausedState && pausedCase && (
+        <div className="absolute inset-x-3 top-1/2 -translate-y-1/2 z-10 max-h-[85%] overflow-y-auto p-2 rounded border border-amber-400 bg-amber-50 dark:bg-amber-900/95 shadow-lg text-sm text-gray-900 dark:text-gray-100">
+          <div className="font-medium mb-1">
+            Paused at step {pausedState.stepIndex + 1} of {pausedCase.id} - {pausedCase.title}
+          </div>
+          {batchQueue !== null && (
+            <div className="mb-1 text-xs text-amber-700 dark:text-amber-400">
+              Part of a Run All batch - {batchQueue.length} more case{batchQueue.length === 1 ? '' : 's'} queued after this one.
+            </div>
+          )}
+          <div className="mb-2 whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+            {pausedInstruction}
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="px-2 py-1 rounded bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+              onClick={handleResume}
+              disabled={runningCaseId !== null || runningAll}
+            >
+              I've done it - Resume{batchQueue !== null ? ' & Continue Batch' : ''}
+            </button>
+            <button
+              className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
+              onClick={discardPausedRun}
+              disabled={runningCaseId !== null || runningAll}
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

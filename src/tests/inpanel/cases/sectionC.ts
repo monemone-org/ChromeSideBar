@@ -1,8 +1,12 @@
 // Section C - "Follow active tab" modes.
 // docs/test/tab-space-association-test-cases.md#section-c---follow-active-tab-modes
 //
-// Covers C.1a-C.1f, each run once per FollowActiveTabMode. C.2 is not ported
-// yet. setFollowActiveTabMode() + activateTabNative() cover the space-switch
+// Covers all of C.1 and C.2. C.1a-C.1f run once per FollowActiveTabMode
+// (the mode is what they test); C.2a-C.2f run once under 'off' - see the
+// C.2 block comment further down for why that's the stronger choice, not
+// just the cheaper one.
+//
+// setFollowActiveTabMode() + activateTabNative() cover the space-switch
 // half; openFillerTabsUntilScrollable() + scrollRowOutOfView() + an explicit
 // precondition check cover the scroll half for real (not just a smoke test -
 // see assertTabRowVisible's caveat in assertions.ts about why an anchor row
@@ -32,9 +36,9 @@
 
 import { FollowActiveTabMode } from '../../../utils/followActiveTab';
 import { TestCase } from '../types';
-import { createTestBookmark, createTestBookmarkInFolder, createTestPinnedSite, createTestSpace, createTestSubfolder, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { activateTabNative, closeTab, openBookmarkTab, openFillerBookmarksUntilScrollable, openFillerTabsUntilScrollable, openPinnedTab, openRegularTab, scrollRowOutOfView, setFollowActiveTabMode, switchSpaceVerified } from '../actions';
-import { assertBookmarkRowExists, assertSidebarShowsSpace, assertTabRowVisible } from '../assertions';
+import { createTestBookmark, createTestBookmarkInFolder, createTestPinnedSite, createTestSpace, createTestSubfolder, TEST_AUDIO_URL, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import { activateTabNative, audioQuickJump, closeTab, navigateTabHistory, openBookmarkTab, openFillerBookmarksUntilScrollable, openFillerTabsUntilScrollable, openPinnedTab, openRegularTab, pause, scrollRowOutOfView, selectAudioTabFromDropdown, selectTabFromHistoryDropdown, setFollowActiveTabMode, showActiveTab, switchSpaceVerified } from '../actions';
+import { assertAudioListIncludes, assertBookmarkRowExists, assertCommandShortcutBound, assertSidebarShowsSpace, assertTabActive, assertTabAudible, assertTabRowVisible } from '../assertions';
 
 const MODES: FollowActiveTabMode[] = ['off', 'space', 'space-and-scroll'];
 
@@ -332,6 +336,317 @@ function makeC1fCase(mode: FollowActiveTabMode): TestCase
   };
 }
 
+// ---------------------------------------------------------------------------
+// C.2 - explicit actions bypass the mode.
+//
+// These run ONCE, under 'off' - not once per mode like C.1, and the manual
+// plan now says the same (see the doc's C.2 intro). That's a stronger test,
+// not just a cheaper one. The mode reaches an explicit action through
+// exactly one expression, useFollowActiveTab's
+//
+//   shouldScroll = explicit || mode === 'space-and-scroll'
+//                           || (mode === 'space' && spaceSwitched)
+//
+// where explicit:true short-circuits the whole thing. The space switch never
+// consults the mode at all - setActiveTabAndSpace (background.ts) doesn't
+// read FOLLOW_ACTIVE_TAB_KEY. So 'off' is the ONLY mode in which the
+// explicit flag is load-bearing: under 'space-and-scroll' the scroll happens
+// regardless, so that run would still pass with explicit:true deleted
+// outright, which is precisely the regression this group exists to catch.
+//
+// Consequence for the skeleton: no arm-the-mode-late dance here (see this
+// file's header). 'off' is both the setup-safe mode and the mode under test,
+// so one setFollowActiveTabMode('off') up front covers both jobs.
+//
+// Coverage note: each case ports its doc table's PRIMARY flow. The trailing
+// "repeat steps 1-4, but ..." variant rows (C.2a's bookmark-in-a-collapsed-
+// folder, C.2b/C.2d's same-space no-switch) are not ported - the
+// explicit-action mechanism is identical, and the collapsed-folder path is
+// already covered by C.1e.
+// ---------------------------------------------------------------------------
+
+export const C2A_SHOW_ACTIVE_TAB: TestCase = {
+  id: 'C.2a',
+  title: '"Show active tab" toolbar button',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+  },
+  steps: [
+    setFollowActiveTabMode('off'),
+    ...switchSpaceVerified('spaceA'),
+    openRegularTab({ url: testUrl('c2a-tabA'), spaceRef: 'spaceA', tabRef: 'tabA' }),
+    activateTabNative('tabA'),
+
+    ...switchSpaceVerified('spaceB'),
+    openFillerTabsUntilScrollable('spaceB'),
+    openRegularTab({ url: testUrl('c2a-tabB'), spaceRef: 'spaceB', tabRef: 'tabB' }),
+    activateTabNative('tabB'),
+    scrollRowOutOfView('tabB'),
+    assertTabRowVisible('tabB', false),
+
+    // Sidebar back on spaceA while the ACTIVE tab is still spaceB's tabB -
+    // the divergence the button exists to resolve.
+    ...switchSpaceVerified('spaceA'),
+    assertSidebarShowsSpace('spaceA'),
+
+    // The actual step under test.
+    showActiveTab(),
+    assertSidebarShowsSpace('spaceB'),
+    assertTabRowVisible('tabB', true),
+  ],
+};
+
+// Both spaces get filler tabs so the target row is off-screen on arrival in
+// EITHER direction - without that, the 'next' leg's row would be the only
+// thing in its space and visible no matter what, making that half of the
+// case pass whether or not scrolling works.
+export const C2B_HISTORY_TOOLBAR_BUTTONS: TestCase = {
+  id: 'C.2b',
+  title: 'Tab history Previous/Next toolbar buttons',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+  },
+  steps: [
+    setFollowActiveTabMode('off'),
+    ...switchSpaceVerified('spaceA'),
+    openFillerTabsUntilScrollable('spaceA'),
+    openRegularTab({ url: testUrl('c2b-tab1'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    activateTabNative('tab1'),
+    scrollRowOutOfView('tab1'),
+    assertTabRowVisible('tab1', false),
+
+    ...switchSpaceVerified('spaceB'),
+    openFillerTabsUntilScrollable('spaceB'),
+    openRegularTab({ url: testUrl('c2b-tab2'), spaceRef: 'spaceB', tabRef: 'tab2' }),
+    activateTabNative('tab2'),
+    scrollRowOutOfView('tab2'),
+    assertTabRowVisible('tab2', false),
+
+    // The actual steps under test: back to tab1, then forward to tab2.
+    navigateTabHistory('prev'),
+    assertSidebarShowsSpace('spaceA'),
+    assertTabRowVisible('tab1', true),
+
+    navigateTabHistory('next'),
+    assertSidebarShowsSpace('spaceB'),
+    assertTabRowVisible('tab2', true),
+  ],
+};
+
+// Same flow as C.2b, driven by the real keyboard shortcuts. The one manual
+// case in Section C, and deliberately just ONE case rather than one per mode:
+// what it adds over C.2b is entirely about the shortcut itself, which has
+// nothing to do with the follow mode.
+//
+// Why not simply send prev-used-tab/next-used-tab like C.2b does: both
+// entry points converge on historyManager.navigate() one line in, so a
+// message-driven version would re-run C.2b exactly while claiming to test
+// the keybinding. It would keep passing with the command renamed or dropped
+// from public/manifest.json, its shortcut unbound or lost to a conflict, or
+// the chrome.commands.onCommand listener deleted. The two
+// assertCommandShortcutBound steps below catch the first two of those
+// automatically; only a real keypress covers the third.
+//
+// Two pauses rather than one that presses both keys: back-then-forward
+// returns to the starting tab, so a single pause couldn't tell "both worked"
+// from "neither did".
+//
+// Unlike every other pause in this suite, these do NOT ask you to close the
+// panel - chrome.commands fires globally, so the shortcut works with the
+// sidebar open and the run resumes on the button alone.
+export const C2C_HISTORY_SHORTCUTS: TestCase = {
+  id: 'C.2c',
+  title: 'History keyboard shortcuts (Previous/Next Used Tab)',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+  },
+  steps: [
+    setFollowActiveTabMode('off'),
+    assertCommandShortcutBound('prev-used-tab'),
+    assertCommandShortcutBound('next-used-tab'),
+
+    ...switchSpaceVerified('spaceA'),
+    openFillerTabsUntilScrollable('spaceA'),
+    openRegularTab({ url: testUrl('c2c-tab1'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    activateTabNative('tab1'),
+    scrollRowOutOfView('tab1'),
+    assertTabRowVisible('tab1', false),
+
+    ...switchSpaceVerified('spaceB'),
+    openFillerTabsUntilScrollable('spaceB'),
+    openRegularTab({ url: testUrl('c2c-tab2'), spaceRef: 'spaceB', tabRef: 'tab2' }),
+    activateTabNative('tab2'),
+    scrollRowOutOfView('tab2'),
+    assertTabRowVisible('tab2', false),
+
+    pause(
+      'Manual step: press the history BACK shortcut',
+      [
+        'Press the "Previous Used Tab" shortcut (default Cmd+Shift+Comma - check chrome://extensions/shortcuts if unsure).',
+        'Leave the sidebar panel open.',
+        'Click Resume below.',
+      ]
+    ),
+    assertSidebarShowsSpace('spaceA'),
+    assertTabRowVisible('tab1', true),
+
+    pause(
+      'Manual step: press the history FORWARD shortcut',
+      [
+        'Press the "Next Used Tab" shortcut (default Cmd+Shift+Period).',
+        'Leave the sidebar panel open.',
+        'Click Resume below.',
+      ]
+    ),
+    assertSidebarShowsSpace('spaceB'),
+    assertTabRowVisible('tab2', true),
+  ],
+};
+
+// Three activations, so the target (tab2) sits a couple of entries back
+// rather than being reachable by a single "Previous" - that's what separates
+// this from C.2b and makes it exercise navigateToIndex rather than navigate.
+//
+// Title deliberately doesn't say "press-and-hold" - this case never performs
+// that gesture. It sends the same two messages the dropdown ends up sending
+// (get-tab-history, then navigate-to-history-index) and so covers the
+// background half only. Everything on the Toolbar.tsx side is skipped: the
+// 300ms hold timer, the quick-click-vs-hold branch in handleHistoryMouseUp,
+// the dropdown rendering, and the entry click wiring - this case passes with
+// all of that broken. Testing the gesture itself needs DOM-level mousedown /
+// wait / click against the real toolbar, which nothing in this suite does yet.
+export const C2D_HISTORY_DROPDOWN: TestCase = {
+  id: 'C.2d',
+  title: 'Jump to a specific tab-history entry (dropdown navigate-to-index path)',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+  },
+  steps: [
+    setFollowActiveTabMode('off'),
+    ...switchSpaceVerified('spaceA'),
+    openRegularTab({ url: testUrl('c2d-tab1'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    activateTabNative('tab1'),
+
+    ...switchSpaceVerified('spaceB'),
+    openFillerTabsUntilScrollable('spaceB'),
+    openRegularTab({ url: testUrl('c2d-tab2'), spaceRef: 'spaceB', tabRef: 'tab2' }),
+    activateTabNative('tab2'),
+    scrollRowOutOfView('tab2'),
+    assertTabRowVisible('tab2', false),
+
+    // tab3 pushes tab2 further back in the history stack.
+    ...switchSpaceVerified('spaceA'),
+    openRegularTab({ url: testUrl('c2d-tab3'), spaceRef: 'spaceA', tabRef: 'tab3' }),
+    activateTabNative('tab3'),
+    assertSidebarShowsSpace('spaceA'),
+
+    // The actual step under test: jump straight to tab2's entry.
+    selectTabFromHistoryDropdown('tab2'),
+    assertSidebarShowsSpace('spaceB'),
+    assertTabRowVisible('tab2', true),
+  ],
+};
+
+// The audio pair needs a genuinely audible tab, and only real playback sets
+// chrome.tabs' `audible` flag - autoplay is blocked without a user gesture,
+// and muted playback doesn't count. So both cases open TEST_AUDIO_URL (see
+// fixtures.ts) and pause for you to press play. assertTabAudible right after
+// the pause is what keeps that honest: skip the play click and the case fails
+// there, at the cause, instead of drifting on and possibly locking onto some
+// unrelated audible tab elsewhere in the browser.
+export const C2E_AUDIO_QUICK_JUMP: TestCase = {
+  id: 'C.2e',
+  title: 'Audio quick-jump (single click on audio button)',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+  },
+  steps: [
+    setFollowActiveTabMode('off'),
+    ...switchSpaceVerified('spaceB'),
+    openFillerTabsUntilScrollable('spaceB'),
+    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceB', tabRef: 'audioTab' }),
+
+    pause(
+      'Manual step: start audio playback',
+      [
+        'Switch to the newly opened YouTube tab in Chrome.',
+        'Press play and leave it playing (unmuted - a muted tab does not count as audible).',
+        'Come back to the sidebar and click Resume below.',
+      ]
+    ),
+    assertTabAudible('audioTab', true),
+    scrollRowOutOfView('audioTab'),
+    assertTabRowVisible('audioTab', false),
+
+    ...switchSpaceVerified('spaceA'),
+    assertSidebarShowsSpace('spaceA'),
+
+    // The actual step under test.
+    audioQuickJump(),
+    assertTabActive('audioTab'),
+    assertSidebarShowsSpace('spaceB'),
+    assertTabRowVisible('audioTab', true),
+  ],
+};
+
+// Two audible tabs, so the dropdown has a real choice to make. The target is
+// deliberately the one in spaceA, opened FIRST and so the older of the two -
+// audioQuickJump (C.2e) always takes playingTabIds[0], the most recent, so
+// picking the older entry is exactly what separates this case from that one.
+export const C2F_AUDIO_DROPDOWN: TestCase = {
+  id: 'C.2f',
+  title: 'Select a tab from the audio tabs dropdown list',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+  },
+  steps: [
+    setFollowActiveTabMode('off'),
+    ...switchSpaceVerified('spaceA'),
+    openFillerTabsUntilScrollable('spaceA'),
+    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceA', tabRef: 'audioTabA' }),
+
+    ...switchSpaceVerified('spaceB'),
+    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceB', tabRef: 'audioTabB' }),
+
+    pause(
+      'Manual step: start playback on BOTH audio tabs',
+      [
+        'Two YouTube tabs were opened. Press play on both, leaving both unmuted.',
+        'Play the Space A one FIRST, then the Space B one - the Space B tab must be the more recent, so selecting Space A\'s entry is a real choice rather than the default.',
+        'Come back to the sidebar and click Resume below.',
+      ]
+    ),
+    assertTabAudible('audioTabA', true),
+    assertTabAudible('audioTabB', true),
+    // Both must be listed, otherwise "pick a specific entry" is a one-item menu.
+    assertAudioListIncludes(['audioTabA', 'audioTabB']),
+
+    ...switchSpaceVerified('spaceA'),
+    scrollRowOutOfView('audioTabA'),
+    assertTabRowVisible('audioTabA', false),
+    ...switchSpaceVerified('spaceB'),
+    assertSidebarShowsSpace('spaceB'),
+
+    // The actual step under test: pick spaceA's (older) entry, not the newest.
+    selectAudioTabFromDropdown('audioTabA'),
+    assertTabActive('audioTabA'),
+    assertSidebarShowsSpace('spaceA'),
+    assertTabRowVisible('audioTabA', true),
+  ],
+};
+
 export const SECTION_C_CASES: TestCase[] = [
   ...MODES.map(makeC1aCase),
   ...MODES.map(makeC1bCase),
@@ -339,4 +654,10 @@ export const SECTION_C_CASES: TestCase[] = [
   ...MODES.map(makeC1dCase),
   ...MODES.map(makeC1eCase),
   ...MODES.map(makeC1fCase),
+  C2A_SHOW_ACTIVE_TAB,
+  C2B_HISTORY_TOOLBAR_BUTTONS,
+  C2C_HISTORY_SHORTCUTS,
+  C2D_HISTORY_DROPDOWN,
+  C2E_AUDIO_QUICK_JUMP,
+  C2F_AUDIO_DROPDOWN,
 ];

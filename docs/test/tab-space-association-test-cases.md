@@ -70,12 +70,12 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | C.1d | Yes     |
 | C.1e | Yes     |
 | C.1f | Yes     |
-| C.2a | No      |
-| C.2b | No      |
-| C.2c | No      |
-| C.2d | No      |
-| C.2e | No      |
-| C.2f | No      |
+| C.2a | Yes     |
+| C.2b | Yes     |
+| C.2c | Yes     |
+| C.2d | Yes     |
+| C.2e | Yes     |
+| C.2f | Yes     |
 | D.1  | Yes     |
 | D.2  | Yes     |
 | E.1  | Yes     |
@@ -85,6 +85,17 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | F.3  | No      |
 | F.4  | No      |
 | F.5  | No      |
+
+Some "Yes" rows cover the case's main flow but not every sub-step. Still manual:
+
+- **D.1 step 3** - needs a second window's sidebar to observe.
+- **C.2a step 5, C.2b step 5, C.2d step 5** - the trailing "repeat, but ..." variants. Same explicit-action mechanism as the main flow, and the collapsed-folder path is covered by C.1e.
+- **C.2d's press-and-hold gesture** - the automated case sends the two messages the dropdown ends up sending (`get-tab-history`, `navigate-to-history-index`), so it covers the background half only. The 300ms hold timer, the quick-click-vs-hold branch in `Toolbar.tsx`'s `handleHistoryMouseUp`, the dropdown rendering, and the entry click wiring are all still manual-only.
+
+Why the "No" rows are still manual:
+
+- **B.4, E.2** - close the window hosting the panel / restart the browser, which kills the runner mid-case. E.2 also gets fresh tab ids on restore, which the runner's saved refs can't re-resolve.
+- **F.1-F.5** - regression sweep, deliberately left as a manual pass.
 
 ---
 
@@ -306,7 +317,10 @@ Not applicable to pinned sites: they're `chrome.storage.local` entries, not real
 
 ## Section C - "Follow active tab" modes
 
-Set via Settings → Behaviour → "Follow active tab": **Off**, **Switch to the tab's space**, **Switch space and show the tab**. Test the activation scenarios below under each mode - a full pass is 3x the table below, but at minimum cover the starred rows in all 3 modes.
+Set via Settings → Behaviour → "Follow active tab": **Off**, **Switch to the tab's space**, **Switch space and show the tab**.
+
+- **C.1** runs once per mode, since the mode is exactly what it's testing. A full pass is 3x that table; at minimum cover the starred rows in all 3.
+- **C.2** runs under **Off** only - see that section for why the other two prove nothing there.
 
 ### C.1 Activation scenarios per mode
 
@@ -371,27 +385,34 @@ Chrome prefers to keep activation inside the same tab group when closing a tab, 
 
 ### C.2 Explicit actions bypass the mode (should always scroll/switch regardless of setting)
 
-Run every sub-case below under all 3 "Follow active tab" modes - expected result is the same in all 3 unless noted. Grouped by trigger mechanism; each group covers cross-space and same-space in one table since the setup is nearly identical.
+Run every sub-case below under **Off** only, not all 3 modes. "Off" is the only mode that actually tests the bypass:
+
+- Explicit actions set `explicit: true`, which short-circuits the scroll decision in `useFollowActiveTab.ts`, and the space switch never reads the mode at all (`setActiveTabAndSpace` in `background.ts`).
+- Under "Space" / "Space and scroll" the switch and scroll happen anyway, so those runs pass even with the bypass completely broken. They cost 2x the work and prove nothing this group is about.
+
+Grouped by trigger mechanism; each group covers cross-space and same-space in one table since the setup is nearly identical.
 
 #### C.2a "Show active tab" toolbar button
 
 | Step | Action                                                                                                  | Expected Result                                                                                                     |
 | ---- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 1    | Switch sidebar to Space A, open a regular tab there and activate it                                       | -                                                                                                                      |
-| 2    | Switch sidebar to Space B, open a regular tab there and activate it                                       | -                                                                                                                      |
-| 3    | Switch sidebar back to Space A (so the active tab is now in Space B, but the sidebar shows Space A)        | -                                                                                                                      |
-| 4    | Click the "Show active tab" toolbar button                                                                | Switches sidebar to Space B, scrolls to the tab - test this specifically under **Off** mode too, since it was previously reported broken there |
-| 5    | Repeat steps 1-4, but make the Space B tab a bookmark tab inside a collapsed folder instead of a regular tab | Folder expands, scrolls to the bookmark row                                                                          |
+| 1    | Settings → Behaviour → set "Follow active tab" to **Off**                                                 | -                                                                                                                      |
+| 2    | Switch sidebar to Space A, open a regular tab there and activate it                                       | -                                                                                                                      |
+| 3    | Switch sidebar to Space B, open a regular tab there and activate it                                       | -                                                                                                                      |
+| 4    | Switch sidebar back to Space A (so the active tab is now in Space B, but the sidebar shows Space A)        | -                                                                                                                      |
+| 5    | Click the "Show active tab" toolbar button                                                                | Switches sidebar to Space B, scrolls to the tab - previously reported broken in **Off**, so this is the mode that matters |
+| 6    | Repeat steps 2-5, but make the Space B tab a bookmark tab inside a collapsed folder instead of a regular tab | Folder expands, scrolls to the bookmark row                                                                          |
 
 #### C.2b Tab history Previous/Next toolbar buttons
 
 | Step | Action                                                                                                  | Expected Result                                              |
 | ---- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| 1    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)                                | -                                                                  |
-| 2    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)                                | -                                                                  |
-| 3    | Click the toolbar's "Previous" button to go back to tab 1                                                  | Switches sidebar to Space A, scrolls to tab 1                    |
-| 4    | Click "Next" to return to tab 2                                                                             | Switches sidebar to Space B, scrolls to tab 2                    |
-| 5    | Repeat steps 1-4, but open both tab 1 and tab 2 in the same Space                                           | No space switch; scrolls to the tab if out of view               |
+| 1    | Settings → Behaviour → set "Follow active tab" to **Off**                                                  | -                                                                  |
+| 2    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)                                | -                                                                  |
+| 3    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)                                | -                                                                  |
+| 4    | Click the toolbar's "Previous" button to go back to tab 1                                                  | Switches sidebar to Space A, scrolls to tab 1                    |
+| 5    | Click "Next" to return to tab 2                                                                             | Switches sidebar to Space B, scrolls to tab 2                    |
+| 6    | Repeat steps 2-5, but open both tab 1 and tab 2 in the same Space                                           | No space switch; scrolls to the tab if out of view               |
 
 #### C.2c History keyboard shortcuts (Cmd+Shift+< / Cmd+Shift+>)
 
@@ -399,41 +420,45 @@ Same setup as C.2b, triggered via keyboard instead of the toolbar buttons. Worth
 
 | Step | Action                                                                       | Expected Result                                              |
 | ---- | ------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| 1    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)      | -                                                                  |
-| 2    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)      | -                                                                  |
-| 3    | Press Cmd+Shift+< (back)                                                        | Switches to Space A, scrolls to tab 1, including under **Off**    |
-| 4    | Press Cmd+Shift+> (forward)                                                     | Switches to Space B, scrolls to tab 2, including under **Off**    |
-| 5    | Repeat steps 1-4, but open both tabs in the same Space                          | No space switch; scrolls to the tab if out of view               |
+| 1    | Settings → Behaviour → set "Follow active tab" to **Off**                       | -                                                                  |
+| 2    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)      | -                                                                  |
+| 3    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)      | -                                                                  |
+| 4    | Press Cmd+Shift+< (back)                                                        | Switches to Space A, scrolls to tab 1                            |
+| 5    | Press Cmd+Shift+> (forward)                                                     | Switches to Space B, scrolls to tab 2                            |
+| 6    | Repeat steps 2-5, but open both tabs in the same Space                          | No space switch; scrolls to the tab if out of view               |
 
 #### C.2d Tab-history dropdown (press-and-hold Previous/Next)
 
 | Step | Action                                                                                                          | Expected Result                            |
 | ---- | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| 1    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)                                      | -                                               |
-| 2    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)                                      | -                                               |
-| 3    | Switch sidebar to Space A again, open a third regular tab there and activate it (tab 3) - tab 2 is now a few entries back in history | -                                               |
-| 4    | Press and hold the toolbar's "Previous" button to open the history dropdown, select tab 2's entry               | Switches to Space B, scrolls to tab 2         |
-| 5    | Repeat steps 1-4, but open all three tabs in the same Space                                                       | No space switch; scrolls to the tab if out of view |
+| 1    | Settings → Behaviour → set "Follow active tab" to **Off**                                                        | -                                               |
+| 2    | Switch sidebar to Space A, open a regular tab there and activate it (tab 1)                                      | -                                               |
+| 3    | Switch sidebar to Space B, open a regular tab there and activate it (tab 2)                                      | -                                               |
+| 4    | Switch sidebar to Space A again, open a third regular tab there and activate it (tab 3) - tab 2 is now a few entries back in history | -                                               |
+| 5    | Press and hold the toolbar's "Previous" button to open the history dropdown, select tab 2's entry               | Switches to Space B, scrolls to tab 2         |
+| 6    | Repeat steps 2-5, but open all three tabs in the same Space                                                       | No space switch; scrolls to the tab if out of view |
 
 #### C.2e Audio quick-jump (single click on audio button)
 
 | Step | Action                                                                                                  | Expected Result                                                                          |
 | ---- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| 1    | Switch sidebar to Space A                                                                                  | -                                                                                                |
-| 2    | Switch sidebar to Space B, open a tab there playing audio (e.g. a page with autoplay video)                | -                                                                                                |
-| 3    | Switch sidebar back to Space A                                                                             | -                                                                                                |
-| 4    | Click the toolbar's audio quick-jump button                                                                | Switches to Space B, scrolls to the audio tab, including under **Off**                          |
-| 5    | Repeat steps 2-4, but make the audio tab a bookmark tab instead of a regular tab                            | Scrolls to the bookmark row (not just tries `data-tab-id` and fails)                            |
-| 6    | Repeat steps 1-4, but open the audio tab in the same Space the sidebar is already showing                  | No space switch; scrolls to the tab if out of view                                              |
-| 7    | Repeat step 6, but make that same-space audio tab a bookmark tab in a collapsed folder                     | No space switch; scrolls to the bookmark row, folder auto-expands if collapsed                  |
+| 1    | Settings → Behaviour → set "Follow active tab" to **Off**                                                  | -                                                                                                |
+| 2    | Switch sidebar to Space A                                                                                  | -                                                                                                |
+| 3    | Switch sidebar to Space B, open a tab there playing audio (e.g. a page with autoplay video)                | -                                                                                                |
+| 4    | Switch sidebar back to Space A                                                                             | -                                                                                                |
+| 5    | Click the toolbar's audio quick-jump button                                                                | Switches to Space B, scrolls to the audio tab                                                   |
+| 6    | Repeat steps 3-5, but make the audio tab a bookmark tab instead of a regular tab                            | Scrolls to the bookmark row (not just tries `data-tab-id` and fails)                            |
+| 7    | Repeat steps 2-5, but open the audio tab in the same Space the sidebar is already showing                  | No space switch; scrolls to the tab if out of view                                              |
+| 8    | Repeat step 7, but make that same-space audio tab a bookmark tab in a collapsed folder                     | No space switch; scrolls to the bookmark row, folder auto-expands if collapsed                  |
 
 #### C.2f Select a tab from the audio tabs dropdown list
 
 | Step | Action                                                                                                 | Expected Result                                                            |
 | ---- | ---------------------------------------------------------------------------------------------------------| -------------------------------------------------------------------------- |
-| 1    | Have 2+ tabs playing audio, at least one in a different Space than the sidebar is currently showing        | -                                                                            |
-| 2    | Open the audio tabs dropdown (toolbar), select the entry from the other Space                              | Switches space, scrolls correctly whether it's a regular or bookmark tab   |
-| 3    | Repeat step 2, selecting an entry that's already in the Space the sidebar is showing                       | No space switch; scrolls to the tab if out of view                        |
+| 1    | Settings → Behaviour → set "Follow active tab" to **Off**                                                  | -                                                                            |
+| 2    | Have 2+ tabs playing audio, at least one in a different Space than the sidebar is currently showing        | -                                                                            |
+| 3    | Open the audio tabs dropdown (toolbar), select the entry from the other Space                              | Switches space, scrolls correctly whether it's a regular or bookmark tab   |
+| 4    | Repeat step 3, selecting an entry that's already in the Space the sidebar is showing                       | No space switch; scrolls to the tab if out of view                        |
 
 ---
 

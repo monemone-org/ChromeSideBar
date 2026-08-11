@@ -22,3 +22,4 @@ docs/test/sidebar-backup
 docs/test/feat-029
 .claude/settings.local.json
 svelte-ver/dist-chrome
+git-commit-msg.txt

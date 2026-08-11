@@ -1,5 +1,7 @@
 # TODO
 
+- [] multi-select tabs and "add to bookmark..." behavie differently from single tab selection.  single tab's add to bookmark will move the tab over as assoicated bookmark tab.  multi-select case doesn't.  We should make multi-select be consistent.  And we should probably named the menu item "Move to bookmark(s)..."
+
 ## In-Progress
 
 - [x] hotkey to jump between spaces

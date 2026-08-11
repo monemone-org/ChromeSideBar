@@ -39,6 +39,129 @@ export function activateTabNative(tabRef: string): TestStep
   };
 }
 
+// ---------------------------------------------------------------------------
+// Section C.2 "explicit action" triggers. Each sends the exact message its
+// toolbar button sends, so they run the real production path rather than a
+// copy of it. All of them bottom out in background.ts's setActiveTabAndSpace
+// (history navigation reaches it via historyManager.navigate/navigateToIndex),
+// which switches space regardless of the "Follow active tab" setting and
+// broadcasts TAB_ACTIVATED with explicit:true - that flag is what makes
+// useFollowActiveTab scroll even under 'off' mode.
+// ---------------------------------------------------------------------------
+
+/** The "Show active tab" toolbar button (Toolbar.tsx, via useShowActiveTab). */
+export function showActiveTab(): TestStep
+{
+  return {
+    kind: 'action',
+    label: 'Click "Show active tab" (toolbar)',
+    run: async (ctx) =>
+    {
+      const [activeTab] = await chrome.tabs.query({ active: true, windowId: ctx.windowId });
+      if (activeTab?.id === undefined) throw new Error('no active tab in the test window');
+      await chrome.runtime.sendMessage({ action: 'set-active-tab-and-space', tabId: activeTab.id });
+    },
+  };
+}
+
+/** The toolbar's tab-history Previous/Next buttons (Toolbar.tsx). */
+export function navigateTabHistory(direction: 'prev' | 'next'): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Click tab history "${direction === 'prev' ? 'Previous' : 'Next'}" (toolbar)`,
+    run: async () =>
+    {
+      await chrome.runtime.sendMessage({ action: direction === 'prev' ? 'prev-used-tab' : 'next-used-tab' });
+    },
+  };
+}
+
+/**
+ * The audio quick-jump button (App.tsx's handleJumpToAudioTab). Goes through
+ * get-last-audible-tab and jumps to whatever IT names, rather than passing a
+ * tab id the case already knows - picking the target is the whole job of this
+ * button, so short-cutting it would leave the audible tracking untested and
+ * make the case a duplicate of C.2a.
+ */
+export function audioQuickJump(): TestStep
+{
+  return {
+    kind: 'action',
+    label: 'Click the audio quick-jump button (toolbar)',
+    run: async () =>
+    {
+      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' }) as {
+        playingTabIds?: number[];
+        historyTabIds?: number[];
+      } | undefined;
+
+      const targetTabId = response?.playingTabIds?.[0] ?? response?.historyTabIds?.[0];
+      if (targetTabId === undefined) throw new Error('background reports no audible tab - did the manual "press play" step actually start playback?');
+
+      await chrome.runtime.sendMessage({ action: 'set-active-tab-and-space', tabId: targetTabId, skipHistory: false });
+    },
+  };
+}
+
+/**
+ * Pick one specific entry out of the audio tabs dropdown
+ * (AudioTabsDropdown.tsx's handleSelectTab). Unlike audioQuickJump, which
+ * always takes the most recent, this targets a named tab - so it first
+ * confirms that tab is actually one of the entries the dropdown would list,
+ * then activates it the same way clicking the row does.
+ */
+export function selectAudioTabFromDropdown(tabRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Select tab "${tabRef}" from the audio tabs dropdown`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' }) as {
+        playingTabIds?: number[];
+        historyTabIds?: number[];
+      } | undefined;
+
+      const listed = [...(response?.playingTabIds ?? []), ...(response?.historyTabIds ?? [])];
+      if (!listed.includes(tabId)) throw new Error(`tab "${tabRef}" (id ${tabId}) isn't in the audio dropdown's list - it wouldn't be selectable`);
+
+      await chrome.runtime.sendMessage({ action: 'set-active-tab-and-space', tabId, skipHistory: false });
+    },
+  };
+}
+
+/**
+ * Pick one specific entry out of the tab-history dropdown (press-and-hold
+ * Previous/Next). Resolves the target's position through the real
+ * get-tab-history response rather than assuming an index, the same way
+ * Toolbar.tsx renders the dropdown from that response and then navigates by
+ * the chosen entry's index - so this fails loudly if the tab isn't actually
+ * in the window's history, instead of silently navigating somewhere else.
+ */
+export function selectTabFromHistoryDropdown(tabRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Select tab "${tabRef}" from the tab-history dropdown`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      const history = await chrome.runtime.sendMessage({ action: 'get-tab-history' }) as {
+        before?: Array<{ tabId: number; index: number }>;
+        after?: Array<{ tabId: number; index: number }>;
+      } | undefined;
+
+      const entries = [...(history?.before ?? []), ...(history?.after ?? [])];
+      const entry = entries.find(e => e.tabId === tabId);
+      if (!entry) throw new Error(`tab "${tabRef}" (id ${tabId}) is not in the window's tab history`);
+
+      await chrome.runtime.sendMessage({ action: 'navigate-to-history-index', index: entry.index });
+    },
+  };
+}
+
 /**
  * Opens filler tabs in spaceRef, in small parallel batches, until the
  * sidebar's scroll container has at least OVERFLOW_FACTOR viewports of
