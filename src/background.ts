@@ -3,6 +3,8 @@ import { FOLLOW_ACTIVE_TAB_KEY, parseFollowActiveTabMode } from './utils/followA
 import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup, restoreTabAssociationBackup } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
 import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
+import { ManagerId, parseManagerActionId, RoutedManager } from './proxies/messageRouting';
+import { TabSpaceRegistryApi } from './proxies/tabSpaceRegistryProxy';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -546,12 +548,34 @@ class LastAudibleTracker
 // TabSpaceRegistry - Tracks home space for tabs opened from bookmarks
 // =============================================================================
 
-class TabSpaceRegistry
+class TabSpaceRegistry implements RoutedManager, TabSpaceRegistryApi
 {
   static STORAGE_KEY = 'bg_tabSpaces';
 
+  readonly managerId = ManagerId.TAB_SPACE_REGISTRY;
+
   // Map<windowId, Map<tabId, spaceId>>
   #registry: Map<number, Map<number, string>> = new Map();
+
+  /**
+   * Routes one of this manager's messages to the matching method. The router
+   * has already resolved the manager half of the action, so only the method
+   * name arrives here. Unknown methods throw rather than being ignored - a
+   * silent no-op here would look exactly like a working call from the proxy
+   * side.
+   */
+  async dispatch(method: string, message: Record<string, unknown>): Promise<unknown>
+  {
+    switch (method)
+    {
+      case 'register':
+        this.register(message.windowId as number, message.tabId as number, message.spaceId as string);
+        return undefined;
+
+      default:
+        throw new Error(`${this.managerId}: unknown method "${method}"`);
+    }
+  }
 
   register(windowId: number, tabId: number, spaceId: string): void
   {
@@ -794,7 +818,7 @@ let tabSpaceRegistry: TabSpaceRegistry;
 //
 // The Chrome group is checked next because it's the tab's current ground
 // truth. The registry is a cache written once when an Arc-style bookmark tab
-// is created (see 'register-tab-space' in background.ts) and nothing updates
+// is created (see TabSpaceRegistry.register, reached via the proxy) and nothing updates
 // it if the tab is later moved to a different group - so it can only be
 // trusted as a fallback for tabs with no live group (the brief window right
 // after a bookmark tab is created before auto-grouping completes).
@@ -1401,8 +1425,57 @@ function getAudioTabLists(allTabs: chrome.tabs.Tab[]): { playingTabIds: number[]
 // Message Handlers
 // =============================================================================
 
+// Every manager that owns messages, keyed by the managerId half of its action
+// strings. Built once here so routing is an exact-match lookup rather than a
+// prefix scan - "Space" would otherwise also match "SpaceWindowState".
+const routedManagers = new Map<string, RoutedManager>();
+
+// Registering the same managerId twice would silently give one manager's
+// messages to the other, so fail at load instead of at runtime.
+function registerManager(manager: RoutedManager): void
+{
+  if (routedManagers.has(manager.managerId))
+  {
+    throw new Error(`duplicate managerId "${manager.managerId}" - message routing would be ambiguous`);
+  }
+  routedManagers.set(manager.managerId, manager);
+}
+
+registerManager(tabSpaceRegistry);
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 {
+  // Manager-routed messages come first: anything shaped "<Manager>_msg_<method>"
+  // belongs to exactly one manager and never falls through to the flat
+  // orchestration handlers below.
+  const routed = parseManagerActionId(message?.action);
+  if (routed)
+  {
+    const manager = routedManagers.get(routed.managerId);
+    if (!manager)
+    {
+      console.error(`[messageRouting] no manager registered for "${routed.managerId}"`);
+      return;
+    }
+
+    // stateReady is awaited here, once, rather than in every manager method -
+    // the service worker can be woken by any of these messages.
+    (async () =>
+    {
+      await stateReady;
+      try
+      {
+        sendResponse(await manager.dispatch(routed.method, message));
+      }
+      catch (error)
+      {
+        console.error(`[messageRouting] ${routed.managerId}.${routed.method} failed:`, error);
+        sendResponse({ error: String(error) });
+      }
+    })();
+    return true;  // async response
+  }
+
   // Get current SpaceWindowState for a window
   if (message.action === SpaceMessageAction.GET_WINDOW_STATE)
   {
@@ -1516,15 +1589,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
         historyManager.navigateToIndex(tabs[0].windowId, message.index);
       });
     })();
-  }
-  else if (message.action === 'register-tab-space')
-  {
-    (async () =>
-    {
-      await stateReady;
-      tabSpaceRegistry.register(message.windowId, message.tabId, message.spaceId);
-    })();
-    return;
   }
   else if (message.action === 'set-active-tab-and-space')
   {

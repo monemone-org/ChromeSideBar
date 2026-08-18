@@ -48,91 +48,277 @@ For comparison, `SpaceWindowState` (`chrome.storage.session`, per-window active 
 
 **What can go wrong** - this one is a confirmed, lasting divergence, not just a race: after a space is deleted via `DeleteSpaceAction`, `SpaceManager`'s in-memory list still contains the deleted space until either the service worker restarts, or some unrelated later edit happens to trigger `UPDATE_SPACES` (which sends the sidebar's - by then correct - full list and overwrites the stale cache as a side effect). The sidebar's own `spaces` React state stays correct throughout, but only because `SpacesContext.tsx` has a *separate* `chrome.storage.onChanged` listener watching this key - a different sync mechanism than the message-based one, which happens to paper over the gap for the UI but does nothing for `SpaceManager`.
 
-## Suggested solution
 
-Move each of these to the single-owner pattern already used for `SpaceWindowState`:
+## Inventory
 
-1. **Background becomes the sole writer** for the underlying storage (both the live record and any backup/cache). Every create/update/remove goes through one code path, in the service worker, never concurrently from two contexts.
-2. **The sidebar stops writing storage directly.** Its in-memory state (`itemToTab`/`tabToItem`/`audibleTabs`/`tabTitles` in `BookmarkTabsContext.tsx`, `spaces` in `SpacesContext.tsx`, pinned sites list) becomes a **read-only mirror**: it sends a message describing the intent ("associate this tab with this item", "delete this space", "add this pinned site") and background performs the actual write, then broadcasts the resulting state (a `STATE_CHANGED`-style message) so every open sidebar/window updates its mirror.
-3. Concretely, this means:
-   - `DeleteSpaceAction`, `usePinnedSites.ts`'s CRUD, `deletePinnedSiteAction.ts`, and `BookmarkTabsContext.tsx`'s `storeAssociation`/`removeLocalTabAssociation`/`rebuildAssociations` all stop calling `chrome.storage.*` directly and instead go through messages.
-   - Background's `saveTabAssociationBackup`-on-navigate logic stays where it is (it was already correctly background-owned) - it's the *other* writer that needs to move, not this one.
-   - `rebuildAssociations`'s job shrinks to "ask background for the current state" rather than independently reading and reconciling storage; the TOCTOU race described in Case 1 disappears because there's no longer a second writer to race against.
+Taken from the code as of 2026-08-11, so the migration below has a fixed target rather than a moving one.
 
-## Proxy client layer
+### Manager classes in `background.ts`
 
-Separate but related problem, also flagged during this discussion: direct `chrome.runtime.sendMessage`/`chrome.runtime.onMessage` calls scattered across components are themselves error-prone today - hand-typed action strings, no compile-time check that a payload matches what the handler expects, `chrome.runtime.lastError` checked inconsistently (or not at all) from call site to call site, and every broadcast listener independently re-filtering on `message.action`.
+| Class | Storage key | Area | Sidebar-facing today |
+| --- | --- | --- | --- |
+| `SpaceWindowStateManager` | `spaceWindowState_{windowId}` | session | yes - already the target pattern |
+| `SpaceManager` | `spaces` | local | yes - but `DeleteSpaceAction` bypasses it (Case 3) |
+| `TabHistoryManager` | `bg_windowTabHistory` | session | yes |
+| `TabSpaceRegistry` | `bg_tabSpaces` | session | yes - `register` only |
+| `LastAudibleTracker` | `bg_lastAudibleTabIds` | session | yes - read only |
+| `TabGroupTracker` | `bg_windowActiveGroups` | session | no - background-internal |
+| `NewsVersionChecker` | `sidebar-news-latest-version`, `sidebar-last-news-check-time` | local | no - writes only these two; the sidebar's `useNewsCheck` writes a *different* key (last-seen), so no shared writer |
 
-Proposed fix: each background-side manager gets a matching **proxy module** that UI code calls like a normal async function/service, never touching `chrome.runtime.*` directly.
+Two managers do not exist yet and are the actual point of Cases 1 and 2:
 
-- `background.ts` keeps its manager objects (`SpaceManager`, `SpaceWindowStateManager`, `TabSpaceRegistry`, a future association manager, etc.), each owning its own request ("method") messages and broadcast messages.
-- A new `src/proxies/` module per manager (e.g. `spaceManagerProxy.ts`, `spaceWindowStateProxy.ts`). Each exported function marshals its parameters into the message shape, calls `chrome.runtime.sendMessage`, unmarshals/validates the response, and returns a typed value - callers just `await proxy.getSpaces()` instead of constructing a message object by hand.
-- Broadcasts: each proxy defines a listener interface (e.g. `SpaceWindowStateListener { onStateChanged(state: SpaceWindowState): void }`), keeps its own `Set<Listener>`, and registers exactly **one** raw `chrome.runtime.onMessage` listener at module load that fans out to every registered listener. Components implement the interface and register/unregister through it - a small `useXxxListener` hook wrapping `addListener`/`removeListener` in a `useEffect` is the natural React ergonomic layer on top.
+- **`TabAssociationManager`** - owner of `tabAssociations_{windowId}` (session) and `tabAssociationsBackup_*` (local). Written today by both `background.ts` and `BookmarkTabsContext.tsx` through the explicitly-shared `src/utils/tabAssociations.ts`.
+- **`PinnedSitesManager`** - owner of `pinnedSites` (local). Written today by `background.ts` (favicon patching), `usePinnedSites.ts` (CRUD), and `deletePinnedSiteAction.ts` (undo).
 
-This also directly enforces the single-owner fix above: once storage-touching code only exists inside the proxy modules and `background.ts`, a component has no import path left to reach `chrome.storage.*` directly the way `DeleteSpaceAction` does today.
+### Messages
 
-Illustrative shape, not final:
+Manager-owned. These become `<Manager>_msg_<method>` and route per the scheme below:
+
+| Message | Owner |
+| --- | --- |
+| `register-tab-space` | `TabSpaceRegistry` |
+| `get-spaces`, `update-spaces` | `SpaceManager` |
+| `get-window-state`, `set-active-space`, `state-changed` | `SpaceWindowStateManager` |
+| `prev-used-tab`, `next-used-tab`, `get-tab-history`, `navigate-to-history-index` | `TabHistoryManager` |
+| `get-last-audible-tab` | `LastAudibleTracker` |
+
+Orchestration. No single manager owns these - they coordinate several, so they stay as direct handlers in `background.ts` and keep their current names:
+
+| Message | Why it has no owner |
+| --- | --- |
+| `set-active-tab-and-space` | activates a tab, resolves its space via `TabSpaceRegistry` + `SpaceManager`, switches `SpaceWindowStateManager`, then broadcasts. The backbone of every C.2 case. |
+| `queue-tab-for-grouping` | calls the free function `queueTabForGrouping`, not a manager method |
+| `tab-activated` (broadcast) | emitted from two unrelated places: the `onActivated` listener and `setActiveTabAndSpace` |
+| `deassociate-tab` (broadcast) | emitted from group-change detection; moves to `TabAssociationManager` once that exists |
+
+Four total, and `deassociate-tab` is temporary. Small enough that leaving them direct costs little.
+
+### Explicitly out of scope
+
+Single-writer already, sidebar-only UI state. Listing them so the refactor does not expand to swallow them:
+
+- `BookmarkTree.tsx` folder expand state, `TabList.tsx` group expand state, `App.tsx` per-space scroll positions
+- `useChromeLocalStorage` settings, including `sidebar-follow-active-tab`. Background *reads* that one but never writes it, so there is still exactly one writer.
+- `useNewsCheck`'s last-seen key
+
+## Design
+
+### Shape
+
+```
+┌─ sidebar ──────────────────┐         ┌─ background.ts ───────────────┐
+│                            │         │                               │
+│  component                 │         │   routeMessage(action)        │
+│     │ calls                │         │      │ split on "_msg_"       │
+│     ▼                      │         │      ▼                        │
+│  proxy.register(...)  ─────┼─msg────►│   Map<managerId, manager>     │
+│     │                      │         │      │                        │
+│     │ reads (sync)         │         │      ▼                        │
+│     ▼                      │         │   manager.dispatch(method)    │
+│  local mirror  ◄───────────┼─bcast───┤      │                        │
+│                            │         │      ▼                        │
+└────────────────────────────┘         │   in-memory + chrome.storage  │
+                                       └───────────────────────────────┘
+```
+
+### 1. Reads never leave the sidebar
+
+Only mutations go through messages. Queries are served synchronously from a local read-only mirror kept current by broadcasts.
+
+This is not a preference - it is forced. `isBookmarkLoaded(id)` and friends are called *during React render*, and message passing is async, so a proxy call there is impossible without restructuring every consumer. The proxy is therefore **not** a 1:1 mirror of the manager: it exposes every mutation, plus a snapshot/subscribe API, and no per-item getters.
+
+### 2. Two-level routing, per manager
+
+`background.ts` knows managers. Each manager knows its own methods. Neither knows the other's half.
+
+```
+"TabSpaceRegistry_msg_register"
+ └── managerId ──┘     └ method ┘
+```
+
+- Split on the `_msg_` separator and look the manager segment up by **exact match**. Not `startsWith`, which mis-routes when one prefix is a prefix of another.
+- Assert managerId uniqueness at startup, so a collision fails loudly at load instead of silently stealing another manager's messages.
+- `await stateReady` and `chrome.runtime.lastError` handling live in the router and the proxy base, once each, rather than being repeated per method as they are today.
+
+### 3. Manager and proxy types are bound together
+
+So the two cannot drift when someone adds a method:
+
+```typescript
+interface TabSpaceRegistryApi
+{
+  register(windowId: number, tabId: number, spaceId: string): void;
+}
+
+// every method becomes async across the message boundary
+type Remote<T> = {
+  [K in keyof T]: T[K] extends (...a: infer A) => infer R ? (...a: A) => Promise<Awaited<R>> : never
+};
+
+// manager implements TabSpaceRegistryApi
+// proxy   implements Remote<TabSpaceRegistryApi>
+```
+
+### 4. Mutation acks carry the resulting state
+
+A mutation completes twice: when background responds, and later when its broadcast reaches every sidebar. If the proxy resolves on the response alone, the calling context's own mirror is briefly stale:
+
+```typescript
+await proxy.deleteSpace(id);
+spacesMirror.get();   // may still contain the deleted space
+```
+
+The `await` cannot help here, because it is synchronizing a different channel than the one that updates the mirror:
+
+```
+proxy.deleteSpace(id)
+  └─ sendMessage ─────────► background
+                               │ mutate + write storage
+                               ├─ sendResponse ──────► resolves the await   (channel 1)
+                               └─ broadcast ─────────► onMessage listener   (channel 2)
+                                                          │
+                                                          ▼
+                                                      mirror updated
+```
+
+Chrome gives no ordering guarantee between the two, and the promise knows nothing about the broadcast. Waiting for the broadcast instead would mean correlating a global message back to one specific call, plus a timeout for when it never arrives.
+
+**Decision:** the response payload carries the resulting state, and the proxy applies it to the local mirror before resolving. Read-after-write is then consistent in the calling context with no waiting and no correlation, and the broadcast keeps its real job of updating *other* windows.
+
+This is not hypothetical: D.2 in the in-panel suite deletes a space and asserts it is gone on the very next step.
+
+### 5. The mirror is a plain store, not React state
+
+Point 4 only works if the mirror can be written and read in the same tick. React state cannot: `setSpaces(next)` schedules a re-render, it does not change the `spaces` const the running function captured at render time. Applying an acked state into `useState` puts us right back where we started.
+
+So each proxy owns a plain observable value outside React, and components subscribe to it with `useSyncExternalStore` (React 18 is already a dependency).
+
+This retires a class of bug we already pay for. The snapshot-based `createSpace`/`deleteSpace`/`removePin` writes are why `src/tests/inpanel/fixtures.ts` needs `FIXTURE_TICK_MS` sleeps between consecutive calls, and why `TestRunnerPanel` rebuilds `ctxRef` on every render. Both exist to work around mutations being routed through React state.
+
+```typescript
+// src/stores/externalStore.ts
+
+/**
+ * One manager's mirrored state in this context. The matching proxy is the
+ * only thing that writes it.
+ */
+export class ExternalStore<T>
+{
+  #value: T;
+  #listeners = new Set<() => void>();
+
+  constructor(initial: T)
+  {
+    this.#value = initial;
+  }
+
+  /**
+   * The current value. Returns the SAME object reference until set() stores a
+   * different one - useSyncExternalStore compares snapshots by identity and
+   * will re-render forever if a fresh object comes back on every call.
+   * Declared as an arrow property so it can be passed detached without losing
+   * `this`.
+   */
+  getSnapshot = (): T =>
+  {
+    return this.#value;
+  };
+
+  subscribe = (onChange: () => void): (() => void) =>
+  {
+    this.#listeners.add(onChange);
+    return () => this.#listeners.delete(onChange);
+  };
+
+  set(next: T): void
+  {
+    if (Object.is(next, this.#value)) return;
+    this.#value = next;
+    for (const listener of this.#listeners) listener();
+  }
+}
+```
 
 ```typescript
 // src/proxies/spaceManagerProxy.ts
-import { SpaceMessageAction } from '../utils/spaceMessages';
-import { Space } from '../contexts/SpacesContext';
+const PREFIX = 'SpaceManager_msg_';
 
-export async function getSpaces(): Promise<Space[]>
-{
-  const response = await chrome.runtime.sendMessage({ action: SpaceMessageAction.GET_SPACES });
-  return response?.spaces ?? [];
-}
+export const spacesStore = new ExternalStore<Space[]>([]);
 
 export async function updateSpaces(spaces: Space[]): Promise<void>
 {
-  await chrome.runtime.sendMessage({ action: SpaceMessageAction.UPDATE_SPACES, spaces });
+  const response = await chrome.runtime.sendMessage({
+    action: `${PREFIX}updateSpaces`,
+    spaces,
+  }) as { spaces: Space[] };
+
+  // Apply the acked state BEFORE resolving, so the caller's next read sees
+  // its own write. This is the whole point of the ack carrying state.
+  spacesStore.set(response.spaces);
 }
 
-export interface SpacesListener
-{
-  onSpacesChanged(spaces: Space[]): void;
-}
-
-const listeners = new Set<SpacesListener>();
-
-export function addSpacesListener(listener: SpacesListener): () => void
-{
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
-
-// One raw listener for the whole module - fans out to every registered listener
+// One raw listener for the module. Its real job is the OTHER windows, whose
+// stores nobody just wrote to.
 chrome.runtime.onMessage.addListener((message) =>
 {
-  if (message.action === SpaceMessageAction.SPACES_CHANGED)
+  if (message.action === `${PREFIX}changed`)
   {
-    for (const listener of listeners) listener.onSpacesChanged(message.spaces);
+    spacesStore.set(message.spaces);
   }
 });
 ```
 
 ```typescript
-// src/hooks/useSpacesListener.ts
-export function useSpacesListener(onChanged: (spaces: Space[]) => void): void
+// src/hooks/useSpaces.ts
+export function useSpaces(): Space[]
 {
-  useEffect(() =>
-  {
-    return addSpacesListener({ onSpacesChanged: onChanged });
-  }, [onChanged]);
+  return useSyncExternalStore(spacesStore.subscribe, spacesStore.getSnapshot);
 }
 ```
 
-### Refinements to fold in
+Worked example - three spaces (Work, Video, Music), deleting Video:
 
-- Standardize error handling in one place: every proxy function should handle `chrome.runtime.lastError` and a missing/malformed response the same way, rather than each call site deciding independently as happens today.
-- One raw `onMessage` listener per proxy module (registered once, at import time) - not one per component. Today several components each register their own listener and filter by `message.action`; the proxy replaces all of them with a single dispatch point.
-- `SpaceMessageAction` (and any future per-manager equivalent) becomes effectively private to `background.ts` + its matching proxy file - nothing else needs to import the raw action strings once the proxy exists.
-- Split the currently-combined `SpaceMessageAction` enum along manager boundaries as part of this: `GET_SPACES`/`UPDATE_SPACES` belong to `SpaceManager`'s proxy; `GET_WINDOW_STATE`/`SET_ACTIVE_SPACE`/`STATE_CHANGED` belong to `SpaceWindowStateManager`'s proxy. They're conflated in one enum today - the proxy split is a natural place to also separate them.
-- Fire-and-forget messages (e.g. `queue-tab-for-grouping`) fit the same shape as `void`-returning async proxy functions - no special-casing needed.
+```
+t0  spacesStore.getSnapshot()  ->  [Work, Video, Music]     3 spaces
+t1  await deleteSpace('video-id')   sendMessage leaves
+t2  background removes it, writes storage, responds { spaces: [Work, Music] }
+t3  proxy runs spacesStore.set([Work, Music])               synchronous
+t4  await returns
+t5  spacesStore.getSnapshot()  ->  [Work, Music]            2 spaces  correct
+t6  React re-renders subscribers with 2 spaces
+t7  broadcast reaches the OTHER window, its store set to [Work, Music]
+```
 
-This isn't extra scope layered on top of the single-owner fix above - it's the concrete mechanism for doing that fix cleanly. Implementing "sidebar sends a message, background owns the write" without this layer just means writing the same hand-rolled `sendMessage`/`onMessage` pattern three more times.
+With `useState`, t5 reads the const captured at render and still returns 3 spaces.
+
+Gotchas:
+
+- `getSnapshot` must return a stable reference. Returning `[...this.#value]` or a `.map()` per call causes an infinite render loop. This is the most common way to get this API wrong.
+- The originating window also receives its own broadcast at t7. The payload is an equal-but-not-identical array, so the `Object.is` guard misses and it costs one redundant re-render. Harmless; avoidable with a revision number in the payload.
+- `getServerSnapshot` (third argument) is SSR-only and not needed here.
+
+Consumers barely change: `SpacesContext` keeps its public API and swaps `useState` for `useSpaces()` internally, so everything calling `useSpacesContext()` is untouched.
+
+## Migration order
+
+One manager end to end before porting the rest, so the layer is proven on something small.
+
+1. **`TabSpaceRegistry`** - smallest surface. Three methods, one sidebar caller (`register`), no broadcasts, and the sidebar never reads it. Proves routing, the `Remote<T>` binding, and the proxy base. Note what it does *not* prove: with no reads and no broadcasts it never touches the store or `useSyncExternalStore`, so the pattern is only half validated after this step.
+2. **`SpaceWindowStateManager`** - already has working broadcasts and a sidebar-side mirror. The first real test of section 5: store, subscribe, and read-after-write. Treat this as the step that decides whether the design holds.
+3. **`SpaceManager`** - fixes Case 3 (a confirmed lasting divergence) as a side effect, by removing `DeleteSpaceAction`'s direct storage write.
+4. **`TabHistoryManager`**, **`LastAudibleTracker`** - mechanical once the pattern is set.
+5. **`PinnedSitesManager`** (new) - fixes Case 2.
+6. **`TabAssociationManager`** (new) - fixes Case 1. Largest, most invasive, most protected by existing tests. Do it last.
+
+Behaviour fixes (`chrome.tabs.onDetached`, and the `docs/test/issues/**` items G1/G2/D1) are a deliberate **second step**, after the routing is in place. Two things not to lose track of:
+
+- Case 3 gets fixed for free by step 3 above, so it needs no separate work.
+- The `onDetached` listener called out in Case 1's scope note is easy to skip, because nothing else in this doc names it. It belongs to step 6 or the follow-up pass, not to neither.
+
+## Verification
+
+The in-panel test runner (`src/tests/inpanel/`, sidebar DEV dropdown) covers exactly the association behaviour this refactor can break - Sections A, B, C, D, E of `docs/test/tab-space-association-test-cases.md`. Run it green before starting to establish a baseline, then after each manager port. Several cases carry known-gap assertions that already fail (G1/G2/G3), so record which ones are red at baseline rather than assuming a red result is new.
 
 ## Cost / scope
 
-This is a real architectural change, not a quick patch - it touches most of the mutation call sites in `BookmarkTabsContext.tsx` and `SpacesContext.tsx`, plus new message handlers in `background.ts` for each mutation type, plus building out the proxy/listener layer itself. Sizing it honestly: comparable in scope to how `SpaceWindowState` is already wired, replicated across three more data types, with a shared proxy layer built alongside it (likely starting with `SpaceWindowState` itself, since it already follows the target pattern and would validate the proxy shape before porting the other three). Recommend doing it as its own dedicated pass, after the current "Follow active tab" / association fixes ship, not bundled with them.
+A real architectural change, not a quick patch. It touches most mutation call sites in `BookmarkTabsContext.tsx` and `SpacesContext.tsx`, adds a manager plus proxy per data type, and builds the routing and mirror layers themselves. Sized honestly: comparable to how `SpaceWindowState` is already wired, replicated across five more data types, with the shared layer built alongside. Do it as its own pass, not folded into a bugfix.

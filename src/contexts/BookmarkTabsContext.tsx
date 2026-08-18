@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
+import { tabSpaceRegistryProxy } from '../proxies/tabSpaceRegistryProxy';
 import { SpaceMessageAction } from '../utils/spaceMessages';
 import {
   getTabAssociations,
@@ -461,12 +462,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         // Register space with background for bookmark tabs
         if (spaceId && windowId)
         {
-          chrome.runtime.sendMessage({
-            action: 'register-tab-space',
-            windowId,
-            tabId,
-            spaceId
-          });
+          tabSpaceRegistryProxy.register(windowId, tabId, spaceId);
         }
 
         // Tell background to re-check this tab (will group into space if active)
@@ -596,12 +592,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
     if (spaceId && currentWindowId !== null)
     {
-      chrome.runtime.sendMessage({
-        action: 'register-tab-space',
-        windowId: currentWindowId,
-        tabId,
-        spaceId
-      });
+      tabSpaceRegistryProxy.register(currentWindowId, tabId, spaceId);
 
       chrome.runtime.sendMessage({
         action: 'queue-tab-for-grouping',

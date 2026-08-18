@@ -3,6 +3,7 @@
  */
 
 import { Space } from '../contexts/SpacesContext';
+import { tabSpaceRegistryProxy } from '../proxies/tabSpaceRegistryProxy';
 import { toChromeColor } from './groupColors';
 
 // Keyed by "windowId:spaceName" - deduplicates concurrent getOrCreateSpaceGroup
@@ -141,7 +142,7 @@ export async function regroupAssociatedTab(
   const targetSpace = await findSpaceForFolder(targetFolderId);
   if (!targetSpace) return;
 
-  chrome.runtime.sendMessage({ action: 'register-tab-space', windowId, tabId, spaceId: targetSpace.id });
+  tabSpaceRegistryProxy.register(windowId, tabId, targetSpace.id);
   chrome.runtime.sendMessage({ action: 'queue-tab-for-grouping', tabId, windowId, spaceId: targetSpace.id });
 }
 

@@ -2,6 +2,11 @@
 
 - [] multi-select tabs and "add to bookmark..." behavie differently from single tab selection.  single tab's add to bookmark will move the tab over as assoicated bookmark tab.  multi-select case doesn't.  We should make multi-select be consistent.  And we should probably named the menu item "Move to bookmark(s)..."
 
+- [] a new menu option to clean up duplicated tabs in the active window.
+
+- [] an new behaviour setting to split BookmarkTree and TabList into 2 scrollable panels. the panels will be splitted with a draggable split bar that can change the 2 panels' sizes.
+
+
 ## In-Progress
 
 - [x] hotkey to jump between spaces
