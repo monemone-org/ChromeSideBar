@@ -6,10 +6,19 @@
 
 - [] an new behaviour setting to split BookmarkTree and TabList into 2 scrollable panels. the panels will be splitted with a draggable split bar that can change the 2 panels' sizes.
 
+- [] per Space specific pin bar + pinned sites
+- [] in Space title bar, show how many tabs are opened (aka how many tabs are in the group)
+      - use bold font for space name 
+      - use normal font for number of opened tabs
+- [] the separater line between pinned site area and space title bar is not obvious when the space colour is used as the background colour.
+
+- [] export/import - should cover extensions settings
+
+- [] Use space colour as sidebar background , default should be 50%
+
+- [] remove the news notification
 
 ## In-Progress
-
-- [x] hotkey to jump between spaces
 
 ## Pending
 
@@ -330,4 +339,6 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 - [x] add a new feature "Welcome" dialog, display what's new text bundled with the extension after upgrade.
 
 - [x] add a "Email Us" menu item . email to chrome-dev@monemone.org
+
+- [x] hotkey to jump between spaces
 

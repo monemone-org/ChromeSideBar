@@ -324,7 +324,7 @@ const TabRow = forwardRef<HTMLDivElement, DraggableTabProps>(({
           )}
           {onAddToBookmark && tab.url && (
             <ContextMenu.Item onSelect={() => onAddToBookmark(tab)}>
-              <Bookmark size={14} className="mr-2" /> Add to Bookmark
+              <Bookmark size={14} className="mr-2" /> Add to Bookmark...
             </ContextMenu.Item>
           )}
           {onOpenAddToGroupDialog && (
