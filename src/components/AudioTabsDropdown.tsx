@@ -22,8 +22,9 @@ export const AudioTabsDropdown = ({
 
     // Use the unified message to activate tab and switch space atomically
     // This handles: tab activation, space lookup, space switching, and history
-    // The background sends STATE_CHANGED to update SpacesContext, and an
-    // explicit TAB_ACTIVATED that scrolls the tab (or bookmark) into view
+    // The background broadcasts SpaceWindowStateManager's "changed" message to
+    // update SpacesContext (via spaceWindowStateProxy), and an explicit
+    // TAB_ACTIVATED that scrolls the tab (or bookmark) into view
     await chrome.runtime.sendMessage({
       action: 'set-active-tab-and-space',
       tabId: tab.id,

@@ -1,10 +1,11 @@
-import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE, SPACES_STORAGE_KEY, Space } from './utils/spaceMessages';
+import { SpaceMessageAction, SPACES_STORAGE_KEY, Space } from './utils/spaceMessages';
 import { FOLLOW_ACTIVE_TAB_KEY, parseFollowActiveTabMode } from './utils/followActiveTab';
 import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup, restoreTabAssociationBackup } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
 import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
-import { ManagerId, parseManagerActionId, RoutedManager } from './proxies/messageRouting';
-import { TabSpaceRegistryApi } from './proxies/tabSpaceRegistryProxy';
+import { parseManagerActionId, RoutedManager } from './managers/proxies/messageRouting';
+import { SpaceWindowStateManager } from './managers/impl/spaceWindowStateManager';
+import { TabSpaceRegistry } from './managers/impl/tabSpaceRegistry';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -16,90 +17,6 @@ const ENABLE_AUTO_GROUP_NEW_TABS = false;
 // chrome.tabGroups.query() returns stale data until manual collapse/expand.
 // See https://github.com/brave/brave-browser/issues/52949
 const ISSUE_52949_WORKAROUND = true;
-
-// =============================================================================
-// SpaceWindowStateManager - Manages SpaceWindowState per window
-// =============================================================================
-
-class SpaceWindowStateManager
-{
-  static STORAGE_KEY_PREFIX = 'spaceWindowState_';
-
-  #states = new Map<number, SpaceWindowState>();  // windowId -> state
-
-  private getStorageKey(windowId: number): string
-  {
-    return `${SpaceWindowStateManager.STORAGE_KEY_PREFIX}${windowId}`;
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // State Access
-  // ─────────────────────────────────────────────────────────────────────────
-
-  getState(windowId: number): SpaceWindowState
-  {
-    return this.#states.get(windowId) || { ...DEFAULT_WINDOW_STATE };
-  }
-
-  getActiveSpace(windowId: number): string
-  {
-    return this.getState(windowId).activeSpaceId;
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // State Mutations
-  // ─────────────────────────────────────────────────────────────────────────
-
-  setActiveSpace(windowId: number, spaceId: string): void
-  {
-    const state = this.getState(windowId);
-    const newState = { ...state, activeSpaceId: spaceId };
-    this.saveState(windowId, newState);
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Persistence & Notification
-  // ─────────────────────────────────────────────────────────────────────────
-
-  private saveState(windowId: number, state: SpaceWindowState): void
-  {
-    this.#states.set(windowId, state);
-    chrome.storage.session.set({ [this.getStorageKey(windowId)]: state });
-
-    // Notify sidebar of state change
-    chrome.runtime.sendMessage({
-      action: SpaceMessageAction.STATE_CHANGED,
-      windowId,
-      state
-    }).catch(() =>
-    {
-      // Sidepanel may not be open - ignore error
-    });
-  }
-
-  removeWindow(windowId: number): void
-  {
-    this.#states.delete(windowId);
-  }
-
-  async load(): Promise<void>
-  {
-    // Load all window states from session storage
-    const result = await chrome.storage.session.get(null);
-
-    for (const [key, value] of Object.entries(result))
-    {
-      if (key.startsWith(SpaceWindowStateManager.STORAGE_KEY_PREFIX))
-      {
-        const windowId = parseInt(key.replace(SpaceWindowStateManager.STORAGE_KEY_PREFIX, ''), 10);
-        if (!isNaN(windowId))
-        {
-          this.#states.set(windowId, value as SpaceWindowState);
-        }
-      }
-    }
-  }
-}
 
 // =============================================================================
 // TabHistoryManager - Manages tab navigation history
@@ -544,90 +461,6 @@ class LastAudibleTracker
   }
 }
 
-// =============================================================================
-// TabSpaceRegistry - Tracks home space for tabs opened from bookmarks
-// =============================================================================
-
-class TabSpaceRegistry implements RoutedManager, TabSpaceRegistryApi
-{
-  static STORAGE_KEY = 'bg_tabSpaces';
-
-  readonly managerId = ManagerId.TAB_SPACE_REGISTRY;
-
-  // Map<windowId, Map<tabId, spaceId>>
-  #registry: Map<number, Map<number, string>> = new Map();
-
-  /**
-   * Routes one of this manager's messages to the matching method. The router
-   * has already resolved the manager half of the action, so only the method
-   * name arrives here. Unknown methods throw rather than being ignored - a
-   * silent no-op here would look exactly like a working call from the proxy
-   * side.
-   */
-  async dispatch(method: string, message: Record<string, unknown>): Promise<unknown>
-  {
-    switch (method)
-    {
-      case 'register':
-        this.register(message.windowId as number, message.tabId as number, message.spaceId as string);
-        return undefined;
-
-      default:
-        throw new Error(`${this.managerId}: unknown method "${method}"`);
-    }
-  }
-
-  register(windowId: number, tabId: number, spaceId: string): void
-  {
-    if (!this.#registry.has(windowId))
-    {
-      this.#registry.set(windowId, new Map());
-    }
-    this.#registry.get(windowId)!.set(tabId, spaceId);
-    this.save();
-  }
-
-  getSpace(windowId: number, tabId: number): string | undefined
-  {
-    return this.#registry.get(windowId)?.get(tabId);
-  }
-
-  unregister(windowId: number, tabId: number): void
-  {
-    this.#registry.get(windowId)?.delete(tabId);
-    this.save();
-  }
-
-  private save(): void
-  {
-    const data: Array<[number, Array<[number, string]>]> = [];
-    for (const [windowId, tabMap] of this.#registry)
-    {
-      data.push([windowId, Array.from(tabMap.entries())]);
-    }
-    chrome.storage.session.set({ [TabSpaceRegistry.STORAGE_KEY]: data });
-  }
-
-  removeWindow(windowId: number): void
-  {
-    this.#registry.delete(windowId);
-  }
-
-  async load(): Promise<void>
-  {
-    const result = await chrome.storage.session.get([TabSpaceRegistry.STORAGE_KEY]);
-    const data = result[TabSpaceRegistry.STORAGE_KEY];
-    if (data)
-    {
-      for (const [windowId, entries] of data)
-      {
-        this.#registry.set(windowId, new Map(entries));
-      }
-    }
-  }
-}
-
-// =============================================================================
 // NewsVersionChecker - Fetches latest news version from GitHub (at most once/week)
 // =============================================================================
 
@@ -1442,6 +1275,7 @@ function registerManager(manager: RoutedManager): void
 }
 
 registerManager(tabSpaceRegistry);
+registerManager(spaceStateManager);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 {
@@ -1476,21 +1310,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
     return true;  // async response
   }
 
-  // Get current SpaceWindowState for a window
-  if (message.action === SpaceMessageAction.GET_WINDOW_STATE)
-  {
-    (async () =>
-    {
-      await stateReady;
-      if (message.windowId)
-      {
-        const state = spaceStateManager.getState(message.windowId);
-        sendResponse(state);
-      }
-    })();
-    return true;
-  }
-
   // Return all Space definitions (loaded + migrated at startup)
   if (message.action === SpaceMessageAction.GET_SPACES)
   {
@@ -1511,20 +1330,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
       if (Array.isArray(message.spaces))
       {
         await spaceManager.update(message.spaces);
-      }
-    })();
-    return;
-  }
-
-  // Set active space
-  if (message.action === SpaceMessageAction.SET_ACTIVE_SPACE)
-  {
-    (async () =>
-    {
-      await stateReady;
-      if (message.windowId && message.spaceId)
-      {
-        spaceStateManager.setActiveSpace(message.windowId, message.spaceId);
       }
     })();
     return;

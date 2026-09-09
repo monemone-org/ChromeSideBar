@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Space, SpaceMessageAction, ALL_SPACE } from '../utils/spaceMessages';
 import { SpaceList, useSpaceListKeyboard, useSpaceListHighlight } from './SpaceList';
+import { spaceWindowStateProxy } from '../managers/proxies/spaceWindowStateProxy';
 
 export const SpaceNavigatorApp = () =>
 {
   const [spaces, setSpaces] = useState<Space[]>([]);
-  const [activeSpaceId, setActiveSpaceId] = useState<string>('all');
+  const [activeSpaceId, setActiveSpaceId] = useState<string>(ALL_SPACE.id);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -27,16 +28,13 @@ export const SpaceNavigatorApp = () =>
       }
     });
 
-    chrome.runtime.sendMessage(
-      { action: SpaceMessageAction.GET_WINDOW_STATE, windowId },
-      (state) =>
-      {
-        if (!chrome.runtime.lastError)
-        {
-          setActiveSpaceId(state?.activeSpaceId || 'all');
-        }
-      }
-    );
+    spaceWindowStateProxy.getState(windowId).then((state) =>
+    {
+      setActiveSpaceId(state.activeSpaceId);
+    }).catch((error) =>
+    {
+      console.error('Failed to get window state:', error);
+    });
   }, [windowId]);
 
   // All = index 0, named spaces = index 1..N
@@ -53,10 +51,7 @@ export const SpaceNavigatorApp = () =>
 
   const handleSelect = useCallback((spaceId: string) =>
   {
-    chrome.runtime.sendMessage(
-      { action: SpaceMessageAction.SET_ACTIVE_SPACE, spaceId, windowId },
-      () => window.close()
-    );
+    spaceWindowStateProxy.setActiveSpace(windowId, spaceId).then(() => window.close());
   }, [windowId]);
 
   // displaySpaces is the search-filtered subset of allSpaces

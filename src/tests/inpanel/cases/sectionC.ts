@@ -624,7 +624,7 @@ export const C2F_AUDIO_DROPDOWN: TestCase = {
       'Manual step: start playback on BOTH audio tabs',
       [
         'Two YouTube tabs were opened. Press play on both, leaving both unmuted.',
-        'Play the Space A one FIRST, then the Space B one - the Space B tab must be the more recent, so selecting Space A\'s entry is a real choice rather than the default.',
+        `Play the ${TEST_SPACE_WORK_NAME} one FIRST, then the ${TEST_SPACE_VIDEO_NAME} one - the ${TEST_SPACE_VIDEO_NAME} tab must be the more recent, so selecting the ${TEST_SPACE_WORK_NAME} entry is a real choice rather than the default.`,
         'Come back to the sidebar and click Resume below.',
       ]
     ),

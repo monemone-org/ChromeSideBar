@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useBookmarkTabsContext } from './BookmarkTabsContext';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { SpaceMessageAction, SpaceWindowState, DEFAULT_WINDOW_STATE, SPACES_STORAGE_KEY, Space, ALL_SPACE } from '../utils/spaceMessages';
+import { SpaceMessageAction, SPACES_STORAGE_KEY, Space, ALL_SPACE } from '../utils/spaceMessages';
 import { toChromeColor } from '../utils/groupColors';
+import { spaceWindowStateProxy } from '../managers/proxies/spaceWindowStateProxy';
+import { useSpaceWindowState } from '../hooks/useSpaceWindowState';
 
 // Re-export Space and ALL_SPACE so all existing imports from SpacesContext continue to work
 export type { Space } from '../utils/spaceMessages';
@@ -46,6 +48,13 @@ const getDebugSpaces = (): Space[] =>
 // Context Interface
 // =============================================================================
 
+/**
+ * Who caused the active space to change. 'user' is a direct gesture (space bar
+ * click, swipe, navigator); 'navigation' is everything code-initiated. App.tsx
+ * reads it to decide whether to also activate a tab.
+ */
+export type SpaceSwitchSource = 'user' | 'navigation';
+
 interface SpacesContextValue
 {
   // Space definitions
@@ -82,7 +91,7 @@ interface SpacesContextValue
   getTabsForSpace: (spaceId: string) => Promise<chrome.tabs.Tab[]>;
 
   // Space switch source (read-once: returns value and resets to 'navigation')
-  getSpaceSwitchSource: () => 'user' | 'navigation';
+  getSpaceSwitchSource: () => SpaceSwitchSource;
 
   // Actions
   getTabIdsInSpace: (space: Space) => Promise<number[]>;
@@ -156,13 +165,14 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [sendSpacesUpdate]);
 
   // ---------------------------------------------------------------------------
-  // Per-window state (read-only copy, synced from background.ts)
+  // Per-window state (read-only mirror of spaceWindowStateProxy's store,
+  // kept current by background.ts's broadcasts - see useSpaceWindowState)
   // ---------------------------------------------------------------------------
   const [windowId, setWindowId] = useState<number | null>(null);
-  const [windowState, setWindowState] = useState<SpaceWindowState>(DEFAULT_WINDOW_STATE);
+  const windowState = useSpaceWindowState();
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Get current window ID and initial state on mount
+  // Get current window ID and mirror this window's SpaceWindowState on mount
   useEffect(() =>
   {
     chrome.windows.getCurrent((window) =>
@@ -171,47 +181,17 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       {
         setWindowId(window.id);
 
-        // Request initial state from background
-        chrome.runtime.sendMessage(
-          { action: SpaceMessageAction.GET_WINDOW_STATE, windowId: window.id },
-          (response: SpaceWindowState) =>
-          {
-            if (chrome.runtime.lastError)
-            {
-              console.error('Failed to get window state:', chrome.runtime.lastError);
-            }
-            else if (response)
-            {
-              setWindowState(response);
-            }
-            setIsInitialized(true);
-          }
-        );
+        spaceWindowStateProxy.mirrorWindow(window.id).then(() =>
+        {
+          setIsInitialized(true);
+        }).catch((error) =>
+        {
+          console.error('Failed to mirror window state:', error);
+          setIsInitialized(true);
+        });
       }
     });
   }, []);
-
-  // Listen for state changes from background
-  useEffect(() =>
-  {
-    const handleMessage = (
-      message: { action: string; windowId?: number; state?: SpaceWindowState },
-      _sender: chrome.runtime.MessageSender,
-      _sendResponse: (response?: unknown) => void
-    ) =>
-    {
-      // Update local state when background sends STATE_CHANGED
-      if (message.action === SpaceMessageAction.STATE_CHANGED &&
-          message.windowId === windowId &&
-          message.state)
-      {
-        setWindowState(message.state);
-      }
-    };
-
-    chrome.runtime.onMessage.addListener(handleMessage);
-    return () => chrome.runtime.onMessage.removeListener(handleMessage);
-  }, [windowId]);
 
   // ---------------------------------------------------------------------------
   // Space CRUD operations
@@ -360,9 +340,9 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // ---------------------------------------------------------------------------
   // Space switch source tracking
   // ---------------------------------------------------------------------------
-  const spaceSwitchSourceRef = useRef<'user' | 'navigation'>('navigation');
+  const spaceSwitchSourceRef = useRef<SpaceSwitchSource>('navigation');
 
-  const getSpaceSwitchSource = useCallback((): 'user' | 'navigation' =>
+  const getSpaceSwitchSource = useCallback((): SpaceSwitchSource =>
   {
     const source = spaceSwitchSourceRef.current;
     spaceSwitchSourceRef.current = 'navigation';
@@ -370,55 +350,47 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Per-window state operations (send messages to background, state updates via STATE_CHANGED)
+  // Per-window state operations (mutate via spaceWindowStateProxy, mirror
+  // updates via its ack and its "changed" broadcast listener)
   // ---------------------------------------------------------------------------
 
-  // Update active space (no tab activation)
-  // Use for: history navigation, spaces disabled, create/delete space
-  const setActiveSpaceId = useCallback((spaceId: string) =>
+  // The two space-switch entry points below differ only in the source they
+  // record, so the actual switch lives here once. The proxy owns the
+  // optimistic mirror write, so nothing here touches its store.
+  const applyActiveSpace = useCallback((spaceId: string, source: SpaceSwitchSource) =>
   {
-    spaceSwitchSourceRef.current = 'navigation';
-    // Update local state immediately for responsive UI
-    setWindowState(prev => ({ ...prev, activeSpaceId: spaceId }));
+    spaceSwitchSourceRef.current = source;
 
     // Notify background
     if (windowId)
     {
       if (import.meta.env.DEV)
       {
-        console.log('[SpaceContext] chrome.runtime.sendMessage: SET_ACTIVE_SPACE', {
+        console.log('[SpaceContext] spaceWindowStateProxy.setActiveSpace', {
           windowId,
-          spaceId
+          spaceId,
+          source
         });
       }
 
-      chrome.runtime.sendMessage({
-        action: SpaceMessageAction.SET_ACTIVE_SPACE,
-        windowId,
-        spaceId
-      });
+      spaceWindowStateProxy.setActiveSpace(windowId, spaceId);
     }
   }, [windowId]);
+
+  // Update active space (no tab activation)
+  // Use for: history navigation, spaces disabled, create/delete space
+  const setActiveSpaceId = useCallback((spaceId: string) =>
+  {
+    applyActiveSpace(spaceId, 'navigation');
+  }, [applyActiveSpace]);
 
   // Switch to space (just update active space, no tab activation)
   // Tab activation happens naturally when user clicks on a tab
   // Use for: user clicks space bar, swipe gestures, space navigator
   const switchToSpace = useCallback((spaceId: string) =>
   {
-    spaceSwitchSourceRef.current = 'user';
-    // Update local state immediately for responsive UI
-    setWindowState(prev => ({ ...prev, activeSpaceId: spaceId }));
-
-    // Notify background
-    if (windowId)
-    {
-      chrome.runtime.sendMessage({
-        action: SpaceMessageAction.SET_ACTIVE_SPACE,
-        windowId,
-        spaceId
-      });
-    }
-  }, [windowId]);
+    applyActiveSpace(spaceId, 'user');
+  }, [applyActiveSpace]);
 
   // Get all tabs for a space (queries Chrome groups by matching Space name to group title)
   const getTabsForSpace = useCallback(async (spaceId: string): Promise<chrome.tabs.Tab[]> =>

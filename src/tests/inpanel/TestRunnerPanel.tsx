@@ -12,7 +12,7 @@
 // instead of it blocking the whole UI.
 
 import { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { MoreVertical, X } from 'lucide-react';
 import { useSpacesContext } from '../../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../../contexts/BookmarkTabsContext';
 import { useBookmarks } from '../../hooks/useBookmarks';
@@ -82,6 +82,19 @@ function requiresManualSteps(testCase: TestCase): boolean
   return testCase.steps.some(step => step.kind === 'pause');
 }
 
+// Section a case belongs to, derived from its id's leading letter (e.g. "A"
+// from "A.1") rather than a separate field - the id format already encodes
+// it and every case in cases/* follows it.
+function sectionOf(testCase: TestCase): string
+{
+  return testCase.id[0];
+}
+
+// Fixed section letters shown as checkboxes, not derived from ALL_CASES -
+// keeps the checkbox order stable (A before B before C...) regardless of
+// case registration order.
+const ALL_SECTIONS = ['A', 'B', 'C', 'D', 'E'];
+
 export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, removePin }: TestRunnerPanelProps) =>
 {
   const spacesCtx = useSpacesContext();
@@ -143,6 +156,24 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
   // runQueue()/runner.ts's writeBatchQueue for why this needs to be
   // persisted rather than just a local variable in runAll()'s loop.
   const [batchQueue, setBatchQueue] = useState<string[] | null>(null);
+  // Whether the title bar's [...] overflow menu (currently just "Download
+  // Results") is open - local UI state, not persisted.
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // Which sections' cases to show/run - defaults to all, resets on remount
+  // (not persisted; unlike resume/batch state, there's no cross-session need
+  // to remember a filter that's just narrowing what you're looking at).
+  const [selectedSections, setSelectedSections] = useState<Set<string>>(new Set(ALL_SECTIONS));
+
+  function toggleSection(section: string)
+  {
+    setSelectedSections(prev =>
+    {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  }
 
   function toggleExpanded(caseId: string)
   {
@@ -290,7 +321,7 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
 
   function runAll()
   {
-    return runQueue(ALL_CASES.map(c => c.id));
+    return runQueue(visibleCases.map(c => c.id));
   }
 
   // Resumes the paused case, then - if it was part of a "Run All" batch and
@@ -340,10 +371,62 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
     setExpandedCaseIds(new Set());
   }
 
+  // Serializes the currently-held results (whatever's in caseResults, same
+  // data the list renders) to a JSON file and triggers a browser download.
+  // Ordered by ALL_CASES rather than Object.keys(caseResults) so the file
+  // reads top-to-bottom the same way the panel's list does, regardless of
+  // which order cases happened to run in. `onlyFailed` narrows the file to
+  // cases with at least one failing result - see downloadFailedResults below.
+  function downloadResults(onlyFailed = false)
+  {
+    const cases = ALL_CASES
+      .filter(testCase => caseResults[testCase.id])
+      .map(testCase =>
+      {
+        const results = caseResults[testCase.id];
+        const summary = summarize(results);
+        return {
+          id: testCase.id,
+          title: testCase.title,
+          section: sectionOf(testCase),
+          passed: summary.failed === 0,
+          total: summary.total,
+          failed: summary.failed,
+          results,
+        };
+      })
+      .filter(testCase => !onlyFailed || !testCase.passed);
+
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      cases,
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `test-results${onlyFailed ? '-failed' : ''}-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadFailedResults()
+  {
+    downloadResults(true);
+  }
+
+  // Only the checked sections' cases - drives both the rendered list and
+  // what "Run All" queues up. A paused/queued case stays reachable via
+  // pausedCase below even if its section gets unchecked mid-run, since that
+  // lookup goes through ALL_CASES, not this filtered view.
+  const visibleCases = ALL_CASES.filter(c => selectedSections.has(sectionOf(c)));
+
   const pausedCase = pausedState ? ALL_CASES.find(c => c.id === pausedState.caseId) : undefined;
   const pausedStep = pausedCase && pausedState ? pausedCase.steps[pausedState.stepIndex] : undefined;
   const pausedInstruction = pausedStep?.kind === 'pause' ? pausedStep.instruction : '';
   const hasAnyResults = Object.keys(caseResults).length > 0;
+  const hasAnyFailedResults = Object.values(caseResults).some(results => results.some(r => !r.passed));
 
   if (!isOpen) return null;
 
@@ -354,13 +437,44 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
     >
       <div className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
         <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100">Test Runner (dev)</h3>
-        <button
-          onClick={() => onOpenChange(false)}
-          aria-label="Close test runner"
-          className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
-        >
-          <X size={16} />
-        </button>
+        <div className="flex items-center gap-1">
+          <div className="relative">
+            <button
+              onClick={() => setIsMenuOpen(prev => !prev)}
+              aria-label="More actions"
+              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+            >
+              <MoreVertical size={16} />
+            </button>
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 z-20 min-w-[10rem] rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-lg py-1">
+                <button
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:hover:bg-transparent"
+                  onClick={() => { downloadResults(); setIsMenuOpen(false); }}
+                  disabled={!hasAnyResults}
+                  title="Download the results shown below as a JSON file"
+                >
+                  Download Results
+                </button>
+                <button
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:hover:bg-transparent"
+                  onClick={() => { downloadFailedResults(); setIsMenuOpen(false); }}
+                  disabled={!hasAnyFailedResults}
+                  title="Download only the cases with at least one failing result, as a JSON file"
+                >
+                  Download Failed Results Only
+                </button>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={() => onOpenChange(false)}
+            aria-label="Close test runner"
+            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
+          >
+            <X size={16} />
+          </button>
+        </div>
       </div>
       <div className="overflow-y-auto flex-1 p-3 space-y-3 text-sm text-gray-900 dark:text-gray-100">
         {panelError && (
@@ -369,26 +483,41 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
-          <button
-            className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
-            onClick={clearResults}
-            disabled={runningCaseId !== null || runningAll || !hasAnyResults}
-            title="Several cases have a known-gap assertion that's expected to currently fail - clear results here once you've seen it, so the panel stops auto-opening for it on every sidebar open."
-          >
-            Clear Results
-          </button>
-          <button
-            className="px-2 py-1 rounded bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50"
-            onClick={runAll}
-            disabled={runningCaseId !== null || runningAll}
-          >
-            {runningAll ? `Running all… (${runningCaseId ?? ''})` : 'Run All'}
-          </button>
+        <div className="flex justify-between items-center gap-2">
+          <div className="flex items-center gap-2">
+            {ALL_SECTIONS.map(section => (
+              <label key={section} className="flex items-center gap-1 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={selectedSections.has(section)}
+                  onChange={() => toggleSection(section)}
+                  disabled={runningCaseId !== null || runningAll}
+                />
+                <span>{section}</span>
+              </label>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button
+              className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
+              onClick={clearResults}
+              disabled={runningCaseId !== null || runningAll || !hasAnyResults}
+              title="Several cases have a known-gap assertion that's expected to currently fail - clear results here once you've seen it, so the panel stops auto-opening for it on every sidebar open."
+            >
+              Clear Results
+            </button>
+            <button
+              className="px-2 py-1 rounded bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50"
+              onClick={runAll}
+              disabled={runningCaseId !== null || runningAll || visibleCases.length === 0}
+            >
+              {runningAll ? `Running tests… (${runningCaseId ?? ''})` : 'Run Tests'}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-0.5">
-          {ALL_CASES.map(testCase =>
+          {visibleCases.map(testCase =>
           {
             const results = caseResults[testCase.id];
             const summary = results ? summarize(results) : null;

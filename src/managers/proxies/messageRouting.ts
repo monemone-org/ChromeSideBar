@@ -17,6 +17,7 @@ const SEPARATOR = '_msg_';
  */
 export const ManagerId = {
   TAB_SPACE_REGISTRY: 'TabSpaceRegistry',
+  SPACE_WINDOW_STATE: 'SpaceWindowStateManager',
 } as const;
 
 export type ManagerIdType = typeof ManagerId[keyof typeof ManagerId];
@@ -56,6 +57,35 @@ export function parseManagerActionId(action: unknown): ParsedManagerAction | und
 }
 
 /**
+ * Calls one method on one manager and returns its ack payload.
+ *
+ * Every proxy method goes through here rather than building its own
+ * sendMessage envelope, so the action string, the failure handling, and the
+ * response type all have exactly one implementation. The router answers a
+ * failed dispatch with `{ error }` (see background.ts) - that comes back as a
+ * resolved response, not a rejection, so it has to be turned back into a
+ * throw here or callers would treat the error envelope as the result.
+ */
+export async function callManager<R>(
+  managerId: ManagerIdType,
+  method: string,
+  payload: Record<string, unknown> = {}
+): Promise<R>
+{
+  const response = await chrome.runtime.sendMessage({
+    action: makeManagerActionId(managerId, method),
+    ...payload,
+  });
+
+  if (response && typeof response === 'object' && 'error' in response)
+  {
+    throw new Error(`${managerId}.${method} failed: ${(response as { error: string }).error}`);
+  }
+
+  return response as R;
+}
+
+/**
  * Turns a manager's synchronous method signatures into their proxy
  * equivalents: same parameters, but every return value becomes a Promise
  * because it now crosses the message boundary.
@@ -71,12 +101,18 @@ export type Remote<T> = {
 };
 
 /**
- * Implemented by every message-owning manager in background.ts. dispatch()
- * receives only the method half of the action - the router has already
- * resolved which manager the message belongs to.
+ * Implemented by every message-owning manager in background.ts.
  */
 export interface RoutedManager
 {
   readonly managerId: ManagerIdType;
+
+  /**
+   * Routes one of this manager's messages to the matching method. Only the
+   * method half of the action arrives here - the router has already resolved
+   * which manager the message belongs to. Unknown methods must throw rather
+   * than be ignored: a silent no-op would look exactly like a working call
+   * from the proxy side.
+   */
   dispatch(method: string, message: Record<string, unknown>): Promise<unknown>;
 }

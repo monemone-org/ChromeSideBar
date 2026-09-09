@@ -3,7 +3,7 @@
  */
 
 import { Space } from '../contexts/SpacesContext';
-import { tabSpaceRegistryProxy } from '../proxies/tabSpaceRegistryProxy';
+import { tabSpaceRegistryProxy } from '../managers/proxies/tabSpaceRegistryProxy';
 import { toChromeColor } from './groupColors';
 
 // Keyed by "windowId:spaceName" - deduplicates concurrent getOrCreateSpaceGroup

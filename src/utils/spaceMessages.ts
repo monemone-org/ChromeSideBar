@@ -35,37 +35,20 @@ export const ALL_SPACE: Space = {
 /**
  * Message action types for space-related communication.
  *
- * SpaceWindowState is managed in background.ts (source of truth).
+ * SpaceWindowState is managed by SpaceWindowStateManager in background.ts and
+ * routed through spaceWindowStateProxy - see src/managers/proxies/messageRouting.ts
+ * and src/managers/proxies/spaceWindowStateProxy.ts. Its messages are no longer listed
+ * here as flat actions.
  * Space definitions are managed by SpaceManager in background.ts.
  * SpacesContext.tsx holds read-only copies that sync via messages.
  *
  * Communication flow:
- *   sidebar → background: GET_WINDOW_STATE, SET_ACTIVE_SPACE, GET_SPACES, UPDATE_SPACES
- *   background → sidebar: STATE_CHANGED
+ *   sidebar → background: GET_SPACES, UPDATE_SPACES
  */
 export const SpaceMessageAction = {
   // ─────────────────────────────────────────────────────────────────────────
   // Sidebar → Background
   // ─────────────────────────────────────────────────────────────────────────
-
-  /**
-   * SpacesContext.tsx → background.ts
-   *
-   * Request current SpaceWindowState on sidebar mount.
-   *
-   * Payload: { windowId: number }
-   * Response: SpaceWindowState
-   */
-  GET_WINDOW_STATE: 'get-window-state',
-
-  /**
-   * SpacesContext.tsx → background.ts
-   *
-   * User switched to a different space in the sidebar.
-   *
-   * Payload: { windowId: number, spaceId: string }
-   */
-  SET_ACTIVE_SPACE: 'set-active-space',
 
   /**
    * SpacesContext.tsx → background.ts
@@ -88,16 +71,6 @@ export const SpaceMessageAction = {
   // ─────────────────────────────────────────────────────────────────────────
   // Background → Sidebar
   // ─────────────────────────────────────────────────────────────────────────
-
-  /**
-   * background.ts → SpacesContext.tsx
-   *
-   * Notify sidebar of SpaceWindowState changes (activeSpaceId changed).
-   * Sidebar updates its read-only copy and re-renders.
-   *
-   * Payload: { windowId: number, state: SpaceWindowState }
-   */
-  STATE_CHANGED: 'state-changed',
 
   /**
    * background.ts → useFollowActiveTab.ts

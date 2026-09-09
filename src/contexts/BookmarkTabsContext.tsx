@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
-import { tabSpaceRegistryProxy } from '../proxies/tabSpaceRegistryProxy';
+import { tabSpaceRegistryProxy } from '../managers/proxies/tabSpaceRegistryProxy';
 import { SpaceMessageAction } from '../utils/spaceMessages';
 import {
   getTabAssociations,

@@ -189,6 +189,14 @@ export function openFillerTabsUntilScrollable(spaceRef: string): TestStep
   const BATCH_SIZE = 10;
   const MAX_BATCHES = 6;
   const OVERFLOW_FACTOR = 2;
+  // Matches openFillerBookmarksUntilScrollable's RENDER_SETTLE_MS below - a
+  // filler tab's effect on scrollHeight isn't visible until TabList has
+  // re-rendered, which only happens after chrome.tabs.onCreated/onUpdated
+  // round-trips back to useTabs' listener and its own 50ms debounce settles.
+  // The awaited chrome.tabs.create/group calls above don't cover that, so
+  // without this sleep needsMoreContent() keeps reading stale (pre-render)
+  // DOM state every batch.
+  const RENDER_SETTLE_MS = 200;
 
   return {
     kind: 'action',
@@ -214,6 +222,7 @@ export function openFillerTabsUntilScrollable(spaceRef: string): TestStep
       {
         await Promise.all(Array.from({ length: BATCH_SIZE }, (_unused, i) => openFiller(`filler-${batch}-${i}`)));
         opened += BATCH_SIZE;
+        await sleep(RENDER_SETTLE_MS);
       }
 
       if (needsMoreContent())
