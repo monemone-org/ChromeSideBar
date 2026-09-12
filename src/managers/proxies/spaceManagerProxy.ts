@@ -86,9 +86,19 @@ class SpaceManagerProxy implements Remote<SpaceManagerApi>
     // time its message was handled, which a newer local write may already
     // have moved past. See CONTEXT_ID in messageRouting.ts for the worked
     // example.
+    //
+    // `migrated` is the one deliberate exception: SpaceManager.updateSpaces()
+    // sets it when it resolved missing bookmarkFolderSegments before storing,
+    // meaning what got stored differs from what THIS context optimistically
+    // wrote (see #applySpaces call in updateSpaces() below). Applying it
+    // despite the matching senderId is safe only because the sole caller
+    // that can hit this - spaces import - awaits the write before the UI
+    // allows another space edit in this window, so there is no newer
+    // optimistic write here for it to clobber. See the shared-storage
+    // decision doc, section 4.
     chrome.runtime.onMessage.addListener((message) =>
     {
-      if (message?.action === SPACES_CHANGED && message.senderId !== CONTEXT_ID)
+      if (message?.action === SPACES_CHANGED && (message.senderId !== CONTEXT_ID || message.migrated === true))
       {
         this.#applySpaces(message.spaces);
       }
@@ -127,7 +137,10 @@ class SpaceManagerProxy implements Remote<SpaceManagerApi>
    * since it hands the new Space back to its caller immediately. The ack is
    * NOT applied to the mirror: we already know the resulting list because we
    * chose it, and applying a reply that a newer write may have superseded
-   * would only move the mirror backwards.
+   * would only move the mirror backwards. The one exception is when
+   * background resolved missing bookmarkFolderSegments we didn't send - the
+   * mirror gets corrected for that via the broadcast's `migrated` flag (see
+   * #subscribeToBroadcasts), not via this method applying its own ack.
    *
    * The promise still resolves with the manager's reply, for callers that
    * need the write to have actually landed - DeleteSpaceAction waits on it,

@@ -243,8 +243,8 @@ export async function importFullBackup(
   options: ImportOptions,
   replacePinnedSites: (sites: PinnedSite[]) => void,
   appendPinnedSites: (sites: PinnedSite[]) => void,
-  replaceSpaces: (spaces: Space[]) => void,
-  appendSpaces: (spaces: Space[]) => void,
+  replaceSpaces: (spaces: Space[]) => Promise<void>,
+  appendSpaces: (spaces: Space[]) => Promise<void>,
   existingSpaceNames: string[]
 ): Promise<ImportResult> {
   // Migrate v1 backups to v2 (PascalCase → kebab-case icon names)
@@ -366,10 +366,13 @@ export async function importFullBackup(
     }
   }
 
-  // Import spaces
+  // Import spaces. Awaited so SpaceManager's segment self-heal (for spaces
+  // with bookmarkFolderPath but no bookmarkFolderSegments - Arc import and
+  // pre-bookmarkFolderSegments backups both produce that shape) has actually
+  // landed by the time this function - and the caller's "success" UI - report done.
   if (options.importSpaces && backup.spaces && backup.spaces.length > 0) {
     if (options.spacesMode === 'replace') {
-      replaceSpaces(backup.spaces);
+      await replaceSpaces(backup.spaces);
     } else {
       // For append mode, rename spaces with duplicate names
       const existingNamesSet = new Set(existingSpaceNames);
@@ -380,7 +383,7 @@ export async function importFullBackup(
         existingNamesSet.add(uniqueName);
         return { ...space, name: uniqueName };
       });
-      appendSpaces(renamedSpaces);
+      await appendSpaces(renamedSpaces);
     }
     result.spacesCount = backup.spaces.length;
   }

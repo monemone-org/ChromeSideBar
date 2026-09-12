@@ -86,8 +86,8 @@ interface SpacesContextValue
   getSpaceById: (id: string) => Space | undefined;
 
   // Import/Export
-  replaceSpaces: (spaces: Space[]) => void;
-  appendSpaces: (spaces: Space[]) => void;
+  replaceSpaces: (spaces: Space[]) => Promise<void>;
+  appendSpaces: (spaces: Space[]) => Promise<void>;
 
   // Per-window state
   activeSpaceId: string;
@@ -108,21 +108,24 @@ interface SpacesContextValue
 const SpacesContext = createContext<SpacesContextValue | null>(null);
 
 /**
- * Hands a new Space list to the proxy and deliberately drops the rejection.
+ * Hands a new Space list to the proxy and deliberately drops the rejection -
+ * a failed write doesn't surface as an unhandled promise rejection, since the
+ * proxy has already logged the failure and resynced its mirror from
+ * background by the time this settles.
  *
- * The proxy has already logged the failure and resynced its mirror from
- * background by the time this rejects, so there is nothing left for a caller
- * to do. The .catch() is here purely so a failed write doesn't surface as an
- * unhandled promise rejection, which it otherwise would at every one of the
- * call sites below - none of them await, because none of them do anything
- * afterwards that depends on the write having landed.
+ * Returns the (always-resolving) promise so replaceSpaces/appendSpaces can
+ * await it - import needs SpaceManager's segment self-heal (see the
+ * shared-storage decision doc) to have actually landed before the import
+ * dialog reports itself done. Every other caller below still doesn't await,
+ * because none of them do anything afterwards that depends on the write
+ * having landed.
  *
  * DeleteSpaceAction is the exception and calls the proxy directly, since an
  * undo right after a delete does have to know the delete arrived.
  */
-const writeSpaces = (spaces: Space[]): void =>
+const writeSpaces = (spaces: Space[]): Promise<void> =>
 {
-  spaceManagerProxy.updateSpaces(spaces).catch(() => {});
+  return spaceManagerProxy.updateSpaces(spaces).then(() => {}, () => {});
 };
 
 // =============================================================================
@@ -309,25 +312,28 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     writeSpaces(updatedSpaces);
   }, []);
 
-  // Replace all spaces (for import with "Replace" option)
-  const replaceSpaces = useCallback((newSpaces: Space[]) =>
+  // Replace all spaces (for import with "Replace" option). Awaits the write
+  // so the caller (import) only reports success once SpaceManager's segment
+  // self-heal has actually landed - see writeSpaces' doc comment.
+  const replaceSpaces = useCallback(async (newSpaces: Space[]): Promise<void> =>
   {
     const spacesWithNewIds = newSpaces.map(space => ({
       ...space,
       id: generateId(),
     }));
-    writeSpaces(spacesWithNewIds);
+    await writeSpaces(spacesWithNewIds);
   }, []);
 
-  // Append spaces to existing (for import with "Add" option)
-  const appendSpaces = useCallback((newSpaces: Space[]) =>
+  // Append spaces to existing (for import with "Add" option). Awaits for the
+  // same reason as replaceSpaces above.
+  const appendSpaces = useCallback(async (newSpaces: Space[]): Promise<void> =>
   {
     const spacesWithNewIds = newSpaces.map(space => ({
       ...space,
       id: generateId(),
     }));
     const combined = [...spaceManagerProxy.snapshot, ...spacesWithNewIds];
-    writeSpaces(combined);
+    await writeSpaces(combined);
   }, []);
 
   // ---------------------------------------------------------------------------

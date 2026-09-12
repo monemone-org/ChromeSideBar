@@ -14,8 +14,13 @@ import { Space } from '../../utils/spaceMessages';
 export interface SpaceManagerApi
 {
   getSpaces(): Space[];
-  /** Returns the resulting list, which becomes the ack payload. */
-  updateSpaces(spaces: Space[]): Space[];
+  /**
+   * Returns the resulting list, which becomes the ack payload. Async because
+   * the manager may need to resolve missing bookmarkFolderSegments (a fresh
+   * chrome.bookmarks.getTree() walk) before it can say what the result is -
+   * see impl/spaceManager.ts's resolveMissingSegments.
+   */
+  updateSpaces(spaces: Space[]): Promise<Space[]>;
 }
 
 /**

@@ -641,8 +641,8 @@ export interface ArcImportCallbacks
 {
   replacePinnedSites: (sites: PinnedSite[]) => void;
   appendPinnedSites: (sites: PinnedSite[]) => void;
-  replaceSpaces: (spaces: Space[]) => void;
-  appendSpaces: (spaces: Space[]) => void;
+  replaceSpaces: (spaces: Space[]) => Promise<void>;
+  appendSpaces: (spaces: Space[]) => Promise<void>;
   existingSpaces: readonly Space[];
 }
 
@@ -727,7 +727,11 @@ export async function importArcData(
         });
       }
 
-      callbacks.replaceSpaces(newSpaces);
+      // Awaited so SpaceManager's segment self-heal has landed by the time
+      // this function reports done - every space created here has
+      // bookmarkFolderPath but no bookmarkFolderSegments (see the shared-
+      // storage decision doc's Case for why Arc import needs this).
+      await callbacks.replaceSpaces(newSpaces);
       result.spacesCount = newSpaces.length;
       result.spacesCreated = newSpaces.length;
       result.notes.push('Existing bookmarks were not modified');
@@ -798,7 +802,8 @@ export async function importArcData(
 
       if (newSpaces.length > 0)
       {
-        callbacks.appendSpaces(newSpaces);
+        // Awaited for the same reason as the replace-mode call above.
+        await callbacks.appendSpaces(newSpaces);
       }
       result.spacesCount = data.spaces.length;
     }

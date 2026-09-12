@@ -46,6 +46,7 @@ Source test plan: [tab-space-association-test-cases.md](tab-space-association-te
 | C.2f       | Select a tab from the audio tabs dropdown list                                                        | Pass             |               |
 | D.1        | Rename a space while it has tracked tabs                                                              | ✗ Bugged (step 3)  | [below](#d1)  |
 | D.2        | Delete a space with tracked tabs                                                                      | Passed           |               |
+| D.3        | Background's own space cache must drop a deleted space immediately                                    | Passed           |               |
 | E.1        | Reload the extension (chrome://extensions → reload)                                                   | Passed           |               |
 | E.2        | Full browser restart                                                                                  | Passed           |               |
 | F          | Regression check on pre-existing behavior                                                             | Passed           |               |

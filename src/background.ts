@@ -1343,11 +1343,22 @@ chrome.commands.onCommand.addListener((command) =>
         const windowId = tabs[0].windowId;
         const win = await chrome.windows.get(windowId);
 
-        // Size the popup to fit all spaces without scrolling (capped at 480px content height)
+        // Size the popup to fit all spaces without scrolling (capped at 480px content height).
+        // Measured from SpaceNavigatorApp.tsx / SpaceList.tsx rendering (Tailwind defaults, 1rem = 16px):
+        //   headerHeight = 37   ("Navigate to Space" row: py-2 padding 16 + text-sm line-height 20 + border-b 1)
+        //   searchBoxHeight = 39 (search row: py-1.5 padding 12 + input py-1 padding 8
+        //                         + input text-xs line-height 16 + input border 2 + border-b 1)
+        //   listPadding = 8    (SpaceList's rows container: py-1 padding, top + bottom)
+        //   rowHeight = 28     (each space row: h-7)
         const spaces = spaceManager.getSpaces();
         const itemCount = spaces.length + 1; // +1 for the "All" space
         const popupWidth = 300;
-        const contentHeight = 37 + itemCount * 28 + 8; // header + rows + padding
+        const headerHeight = 37;
+        const searchBoxHeight = 39;
+        const listPadding = 8;
+        const rowHeight = 28;
+        const bottomPadding = 10;
+        const contentHeight = headerHeight + searchBoxHeight + listPadding + itemCount * rowHeight + bottomPadding;
         const popupHeight = Math.min(contentHeight, 480) + 30; // +30 for OS title bar
 
         // Center the popup within the browser window

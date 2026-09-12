@@ -78,6 +78,8 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | C.2f | Yes     |
 | D.1  | Yes     |
 | D.2  | Yes     |
+| D.3  | Yes     |
+| D.4  | Yes     |
 | E.1  | Yes     |
 | E.2  | No      |
 | F.1  | No      |
@@ -480,6 +482,36 @@ Same setup as C.2b, triggered via keyboard instead of the toolbar buttons. Worth
 | 2    | Also open a pinned site's tab, and a plain regular tab, in Space A - all three tab types now open at once | -                                                                                                                                                                     |
 | 3    | Delete Space A (with all three tabs open)                                    | The bookmark tab and regular tab should close (they're members of Space A's Chrome group, which `DeleteSpaceAction` closes); the pinned tab should stay open and untouched.  Confirm no leftover/orphaned association or registry state for the two closed tabs if reused afterward |
 | 4    | Undo the space deletion (if offered)                                         | Space, the bookmark tab, and the regular tab restore correctly, associations intact; the pinned tab was never affected, so there's nothing to restore for it         |
+
+### D.3 Background's own space cache must drop a deleted space immediately
+
+Regression check for Case 3 in `docs/decisions/2026-07-30-shared-storage-multiple-writers.md`.
+Automated in `src/tests/inpanel/cases/sectionD.ts`.
+
+| Step | Action                                                                                                                   | Expected Result                                                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 1    | Create Space A                                                                                                            | -                                                                                                                                    |
+| 2    | Delete Space A                                                                                                            | Space A disappears from the sidebar immediately                                                                                     |
+| 3    | **Immediately** (no other space edit first), open the Space Navigator popup (Cmd/Ctrl+Shift+S) - any window                | Space A must **not** appear in the popup's list                                                                                     |
+| 4    | Deeper check: open the service worker's own console (`chrome://extensions` → this extension → "service worker") and look at the log line from step 2's delete (DEV builds only) | The most recent `[SpaceManager] updateSpaces applied: [...]` line must **not** list Space A |
+
+### D.4 Legacy space (`bookmarkFolderPath`, no `bookmarkFolderSegments`) self-heals immediately
+
+Regression check for `SpaceManager.updateSpaces()`'s segment self-heal (see
+`docs/decisions/2026-07-30-shared-storage-multiple-writers.md`). Automated in
+`src/tests/inpanel/cases/sectionD.ts`.
+
+| Step | Action                                                                                                                                    | Expected Result                                                    |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1    | Create a space with a real bookmark folder                                                                                                   | Space has `bookmarkFolderSegments` set                              |
+| 2    | Strip `bookmarkFolderSegments` from it (keep `bookmarkFolderPath`) and write the list via `spaceManagerProxy.updateSpaces()` - the shape Arc import and any pre-`bookmarkFolderSegments` backup produce | -                                                                    |
+| 3    | Check background's own space list                                                                                                            | `bookmarkFolderSegments` restored, matching the original            |
+| 4    | Check this window's own mirror (what `BookmarkTree.tsx` renders from)                                                                        | `bookmarkFolderSegments` restored there too, not just background's copy |
+
+Manual-only gap: data that predates `bookmarkFolderSegments` entirely and has
+never gone through `updateSpaces()` (e.g. first launch after an old-version
+upgrade) still depends on `SpaceManager.load()`'s startup `migrate()`, which
+this case doesn't exercise.
 
 ---
 

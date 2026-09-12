@@ -25,8 +25,13 @@ export const getIcon = (iconName: string, size: number = 14, isActive: boolean =
   const filterClass = isActive ? "invert dark:invert-0" : "dark:invert";
 
   // Use Iconify CDN for Lucide icons
+  // key={iconName} forces a fresh <img> element when the icon changes, so an
+  // onError-hidden state from a previous (invalid) icon name doesn't stick
+  // around on a reused DOM node - React never manages `style` since it's
+  // never passed as a prop, so it wouldn't reset it on its own.
   return (
     <img
+      key={iconName}
       src={getIconUrl(iconName)}
       alt={iconName}
       width={size}

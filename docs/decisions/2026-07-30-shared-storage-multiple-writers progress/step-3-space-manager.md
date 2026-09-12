@@ -309,7 +309,7 @@ Manual checks the suite does not cover:
 - delete a space, then immediately open the Space Navigator popup (which reads
   through `getSpaces`, hitting `SpaceManager`'s in-memory cache) - the deleted
   space must be gone. This is Case 3 itself: before this step, the popup would
-  still list it.
+  still list it. (test case D.3)
 - import spaces with both "Replace" and "Add" (`replaceSpaces`/`appendSpaces`)
 - restart the service worker (toggle the extension) with spaces that have no
   `bookmarkFolderSegments`, to confirm `migrate()` still runs and writes

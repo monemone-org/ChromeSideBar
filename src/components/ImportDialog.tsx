@@ -20,8 +20,8 @@ interface ImportDialogProps {
   onClose: () => void;
   replacePinnedSites: (sites: PinnedSite[]) => void;
   appendPinnedSites: (sites: PinnedSite[]) => void;
-  replaceSpaces: (spaces: Space[]) => void;
-  appendSpaces: (spaces: Space[]) => void;
+  replaceSpaces: (spaces: Space[]) => Promise<void>;
+  appendSpaces: (spaces: Space[]) => Promise<void>;
   existingSpaces: readonly Space[];
 }
 
