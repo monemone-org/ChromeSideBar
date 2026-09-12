@@ -18,6 +18,7 @@ const SEPARATOR = '_msg_';
 export const ManagerId = {
   TAB_SPACE_REGISTRY: 'TabSpaceRegistry',
   SPACE_WINDOW_STATE: 'SpaceWindowStateManager',
+  SPACES: 'SpaceManager',
 } as const;
 
 export type ManagerIdType = typeof ManagerId[keyof typeof ManagerId];
@@ -57,6 +58,31 @@ export function parseManagerActionId(action: unknown): ParsedManagerAction | und
 }
 
 /**
+ * Identifies THIS extension context (one sidebar, one popup, the service
+ * worker) for the life of the page. callManager stamps it on every outgoing
+ * message, and a manager echoes it back on the broadcast that the message
+ * caused.
+ *
+ * That lets a proxy tell its own broadcast apart from another window's, which
+ * is what keeps an echo from overwriting a newer local write:
+ *
+ *   updateSpaces([Work])          mirror [Work],        message 1 sent
+ *   updateSpaces([Work, Video])   mirror [Work, Video], message 2 sent
+ *   broadcast for message 1       ours, ignored
+ *   broadcast for message 2       ours, ignored
+ *
+ * Without it, the broadcast for message 1 lands on top of message 2's write
+ * and Video disappears from the mirror. Anything reading the list in that
+ * window (createSpace reads it on every call) then writes the loss back out
+ * permanently.
+ *
+ * A broadcast with no senderId, or with somebody else's, is always applied -
+ * that's either another window's write or a background-internal change, and
+ * both are news to us.
+ */
+export const CONTEXT_ID = `ctx_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+/**
  * Calls one method on one manager and returns its ack payload.
  *
  * Every proxy method goes through here rather than building its own
@@ -74,6 +100,7 @@ export async function callManager<R>(
 {
   const response = await chrome.runtime.sendMessage({
     action: makeManagerActionId(managerId, method),
+    senderId: CONTEXT_ID,
     ...payload,
   });
 

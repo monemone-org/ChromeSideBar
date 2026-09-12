@@ -51,7 +51,7 @@ export function useSpaceListKeyboard({
   onEscape,
   enabled = true,
 }: {
-  spaces: Space[];
+  spaces: readonly Space[];
   highlightedIndex: number;
   setHighlightedIndex: (index: number) => void;
   onSelect: (spaceId: string) => void;
@@ -59,7 +59,7 @@ export function useSpaceListKeyboard({
   firstKeyIsZero?: boolean;
   onEscape?: () => void;
   enabled?: boolean;
-}): { filteredSpaces: Space[]; searchQuery: string; onSearchChange: (text: string) => void; searchInputRef: React.RefObject<HTMLInputElement> }
+}): { filteredSpaces: readonly Space[]; searchQuery: string; onSearchChange: (text: string) => void; searchInputRef: React.RefObject<HTMLInputElement> }
 {
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -218,7 +218,7 @@ export function useSpaceListHighlight({
   enabled = true,
   onActivate,
 }: {
-  spaces: Space[];
+  spaces: readonly Space[];
   activeSpaceId: string;
   setHighlightedIndex: (index: number) => void;
   itemRefs: React.MutableRefObject<(HTMLButtonElement | null)[]>;
@@ -243,7 +243,7 @@ export function useSpaceListHighlight({
 
 export interface SpaceListProps
 {
-  spaces: Space[];
+  spaces: readonly Space[];
   highlightedIndex: number;
   activeSpaceId: string;
   // When true, key hints use "0" for index 0 and "1"-"9" for 1-9.

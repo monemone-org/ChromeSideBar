@@ -2,6 +2,7 @@ import { UndoableAction } from './types';
 import { truncateTitle } from '../utils/truncateTitle';
 import { Space } from '../contexts/SpacesContext';
 import { toChromeColor } from '../utils/groupColors';
+import { spaceManagerProxy } from '../managers/proxies/spaceManagerProxy';
 
 interface TabSnapshot
 {
@@ -19,8 +20,6 @@ interface SpaceSnapshot
   tabs: TabSnapshot[];
 }
 
-const SPACES_STORAGE_KEY = 'spaces';
-
 /**
  * Undoable action for deleting a space.
  * Snapshots the space definition and its grouped tabs before deletion,
@@ -30,7 +29,7 @@ export class DeleteSpaceAction implements UndoableAction
 {
   description = '';
   private spaceId: string;
-  private getSpaces: () => Space[];
+  private getSpaces: () => readonly Space[];
   private windowId: number;
   private snapshot: SpaceSnapshot | null = null;
   private getItemKeyForTab?: (tabId: number) => string | null;
@@ -38,7 +37,7 @@ export class DeleteSpaceAction implements UndoableAction
 
   constructor(
     spaceId: string,
-    getSpaces: () => Space[],
+    getSpaces: () => readonly Space[],
     windowId: number,
     getItemKeyForTab?: (tabId: number) => string | null,
     restoreAssociation?: (tabId: number, itemKey: string) => Promise<void>
@@ -118,9 +117,11 @@ export class DeleteSpaceAction implements UndoableAction
       }
     }
 
-    // Remove space from storage
+    // Remove space from storage, routed through SpaceManager so its
+    // in-memory cache stays in sync (Case 3 - see the shared-storage
+    // decision doc)
     const remaining = currentSpaces.filter(s => s.id !== this.spaceId);
-    await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: remaining });
+    await spaceManagerProxy.updateSpaces(remaining);
 
     // Build description
     this.description = `Deleted space "${truncateTitle(space.name)}"`;
@@ -146,12 +147,14 @@ export class DeleteSpaceAction implements UndoableAction
         + `with ${this.snapshot.tabs.length} tabs`);
     }
 
-    // Restore space in storage at original index
-    const result = await chrome.storage.local.get([SPACES_STORAGE_KEY]);
-    const currentSpaces: Space[] = result[SPACES_STORAGE_KEY] || [];
+    // Restore space in storage at original index. Round-trips through
+    // getSpaces() rather than reading a store snapshot: this action can run
+    // with no mounted SpacesContext (see deleteSpaceActionTest.ts), so there
+    // is no populated mirror to read in that case.
+    const currentSpaces = await spaceManagerProxy.getSpaces();
     const insertAt = Math.min(this.snapshot.index, currentSpaces.length);
     currentSpaces.splice(insertAt, 0, this.snapshot.space);
-    await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: currentSpaces });
+    await spaceManagerProxy.updateSpaces(currentSpaces);
 
     // Recreate tabs sorted by index ascending
     if (this.snapshot.tabs.length > 0)

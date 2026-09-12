@@ -30,7 +30,11 @@ export class SpaceWindowStateManager implements RoutedManager, SpaceWindowStateA
         return this.getState(message.windowId as number);
 
       case 'setActiveSpace':
-        return this.setActiveSpace(message.windowId as number, message.spaceId as string);
+        return this.setActiveSpace(
+          message.windowId as number,
+          message.spaceId as string,
+          message.senderId as string | undefined
+        );
 
       default:
         throw new Error(`${this.managerId}: unknown method "${method}"`);
@@ -55,11 +59,14 @@ export class SpaceWindowStateManager implements RoutedManager, SpaceWindowStateA
   // State Mutations
   // ─────────────────────────────────────────────────────────────────────────
 
-  setActiveSpace(windowId: number, spaceId: string): SpaceWindowState
+  // originId identifies the context that asked for this change, so the
+  // broadcast below can be recognised as an echo by whoever sent it. Absent
+  // for background-internal callers, whose broadcasts are news to everyone.
+  setActiveSpace(windowId: number, spaceId: string, originId?: string): SpaceWindowState
   {
     const state = this.getState(windowId);
     const newState = { ...state, activeSpaceId: spaceId };
-    this.saveState(windowId, newState);
+    this.saveState(windowId, newState, originId);
     return newState;
   }
 
@@ -67,16 +74,19 @@ export class SpaceWindowStateManager implements RoutedManager, SpaceWindowStateA
   // Persistence & Notification
   // ─────────────────────────────────────────────────────────────────────────
 
-  private saveState(windowId: number, state: SpaceWindowState): void
+  private saveState(windowId: number, state: SpaceWindowState, originId?: string): void
   {
     this.#states.set(windowId, state);
     chrome.storage.session.set({ [this.getStorageKey(windowId)]: state });
 
-    // Notify sidebar of state change
+    // Notify sidebar of state change. senderId is echoed back so the context
+    // that requested the change can ignore its own echo - see CONTEXT_ID in
+    // proxies/messageRouting.ts.
     chrome.runtime.sendMessage({
       action: SPACE_WINDOW_STATE_CHANGED,
       windowId,
-      state
+      state,
+      senderId: originId
     }).catch(() =>
     {
       // Sidepanel may not be open - ignore error

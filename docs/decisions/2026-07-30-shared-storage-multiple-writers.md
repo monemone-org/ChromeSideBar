@@ -159,7 +159,9 @@ type Remote<T> = {
 // proxy   implements Remote<TabSpaceRegistryApi>
 ```
 
-### 4. Mutation acks carry the resulting state
+### 4. Mutation acks carry the resulting state (superseded, see step 3.5)
+
+**This section is what step 2 and the original step 3 plan built. It shipped, turned out to have a real bug, and was replaced. Kept here so the history of the decision reads honestly - see the correction at the bottom of this section and step 3.5 in the migration order below for what actually ships now.**
 
 A mutation completes twice: when background responds, and later when its broadcast reaches every sidebar. If the proxy resolves on the response alone, the calling context's own mirror is briefly stale:
 
@@ -183,9 +185,13 @@ proxy.deleteSpace(id)
 
 Chrome gives no ordering guarantee between the two, and the promise knows nothing about the broadcast. Waiting for the broadcast instead would mean correlating a global message back to one specific call, plus a timeout for when it never arrives.
 
-**Decision:** the response payload carries the resulting state, and the proxy applies it to the local mirror before resolving. Read-after-write is then consistent in the calling context with no waiting and no correlation, and the broadcast keeps its real job of updating *other* windows.
+**Original decision:** the response payload carries the resulting state, and the proxy applies it to the local mirror before resolving. Read-after-write is then consistent in the calling context with no waiting and no correlation, and the broadcast keeps its real job of updating *other* windows.
 
 This is not hypothetical: D.2 in the in-panel suite deletes a space and asserts it is gone on the very next step.
+
+**Why this was wrong.** The mutation already writes the mirror optimistically, before the message even goes out (see section 5's worked example) - that's what makes read-after-write true. The ack was a second write to the same mirror, arriving later, over an unrelated channel. Two mutations fired back to back without awaiting (which is the normal case - the CRUD callbacks below don't await) put two messages in flight at once. The ack for the FIRST one can arrive after the SECOND optimistic write, and applying it clobbers the newer local state with older data. Concretely: `updateSpaces([Work])` then `updateSpaces([Work, Video])` fired in succession, then the ack for the first call lands carrying `[Work]` and gets applied on top of `[Work, Video]` - Video vanishes from the mirror. Because the next mutation reads the mirror to build its new list, the loss is not just a flicker, it gets written back out and becomes permanent.
+
+**What replaced it, in one line:** the optimistic write already gives read-after-write, with no round trip needed to prove it. The ack's payload is no longer applied to the mirror at all - the proxy resolves with it (some callers still need to know the write landed), but nothing touches the store on the way through. The actual fix for cross-context echoes is a sender id, not the ack: see step 3.5 below.
 
 ### 5. The mirror is a plain store, not React state
 
@@ -239,14 +245,20 @@ export class ExternalStore<T>
 }
 ```
 
+This is the code as originally planned (see the correction in section 4 above - the actual shipped version drops the `spacesStore.set(response.spaces)` line entirely and adds a sender-id guard to the broadcast listener; see `src/managers/proxies/spaceManagerProxy.ts` for what's really there):
+
 ```typescript
-// src/proxies/spaceManagerProxy.ts
+// src/proxies/spaceManagerProxy.ts  (as originally planned - superseded)
 const PREFIX = 'SpaceManager_msg_';
 
 export const spacesStore = new ExternalStore<Space[]>([]);
 
 export async function updateSpaces(spaces: Space[]): Promise<void>
 {
+  // Optimistic write - already there in the original plan too, this part
+  // did not change.
+  spacesStore.set(spaces);
+
   const response = await chrome.runtime.sendMessage({
     action: `${PREFIX}updateSpaces`,
     spaces,
@@ -254,6 +266,11 @@ export async function updateSpaces(spaces: Space[]): Promise<void>
 
   // Apply the acked state BEFORE resolving, so the caller's next read sees
   // its own write. This is the whole point of the ack carrying state.
+  //
+  // SUPERSEDED - this line is what step 3.5 removed. The optimistic write
+  // two lines up already gives read-after-write; applying the ack on top of
+  // it is what let an in-flight ack clobber a newer optimistic write. See
+  // section 4.
   spacesStore.set(response.spaces);
 }
 
@@ -263,6 +280,9 @@ chrome.runtime.onMessage.addListener((message) =>
 {
   if (message.action === `${PREFIX}changed`)
   {
+    // SUPERSEDED - step 3.5 adds `&& message.senderId !== CONTEXT_ID` here,
+    // so a context's own echo of its own write is skipped instead of
+    // applied.
     spacesStore.set(message.spaces);
   }
 });
@@ -276,25 +296,30 @@ export function useSpaces(): Space[]
 }
 ```
 
-Worked example - three spaces (Work, Video, Music), deleting Video:
+Worked example - three spaces (Work, Video, Music), deleting Video. This traces what actually ships (optimistic write, no ack applied, sender id skipped on echo):
 
 ```
 t0  spacesStore.getSnapshot()  ->  [Work, Video, Music]     3 spaces
-t1  await deleteSpace('video-id')   sendMessage leaves
-t2  background removes it, writes storage, responds { spaces: [Work, Music] }
-t3  proxy runs spacesStore.set([Work, Music])               synchronous
-t4  await returns
-t5  spacesStore.getSnapshot()  ->  [Work, Music]            2 spaces  correct
-t6  React re-renders subscribers with 2 spaces
-t7  broadcast reaches the OTHER window, its store set to [Work, Music]
+t1  spacesStore.set([Work, Music])                          optimistic, synchronous
+t2  spacesStore.getSnapshot()  ->  [Work, Music]            2 spaces  correct, no await needed
+t3  React re-renders subscribers with 2 spaces
+t4  sendMessage(..., senderId: CONTEXT_ID) leaves
+t5  background removes it, writes storage, responds { spaces: [Work, Music] },
+    and separately broadcasts { spaces: [Work, Music], senderId: CONTEXT_ID }
+t6  await deleteSpace('video-id') returns - the ack is NOT applied to the store,
+    it was already correct since t1
+t7  the broadcast from t5 reaches this same context; senderId matches
+    CONTEXT_ID, so it's skipped instead of applied
+t8  broadcast reaches the OTHER window (a different CONTEXT_ID), applied there,
+    its store set to [Work, Music]
 ```
 
-With `useState`, t5 reads the const captured at render and still returns 3 spaces.
+With `useState`, a read right after t1 would still read the const captured at render and return 3 spaces - the plain store is what makes t2 correct.
 
 Gotchas:
 
 - `getSnapshot` must return a stable reference. Returning `[...this.#value]` or a `.map()` per call causes an infinite render loop. This is the most common way to get this API wrong.
-- The originating window also receives its own broadcast at t7. The payload is an equal-but-not-identical array, so the `Object.is` guard misses and it costs one redundant re-render. Harmless; avoidable with a revision number in the payload.
+- The originating window also receives its own broadcast (t7 above). Originally this cost one redundant re-render, since the payload is an equal-but-not-identical array and the `Object.is` guard misses. Step 3.5 actually solved this, and better than a revision number would have: `CONTEXT_ID` (a random id per extension context) is stamped as `senderId` on every outgoing message and echoed back on the broadcast it causes, so the proxy's listener recognises and skips its own echo outright - no redundant re-render, and no dependence on `Object.is` at all for this case.
 - `getServerSnapshot` (third argument) is SSR-only and not needed here.
 
 Consumers barely change: `SpacesContext` keeps its public API and swaps `useState` for `useSpaces()` internally, so everything calling `useSpacesContext()` is untouched.
@@ -303,9 +328,16 @@ Consumers barely change: `SpacesContext` keeps its public API and swaps `useStat
 
 One manager end to end before porting the rest, so the layer is proven on something small.
 
-1. **`TabSpaceRegistry`** - smallest surface. Three methods, one sidebar caller (`register`), no broadcasts, and the sidebar never reads it. Proves routing, the `Remote<T>` binding, and the proxy base. Note what it does *not* prove: with no reads and no broadcasts it never touches the store or `useSyncExternalStore`, so the pattern is only half validated after this step.
-2. **`SpaceWindowStateManager`** - already has working broadcasts and a sidebar-side mirror. The first real test of section 5: store, subscribe, and read-after-write. Treat this as the step that decides whether the design holds.
-3. **`SpaceManager`** - fixes Case 3 (a confirmed lasting divergence) as a side effect, by removing `DeleteSpaceAction`'s direct storage write.
+1. **`TabSpaceRegistry`** - done (commit `b146a3f`). Smallest surface. Three methods, one sidebar caller (`register`), no broadcasts, and the sidebar never reads it. Proves routing, the `Remote<T>` binding, and the proxy base. Note what it does *not* prove: with no reads and no broadcasts it never touches the store or `useSyncExternalStore`, so the pattern is only half validated after this step.
+2. **`SpaceWindowStateManager`** - done. Already had working broadcasts and a sidebar-side mirror. The first real test of section 5: store, subscribe, and read-after-write. Shipped with the acks-carry-state mechanism from the original section 4 - see step 3.5, which retro-fixed this step once the flaw was found.
+3. **`SpaceManager`** - done. Fixes Case 3 (a confirmed lasting divergence) as a side effect, by removing `DeleteSpaceAction`'s direct storage write. Also shipped with the original section 4 mechanism, in the same review pass that caught it.
+3.5. **Correction pass** - done. Review of step 3 found the flaw described in section 4: applying a mutation's ack to the mirror can clobber a newer optimistic write when two mutations are in flight without an `await` between them, which is the normal case for the CRUD callbacks in `SpacesContext`. This also affected step 2, which shipped with the same ack-applies-to-mirror mechanism, so step 3.5 retro-fixed both proxies together, not just the new one. The fix, replacing section 4's original mechanism:
+   - `CONTEXT_ID` (`src/managers/proxies/messageRouting.ts`) - a random id generated once per extension context (each sidebar, each popup). `callManager` stamps it on every outgoing message as `senderId`.
+   - Each manager echoes the `senderId` it received back onto the broadcast it sends (`originId` parameter on `updateSpaces` / `setActiveSpace` / `saveState`, absent for background-internal callers).
+   - Each proxy's broadcast listener skips a broadcast whose `senderId` matches its own `CONTEXT_ID` - the actual fix, since an echo of your own write can never tell you anything you don't already know.
+   - The ack is no longer applied to the mirror at all. The optimistic write already gives read-after-write with no round trip, which is what makes the sender-id guard sufficient without needing any sequence counter.
+   - A failed write re-reads true state from background to repair the mirror, rather than rolling back to a remembered value - a rollback could undo a later write that did succeed.
+   - `spaceManagerProxy` exposes its mirror as a `readonly Space[]` `snapshot` getter, read by the CRUD callbacks at call time instead of a render-captured value.
 4. **`TabHistoryManager`**, **`LastAudibleTracker`** - mechanical once the pattern is set.
 5. **`PinnedSitesManager`** (new) - fixes Case 2.
 6. **`TabAssociationManager`** (new) - fixes Case 1. Largest, most invasive, most protected by existing tests. Do it last.

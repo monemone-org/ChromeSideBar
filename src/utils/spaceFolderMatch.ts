@@ -6,7 +6,7 @@ import { Space } from './spaceMessages';
 // A bookmark folder is assumed to belong to at most one Space (see CLAUDE.md
 // "Design Assumptions") - if more than one Space's folder segments match, the
 // first one found wins.
-export function findSpaceForFolderSegments(folderSegments: string[], spaces: Space[]): Space | undefined
+export function findSpaceForFolderSegments(folderSegments: string[], spaces: readonly Space[]): Space | undefined
 {
   return spaces.find(space =>
   {

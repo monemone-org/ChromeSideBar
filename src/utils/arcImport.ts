@@ -643,7 +643,7 @@ export interface ArcImportCallbacks
   appendPinnedSites: (sites: PinnedSite[]) => void;
   replaceSpaces: (spaces: Space[]) => void;
   appendSpaces: (spaces: Space[]) => void;
-  existingSpaces: Space[];
+  existingSpaces: readonly Space[];
 }
 
 export async function importArcData(

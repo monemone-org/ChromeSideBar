@@ -35,12 +35,13 @@ import { sleep } from './stepHelpers';
 import { ALL_CASES } from './cases';
 
 // SpacesContext (and the other contexts this panel depends on) start with
-// empty/default state and only populate via an async chrome.runtime message
-// round-trip fired on mount (see SpacesContext.tsx's GET_SPACES effect) -
-// every pause->close->reopen cycle is a fresh mount, racing that load
-// against whatever the resumed run does next. Give it a moment to settle
-// before driving anything, so resetTestData()/setup() don't read
-// still-empty context state right after a remount.
+// empty/default state and only populate via an async load on mount (the
+// spaceManagerProxy/spaceWindowStateProxy mirror fills, see
+// SpacesContext.tsx's mount effect) - every pause->close->reopen cycle is a
+// fresh mount, racing that load against whatever the resumed run does next.
+// Give it a moment to settle before driving anything, so
+// resetTestData()/setup() don't read still-empty context state right after a
+// remount.
 const RESUME_SETTLE_MS = 800;
 
 interface TestRunnerPanelProps

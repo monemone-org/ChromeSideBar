@@ -22,7 +22,7 @@ export interface TestResult
 export interface TestContext
 {
   windowId: number;
-  spaces: Space[];
+  spaces: readonly Space[];
   pinnedSites: PinnedSite[];
   // string/number for tab/bookmark/space/pin ids, or any other value a step
   // needs to hand off to a later step (e.g. a DeleteSpaceAction instance

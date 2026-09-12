@@ -12,6 +12,11 @@
  * The half of a store that consumers get: enough for useSyncExternalStore,
  * and no set(). Proxies expose their mirror as this so "the proxy is the only
  * writer" is enforced by the type rather than only documented.
+ *
+ * The VALUE handed back by getSnapshot must be treated as immutable too.
+ * It is the live object, not a copy, so mutating it in place changes what
+ * every subscriber sees without firing a single listener, since only set()
+ * notifies. Build a new value and route it through the owning proxy instead.
  */
 export interface ReadableStore<T>
 {

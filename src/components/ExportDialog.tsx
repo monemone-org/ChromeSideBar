@@ -15,7 +15,7 @@ interface ExportDialogProps {
   onClose: () => void;
   pinnedSites: PinnedSite[];
   bookmarks: chrome.bookmarks.BookmarkTreeNode[];
-  spaces: Space[];
+  spaces: readonly Space[];
 }
 
 interface TabGroupBackup {
@@ -34,7 +34,7 @@ interface FullBackup {
   pinnedSites?: PinnedSite[];
   bookmarks?: chrome.bookmarks.BookmarkTreeNode[];
   tabGroups?: TabGroupBackup[];
-  spaces?: Space[];
+  spaces?: readonly Space[];
 }
 
 export function ExportDialog({
@@ -108,7 +108,10 @@ export function ExportDialog({
 
       // Add spaces if selected
       if (exportSpaces && spaces.length > 0) {
-        backup.spaces = spaces;
+        // Copy: `spaces` is the readonly mirror, and FullBackup.spaces
+        // stays mutable because importFullBackup passes it to
+        // replaceSpaces(Space[]).
+        backup.spaces = [...spaces];
       }
 
       // Download the file

@@ -1,4 +1,4 @@
-import { SpaceMessageAction, SPACES_STORAGE_KEY, Space } from './utils/spaceMessages';
+import { SpaceMessageAction, Space } from './utils/spaceMessages';
 import { FOLLOW_ACTIVE_TAB_KEY, parseFollowActiveTabMode } from './utils/followActiveTab';
 import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup, restoreTabAssociationBackup } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
@@ -6,6 +6,7 @@ import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
 import { parseManagerActionId, RoutedManager } from './managers/proxies/messageRouting';
 import { SpaceWindowStateManager } from './managers/impl/spaceWindowStateManager';
 import { TabSpaceRegistry } from './managers/impl/tabSpaceRegistry';
+import { SpaceManager } from './managers/impl/spaceManager';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -525,91 +526,6 @@ class NewsVersionChecker
     {
       // Silently skip — try again next week
     }
-  }
-}
-
-// =============================================================================
-// SpaceManager - Manages Space definitions (load, migrate, save)
-// =============================================================================
-
-// Walk bookmark tree matching path string as a prefix chain to build segment array.
-// Returns the title segments (one per folder level) or null if not found.
-// Handles folder names containing '/' by treating each node title as an atomic segment.
-function findFolderSegmentsByPath(
-  nodes: chrome.bookmarks.BookmarkTreeNode[],
-  path: string,
-  isRoot: boolean = true
-): string[] | null
-{
-  for (const node of nodes)
-  {
-    if (node.url) continue;
-
-    // Root-level folders matched case-insensitively for platform differences
-    const matches = isRoot
-      ? path.toLowerCase().startsWith(node.title.toLowerCase())
-      : path.startsWith(node.title);
-    if (!matches) continue;
-
-    const after = path.slice(node.title.length);
-    // Ensure match is a complete segment boundary, not a partial name match
-    if (after !== '' && !after.startsWith('/')) continue;
-
-    if (after === '') return [node.title];
-
-    const childSegments = findFolderSegmentsByPath(node.children || [], after.slice(1), false);
-    if (childSegments) return [node.title, ...childSegments];
-  }
-  return null;
-}
-
-class SpaceManager
-{
-  private spaces: Space[] = [];
-
-  async load(): Promise<void>
-  {
-    const result = await chrome.storage.local.get([SPACES_STORAGE_KEY]);
-    let spaces: Space[] = result[SPACES_STORAGE_KEY] || [];
-    spaces = await this.migrate(spaces);
-    this.spaces = spaces;
-  }
-
-  // Populate bookmarkFolderSegments for spaces that only have bookmarkFolderPath
-  private async migrate(spaces: Space[]): Promise<Space[]>
-  {
-    const needsMigration = spaces.some(s => s.bookmarkFolderPath && !s.bookmarkFolderSegments);
-    if (!needsMigration) return spaces;
-
-    const tree = await chrome.bookmarks.getTree();
-    const roots = tree[0]?.children || [];
-
-    const migrated = spaces.map(space =>
-    {
-      if (!space.bookmarkFolderPath || space.bookmarkFolderSegments) return space;
-      const segments = findFolderSegmentsByPath(roots, space.bookmarkFolderPath);
-      return segments ? { ...space, bookmarkFolderSegments: segments } : space;
-    });
-
-    // Only write back if anything changed
-    const hasChanges = migrated.some((s, i) => s !== spaces[i]);
-    if (hasChanges)
-    {
-      await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: migrated });
-    }
-
-    return migrated;
-  }
-
-  getSpaces(): Space[]
-  {
-    return this.spaces;
-  }
-
-  async update(spaces: Space[]): Promise<void>
-  {
-    this.spaces = spaces;
-    await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: spaces });
   }
 }
 
@@ -1276,6 +1192,7 @@ function registerManager(manager: RoutedManager): void
 
 registerManager(tabSpaceRegistry);
 registerManager(spaceStateManager);
+registerManager(spaceManager);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 {
@@ -1308,31 +1225,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
       }
     })();
     return true;  // async response
-  }
-
-  // Return all Space definitions (loaded + migrated at startup)
-  if (message.action === SpaceMessageAction.GET_SPACES)
-  {
-    (async () =>
-    {
-      await stateReady;
-      sendResponse({ spaces: spaceManager.getSpaces() });
-    })();
-    return true;
-  }
-
-  // Persist updated Space definitions from the sidebar
-  if (message.action === SpaceMessageAction.UPDATE_SPACES)
-  {
-    (async () =>
-    {
-      await stateReady;
-      if (Array.isArray(message.spaces))
-      {
-        await spaceManager.update(message.spaces);
-      }
-    })();
-    return;
   }
 
   // Re-queue a tab for grouping check (used by sidebar after storing association).

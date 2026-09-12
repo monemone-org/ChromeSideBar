@@ -2,10 +2,24 @@
 created: 2026-09-07
 step: 2
 manager: SpaceWindowStateManager
-status: planned
+status: shipped
 ---
 
 # Step 2: Port `SpaceWindowStateManager`
+
+> **Shipped, then corrected.** This step landed as planned below, including the
+> "acks carry state" mirror-write in `setActiveSpace`. A step 3 code review
+> found that mechanism has a real bug - an in-flight ack can clobber a newer
+> optimistic write - and step 3.5 fixed it here too, not just in the new
+> `SpaceManager` proxy. What actually ships now: a `senderId`/`CONTEXT_ID`
+> guard replaces the ack-applies-to-mirror step entirely (the ack is no longer
+> applied to the store at all), and a failed write re-reads state from
+> background instead of rolling back. See the main decision doc,
+> `docs/decisions/2026-07-30-shared-storage-multiple-writers.md`, section 4 and
+> the step 3.5 entry in "Migration order," for the full story. The plan below
+> is left as originally written since it's a record of what was designed at
+> the time; the "Read-after-write, worked" section further down is corrected
+> to match what's actually in `src/managers/proxies/spaceWindowStateProxy.ts`.
 
 Implementation plan for step 2 of the migration order in
 `docs/decisions/2026-07-30-shared-storage-multiple-writers.md`.
@@ -74,6 +88,11 @@ three things that are not part of the Api because the manager has no equivalent:
 (decision 4), so a read right after the `await` sees the write. It applies only
 when the call's `windowId` is the mirrored one.
 
+**As planned above, this applies the ack to the store. SUPERSEDED by step 3.5:
+the shipped `setActiveSpace` applies the state to the store BEFORE the message
+even goes out (optimistic write) and does not touch the store again with the
+ack - see the note at the top of this doc.**
+
 Each extension page loads its own module instance, so the single mirrored
 `windowId` per module is not a limitation.
 
@@ -136,6 +155,11 @@ untouched.
 same value a round-trip later. Purer would be ack-only, but that puts a message
 round-trip in front of every space switch for no correctness gain.
 
+**SUPERSEDED (step 3.5):** the ack no longer touches the store at all, not even
+with an equal value - it turned out an ack applied on top of a *different*,
+newer optimistic write is exactly the bug step 3.5 fixed. The optimistic write
+itself is unchanged and is still the thing that makes reads correct.
+
 ### 7. `src/components/SpaceNavigatorApp.tsx`
 
 Swap the two raw `chrome.runtime.sendMessage` calls for
@@ -153,24 +177,30 @@ doc's inventory.
 
 ## Read-after-write, worked
 
+**Corrected to match the shipped code (step 3.5) - t5 no longer applies the
+ack. See the note at the top of this doc.**
+
 Window 12 is on space `all`, user clicks `Work` (`space_work`):
 
 ```
 t0  store.getSnapshot().activeSpaceId          -> 'all'
 t1  store.set({ activeSpaceId: 'space_work' })    optimistic, synchronous
 t2  React re-renders subscribers with 'space_work'
-t3  sendMessage 'SpaceWindowStateManager_msg_setActiveSpace' leaves
+t3  sendMessage(..., senderId: CONTEXT_ID) 'SpaceWindowStateManager_msg_setActiveSpace' leaves
 t4  background mutates + writes session storage,
-    responds { activeSpaceId: 'space_work' }
-t5  proxy applies the ack to the store - Object.is misses (new object),
-    so one redundant re-render with an identical value
-t6  await resolves; any read here is correct
-t7  broadcast reaches OTHER windows mirroring window 12 (there are none;
-    the state is per-window), and this window ignores it as its own echo
+    responds { activeSpaceId: 'space_work' }, and separately broadcasts
+    { windowId: 12, state: { activeSpaceId: 'space_work' }, senderId: CONTEXT_ID }
+t5  await resolves with the ack payload - it is NOT applied to the store,
+    since the store already holds 'space_work' from t1. No redundant re-render.
+t6  any read here is correct, and was already correct back at t2
+t7  the broadcast from t4 reaches this same context; senderId matches
+    CONTEXT_ID so it's skipped as an echo instead of applied
+t8  broadcast reaches OTHER windows mirroring window 12 (there are none;
+    the state is per-window)
 ```
 
-With `useState`, a read at t6 inside the same function would still see the
-`windowState` const captured at render time, i.e. `'all'`.
+With `useState`, a read at t2 (let alone t6) inside the same function would
+still see the `windowState` const captured at render time, i.e. `'all'`.
 
 ## Verification
 
@@ -192,3 +222,7 @@ Manual checks the suite does not cover:
 Steps 3-6 (`SpaceManager`, `TabHistoryManager`/`LastAudibleTracker`,
 `PinnedSitesManager`, `TabAssociationManager`) and the behaviour fixes
 (`chrome.tabs.onDetached`, G1/G2/D1) stay untouched.
+
+(Written when this doc was "planned." As it actually played out: step 3
+followed, then step 3.5 - the sender-id correction - retro-fixed this step's
+proxy too. See the note at the top of this doc.)

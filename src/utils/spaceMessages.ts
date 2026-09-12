@@ -39,35 +39,14 @@ export const ALL_SPACE: Space = {
  * routed through spaceWindowStateProxy - see src/managers/proxies/messageRouting.ts
  * and src/managers/proxies/spaceWindowStateProxy.ts. Its messages are no longer listed
  * here as flat actions.
- * Space definitions are managed by SpaceManager in background.ts.
- * SpacesContext.tsx holds read-only copies that sync via messages.
+ * Space definitions are managed by SpaceManager in background.ts and routed
+ * through spaceManagerProxy the same way. SpacesContext.tsx holds a read-only
+ * mirror that syncs via that proxy, not via the flat actions below.
  *
- * Communication flow:
- *   sidebar → background: GET_SPACES, UPDATE_SPACES
+ * What remains here are the two orchestration broadcasts that no single
+ * manager owns.
  */
 export const SpaceMessageAction = {
-  // ─────────────────────────────────────────────────────────────────────────
-  // Sidebar → Background
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /**
-   * SpacesContext.tsx → background.ts
-   *
-   * Request all Space definitions on sidebar mount.
-   *
-   * Response: { spaces: Space[] }
-   */
-  GET_SPACES: 'get-spaces',
-
-  /**
-   * SpacesContext.tsx → background.ts
-   *
-   * Persist updated Space definitions (any CRUD operation).
-   *
-   * Payload: { spaces: Space[] }
-   */
-  UPDATE_SPACES: 'update-spaces',
-
   // ─────────────────────────────────────────────────────────────────────────
   // Background → Sidebar
   // ─────────────────────────────────────────────────────────────────────────

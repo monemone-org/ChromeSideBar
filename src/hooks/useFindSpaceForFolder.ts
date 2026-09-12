@@ -8,7 +8,7 @@ import { findSpaceForFolderSegments } from '../utils/spaceFolderMatch';
 // hold both don't end up with a second set of listeners/state for the same data.
 export const useFindSpaceForFolder = (
   getBookmarkSegments: (bookmarkId: string) => Promise<string[]>,
-  spaces: Space[]
+  spaces: readonly Space[]
 ) =>
 {
   return useCallback(async (folderId: string): Promise<Space | undefined> =>

@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { Space, SpaceMessageAction, ALL_SPACE } from '../utils/spaceMessages';
+import { Space, ALL_SPACE } from '../utils/spaceMessages';
 import { SpaceList, useSpaceListKeyboard, useSpaceListHighlight } from './SpaceList';
 import { spaceWindowStateProxy } from '../managers/proxies/spaceWindowStateProxy';
+import { spaceManagerProxy } from '../managers/proxies/spaceManagerProxy';
 
 export const SpaceNavigatorApp = () =>
 {
@@ -20,12 +21,12 @@ export const SpaceNavigatorApp = () =>
   // Load spaces and current active space from background on mount
   useEffect(() =>
   {
-    chrome.runtime.sendMessage({ action: SpaceMessageAction.GET_SPACES }, (response) =>
+    spaceManagerProxy.getSpaces().then((loadedSpaces) =>
     {
-      if (!chrome.runtime.lastError)
-      {
-        setSpaces(response?.spaces || []);
-      }
+      setSpaces(loadedSpaces);
+    }).catch((error) =>
+    {
+      console.error('Failed to get spaces:', error);
     });
 
     spaceWindowStateProxy.getState(windowId).then((state) =>

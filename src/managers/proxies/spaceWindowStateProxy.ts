@@ -5,7 +5,7 @@
 // see docs/decisions/2026-07-30-shared-storage-multiple-writers.md, section 5
 // ("The mirror is a plain store, not React state").
 
-import { ManagerId, callManager, Remote } from './messageRouting';
+import { ManagerId, callManager, CONTEXT_ID, Remote } from './messageRouting';
 import { SpaceWindowStateApi, SPACE_WINDOW_STATE_CHANGED } from '../shared/spaceWindowStateApi';
 import { ExternalStore, ReadableStore } from '../../stores/externalStore';
 import { SpaceWindowState, DEFAULT_WINDOW_STATE } from '../../utils/spaceMessages';
@@ -67,12 +67,13 @@ class SpaceWindowStateProxy implements Remote<SpaceWindowStateApi>
     if (this.#subscribed) return;
     this.#subscribed = true;
 
-    // The broadcast's real job is the OTHER windows' writes - this window's
-    // own are already applied optimistically and from the ack, well before
-    // the broadcast arrives.
+    // The broadcast's real job is the OTHER windows' writes. Our own come
+    // back here too, and must be skipped: an echo describes the state at the
+    // time its message was handled, which a newer local write may already
+    // have moved past.
     chrome.runtime.onMessage.addListener((message) =>
     {
-      if (message?.action === SPACE_WINDOW_STATE_CHANGED)
+      if (message?.action === SPACE_WINDOW_STATE_CHANGED && message.senderId !== CONTEXT_ID)
       {
         this.#applyState(message.windowId, message.state);
       }
@@ -81,9 +82,8 @@ class SpaceWindowStateProxy implements Remote<SpaceWindowStateApi>
 
   /**
    * The single writer of the mirror. Drops states for any window but the
-   * mirrored one, and drops states that match what the store already holds -
-   * one space switch produces three identical states (optimistic, ack, then
-   * broadcast), and without this guard each would re-render every consumer.
+   * mirrored one, and drops states that match what the store already holds,
+   * so a no-op write doesn't re-render every consumer.
    */
   #applyState(windowId: number, state: SpaceWindowState): void
   {
@@ -99,23 +99,44 @@ class SpaceWindowStateProxy implements Remote<SpaceWindowStateApi>
   }
 
   /**
-   * Switches the window's active space. The mirror is updated optimistically
-   * before the message goes out, so the UI responds without waiting for a
-   * round trip, and again from the ack BEFORE this resolves, so the caller's
-   * next read sees its own write (decision 4).
+   * Switches the window's active space.
+   *
+   * The mirror is updated before the message goes out, so the UI responds
+   * without waiting for a round trip and a read on the next line sees the
+   * write. The ack is NOT applied to the mirror: we already know the
+   * resulting state because we chose it, and applying a reply that a newer
+   * switch may have superseded would only move the mirror backwards.
+   *
+   * The promise still resolves with the manager's reply, for callers that
+   * need the switch to have actually landed - SpaceNavigatorApp waits on it
+   * before closing itself. Callers that just want the UI updated can ignore
+   * it.
    */
   async setActiveSpace(windowId: number, spaceId: string): Promise<SpaceWindowState>
   {
     this.#applyState(windowId, { ...this.#store.getSnapshot(), activeSpaceId: spaceId });
 
-    const state = await callManager<SpaceWindowState>(
-      ManagerId.SPACE_WINDOW_STATE,
-      'setActiveSpace',
-      { windowId, spaceId }
-    );
-
-    this.#applyState(windowId, state);
-    return state;
+    try
+    {
+      return await callManager<SpaceWindowState>(
+        ManagerId.SPACE_WINDOW_STATE,
+        'setActiveSpace',
+        { windowId, spaceId }
+      );
+    }
+    catch (error)
+    {
+      // The optimistic write above is now showing a switch that never
+      // happened. Ask background what the truth is rather than rolling back
+      // to a remembered value, which could undo a LATER switch that did
+      // succeed. A failed resync means the worker is gone and this page is
+      // about to be torn down anyway, so there is nothing further to do.
+      console.error('[spaceWindowStateProxy] setActiveSpace failed, resyncing:', error);
+      this.getState(windowId)
+        .then((state) => this.#applyState(windowId, state))
+        .catch(() => {});
+      throw error;
+    }
   }
 }
 

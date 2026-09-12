@@ -1,10 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useBookmarkTabsContext } from './BookmarkTabsContext';
 import { useBookmarks } from '../hooks/useBookmarks';
-import { SpaceMessageAction, SPACES_STORAGE_KEY, Space, ALL_SPACE } from '../utils/spaceMessages';
+import { Space, ALL_SPACE } from '../utils/spaceMessages';
 import { toChromeColor } from '../utils/groupColors';
 import { spaceWindowStateProxy } from '../managers/proxies/spaceWindowStateProxy';
 import { useSpaceWindowState } from '../hooks/useSpaceWindowState';
+import { spaceManagerProxy } from '../managers/proxies/spaceManagerProxy';
+import { useSpaces } from '../hooks/useSpaces';
 
 // Re-export Space and ALL_SPACE so all existing imports from SpacesContext continue to work
 export type { Space } from '../utils/spaceMessages';
@@ -58,7 +60,12 @@ export type SpaceSwitchSource = 'user' | 'navigation';
 interface SpacesContextValue
 {
   // Space definitions
-  spaces: Space[];
+  // readonly: this is the live array behind spaceManagerProxy's mirror, not
+  // a copy. Sorting or pushing it in place would change what every consumer
+  // sees without notifying any of them, since only the store's set() fires
+  // listeners - and the next CRUD call would then persist that accident.
+  // Build a new list and go through the context's own mutators instead.
+  spaces: readonly Space[];
   allSpaces: Space[];  // Includes "All" space at the beginning
   activeSpace: Space;
   isInitialized: boolean;
@@ -100,6 +107,24 @@ interface SpacesContextValue
 
 const SpacesContext = createContext<SpacesContextValue | null>(null);
 
+/**
+ * Hands a new Space list to the proxy and deliberately drops the rejection.
+ *
+ * The proxy has already logged the failure and resynced its mirror from
+ * background by the time this rejects, so there is nothing left for a caller
+ * to do. The .catch() is here purely so a failed write doesn't surface as an
+ * unhandled promise rejection, which it otherwise would at every one of the
+ * call sites below - none of them await, because none of them do anything
+ * afterwards that depends on the write having landed.
+ *
+ * DeleteSpaceAction is the exception and calls the proxy directly, since an
+ * undo right after a delete does have to know the delete arrived.
+ */
+const writeSpaces = (spaces: Space[]): void =>
+{
+  spaceManagerProxy.updateSpaces(spaces).catch(() => {});
+};
+
 // =============================================================================
 // Provider
 // =============================================================================
@@ -113,56 +138,11 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const { findFolderBySegments, getAllBookmarksInFolder } = useBookmarks();
 
   // ---------------------------------------------------------------------------
-  // Space definitions state - loaded from background.ts (SpaceManager)
+  // Space definitions - read-only mirror of spaceManagerProxy's store, kept
+  // current by background.ts's broadcasts (cross-window sync is the
+  // SPACES_CHANGED broadcast now, not a chrome.storage.onChanged listener)
   // ---------------------------------------------------------------------------
-  const [spaces, setSpaces] = useState<Space[]>([]);
-
-  // Send updated spaces to background for persistence
-  const sendSpacesUpdate = useCallback((newSpaces: Space[]) =>
-  {
-    chrome.runtime.sendMessage({ action: SpaceMessageAction.UPDATE_SPACES, spaces: newSpaces });
-  }, []);
-
-  // Load spaces on mount - request from background (which may have run migration)
-  // Also listen for storage changes to stay in sync across windows
-  useEffect(() =>
-  {
-    chrome.runtime.sendMessage({ action: SpaceMessageAction.GET_SPACES }, (response: { spaces: Space[] }) =>
-    {
-      if (chrome.runtime.lastError)
-      {
-        console.error('Failed to load spaces:', chrome.runtime.lastError.message);
-        return;
-      }
-      let loadedSpaces: Space[] = response?.spaces || [];
-
-      // Initialize with debug spaces if empty (dev mode only)
-      if (loadedSpaces.length === 0)
-      {
-        const debugSpaces = getDebugSpaces();
-        if (debugSpaces.length > 0)
-        {
-          loadedSpaces = debugSpaces;
-          sendSpacesUpdate(loadedSpaces);
-        }
-      }
-
-      setSpaces(loadedSpaces);
-    });
-
-    // Listen for storage changes so other windows stay in sync when background saves
-    const handleStorageChange = (changes: { [key: string]: chrome.storage.StorageChange }, areaName: string) =>
-    {
-      if (areaName !== 'local') return;
-      if (changes[SPACES_STORAGE_KEY])
-      {
-        setSpaces(changes[SPACES_STORAGE_KEY].newValue || []);
-      }
-    };
-
-    chrome.storage?.onChanged.addListener(handleStorageChange);
-    return () => chrome.storage?.onChanged.removeListener(handleStorageChange);
-  }, [sendSpacesUpdate]);
+  const spaces = useSpaces();
 
   // ---------------------------------------------------------------------------
   // Per-window state (read-only mirror of spaceWindowStateProxy's store,
@@ -172,7 +152,8 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const windowState = useSpaceWindowState();
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Get current window ID and mirror this window's SpaceWindowState on mount
+  // Get current window ID, then load both mirrors (spaces and this window's
+  // SpaceWindowState) before considering the context initialized
   useEffect(() =>
   {
     chrome.windows.getCurrent((window) =>
@@ -181,12 +162,25 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       {
         setWindowId(window.id);
 
-        spaceWindowStateProxy.mirrorWindow(window.id).then(() =>
+        Promise.all([
+          spaceManagerProxy.load(),
+          spaceWindowStateProxy.mirrorWindow(window.id),
+        ]).then(([loadedSpaces]) =>
         {
+          // Initialize with debug spaces if empty (dev mode only)
+          if (loadedSpaces.length === 0)
+          {
+            const debugSpaces = getDebugSpaces();
+            if (debugSpaces.length > 0)
+            {
+              writeSpaces(debugSpaces);
+            }
+          }
+
           setIsInitialized(true);
         }).catch((error) =>
         {
-          console.error('Failed to mirror window state:', error);
+          console.error('Failed to load spaces/window state:', error);
           setIsInitialized(true);
         });
       }
@@ -219,11 +213,13 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       bookmarkFolderSegments,
     };
 
-    const updatedSpaces = [...spaces, newSpace];
-    setSpaces(updatedSpaces);
-    sendSpacesUpdate(updatedSpaces);
+    // Read the store snapshot at call time, not the render-captured `spaces`
+    // const, so back-to-back calls each see the previous call's write (the
+    // whole point of this refactor - see decision 4 in the shared-storage doc)
+    const updatedSpaces = [...spaceManagerProxy.snapshot, newSpace];
+    writeSpaces(updatedSpaces);
     return newSpace;
-  }, [spaces, sendSpacesUpdate]);
+  }, []);
 
   const getSpaceById = useCallback((id: string): Space | undefined =>
   {
@@ -247,12 +243,13 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.error('[updateSpace] bookmarkFolderSegments required when bookmarkFolderPath is set');
     }
 
-    // Update Space in storage
-    const updatedSpaces = spaces.map(s =>
+    // Update Space in storage - read the store snapshot at call time, not the
+    // render-captured `spaces` const, so this doesn't clobber a write another
+    // call made after this callback was created
+    const updatedSpaces = spaceManagerProxy.snapshot.map(s =>
       s.id === id ? { ...s, ...updates } : s
     );
-    setSpaces(updatedSpaces);
-    sendSpacesUpdate(updatedSpaces);
+    writeSpaces(updatedSpaces);
 
     // Sync name/color changes to Chrome group
     if (windowId && (updates.name || updates.color))
@@ -274,45 +271,43 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (import.meta.env.DEV) console.error('[updateSpace] Failed to sync to Chrome group:', error);
       }
     }
-  }, [spaces, sendSpacesUpdate, getSpaceById, windowId]);
+  }, [getSpaceById, windowId]);
 
   // Batch-update folder path + segments for multiple spaces at once (e.g. after a folder rename)
   const updateSpaceFolderPaths = useCallback((updates: { id: string; bookmarkFolderPath: string; bookmarkFolderSegments: string[] }[]) =>
   {
     if (updates.length === 0) return;
-    const updatedSpaces = spaces.map(s =>
+    const updatedSpaces = spaceManagerProxy.snapshot.map(s =>
     {
       const update = updates.find(u => u.id === s.id);
       return update
         ? { ...s, bookmarkFolderPath: update.bookmarkFolderPath, bookmarkFolderSegments: update.bookmarkFolderSegments }
         : s;
     });
-    setSpaces(updatedSpaces);
-    sendSpacesUpdate(updatedSpaces);
-  }, [spaces, sendSpacesUpdate]);
+    writeSpaces(updatedSpaces);
+  }, []);
 
   const deleteSpaceBase = useCallback((id: string) =>
   {
     if (id === 'all') return; // Cannot delete "All" space
-    const updatedSpaces = spaces.filter(s => s.id !== id);
-    setSpaces(updatedSpaces);
-    sendSpacesUpdate(updatedSpaces);
-  }, [spaces, sendSpacesUpdate]);
+    const updatedSpaces = spaceManagerProxy.snapshot.filter(s => s.id !== id);
+    writeSpaces(updatedSpaces);
+  }, []);
 
   const moveSpace = useCallback((activeId: string, overId: string) =>
   {
-    const oldIndex = spaces.findIndex(s => s.id === activeId);
-    const newIndex = spaces.findIndex(s => s.id === overId);
+    const currentSpaces = spaceManagerProxy.snapshot;
+    const oldIndex = currentSpaces.findIndex(s => s.id === activeId);
+    const newIndex = currentSpaces.findIndex(s => s.id === overId);
 
     if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
 
-    const updatedSpaces = [...spaces];
+    const updatedSpaces = [...currentSpaces];
     const [removed] = updatedSpaces.splice(oldIndex, 1);
     updatedSpaces.splice(newIndex, 0, removed);
 
-    setSpaces(updatedSpaces);
-    sendSpacesUpdate(updatedSpaces);
-  }, [spaces, sendSpacesUpdate]);
+    writeSpaces(updatedSpaces);
+  }, []);
 
   // Replace all spaces (for import with "Replace" option)
   const replaceSpaces = useCallback((newSpaces: Space[]) =>
@@ -321,9 +316,8 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ...space,
       id: generateId(),
     }));
-    setSpaces(spacesWithNewIds);
-    sendSpacesUpdate(spacesWithNewIds);
-  }, [sendSpacesUpdate]);
+    writeSpaces(spacesWithNewIds);
+  }, []);
 
   // Append spaces to existing (for import with "Add" option)
   const appendSpaces = useCallback((newSpaces: Space[]) =>
@@ -332,10 +326,9 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ...space,
       id: generateId(),
     }));
-    const combined = [...spaces, ...spacesWithNewIds];
-    setSpaces(combined);
-    sendSpacesUpdate(combined);
-  }, [spaces, sendSpacesUpdate]);
+    const combined = [...spaceManagerProxy.snapshot, ...spacesWithNewIds];
+    writeSpaces(combined);
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Space switch source tracking

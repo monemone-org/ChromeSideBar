@@ -14,7 +14,7 @@ interface SpaceEditDialogProps
 {
   isOpen: boolean;
   space: Space | null; // null = create mode, Space = edit mode
-  existingSpaces: Space[]; // all spaces for duplicate name validation
+  existingSpaces: readonly Space[]; // all spaces for duplicate name validation
   onClose: () => void;
   onSave: (spaceData: {
     name: string;

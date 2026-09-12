@@ -79,7 +79,7 @@ export async function getOrCreateSpaceGroup(tabId: number, space: Space, windowI
 export async function moveTabToSpace(
   tabId: number,
   spaceId: string,
-  spaces: Space[],
+  spaces: readonly Space[],
   windowId: number
 ): Promise<{ success: boolean; message?: string; error?: string }>
 {
@@ -198,7 +198,7 @@ export async function createTabFromUrl(
 export async function createTabInSpace(
   url: string,
   spaceId: string,
-  spaces: Space[],
+  spaces: readonly Space[],
   windowId: number
 ): Promise<{ success: boolean; tab?: chrome.tabs.Tab; error?: string }>
 {

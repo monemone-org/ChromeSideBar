@@ -22,7 +22,7 @@ interface ArcImportDialogProps
   appendPinnedSites: (sites: PinnedSite[]) => void;
   replaceSpaces: (spaces: Space[]) => void;
   appendSpaces: (spaces: Space[]) => void;
-  existingSpaces: Space[];
+  existingSpaces: readonly Space[];
 }
 
 type DialogState = 'intro' | 'selecting' | 'preview' | 'importing' | 'success';
