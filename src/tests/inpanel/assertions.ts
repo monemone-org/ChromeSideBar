@@ -4,6 +4,7 @@
 
 import { TestStep } from './types';
 import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, sleep } from './stepHelpers';
+import { lastAudibleTrackerProxy } from '../../managers/proxies/lastAudibleTrackerProxy';
 
 async function tabGroupTitle(tabId: number): Promise<string | undefined>
 {
@@ -26,6 +27,41 @@ export function assertTabInSpace(tabRef: string, spaceRef: string): TestStep
       if (groupTitle !== space.name)
       {
         throw new Error(`expected tab's Chrome group title to be "${space.name}", got ${groupTitle ? `"${groupTitle}"` : '(ungrouped)'}`);
+      }
+    },
+  };
+}
+
+/**
+ * assertTabInSpace, but polls until `timeoutMs` passes. For tabs grouped by
+ * background's grouping queue rather than by the step before, where the
+ * runner's fixed settle delay between steps is no guarantee the queue has
+ * reached this tab yet.
+ */
+export function assertTabInSpaceWithin(tabRef: string, spaceRef: string, timeoutMs: number): TestStep
+{
+  const POLL_MS = 100;
+
+  return {
+    kind: 'assert',
+    label: `Tab "${tabRef}" is in space "${spaceRef}" within ${timeoutMs}ms`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      const space = resolveSpace(ctx, spaceRef);
+      const deadline = Date.now() + timeoutMs;
+
+      // Keep checking until the tab's group title matches or time runs out.
+      let groupTitle = await tabGroupTitle(tabId);
+      while (groupTitle !== space.name && Date.now() < deadline)
+      {
+        await sleep(POLL_MS);
+        groupTitle = await tabGroupTitle(tabId);
+      }
+
+      if (groupTitle !== space.name)
+      {
+        throw new Error(`expected tab's Chrome group title to be "${space.name}" within ${timeoutMs}ms, got ${groupTitle ? `"${groupTitle}"` : '(ungrouped)'}`);
       }
     },
   };
@@ -285,7 +321,20 @@ export function assertTabActive(tabRef: string): TestStep
     {
       const tabId = resolveTabId(ctx, tabRef);
       const tab = await chrome.tabs.get(tabId);
-      if (!tab.active) throw new Error(`expected tab ${tabId} to be active, but it isn't`);
+      if (!tab.active)
+      {
+        // Name the tab that IS active, so a failure can be diagnosed from the
+        // results file alone - by its ref when the case created it, otherwise
+        // by URL.
+        const [activeTab] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
+        const activeRef = [...ctx.refs.entries()].find(([, value]) => value === activeTab?.id)?.[0];
+        const activeDesc = activeTab === undefined
+          ? 'no tab'
+          : activeRef !== undefined
+            ? `"${activeRef}" (id ${activeTab.id})`
+            : `id ${activeTab.id} (${activeTab.url || activeTab.pendingUrl || 'no url'})`;
+        throw new Error(`expected tab "${tabRef}" (id ${tabId}) to be active, but ${activeDesc} is`);
+      }
     },
   };
 }
@@ -298,11 +347,8 @@ export function assertAudioListIncludes(tabRefs: string[]): TestStep
     label: `Audio tab list includes [${tabRefs.join(', ')}]`,
     run: async (ctx) =>
     {
-      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' }) as {
-        playingTabIds?: number[];
-        historyTabIds?: number[];
-      } | undefined;
-      const listed = [...(response?.playingTabIds ?? []), ...(response?.historyTabIds ?? [])];
+      const { playingTabIds, historyTabIds } = await lastAudibleTrackerProxy.getAudioTabLists(ctx.windowId);
+      const listed = [...playingTabIds, ...historyTabIds];
 
       const missing = tabRefs.filter(ref => !listed.includes(resolveTabId(ctx, ref)));
       if (missing.length > 0)

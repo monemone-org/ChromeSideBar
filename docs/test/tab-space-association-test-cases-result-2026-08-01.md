@@ -11,14 +11,14 @@ Source test plan: [tab-space-association-test-cases.md](tab-space-association-te
 | ---------- | ----------------------------------------------------------------------------------------------------- | ---------------- | ------------- |
 | A.1        | Regular tab moved to another space, sidebar open                                                      | Pass             |               |
 | A.2        | Bookmark tab moved to a different space's group, sidebar open                                         | Pass             |               |
-| A.3        | Bookmark tab moved to a different space's group, sidebar CLOSED (known gap G2)                        | ✗ Bugged           | [below](#a3)  |
+| A.3        | Bookmark tab moved to a different space's group, sidebar CLOSED (known gap G2)                        | ✗ Bugged         | [below](#a3)  |
 | A.4        | Pinned tab moved to a different space's group                                                         | Pass             | [below](#a4)  |
-| A.5        | Bookmark tab: native "Remove from group" / ungroup (known gap G3)                                     | ✗ Bugged           | Per G3        |
+| A.5        | Bookmark tab: native "Remove from group" / ungroup (known gap G3)                                     | ✗ Bugged         | Per G3        |
 | A.5b       | Regular tab: native "Remove from group" / ungroup                                                     | Pass             |               |
 | A.5c       | Pinned tab: native "Remove from group" / ungroup                                                      | Pass             |               |
-| A.6        | Tab moved to a different window                                                                       | ✗ Bugged           | [below](#a6)  |
+| A.6        | Tab moved to a different window                                                                       | ✗ Bugged         | [below](#a6)  |
 | A.6b       | Regular tab moved to a different window                                                               | Passed           |               |
-| A.6c       | Pinned tab moved to a different window                                                                | ✗ Bugged           | [below](#a6c) |
+| A.6c       | Pinned tab moved to a different window                                                                | ✗ Bugged         | [below](#a6c) |
 | A.7 Step 3 | Regular tab bookmarked via drag-into-tree, then moved to another space                                | Pass             | [below](#a7)  |
 | A.7 Step 4 | Regular tab bookmarked via drag-into-tree, then "Move to Space" to another space                      | Pass             | [below](#a7)  |
 | A.7 Step 5 | Regular tab bookmarked via drag-into-tree, close sidebar. then move tab to tab group B                | ✗ Bugged (=G2/A.3) | [below](#a3)  |
@@ -30,8 +30,8 @@ Source test plan: [tab-space-association-test-cases.md](tab-space-association-te
 | B.3        | Close via "Close Tab" in the sidebar's own context menu / multi-close                                 | Pass             |               |
 | B.4 Step 4 | Close the whole window with tracked tabs open                                                         | Pass             |               |
 | B.4 Step 5 | Close the whole window with tracked tabs open                                                         | Pass             |               |
-| B.5        | Delete a bookmark while its tab is open (known gap G1)                                                | ✗ Bugged           | Per G1        |
-| B.5b       | Delete a bookmark via Chrome's native bookmark manager, sidebar closed                                | ✗ Bugged           | Per G1        |
+| B.5        | Delete a bookmark while its tab is open (known gap G1)                                                | ✗ Bugged         | Per G1        |
+| B.5b       | Delete a bookmark via Chrome's native bookmark manager, sidebar closed                                | ✗ Bugged         | Per G1        |
 | C.1a       | Activate another tab in the same space (Off/Space/Space-and-scroll)                                   | Pass/Pass/Pass   |               |
 | C.1b       | Activate a tab in a different space (Off/Space/Space-and-scroll)                                      | Pass/Pass/Pass   |               |
 | C.1c       | Close active tab, activates another tab in the same space (Off/Space/Space-and-scroll)                | Pass/Pass/Pass   |               |
@@ -47,6 +47,7 @@ Source test plan: [tab-space-association-test-cases.md](tab-space-association-te
 | D.1        | Rename a space while it has tracked tabs                                                              | ✗ Bugged (step 3)  | [below](#d1)  |
 | D.2        | Delete a space with tracked tabs                                                                      | Passed           |               |
 | D.3        | Background's own space cache must drop a deleted space immediately                                    | Passed           |               |
+| D.4        | D.4 Legacy space (`bookmarkFolderPath`, no `bookmarkFolderSegments`) self-heals immediately           | Passed
 | E.1        | Reload the extension (chrome://extensions → reload)                                                   | Passed           |               |
 | E.2        | Full browser restart                                                                                  | Passed           |               |
 | F          | Regression check on pre-existing behavior                                                             | Passed           |               |

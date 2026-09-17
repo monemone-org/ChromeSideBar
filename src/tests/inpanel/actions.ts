@@ -11,6 +11,8 @@ import { TestStep } from './types';
 import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, sleep } from './stepHelpers';
 import { assertSidebarShowsSpace } from './assertions';
 import { testUrl } from './fixtures';
+import { tabHistoryManagerProxy } from '../../managers/proxies/tabHistoryManagerProxy';
+import { lastAudibleTrackerProxy } from '../../managers/proxies/lastAudibleTrackerProxy';
 
 /** Set the "Follow active tab" mode via the same chrome.storage.local key Settings writes - background.ts (space-switch) and useFollowActiveTab (scroll) both read this key directly, so this is the real setting, not a UI simulation. */
 export function setFollowActiveTabMode(mode: FollowActiveTabMode): TestStep
@@ -70,16 +72,16 @@ export function navigateTabHistory(direction: 'prev' | 'next'): TestStep
   return {
     kind: 'action',
     label: `Click tab history "${direction === 'prev' ? 'Previous' : 'Next'}" (toolbar)`,
-    run: async () =>
+    run: async (ctx) =>
     {
-      await chrome.runtime.sendMessage({ action: direction === 'prev' ? 'prev-used-tab' : 'next-used-tab' });
+      await tabHistoryManagerProxy.navigate(ctx.windowId, direction === 'prev' ? -1 : 1);
     },
   };
 }
 
 /**
  * The audio quick-jump button (App.tsx's handleJumpToAudioTab). Goes through
- * get-last-audible-tab and jumps to whatever IT names, rather than passing a
+ * lastAudibleTrackerProxy.getAudioTabLists and jumps to whatever IT names, rather than passing a
  * tab id the case already knows - picking the target is the whole job of this
  * button, so short-cutting it would leave the audible tracking untested and
  * make the case a duplicate of C.2a.
@@ -89,14 +91,11 @@ export function audioQuickJump(): TestStep
   return {
     kind: 'action',
     label: 'Click the audio quick-jump button (toolbar)',
-    run: async () =>
+    run: async (ctx) =>
     {
-      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' }) as {
-        playingTabIds?: number[];
-        historyTabIds?: number[];
-      } | undefined;
+      const { playingTabIds, historyTabIds } = await lastAudibleTrackerProxy.getAudioTabLists(ctx.windowId);
 
-      const targetTabId = response?.playingTabIds?.[0] ?? response?.historyTabIds?.[0];
+      const targetTabId = playingTabIds[0] ?? historyTabIds[0];
       if (targetTabId === undefined) throw new Error('background reports no audible tab - did the manual "press play" step actually start playback?');
 
       await chrome.runtime.sendMessage({ action: 'set-active-tab-and-space', tabId: targetTabId, skipHistory: false });
@@ -119,12 +118,9 @@ export function selectAudioTabFromDropdown(tabRef: string): TestStep
     run: async (ctx) =>
     {
       const tabId = resolveTabId(ctx, tabRef);
-      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' }) as {
-        playingTabIds?: number[];
-        historyTabIds?: number[];
-      } | undefined;
+      const { playingTabIds, historyTabIds } = await lastAudibleTrackerProxy.getAudioTabLists(ctx.windowId);
 
-      const listed = [...(response?.playingTabIds ?? []), ...(response?.historyTabIds ?? [])];
+      const listed = [...playingTabIds, ...historyTabIds];
       if (!listed.includes(tabId)) throw new Error(`tab "${tabRef}" (id ${tabId}) isn't in the audio dropdown's list - it wouldn't be selectable`);
 
       await chrome.runtime.sendMessage({ action: 'set-active-tab-and-space', tabId, skipHistory: false });
@@ -135,7 +131,8 @@ export function selectAudioTabFromDropdown(tabRef: string): TestStep
 /**
  * Pick one specific entry out of the tab-history dropdown (press-and-hold
  * Previous/Next). Resolves the target's position through the real
- * get-tab-history response rather than assuming an index, the same way
+ * tabHistoryManagerProxy.getHistoryDetails response rather than assuming an
+ * index, the same way
  * Toolbar.tsx renders the dropdown from that response and then navigates by
  * the chosen entry's index - so this fails loudly if the tab isn't actually
  * in the window's history, instead of silently navigating somewhere else.
@@ -148,16 +145,13 @@ export function selectTabFromHistoryDropdown(tabRef: string): TestStep
     run: async (ctx) =>
     {
       const tabId = resolveTabId(ctx, tabRef);
-      const history = await chrome.runtime.sendMessage({ action: 'get-tab-history' }) as {
-        before?: Array<{ tabId: number; index: number }>;
-        after?: Array<{ tabId: number; index: number }>;
-      } | undefined;
+      const history = await tabHistoryManagerProxy.getHistoryDetails(ctx.windowId);
 
-      const entries = [...(history?.before ?? []), ...(history?.after ?? [])];
+      const entries = [...history.before, ...history.after];
       const entry = entries.find(e => e.tabId === tabId);
       if (!entry) throw new Error(`tab "${tabRef}" (id ${tabId}) is not in the window's tab history`);
 
-      await chrome.runtime.sendMessage({ action: 'navigate-to-history-index', index: entry.index });
+      await tabHistoryManagerProxy.navigateToIndex(ctx.windowId, entry.index);
     },
   };
 }
@@ -421,6 +415,39 @@ export function moveTabNative(opts: { tabRef: string; targetSpaceRef: string }):
   };
 }
 
+/**
+ * Create a tab the way Cmd+T does: active, and with no grouping of its own.
+ * Unlike openRegularTab, which puts the tab into a space's group itself, this
+ * leaves grouping entirely to background's chrome.tabs.onCreated listener -
+ * the path under test when a brand-new tab should join the active space.
+ */
+export function openNewTabNative(opts: { url: string; tabRef: string }): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Open a new tab ${opts.url} (native, like Cmd+T)`,
+    run: async (ctx) =>
+    {
+      const tab = await chrome.tabs.create({ url: opts.url, active: true, windowId: ctx.windowId });
+      if (tab.id === undefined) throw new Error('chrome.tabs.create did not return an id');
+      ctx.refs.set(opts.tabRef, tab.id);
+    },
+  };
+}
+
+/** A bookmark row's "Move To Tabs" menu item (BookmarkTree.tsx): breaks the bookmark's association with its tab, leaving the tab open. */
+export function moveBookmarkTabToTabs(bookmarkRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `"Move To Tabs" on bookmark "${bookmarkRef}"`,
+    run: async (ctx) =>
+    {
+      ctx.deassociateBookmarkTab(resolveStringRef(ctx, bookmarkRef));
+    },
+  };
+}
+
 /** Move a tab to a space via the sidebar's own tab-row "Move to Space" action (src/utils/tabOperations.ts). */
 export function moveTabSidebar(opts: { tabRef: string; targetSpaceRef: string }): TestStep
 {
@@ -452,10 +479,9 @@ export function switchSpace(spaceRef: string): TestStep
 
 /**
  * switchSpace() plus a verification that the switch actually took - use
- * `...switchSpaceVerified(ref)` (spread) in a case's steps array. Every
- * case previously called switchSpace() alone without ever checking its
- * effect, so a silently broken switchToSpace() would leave all 17+ call
- * sites across Section A/B/D green regardless.
+ * `...switchSpaceVerified(ref)` (spread) in a case's steps array. Prefer this
+ * over a bare switchSpace(): unchecked, a silently broken switchToSpace()
+ * leaves all 17+ call sites across Section A/B/D green regardless.
  */
 export function switchSpaceVerified(spaceRef: string): TestStep[]
 {
@@ -489,11 +515,22 @@ export function closeTab(tabRef: string): TestStep
   };
 }
 
-/** Pause for a manual step, rendering `steps` as a numbered list (TestRunnerPanel's paused banner is whitespace-pre-wrap) rather than one run-on paragraph. */
-export function pause(label: string, steps: string[]): TestStep
+/**
+ * Pause for a manual step, rendering `steps` as a numbered list rather than one run-on
+ * paragraph. TestRunnerPanel's paused banner renders each "N. " line on its own row, dims
+ * anything after a " - " as an explanation/aside, and turns chrome://... mentions into
+ * clickable links - see renderPausedLine there.
+ *
+ * Pass `confirm` when the step asks the tester to JUDGE something the runner
+ * cannot observe - whether a favicon rendered, whether a dropdown appeared.
+ * The banner then offers Pass/Fail plus a note box instead of a single Resume
+ * button, and the answer is recorded as a result under that question. Leave it
+ * off for a pause that only asks for an action to be carried out.
+ */
+export function pause(label: string, steps: string[], confirm?: string): TestStep
 {
   const instruction = steps.map((step, i) => `${i + 1}. ${step}`).join('\n');
-  return { kind: 'pause', label, instruction };
+  return { kind: 'pause', label, instruction, confirm };
 }
 
 /** Remove a tab from its Chrome group entirely, without joining another one - mirrors native right-click "Remove from group". */

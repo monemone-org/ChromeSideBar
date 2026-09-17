@@ -2,6 +2,9 @@ import { Settings, Volume2, ChevronDown, X, Save, Clock, Bookmark, Trash2, Rotat
 import React, { forwardRef, useState, useRef, useEffect, useCallback } from 'react';
 import * as DropdownMenu from './menu/DropdownMenu';
 import { useShowActiveTab } from '../hooks/useFollowActiveTab';
+import { useSpacesContext } from '../contexts/SpacesContext';
+import { tabHistoryManagerProxy } from '../managers/proxies/tabHistoryManagerProxy';
+import { TabHistoryItem } from '../managers/shared/tabHistoryManagerApi';
 
 interface ToolbarProps
 {
@@ -81,22 +84,20 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   // "Show active tab" button: switch to the active tab's space and scroll to it
   const showActiveTab = useShowActiveTab();
 
+  // This sidebar's own window. Every tab-history call names it explicitly, so
+  // background never has to guess which window the request came from.
+  const { windowId } = useSpacesContext();
+
   // Tab history navigation shortcuts
   const [prevTabShortcut, setPrevTabShortcut] = useState<string>('');
   const [nextTabShortcut, setNextTabShortcut] = useState<string>('');
 
-  // Tab history dropdown state
-  interface HistoryItem
-  {
-    tabId: number;
-    index: number;
-    title: string;
-    url: string;
-    favIconUrl: string;
-  }
+  // Tab history dropdown state. The row type is the manager's own
+  // TabHistoryItem, so the dropdown and getHistoryDetails share one
+  // declaration instead of two copies that can drift.
   const [historyDropdown, setHistoryDropdown] = useState<'prev' | 'next' | null>(null);
-  const [historyBefore, setHistoryBefore] = useState<HistoryItem[]>([]);
-  const [historyAfter, setHistoryAfter] = useState<HistoryItem[]>([]);
+  const [historyBefore, setHistoryBefore] = useState<TabHistoryItem[]>([]);
+  const [historyAfter, setHistoryAfter] = useState<TabHistoryItem[]>([]);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevButtonRef = useRef<HTMLButtonElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
@@ -160,26 +161,24 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   // Tab history navigation handlers
   const handlePrevUsedTab = useCallback(() =>
   {
-    chrome.runtime.sendMessage({ action: 'prev-used-tab' });
-  }, []);
+    if (windowId === null) return;
+    tabHistoryManagerProxy.navigate(windowId, -1);
+  }, [windowId]);
 
   const handleNextUsedTab = useCallback(() =>
   {
-    chrome.runtime.sendMessage({ action: 'next-used-tab' });
-  }, []);
+    if (windowId === null) return;
+    tabHistoryManagerProxy.navigate(windowId, 1);
+  }, [windowId]);
 
   // Fetch tab history for dropdown
-  const fetchTabHistory = useCallback(() =>
+  const fetchTabHistory = useCallback(async () =>
   {
-    chrome.runtime.sendMessage({ action: 'get-tab-history' }, (response) =>
-    {
-      if (response)
-      {
-        setHistoryBefore(response.before || []);
-        setHistoryAfter(response.after || []);
-      }
-    });
-  }, []);
+    if (windowId === null) return;
+    const details = await tabHistoryManagerProxy.getHistoryDetails(windowId);
+    setHistoryBefore(details.before || []);
+    setHistoryAfter(details.after || []);
+  }, [windowId]);
 
   // Handle click-and-hold for history dropdown
   const handleHistoryMouseDown = useCallback((direction: 'prev' | 'next') =>
@@ -239,9 +238,12 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
   // Navigate to specific history item
   const handleHistoryItemClick = useCallback((index: number) =>
   {
-    chrome.runtime.sendMessage({ action: 'navigate-to-history-index', index });
+    if (windowId !== null)
+    {
+      tabHistoryManagerProxy.navigateToIndex(windowId, index);
+    }
     setHistoryDropdown(null);
-  }, []);
+  }, [windowId]);
 
   // DropdownMenu handles click-outside and escape key automatically
 

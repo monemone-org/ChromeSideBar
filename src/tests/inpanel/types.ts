@@ -12,6 +12,10 @@ export interface TestResult
   name: string;
   passed: boolean;
   error?: string;
+  // Free text the tester typed at a 'confirm' pause. Kept on a pass as well
+  // as a failure - "the favicons rendered but looked stretched" is worth
+  // recording even though the check passed.
+  note?: string;
 }
 
 // Bundles the live hooks/context values a step needs. Rebuilt every render by
@@ -63,6 +67,9 @@ export interface TestContext
   getItemKeyForTab: (tabId: number) => string | null;
   restoreItemAssociation: (tabId: number, itemKey: string) => Promise<void>;
   associateExistingTab: (tabId: number, bookmarkId: string, spaceId?: string) => Promise<void>;
+  // What a bookmark row's "Move To Tabs" menu item calls: breaks the
+  // association, leaving the tab open where it is.
+  deassociateBookmarkTab: (bookmarkId: string) => void;
 
   // Pinned sites (usePinnedSites)
   addPin: (url: string, title: string) => Promise<void>;
@@ -74,7 +81,12 @@ export type StepRunner = (ctx: TestContext) => Promise<void>;
 export type TestStep =
   | { kind: 'action'; label: string; run: StepRunner }
   | { kind: 'assert'; label: string; run: StepRunner }
-  | { kind: 'pause'; label: string; instruction: string };
+  // `confirm` turns a pause into a question the tester answers Pass or Fail,
+  // for checks the runner structurally cannot make (does a row render a
+  // favicon? did a dropdown appear?). The answer becomes a TestResult like
+  // any assert. Omit it for pauses that only ask for an action to be
+  // performed, e.g. reloading the extension.
+  | { kind: 'pause'; label: string; instruction: string; confirm?: string };
 
 export interface TestCase
 {

@@ -176,6 +176,21 @@ export async function createTestSubfolder(
   return folder;
 }
 
+/** Create a subfolder inside another folder ref (e.g. one from createTestSubfolder), for bookmarks nested several folders deep. */
+export async function createTestSubfolderInFolder(
+  ctx: TestContext,
+  parentFolderRef: string,
+  title: string,
+  folderRef: string
+): Promise<chrome.bookmarks.BookmarkTreeNode>
+{
+  const parentFolderId = ctx.refs.get(parentFolderRef);
+  if (typeof parentFolderId !== 'string') throw new Error(`createTestSubfolderInFolder: no folder ref "${parentFolderRef}" - call createTestSubfolder first`);
+  const folder = await ctx.createFolder(parentFolderId, title);
+  ctx.refs.set(folderRef, folder.id);
+  return folder;
+}
+
 /**
  * Create a pinned site and wait for it to land in storage, recording its id
  * in ctx.refs. Takes getCtx for signature consistency with createTestSpace,

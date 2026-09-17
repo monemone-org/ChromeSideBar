@@ -38,6 +38,7 @@ import { Settings, Info, Upload, Download, RefreshCw, LayoutGrid, Undo2, Sparkle
 import { SectionHeader } from './components/SectionHeader';
 import { SpaceContextMenuContent } from './components/SpaceContextMenuContent';
 import { useNewsCheck } from './hooks/useNewsCheck';
+import { lastAudibleTrackerProxy } from './managers/proxies/lastAudibleTrackerProxy';
 import { useFollowActiveTab } from './hooks/useFollowActiveTab';
 import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY, DEFAULT_FOLLOW_ACTIVE_TAB_MODE, parseFollowActiveTabMode } from './utils/followActiveTab';
 import * as DropdownMenu from './components/menu/DropdownMenu';
@@ -848,9 +849,12 @@ function App() {
   {
     try
     {
-      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' });
-      const playingTabIds: number[] = response?.playingTabIds || [];
-      const historyTabIds: number[] = response?.historyTabIds || [];
+      // App() sits outside SpacesProvider, so there is no context windowId to
+      // read - resolve this window inline instead.
+      const { id: windowId } = await chrome.windows.getCurrent();
+      if (windowId === undefined) return;
+
+      const { playingTabIds, historyTabIds } = await lastAudibleTrackerProxy.getAudioTabLists(windowId);
       const targetTabId = playingTabIds[0] ?? historyTabIds[0];
 
       if (targetTabId !== undefined)
@@ -872,11 +876,15 @@ function App() {
   const handleOpenAudioDialog = useCallback(async () => {
     try
     {
-      const response = await chrome.runtime.sendMessage({ action: 'get-last-audible-tab' });
+      // Same as handleJumpToAudioTab: no context windowId out here, so this
+      // window is resolved inline.
+      const { id: windowId } = await chrome.windows.getCurrent();
+      if (windowId === undefined) return;
+
+      const { playingTabIds, historyTabIds } = await lastAudibleTrackerProxy.getAudioTabLists(windowId);
 
       // Convert ID arrays to Sets for O(1) lookup
-      const playingIdSet = new Set(response?.playingTabIds || []);
-      const historyTabIds = response?.historyTabIds || [];
+      const playingIdSet = new Set(playingTabIds);
       const historyIdSet = new Set(historyTabIds);
       const playing: chrome.tabs.Tab[] = [];
       const history: chrome.tabs.Tab[] = [];

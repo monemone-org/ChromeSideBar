@@ -19,6 +19,8 @@ export const ManagerId = {
   TAB_SPACE_REGISTRY: 'TabSpaceRegistry',
   SPACE_WINDOW_STATE: 'SpaceWindowStateManager',
   SPACES: 'SpaceManager',
+  TAB_HISTORY: 'TabHistoryManager',
+  LAST_AUDIBLE: 'LastAudibleTracker',
 } as const;
 
 export type ManagerIdType = typeof ManagerId[keyof typeof ManagerId];

@@ -11,7 +11,7 @@
 // you can keep using tabs/bookmarks/spaces while a run is in progress
 // instead of it blocking the whole UI.
 
-import { useEffect, useRef, useState } from 'react';
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { MoreVertical, X } from 'lucide-react';
 import { useSpacesContext } from '../../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../../contexts/BookmarkTabsContext';
@@ -66,6 +66,16 @@ interface CaseSummary
   failed: number;
 }
 
+// Outcome of a "Run Tests" batch that finished cleanly (every queued case ran
+// to completion - not stopped by a pause or an error). Cases, not steps: the
+// per-row list already shows step-level pass/fail for each case, so the
+// batch-level signal only needs to say how many cases came out clean.
+interface BatchSummary
+{
+  casesRun: number;
+  casesFailed: number;
+}
+
 function summarize(results: TestResult[]): CaseSummary
 {
   return { total: results.length, failed: results.filter(r => !r.passed).length };
@@ -91,10 +101,83 @@ function sectionOf(testCase: TestCase): string
   return testCase.id[0];
 }
 
+// Matches a chrome:// URL mentioned in a paused step's instructions (e.g.
+// "chrome://extensions"). Only word/slash/hyphen characters, so trailing
+// sentence punctuation - the period after "chrome://extensions.", the comma
+// after "chrome://bookmarks," - is left out of the match.
+const CHROME_URL_PATTERN = /chrome:\/\/[a-zA-Z0-9/_-]+/g;
+
+// Opens a chrome:// page in a new tab. A plain <a href="chrome://..."> can't
+// navigate there - Chrome blocks that from page content - but the
+// extension's own chrome.tabs API can.
+function openChromeUrl(url: string): void
+{
+  void chrome.tabs.create({ url });
+}
+
+/** Splits `text` on any chrome://... substrings, rendering each as a clickable link (see openChromeUrl) and leaving the rest as plain text. */
+function linkifyChromeUrls(text: string, keyPrefix: string): ReactNode[]
+{
+  const parts: ReactNode[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let matchCount = 0;
+  CHROME_URL_PATTERN.lastIndex = 0;
+  while ((match = CHROME_URL_PATTERN.exec(text)) !== null)
+  {
+    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+    const url = match[0];
+    parts.push(
+      <button
+        key={`${keyPrefix}-url-${matchCount++}`}
+        type="button"
+        className="text-blue-600 dark:text-blue-400 underline hover:no-underline"
+        onClick={() => openChromeUrl(url)}
+      >
+        {url}
+      </button>
+    );
+    lastIndex = CHROME_URL_PATTERN.lastIndex;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
+
+/**
+ * Renders one numbered line of a paused step's instructions (see pause() in
+ * actions.ts). Steps in cases/* consistently write "<action> - <why/what to
+ * expect>" when there's an aside to add, so splitting on the first " - " and
+ * dimming everything after it separates the actual action from the
+ * explanation instead of running them together as one same-weight sentence.
+ * Lines with no " - " (most of them) render unchanged.
+ */
+function renderPausedLine(line: string, key: number): JSX.Element
+{
+  const numberMatch = /^(\d+\. )(.*)$/.exec(line);
+  const prefix = numberMatch ? numberMatch[1] : '';
+  const rest = numberMatch ? numberMatch[2] : line;
+
+  const splitIndex = rest.indexOf(' - ');
+  const action = splitIndex === -1 ? rest : rest.slice(0, splitIndex);
+  const explanation = splitIndex === -1 ? null : rest.slice(splitIndex); // keeps the leading " - "
+
+  return (
+    <div key={key}>
+      {prefix}
+      {linkifyChromeUrls(action, `line-${key}-action`)}
+      {explanation !== null && (
+        <span className="text-gray-500 dark:text-gray-400">
+          {linkifyChromeUrls(explanation, `line-${key}-explanation`)}
+        </span>
+      )}
+    </div>
+  );
+}
+
 // Fixed section letters shown as checkboxes, not derived from ALL_CASES -
 // keeps the checkbox order stable (A before B before C...) regardless of
 // case registration order.
-const ALL_SECTIONS = ['A', 'B', 'C', 'D', 'E'];
+const ALL_SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
 export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, removePin }: TestRunnerPanelProps) =>
 {
@@ -139,11 +222,15 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
     getItemKeyForTab: bookmarkTabsCtx.getItemKeyForTab,
     restoreItemAssociation: bookmarkTabsCtx.restoreItemAssociation,
     associateExistingTab: bookmarkTabsCtx.associateExistingTab,
+    deassociateBookmarkTab: bookmarkTabsCtx.deassociateBookmarkTab,
     addPin,
     removePin,
   };
 
   const [pausedState, setPausedState] = useState<ResumeState | null>(null);
+  // What the tester typed at a 'confirm' pause. Cleared on resume so the next
+  // question starts blank rather than inheriting the previous answer's text.
+  const [confirmNote, setConfirmNote] = useState('');
   const [runningCaseId, setRunningCaseId] = useState<string | null>(null);
   // Per-case, not a single flat log - each case keeps its own last (or
   // in-progress) step results, so running case B doesn't erase case A's
@@ -157,6 +244,12 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
   // runQueue()/runner.ts's writeBatchQueue for why this needs to be
   // persisted rather than just a local variable in runAll()'s loop.
   const [batchQueue, setBatchQueue] = useState<string[] | null>(null);
+  // Set once a "Run Tests" batch finishes cleanly (see runQueue) - the only
+  // proactive signal that the whole batch is done, since the button reverting
+  // from "Running tests…" back to "Run Tests" is easy to miss. Not persisted:
+  // it's a one-off notice for the run you just watched, not state to restore
+  // across a remount (unlike ResumeState/CaseResultsMap/BATCH_QUEUE).
+  const [batchSummary, setBatchSummary] = useState<BatchSummary | null>(null);
   // Whether the title bar's [...] overflow menu (currently just "Download
   // Results") is open - local UI state, not persisted.
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -238,6 +331,7 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
     setPanelError(null);
     setRunningCaseId(testCase.id);
     setPausedState(null);
+    setBatchSummary(null);
     setCaseResults(prev => ({ ...prev, [testCase.id]: resume?.results ?? [] }));
     setExpandedCaseIds(prev => new Set(prev).add(testCase.id));
 
@@ -297,6 +391,7 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
   async function runQueue(caseIds: string[])
   {
     setRunningAll(true);
+    setBatchSummary(null);
     try
     {
       for (let i = 0; i < caseIds.length; i++)
@@ -313,6 +408,18 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
       }
       await clearBatchQueue();
       setBatchQueue(null);
+
+      // The queue ran to completion (no pause, no error) - this is the only
+      // point that counts as "the batch is done", so it's where the
+      // completion banner's summary gets computed. Read back the
+      // just-persisted per-case results rather than the caseResults state
+      // (which each runCase call updates independently) so this doesn't race
+      // a state update that hasn't landed yet. ALL_CASES.some(...) guards
+      // against the same "id not found" case the loop above already skips.
+      const allResults = await readAllCaseResults();
+      const ranCaseIds = caseIds.filter(id => ALL_CASES.some(c => c.id === id));
+      const casesFailed = ranCaseIds.filter(id => (allResults[id] ?? []).some(r => !r.passed)).length;
+      setBatchSummary({ casesRun: ranCaseIds.length, casesFailed });
     }
     finally
     {
@@ -330,9 +437,37 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
   // this, resuming only ever advanced the one case the run happened to
   // pause on, leaving every later case in the batch un-run until you
   // manually clicked Run All again.
-  async function handleResume()
+  /**
+   * Resumes the paused case. `verdict` and `note` are only passed from a
+   * 'confirm' pause, where the tester answers a question the runner cannot
+   * check itself; a plain pause resumes with neither.
+   *
+   * The verdict is turned into a TestResult here rather than in runFrom
+   * because the run restarts at the step AFTER the pause and so never
+   * revisits it - see runCase's fromIndex.
+   */
+  async function handleResume(verdict?: boolean, note?: string)
   {
     if (!pausedCase || !pausedState) return;
+
+    let state = pausedState;
+    if (verdict !== undefined)
+    {
+      // Derived here rather than read off pausedConfirm below, which is
+      // declared further down the component and would be a forward reference.
+      const step = pausedCase.steps[pausedState.stepIndex];
+      const result: TestResult = {
+        name: step.kind === 'pause' && step.confirm ? step.confirm : step.label,
+        passed: verdict,
+      };
+      if (note) result.note = note;
+      // Without a note there'd be nothing under a red line explaining it, so
+      // say plainly that a person called it rather than an assertion.
+      if (!verdict && !note) result.error = 'Reported as failed by the tester, with no note.';
+
+      state = { ...pausedState, results: [...pausedState.results, result] };
+    }
+    setConfirmNote('');
 
     // setRunningAll (not runningCaseId - runCase hasn't started yet) so the
     // buttons are already disabled during the settle wait below, not just
@@ -344,11 +479,11 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
 
       if (batchQueue === null)
       {
-        await runCase(pausedCase, pausedState);
+        await runCase(pausedCase, state);
         return;
       }
 
-      const completed = await runCase(pausedCase, pausedState);
+      const completed = await runCase(pausedCase, state);
       if (completed) await runQueue(batchQueue);
     }
     finally
@@ -426,6 +561,9 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
   const pausedCase = pausedState ? ALL_CASES.find(c => c.id === pausedState.caseId) : undefined;
   const pausedStep = pausedCase && pausedState ? pausedCase.steps[pausedState.stepIndex] : undefined;
   const pausedInstruction = pausedStep?.kind === 'pause' ? pausedStep.instruction : '';
+  // Set only on a pause that asks the tester to judge something. Its presence
+  // is what swaps the banner's single Resume button for Pass/Fail.
+  const pausedConfirm = pausedStep?.kind === 'pause' ? pausedStep.confirm : undefined;
   const hasAnyResults = Object.keys(caseResults).length > 0;
   const hasAnyFailedResults = Object.values(caseResults).some(results => results.some(r => !r.passed));
 
@@ -477,6 +615,34 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
           </button>
         </div>
       </div>
+
+      {/*
+        Docked as its own row right under the title bar, outside the scrolling
+        content area below - unlike panelError/the case list, this needs to
+        stay visible no matter how far you've scrolled the case list, since
+        it's the signal that a run just finished.
+      */}
+      {batchSummary && (
+        <div
+          className={`flex items-center justify-between gap-2 px-2 py-1.5 text-sm flex-shrink-0 border-b border-gray-200 dark:border-gray-700 ${
+            batchSummary.casesFailed === 0
+              ? 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200'
+              : 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200'
+          }`}
+        >
+          <span>
+            Run complete: {batchSummary.casesRun - batchSummary.casesFailed}/{batchSummary.casesRun} cases passed
+          </span>
+          <button
+            onClick={() => setBatchSummary(null)}
+            aria-label="Dismiss run summary"
+            className="p-0.5 hover:bg-black/10 dark:hover:bg-white/10 rounded flex-shrink-0"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       <div className="overflow-y-auto flex-1 p-3 space-y-3 text-sm text-gray-900 dark:text-gray-100">
         {panelError && (
           <div className="p-2 rounded bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200">
@@ -569,6 +735,7 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
                       <li key={i} className={result.passed ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>
                         {result.passed ? '✓' : '✗'} {result.name}
                         {result.error && <span className="block pl-4 text-gray-500">{result.error}</span>}
+                        {result.note && <span className="block pl-4 text-gray-500 italic">{result.note}</span>}
                       </li>
                     ))}
                     {/* Only shown once the case has actually stopped running (not mid-run, not paused on a manual step) - marks the log as complete rather than possibly still in progress. */}
@@ -601,17 +768,53 @@ export const TestRunnerPanel = ({ isOpen, onOpenChange, pinnedSites, addPin, rem
               Part of a Run All batch - {batchQueue.length} more case{batchQueue.length === 1 ? '' : 's'} queued after this one.
             </div>
           )}
-          <div className="mb-2 whitespace-pre-wrap text-gray-700 dark:text-gray-300">
-            {pausedInstruction}
+          <div className="mb-2 text-gray-700 dark:text-gray-300">
+            {pausedInstruction.split('\n').map((line, i) => renderPausedLine(line, i))}
           </div>
+          {/*
+            A confirm pause is the only place a person's own judgement enters
+            the results, so it gets the question spelled out again next to the
+            answer rather than left buried in the numbered instructions above.
+          */}
+          {pausedConfirm && (
+            <div className="mb-2">
+              <div className="font-medium mb-1">{pausedConfirm}</div>
+              <textarea
+                value={confirmNote}
+                onChange={(e) => setConfirmNote(e.target.value)}
+                placeholder="Optional note - what you actually saw. Worth filling in on a Fail."
+                rows={2}
+                className="w-full px-2 py-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              />
+            </div>
+          )}
           <div className="flex gap-2">
-            <button
-              className="px-2 py-1 rounded bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
-              onClick={handleResume}
-              disabled={runningCaseId !== null || runningAll}
-            >
-              I've done it - Resume{batchQueue !== null ? ' & Continue Batch' : ''}
-            </button>
+            {pausedConfirm ? (
+              <>
+                <button
+                  className="px-2 py-1 rounded bg-green-700 text-white hover:bg-green-800 disabled:opacity-50"
+                  onClick={() => handleResume(true, confirmNote.trim())}
+                  disabled={runningCaseId !== null || runningAll}
+                >
+                  Pass
+                </button>
+                <button
+                  className="px-2 py-1 rounded bg-red-700 text-white hover:bg-red-800 disabled:opacity-50"
+                  onClick={() => handleResume(false, confirmNote.trim())}
+                  disabled={runningCaseId !== null || runningAll}
+                >
+                  Fail
+                </button>
+              </>
+            ) : (
+              <button
+                className="px-2 py-1 rounded bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50"
+                onClick={() => handleResume()}
+                disabled={runningCaseId !== null || runningAll}
+              >
+                I've done it - Resume{batchQueue !== null ? ' & Continue Batch' : ''}
+              </button>
+            )}
             <button
               className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
               onClick={discardPausedRun}

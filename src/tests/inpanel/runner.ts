@@ -1,8 +1,8 @@
 // Executes a TestCase's steps in order, persisting a checkpoint to
 // chrome.storage.local when it hits a manual-pause step so a later panel
-// mount can resume where it left off. chrome.storage.session was tried
-// first, but doesn't survive a "Reload" from chrome://extensions (E.1's own
-// manual step) - only local storage does, so every case's
+// mount can resume where it left off. Local storage and not session storage,
+// because chrome.storage.session does not survive a "Reload" from
+// chrome://extensions (E.1's own manual step) - so every case's
 // resume/results/batch-queue state lives there, not just E.1's. See types.ts
 // for the step shapes and TestRunnerPanel.tsx for how this is driven from
 // the UI.

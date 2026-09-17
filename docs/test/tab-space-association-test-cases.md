@@ -76,28 +76,30 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | C.2d | Yes     |
 | C.2e | Yes     |
 | C.2f | Yes     |
+| C.2g | Yes     |
 | D.1  | Yes     |
 | D.2  | Yes     |
 | D.3  | Yes     |
 | D.4  | Yes     |
 | E.1  | Yes     |
 | E.2  | No      |
-| F.1  | No      |
-| F.2  | No      |
-| F.3  | No      |
-| F.4  | No      |
-| F.5  | No      |
+| E.3  | Yes     |
+| F.1  | Yes     |
+| F.2  | Yes     |
+| F.3  | Yes     |
+| F.4  | Yes     |
+
+The trailing "repeat, but ..." variant steps in C.2a-C.2e run as their own cases, named after the variant - e.g. `C.2b (same space)`, `C.2e (same space, collapsed folder)`. C.2f's same-space pick (step 4) runs at the end of C.2f itself.
 
 Some "Yes" rows cover the case's main flow but not every sub-step. Still manual:
 
 - **D.1 step 3** - needs a second window's sidebar to observe.
-- **C.2a step 5, C.2b step 5, C.2d step 5** - the trailing "repeat, but ..." variants. Same explicit-action mechanism as the main flow, and the collapsed-folder path is covered by C.1e.
-- **C.2d's press-and-hold gesture** - the automated case sends the two messages the dropdown ends up sending (`get-tab-history`, `navigate-to-history-index`), so it covers the background half only. The 300ms hold timer, the quick-click-vs-hold branch in `Toolbar.tsx`'s `handleHistoryMouseUp`, the dropdown rendering, and the entry click wiring are all still manual-only.
+- **C.2d's press-and-hold gesture** - the automated case makes the two proxy calls the dropdown ends up making (`getHistoryDetails`, `navigateToIndex`), so it covers the background half only. The 300ms hold timer, the quick-click-vs-hold branch in `Toolbar.tsx`'s `handleHistoryMouseUp`, the dropdown rendering, and the entry click wiring are covered by C.2g instead.
+- **C.2g's gestures, E.3's worker stop, and F.1's drag** - performed by you at a pause, with the runner checking the result. See those cases.
 
 Why the "No" rows are still manual:
 
 - **B.4, E.2** - close the window hosting the panel / restart the browser, which kills the runner mid-case. E.2 also gets fresh tab ids on restore, which the runner's saved refs can't re-resolve.
-- **F.1-F.5** - regression sweep, deliberately left as a manual pass.
 
 ---
 
@@ -220,7 +222,7 @@ Two ways to move a tab's Chrome group - test both, they may behave differently s
 | 5    | Repeat steps 1-2, close the sidebar panel, then move the tab (native, method a) into Space B's group | -                                                                                                                                                                                                                      |
 | 6    | Reopen the sidebar, check Space A's bookmark tree                                                    | Compare against step 3 - confirm whether closing the sidebar during the move changes the outcome                                                                                                                       |
 
-Note: step 4 originally said "sidebar method (b)" per the Section A intro, meaning a tab-row "Move to Space." For a bookmarked tab, right-clicking finds the **bookmark** row instead, whose own "Move to Space" is a different action (moves the bookmark's file location) - not the tab-row action A.1/A.2 use. Worded explicitly above to avoid re-confusing the two.
+Note: step 4 means the **bookmark** row's "Move to Space", not the tab row's. They are different actions - the bookmark one moves the bookmark's folder location, the tab one is what A.1/A.2 use - and for a bookmarked tab a right-click lands on the bookmark row, so step 4 names the target explicitly.
 
 ### A.7b Bookmarked tab moved via generic "Move Bookmark to..." folder picker
 
@@ -462,6 +464,45 @@ Same setup as C.2b, triggered via keyboard instead of the toolbar buttons. Worth
 | 3    | Open the audio tabs dropdown (toolbar), select the entry from the other Space                              | Switches space, scrolls correctly whether it's a regular or bookmark tab   |
 | 4    | Repeat step 3, selecting an entry that's already in the Space the sidebar is showing                       | No space switch; scrolls to the tab if out of view                        |
 
+The sub-case below is not about the follow-mode bypass, unlike C.2a-C.2f. It
+covers the press-and-hold gesture on the history buttons, which C.2d only
+reaches the background half of. The follow mode is irrelevant to it, so run it
+under whatever is already set.
+
+Not covered: which window a history or audio request lands on. Every sidebar
+entry point to those calls is a click, and clicking a background window's side
+panel focuses that window as part of the click, so there is no reachable state
+where the request and the focused window disagree.
+
+#### C.2g History dropdown press-and-hold gesture
+
+Guided case: the runner drives the setup and every assertion, and pauses for
+you to perform each gesture. Automated in `src/tests/inpanel/cases/sectionC.ts`.
+
+C.2d covers the background half of the same dropdown by calling
+`getHistoryDetails` and `navigateToIndex` directly, so everything on the
+`Toolbar.tsx` side is what this case adds: the hold timer, the
+quick-click-versus-hold branch in `handleHistoryMouseUp`, the dropdown
+rendering, and the entry click wiring.
+
+Every test tab is an `example.com` URL, so the dropdown rows all carry the same
+title. Entries are listed most recent first, so the steps below identify the
+target by position rather than by name.
+
+| Step | Action                                                                              | Expected Result                                                                          |
+| ---- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 1    | Activate three or more tabs across two spaces to build some history                   | -                                                                                          |
+| 2    | Press and hold the toolbar's "Previous" button for about half a second                | Dropdown opens, listing earlier tabs, each with its title and favicon                      |
+| 3    | Confirm each listed entry shows a title, plus a favicon or the grey fallback square    | Titles are populated. A grey square is not a failure: `Toolbar.tsx` renders one for any tab with no favicon. This is `getHistoryDetails` end to end, including the Space lookup it does per entry |
+| 4    | Click one of the entries                                                              | Jumps to that tab, switching space if needed; dropdown closes                               |
+| 5    | Quick-click "Previous" instead of holding                                             | Navigates one step back; no dropdown appears                                                |
+| 6    | Click "Previous" once, normally, while the dropdown is already open                   | Dropdown dismisses; no navigation happens. A plain click, not a hold: the open dropdown puts a full-screen overlay (`MenuBase.tsx`) over the button, so no hold timer can start and the duration is irrelevant |
+| 7    | Repeat steps 2-4 on the "Next" button, after navigating backwards first               | Same behaviour, listing the entries ahead of the current position                            |
+
+Not covered: `handleHistoryMouseLeave`'s timer cancel. Reaching it means
+pressing the button and dragging off within the 300ms before the dropdown
+opens, which is too fiddly to perform the same way twice.
+
 ---
 
 ## Section D - Space lifecycle
@@ -532,16 +573,40 @@ this case doesn't exercise.
 | 1    | Have several bookmark/pinned tabs open, and quit/relaunch Chrome (with "continue where you left off" enabled) | Chrome restores tabs with new tab IDs                                                                                                                                                                       |
 | 2    | Open the sidebar                                                                                              | Backup-matching logic should re-associate bookmarks/pins to their restored tabs (by domain/index matching) - confirm this still works after this session's changes to `tabAssociations.ts`/`getSpaceForTab` |
 
+### E.3 Service worker restart repopulates tab history and audible tracking
+
+Guided case: the runner pauses for you to stop the service worker by hand,
+then verifies the recovery itself. Automated in
+`src/tests/inpanel/cases/sectionE.ts`. Regression check for step 4 of
+`docs/decisions/2026-07-30-shared-storage-multiple-writers.md`: both managers
+moved out of `background.ts`, and `LastAudibleTracker` now has to be
+constructed after `TabHistoryManager` because it holds one. A wiring mistake
+there shows up only on a cold start, when `load()` runs.
+
+Do **not** substitute E.1 for this. Reloading the extension is a fresh
+extension load, and `chrome.storage.session` may well be cleared with it, in
+which case there is nothing left to repopulate and the case proves nothing
+either way. Terminating the worker leaves session storage alone, which is the
+condition this case needs. Step 3 checks that assumption rather than trusting
+it.
+
+| Step | Action                                                                                                                             | Expected Result                                                                                       |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| 1    | Activate four or five tabs in turn to build some history, and play then stop audio in one of them                                    | The audio dropdown lists that tab under recently played                                                |
+| 2    | Open a **new window** and go to `chrome://extensions` there, click this extension's "service worker" link, then in the DevTools that open go to Application → Service Workers → Stop. Letting it idle for a minute or so works too. Come back by clicking inside the first window's sidebar, not a tab | Worker terminated. The extension is NOT reloaded. The first window's tab history is untouched, since history is kept per window |
+| 3    | Back in the sidebar, press the toolbar's "Previous" button                                                                          | Worker wakes, `TabHistoryManager.load()` repopulates from session storage, and navigation goes one step back as if nothing happened. If history is empty instead, session storage did not survive and this case cannot run on this Chrome build |
+| 4    | Open the audio dropdown                                                                                                            | The tab from step 1 is still listed under recently played, so `LastAudibleTracker.load()` ran too       |
+| 5    | Press and hold "Previous" to open the history dropdown                                                                             | Entries still carry their titles, favicons and correct Space, so the injected `getSpaceForTab` survived the restart |
+
 ---
 
 ## Section F - Regression check on pre-existing behavior
 
-Quick pass to confirm nothing adjacent broke:
+Adjacent behaviour that shouldn't break. Automated in `src/tests/inpanel/cases/sectionF.ts`; F.1 is guided.
 
-| #   | Action                                                                                             | Expected Result                                                                                                                      |
-| --- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Normal drag-and-drop of tabs between spaces via the sidebar (unrelated to bookmark tabs)           | Still works as before                                                                                                                |
-| 2   | "Move to Tabs" on a bookmark tab (context menu), tab stays in its original group                   | Association breaks (unchanged behavior); confirm no double-message or console error now that background also reacts to group changes |
-| 3   | Creating a brand-new tab while a space is active                                                   | Still auto-groups into that space's Chrome group                                                                                     |
-| 4   | Opening a bookmark tab whose folder is deeply nested/collapsed                                     | Folder(s) expand and scroll to it, same as before                                                                                    |
-| 5   | General sidebar responsiveness - no visible lag or repeated console errors during any of the above | -                                                                                                                                    |
+| #   | Action                                                                                                        | Expected Result                                                                                   |
+| --- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 1   | In Space A, drag a regular tab's row onto Space B's icon in the space bar                                      | Tab moves into Space B's Chrome group                                                             |
+| 2   | Open a bookmark tab in Space A, then right-click the bookmark → "Move To Tabs"                                | Bookmark shows as not loaded; the tab stays open, still in Space A's Chrome group                 |
+| 3   | With Space B active, create a brand-new tab (Cmd+T)                                                           | The tab joins Space B's Chrome group                                                              |
+| 4   | Open a bookmark tab three collapsed folders deep in Space B, activate it, switch the sidebar to Space A, then click "Show active tab" | Switches to Space B, all three folders expand, and it scrolls to the bookmark row |
