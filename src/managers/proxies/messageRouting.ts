@@ -21,6 +21,7 @@ export const ManagerId = {
   SPACES: 'SpaceManager',
   TAB_HISTORY: 'TabHistoryManager',
   LAST_AUDIBLE: 'LastAudibleTracker',
+  PINNED_SITES: 'PinnedSitesManager',
 } as const;
 
 export type ManagerIdType = typeof ManagerId[keyof typeof ManagerId];

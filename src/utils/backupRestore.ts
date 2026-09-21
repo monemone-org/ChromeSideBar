@@ -70,7 +70,7 @@ export function isFullBackup(data: unknown): data is FullBackup {
 
 // Export all data (bookmarks, tabs+groups, pinned sites)
 export async function exportFullBackup(
-  pinnedSites: PinnedSite[],
+  pinnedSites: readonly PinnedSite[],
   bookmarks: chrome.bookmarks.BookmarkTreeNode[]
 ): Promise<void> {
   // Get current tabs and tab groups
@@ -93,7 +93,7 @@ export async function exportFullBackup(
   const backup: FullBackup = {
     version: 2,
     exportedAt: new Date().toISOString(),
-    pinnedSites,
+    pinnedSites: [...pinnedSites],
     bookmarks,
     tabGroups,
   };

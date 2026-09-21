@@ -1,9 +1,11 @@
 // Section E - Restart / reload durability.
 // docs/test/tab-space-association-test-cases.md#section-e---restart--reload-durability
 
-import { TestCase } from '../types';
+import { TestCase, TestStep } from '../types';
+import { tabHistoryManagerProxy } from '../../../managers/proxies/tabHistoryManagerProxy';
+import { resolveTabId } from '../stepHelpers';
 import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_AUDIO_URL, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { activateTabNative, navigateTabHistory, openBookmarkTab, openPinnedTab, openRegularTab, pause, switchSpaceVerified } from '../actions';
+import { activateTabNative, closeTesterWindow, navigateTabHistory, openBookmarkTab, openPageForTester, openPinnedTab, openRegularTab, pause, switchSpaceVerified } from '../actions';
 import { assertAudioListIncludes, assertBookmarkLoaded, assertPinnedLoaded, assertTabActive, assertTabAudible, assertTabInSpace } from '../assertions';
 
 // The runner's pause/resume checkpoint (runner.ts) persists to
@@ -36,11 +38,11 @@ export const E1_RELOAD_EXTENSION: TestCase = {
     assertBookmarkLoaded('bmB', true),
     assertPinnedLoaded('pin', true),
 
+    openPageForTester({ url: 'chrome://extensions', ref: 'extensionsTab' }),
     pause(
       'Manual step: reload the extension',
       [
-        'Open chrome://extensions.',
-        'Find this extension and click its reload button (circular arrow icon).',
+        'In the `chrome://extensions` tab that just opened, find this extension and click its **reload** button (circular arrow icon).',
         'Reopen the sidebar panel to resume.',
       ]
     ),
@@ -54,6 +56,46 @@ export const E1_RELOAD_EXTENSION: TestCase = {
     assertTabInSpace('tabB', 'spaceB'),
   ],
 };
+
+/**
+ * Read background's own history for this window and check what Previous would
+ * go back to, before actually pressing it.
+ *
+ * Without this, a failed "audioTab is active" assertion has three possible
+ * causes that look identical: the history was never restored after the
+ * restart, it was restored but points somewhere else, or navigation itself is
+ * broken. This separates the first two by naming what background actually
+ * holds.
+ */
+function assertPreviousHistoryEntry(tabRef: string): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Background's history has "${tabRef}" as the previous entry`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      const history = await tabHistoryManagerProxy.getHistoryDetails(ctx.windowId);
+      const previous = history.before[history.before.length - 1];
+
+      if (!previous)
+      {
+        throw new Error(`background has no earlier entry for this window (currentIndex ${history.currentIndex}, `
+          + `${history.before.length} before / ${history.after.length} after), so Previous has nowhere to go. `
+          + 'An empty history here means load() did not restore it - most likely the extension was reloaded rather than the worker stopped');
+      }
+
+      if (previous.tabId !== tabId)
+      {
+        const entries = [...history.before, ...history.after]
+          .map(item => `${item.index}:${item.tabId} "${item.title}"`)
+          .join(', ');
+        throw new Error(`expected the previous entry to be tab ${tabId}, got ${previous.tabId} ("${previous.title}"). `
+          + `Full history: [${entries}], currentIndex ${history.currentIndex}`);
+      }
+    },
+  };
+}
 
 // E.3 - a cold start of the service worker, which is the only time each
 // manager's load() runs and refills its in-memory state from session storage.
@@ -126,20 +168,23 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
     activateTabNative('tab3'),
     assertTabActive('tab3'),
 
+    // Its own window, not a tab here: tab history is kept per window, so a tab
+    // in this window would change what Previous goes back to.
+    openPageForTester({ url: 'chrome://extensions', ref: 'extensionsWindow', inNewWindow: true }),
     pause(
       'Manual step: stop the service worker (do NOT reload the extension)',
       [
-        'Open a NEW WINDOW (Cmd/Ctrl+N) and go to chrome://extensions there. Tab history is kept per window, so opening it as a tab in this window would change what Previous goes back to.',
-        'Find this extension and click its "service worker" link - DevTools opens for the worker.',
-        'In those DevTools, go to Application -> Service Workers and click Stop. Waiting a minute or so for it to idle out works too.',
-        'Do NOT click the extension\'s reload button - that is a fresh extension load and clears chrome.storage.session, which is exactly what this case needs kept.',
+        'In the window that just opened, find this extension and click its **service worker** link - DevTools opens for the worker.',
+        'In those DevTools, go to **Application** -> **Service Workers** and click **Stop** - waiting a minute or so for it to idle out works too.',
+        'Do NOT click the extension\'s **reload** button - that is a fresh extension load and clears chrome.storage.session, which is exactly what this case needs kept.',
         'Come back to this window by clicking inside the sidebar, not a tab, and click Resume below.',
       ]
     ),
-
     // The first proxy call wakes the worker, which runs load() on every
-    // manager before the router dispatches anything. If the history came back
-    // empty, navigate() is a silent no-op and tab3 stays active.
+    // manager before the router dispatches anything. Reading the history
+    // before pressing Previous says whether load() restored it, separately
+    // from whether navigation works.
+    assertPreviousHistoryEntry('audioTab'),
     navigateTabHistory('prev'),
     assertTabActive('audioTab'),
 
@@ -148,6 +193,11 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
     // which also means the construction order held, since this call reaches
     // through the tracker into the history manager for its sort order.
     assertAudioListIncludes(['audioTab']),
+
+    // Closed last, not straight after the pause: closing a window moves
+    // Chrome's focus back to this one, and everything above is measuring this
+    // window's tab activity.
+    closeTesterWindow('extensionsWindow'),
   ],
 };
 

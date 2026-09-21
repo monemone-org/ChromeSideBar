@@ -88,6 +88,22 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | F.2  | Yes     |
 | F.3  | Yes     |
 | F.4  | Yes     |
+| P.1  | Yes     |
+| P.2  | Yes     |
+| P.3  | Yes     |
+| P.4  | Yes     |
+| P.5  | Yes     |
+| P.6  | Yes - guided, needs network |
+| P.7  | Yes - guided |
+| P.8  | Yes - guided |
+| P.9  | Yes - import only; export stays manual |
+| P.10 | Yes - guided |
+
+All of Section P is automated in `src/tests/inpanel/cases/sectionP.ts`. Its
+mutations go through the same `usePinnedSites` callbacks the pinned bar uses,
+rather than the proxy underneath them, so a bug in a hook callback fails a case
+instead of passing beneath it. What the four non-plain rows give up is listed
+under "Why the No rows are still manual" below.
 
 The trailing "repeat, but ..." variant steps in C.2a-C.2e run as their own cases, named after the variant - e.g. `C.2b (same space)`, `C.2e (same space, collapsed folder)`. C.2f's same-space pick (step 4) runs at the end of C.2f itself.
 
@@ -100,6 +116,21 @@ Some "Yes" rows cover the case's main flow but not every sub-step. Still manual:
 Why the "No" rows are still manual:
 
 - **B.4, E.2** - close the window hosting the panel / restart the browser, which kills the runner mid-case. E.2 also gets fresh tab ids on restore, which the runner's saved refs can't re-resolve.
+
+Section P is automated, but four of its cases carry a caveat:
+
+- **P.6** depends on the network, and it opens with a guided step asking you to clear Chrome's browsing history, because that is where favicons live and there is no way for the extension to clear them without also deleting real history. It tells background's write apart from the sidebar resolver's by watching for a `PINNED_SITES_CHANGED` broadcast with no `senderId`. P.6 and P.7 deliberately use different sites (wikipedia.org and mozilla.org) so that running one does not warm the other's icon.
+- **P.7** sets up and checks itself, but nothing can force a background write into the few milliseconds a sidebar write is in flight, so a pass may mean the race never happened. Run it, but do not read a green as proof. It also needs its site cleared from history, same as P.6, or the background write it tries to race never happens at all.
+- **P.8** needs you to stop the service worker, like E.3.
+- **P.9** drives `importFullBackup` against a checked-in fixture (`src/tests/inpanel/data/pinned-sites-backup.json`), which is the identical path the dialog takes below its file picker. Its replace step wipes the whole pin list by design and restores it in a `finally`, so an abandoned run cannot leave your pins deleted. Export stays manual. Its custom-icon step needs the network, like P.6.
+- **P.10** needs both sidebars open and the pin edits performed by hand in the other window. **Run it from the receiving window** - it reads its own mirror, so every check is machine-made. Only its last step, the reverse direction, is a `confirm` pause.
+
+---
+
+## Writing a case
+
+Conventions for adding cases here or to the in-panel runner live in
+`docs/test/writing-test-cases.md`.
 
 ---
 
@@ -593,7 +624,7 @@ it.
 | Step | Action                                                                                                                             | Expected Result                                                                                       |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | 1    | Activate four or five tabs in turn to build some history, and play then stop audio in one of them                                    | The audio dropdown lists that tab under recently played                                                |
-| 2    | Open a **new window** and go to `chrome://extensions` there, click this extension's "service worker" link, then in the DevTools that open go to Application → Service Workers → Stop. Letting it idle for a minute or so works too. Come back by clicking inside the first window's sidebar, not a tab | Worker terminated. The extension is NOT reloaded. The first window's tab history is untouched, since history is kept per window |
+| 2    | At the pause: the runner opens `chrome://extensions` in its own window, so click this extension's "service worker" link there, then in the DevTools that open go to Application → Service Workers → Stop. Letting it idle for a minute or so works too. Come back by clicking inside the first window's sidebar, not a tab | Worker terminated. The extension is NOT reloaded. The first window's tab history is untouched, since history is kept per window and the page was opened in a separate one |
 | 3    | Back in the sidebar, press the toolbar's "Previous" button                                                                          | Worker wakes, `TabHistoryManager.load()` repopulates from session storage, and navigation goes one step back as if nothing happened. If history is empty instead, session storage did not survive and this case cannot run on this Chrome build |
 | 4    | Open the audio dropdown                                                                                                            | The tab from step 1 is still listed under recently played, so `LastAudibleTracker.load()` ran too       |
 | 5    | Press and hold "Previous" to open the history dropdown                                                                             | Entries still carry their titles, favicons and correct Space, so the injected `getSpaceForTab` survived the restart |
@@ -610,3 +641,192 @@ Adjacent behaviour that shouldn't break. Automated in `src/tests/inpanel/cases/s
 | 2   | Open a bookmark tab in Space A, then right-click the bookmark → "Move To Tabs"                                | Bookmark shows as not loaded; the tab stays open, still in Space A's Chrome group                 |
 | 3   | With Space B active, create a brand-new tab (Cmd+T)                                                           | The tab joins Space B's Chrome group                                                              |
 | 4   | Open a bookmark tab three collapsed folders deep in Space B, activate it, switch the sidebar to Space A, then click "Show active tab" | Switches to Space B, all three folders expand, and it scrolls to the bookmark row |
+
+---
+
+## Section P - Pinned site list ownership
+
+Cases for step 5 of `docs/decisions/2026-07-30-shared-storage-multiple-writers.md`:
+`PinnedSitesManager` is now the only writer of `chrome.storage.local['pinnedSites']`,
+and the sidebar reaches it through `pinnedSitesManagerProxy`. Lettered P rather
+than G so the ids don't read like the known gaps G1-G3.
+
+Automated in `src/tests/inpanel/cases/sectionP.ts`. P.7, P.8 and P.10 are
+guided; P.6 and one step of P.9 need the network.
+
+Two things most of these cases check, so they aren't repeated in every row:
+
+- **background's own list** means `pinnedSitesManagerProxy.getPinnedSites()`, a
+  fresh round trip to the manager's in-memory copy. Storage being right is not
+  enough: Case 3 was a bug where storage was right and background's cache was
+  stale for the rest of the session.
+- **this window's mirror** means `pinnedSitesManagerProxy.snapshot`, which is
+  what `PinnedBar` renders from.
+
+### P.1 Every pin mutation reaches background's own list
+
+The broad round trip. One pass over the operations that have no coverage at all
+today.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Add a pin | Appears in the pinned bar; present in background's own list |
+| 2    | Edit its title and URL | Both update in the bar and in background's list |
+| 3    | Give it an emoji, then replace the emoji with a custom Lucide icon | The bar shows the emoji, then the icon. Background's list shows `emoji` set with `customIconName` cleared, then the reverse - the two are never both set |
+| 4    | Right-click → "Reset to site icon" | Custom icon and emoji both cleared in background's list; the bar falls back to the site favicon, or a letter tile if Chrome has nothing cached |
+| 5    | Duplicate the pin | Two pins, adjacent, with different ids. Both in background's list |
+| 6    | Drag one pin to a different position | New order in the bar and in background's list, identical |
+| 7    | Unpin both | Gone from the bar and from background's list |
+
+### P.2 Read-after-write: two mutations in a row
+
+Regression check for the mirror being a plain store rather than React state.
+Before step 5, a second pin mutation built its new array from the render-
+captured list, so the first one's write was silently dropped.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Add two pins in immediate succession, with no wait between them | **Both** present, in both the mirror and background's list. One surviving pin means the snapshot bug is back |
+| 2    | Unpin two pins in immediate succession | Both gone, from both |
+| 3    | Read the mirror on the line straight after an unpin returns, with no sleep | The unpinned pin is already absent. It is the optimistic write that makes this true, not the round trip |
+
+### P.3 Delete and undo restores position
+
+`DeletePinnedSiteAction` through the manager. The only coverage today is the
+DEV dropdown's "Unit Test Do/Undo Delete Pinned Sites", which rewrites the
+whole pin list as setup - this case is the same check against pins you can see.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | With at least four pins, unpin the **second** one | It disappears; the rest keep their order |
+| 2    | Undo | It comes back **at position two**, not at the end. Same in background's list |
+| 3    | Unpin two pins at once (multi-select), then undo | Both return at their original indices |
+| 4    | Unpin a pin whose tab is open, then undo | The tab closes on delete; the pin returns on undo, and the tab does not reopen (undo restores pin data only) |
+
+### P.4 Background's own pin cache must reflect a sidebar change immediately
+
+The Case 2 equivalent of D.3. Before step 5 background had no in-memory pin
+list at all, so this is a new guarantee rather than a fixed bug.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Add a pin | - |
+| 2    | **Immediately** (no other pin edit first) read background's own list | The new pin is there |
+| 3    | Unpin it, and immediately read background's own list again | Gone. A stale entry here means the manager's in-memory copy and storage have diverged |
+
+### P.5 A late icon patch must not overwrite a newer choice
+
+Regression check for `PinnedSiteFaviconPatch`'s provenance. Every icon resolve
+is asynchronous, so a patch can land for a pin the user has since changed.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Add a pin with no favicon, and give it custom Lucide icon "Star" | The bar shows a star |
+| 2    | Change it to a different icon, or an emoji, before the first resolve has landed. If that is too fast to hit by hand, call `pinnedSitesManagerProxy.setFavicons([{ id, favicon: <any data url>, forCustomIconName: 'Star' }])` from the sidebar console afterwards - the same shape a late resolve produces | The pin keeps the **newer** icon. The stale patch is dropped, not applied |
+| 3    | Same again for a site favicon: give a favicon-less pin an emoji, then send a patch with **no** `forCustomIconName` | The emoji survives |
+
+### P.6 Scenario 5 - background fills in a missing favicon
+
+The reason the manager needs a writer in background at all.
+
+The case needs a site whose favicon Chrome does not already hold, so it starts
+with a guided step that clears it. Clearing has to include **Browsing
+history**, because that is where Chrome keeps favicons. Chrome also falls back
+to the icon it holds for a site when it has nothing for an exact address, so a
+unique query string is not an alternative to clearing.
+
+The automated version uses `https://www.wikipedia.org/`, and P.7 uses
+`https://www.mozilla.org/` so that running one case does not give the other
+one's site an icon.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | At the pause: the runner opens the Clear browsing data settings, so tick "Browsing history", set the range to **All time**, and delete | Chrome no longer holds an icon for either site. A shorter range leaves the icon in place and the next step fails |
+| 2    | Pin the site by pasting the URL via "Add pin", not by pinning an open tab | The pin shows a letter tile, no favicon. Confirm `favicon` is unset in background's list, rather than trusting the tile |
+| 3    | Open a normal tab on that URL | Within a second or two the pinned icon becomes the site's favicon, with no sidebar reload |
+| 4    | Check background's own list | `favicon` set on that pin |
+
+Who set it matters, and the two candidates are hard to tell apart by looking.
+The sidebar's own lazy resolver also fills in missing favicons, so a passing
+step 2 could be either writer. The discriminator is the broadcast: a
+`PINNED_SITES_CHANGED` message with **no** `senderId` came from background,
+because only a sidebar-originated call carries one, so the case watches for
+that message rather than polling the icon. In practice the resolver cannot win
+here, because it runs on mount and on list changes, and visiting a page changes
+neither.
+
+### P.7 A background favicon patch must not resurrect an unpinned pin
+
+The in-flight broadcast case (decision 2 in the step 5 plan). Guided: the
+runner sets up and checks, you supply the timing.
+
+**A pass here is weaker than a pass elsewhere.** Nothing can make background
+patch a favicon inside the few milliseconds a sidebar write is in flight, so
+the race may simply not have happened, and the case then passes without having
+tested anything. It is worth running anyway because the failure it looks for is
+machine-checkable and specific: this window disagreeing with background.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Set up as in P.6: pin A on a site Chrome holds no icon for, plus a second pin B | Neither has a favicon. P.6's clearing step covers this case's site too |
+| 2    | At the pause: open a tab on A's URL and unpin B **as close to simultaneously as you can manage** | - |
+| 3    | Let both settle, then look at the bar | A has its favicon **and** B is gone. B flickering back and staying is the failure this case exists for |
+| 4    | Compare this window's mirror against background's own list, entry by entry | Identical. A mismatch means this window is stale while storage is correct, which is the exact shape of the bug |
+
+Not covered: a run where the race did not happen. Making it deterministic
+would need a DEV-only message that has background emit a pin broadcast on
+demand, which does not exist.
+
+### P.8 Pins survive a service worker restart
+
+The cold-start path, same reasoning as E.3: `PinnedSitesManager.load()` only
+runs when the worker starts, so a mistake there shows up nowhere else. Stop the
+worker, don't reload the extension - a reload is a fresh extension load and
+proves less.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Note the current pins and their order | - |
+| 2    | Stop the service worker (see E.3 step 2 for how) | - |
+| 3    | Back in the sidebar, unpin a pin | Worker wakes, `load()` repopulates, and the unpin applies to the **full** list - the other pins are all still there. An empty or truncated bar means `load()` did not run before the mutation |
+| 4    | Undo | The pin returns at its original index |
+
+### P.9 Import and export
+
+`replaceAll` and the bulk append, which no other case reaches.
+
+Automate this against a **checked-in fixture** rather than a file the tester
+picks: a small backup JSON in the repo (say
+`src/tests/inpanel/data/pinned-sites-backup.json`, imported directly -
+`resolveJsonModule` is on and `src` is in `tsconfig`'s include). Give its pins
+titles carrying `TEST_PINNED_PREFIX` so `resetTestData` cleans them up like any
+other test pin, one pin with an embedded favicon and one deliberately without,
+so step 4 has something to resolve.
+
+The import path the fixture drives is `importFullBackup` ->
+`replacePinnedSites` / `appendPinnedSites` -> the proxy, which is the identical
+wiring the dialog uses. Only the file picker is skipped, the same shortcut D.4
+takes for the Import dialog.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Starting from two known pins, import the fixture with pinned sites set to **append** | Original two still first, fixture's pins after them, all with fresh ids. Background's own list agrees |
+| 2    | Import the same fixture again with **replace** | The list is exactly the fixture's pins - the originals and the first import's copies are both gone |
+| 3    | Check ids across the two imports | Every import assigns new ids, so no id from step 1 survives into step 2 |
+| 4    | Look at the fixture's favicon-less pin a few seconds after import | Its icon resolves in without a reload, via the lazy resolver's `setFavicons` |
+| 5    | **Manual, not automatable:** export a full backup with pins selected through the Export dialog | The downloaded JSON contains every pin with favicons embedded. The file picker is the part no runner can drive |
+
+### P.10 Two windows stay in sync
+
+Cross-window sync is a manager broadcast, so it needs checking directly.
+
+Guided, and **run the case in window 2**, the receiving window: it reads its
+own mirror, so every check is machine-made and only the actions are yours.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Open the sidebar in two windows, and start this case in **window 2** | Both show the same pins |
+| 2    | At the pause: add a pin in **window 1** | Window 2's own mirror gains it, with no reload and nothing typed in window 2 |
+| 3    | At the pause: reorder that pin in window 1, and nothing else | Window 2 still shows it |
+| 4    | At the pause: unpin it in window 1, watching it actually disappear there | Window 2's mirror drops it too |
+| 5    | At the pause: add a pin in **window 2** (the runner's own window) | Window 1 shows it. This direction needs your eyes - the runner can't read the other window's mirror - so it is a `confirm` pause |

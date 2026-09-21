@@ -32,10 +32,11 @@ For comparison, `SpaceWindowState` (`chrome.storage.session`, per-window active 
 
 ## Case 2: Pinned sites (`pinnedSites`, local storage)
 
-**Where**:
+**Where** - four writers, not the three this doc originally listed (the lazy icon resolver was found while doing the port):
 
 - `background.ts`'s `chrome.tabs.onUpdated` handler ("Scenario 5") reads the whole `pinnedSites` array, patches in a favicon for sites matching the tab's domain, writes the whole array back.
 - `src/hooks/usePinnedSites.ts` (sidebar CRUD - add/remove/reorder/edit) and `src/actions/deletePinnedSiteAction.ts` (undo support) do their own independent read-modify-writes to the same key.
+- `usePinnedSites.ts`'s lazy icon resolver, a separate writer from the CRUD callbacks above: it fetches missing favicons and Lucide icons asynchronously, then re-reads storage and writes the whole array back. Re-reading first narrows the race but doesn't close it.
 
 **What can go wrong**: same read-modify-write race shape as Case 1's backup writes. No persistent in-memory cache on the background side, so this is a transient race rather than a lasting divergence - but still capable of dropping a concurrent CRUD change (e.g. a reorder or edit) if it lands in the same narrow window as a favicon update.
 
@@ -68,7 +69,7 @@ Taken from the code as of 2026-08-11, so the migration below has a fixed target 
 Two managers do not exist yet and are the actual point of Cases 1 and 2:
 
 - **`TabAssociationManager`** - owner of `tabAssociations_{windowId}` (session) and `tabAssociationsBackup_*` (local). Written today by both `background.ts` and `BookmarkTabsContext.tsx` through the explicitly-shared `src/utils/tabAssociations.ts`.
-- **`PinnedSitesManager`** - owner of `pinnedSites` (local). Written today by `background.ts` (favicon patching), `usePinnedSites.ts` (CRUD), and `deletePinnedSiteAction.ts` (undo).
+- **`PinnedSitesManager`** - owner of `pinnedSites` (local). Written today by `background.ts` (favicon patching), `usePinnedSites.ts` (CRUD *and* its lazy icon resolver, two separate writers), and `deletePinnedSiteAction.ts` (undo). Built in step 5.
 
 ### Messages
 
@@ -324,6 +325,42 @@ Gotchas:
 
 Consumers barely change: `SpacesContext` keeps its public API and swaps `useState` for `useSpaces()` internally, so everything calling `useSpacesContext()` is untouched.
 
+### 6. Whole-list writes vs per-operation writes (added by step 5)
+
+Steps 2 and 3 send the whole new list (`updateSpaces(spaces)`). That works for Spaces because only sidebars write them, so the loser of a race is always a window that had the stale list on screen anyway.
+
+Pinned sites broke that assumption: background writes them on its own, patching in favicons. A whole-list write would move the race rather than remove it:
+
+1. Background adds a favicon to its list and broadcasts.
+2. Before that broadcast arrives, the sidebar sends a reorder built from its older mirror, which has no favicon.
+3. The manager stores that list, and the favicon is gone.
+
+So `PinnedSitesApi` names what changed instead - `removePins(ids)`, `movePin(...)`, `setFavicons(patches)` and so on - and the manager applies each operation to its own authoritative list. Two writers now only collide when they touch the same pin.
+
+Each operation's list transform is a pure function in `managers/shared/pinnedSitesApi.ts`, called by both sides: the manager to change the real list, the proxy to apply the same change to its mirror optimistically. One implementation, so an optimistic write cannot disagree with what gets stored.
+
+`setFavicons` is the one operation whose patches can go stale, because every caller resolved its icons asynchronously. Each patch records what it was resolved *for* - a site favicon, or one specific `customIconName` - and the manager re-checks that against the pin before applying it, so a patch for an icon the user has since replaced is dropped instead of overwriting the new one.
+
+### 7. Broadcasts that arrive mid-write (added by step 5)
+
+The sender-id guard from step 3.5 only covers a context's own echo. A broadcast from *elsewhere* is always applied, which is correct when nothing of ours is in flight and wrong when something is:
+
+```
+mirror [A B C D]
+user unpins D          mirror [A B C], removePins([D]) sent
+background patches B's favicon, broadcasts [A B* C D]
+  -> applied - D is back on screen
+background handles the remove, broadcasts [A B* C] with OUR senderId
+  -> dropped as our own echo
+D stays on screen until some unrelated later broadcast
+```
+
+Storage is right and this one window is wrong, which is the bug the sender-id guard was meant to prevent, arriving from the other side.
+
+`pinnedSitesManagerProxy` counts its in-flight writes. A foreign broadcast arriving while that count is above zero is dropped and the fact recorded; when the last write returns, the proxy re-reads the list and applies that. The re-read only happens when something was actually dropped, so the normal path still costs no extra round trip.
+
+**This same hole exists in `spaceManagerProxy`** and is deliberately left there for now. It needs another window writing spaces in the same few milliseconds, which is rare and self-heals on the next space edit, whereas pins have background writing them unprompted. Worth fixing when that proxy is next touched - the counter is about fifteen lines and would move to a shared base rather than being written twice.
+
 ## Migration order
 
 One manager end to end before porting the rest, so the layer is proven on something small.
@@ -338,13 +375,14 @@ One manager end to end before porting the rest, so the layer is proven on someth
    - The ack is no longer applied to the mirror at all. The optimistic write already gives read-after-write with no round trip, which is what makes the sender-id guard sufficient without needing any sequence counter.
    - A failed write re-reads true state from background to repair the mirror, rather than rolling back to a remembered value - a rollback could undo a later write that did succeed.
    - `spaceManagerProxy` exposes its mirror as a `readonly Space[]` `snapshot` getter, read by the CRUD callbacks at call time instead of a render-captured value.
-4. **`TabHistoryManager`**, **`LastAudibleTracker`** - mechanical once the pattern is set.
-5. **`PinnedSitesManager`** (new) - fixes Case 2.
+4. **`TabHistoryManager`**, **`LastAudibleTracker`** - done (commit `11ffa97`). Mechanical, as expected.
+5. **`PinnedSitesManager`** (new) - done, fixes Case 2. The first manager whose API is per-operation rather than whole-list, and the first with a writer in background that nobody asked for - see sections 6 and 7 above for both, and for the `spaceManagerProxy` follow-up this leaves behind. `PinnedSite` moved from `hooks/usePinnedSites.ts` to `managers/shared/pinnedSitesApi.ts`, since the service worker needs the type and must not import a React module; the hook re-exports it. The hook keeps its public API, so `App.tsx` and the components below it are unchanged apart from the list now being `readonly`.
 6. **`TabAssociationManager`** (new) - fixes Case 1. Largest, most invasive, most protected by existing tests. Do it last.
 
 Behaviour fixes (`chrome.tabs.onDetached`, and the `docs/test/issues/**` items G1/G2/D1) are a deliberate **second step**, after the routing is in place. Two things not to lose track of:
 
 - Case 3 gets fixed for free by step 3 above, so it needs no separate work.
+- The in-flight-broadcast counter from section 7 wants porting to `spaceManagerProxy`, ideally as a shared proxy base rather than a second copy.
 - The `onDetached` listener called out in Case 1's scope note is easy to skip, because nothing else in this doc names it. It belongs to step 6 or the follow-up pass, not to neither.
 
 ## Verification

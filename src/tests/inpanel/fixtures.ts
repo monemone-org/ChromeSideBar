@@ -49,13 +49,14 @@ export function testUrl(label: string): string
   return `${TEST_URL_PREFIX}${label}`;
 }
 
-// Yield long enough for a React state update (setSpaces/setPinnedSites, both
-// snapshot-based rather than functional updaters - see SpacesContext.tsx's
-// createSpace/deleteSpaceBase and usePinnedSites.ts's removePin) to commit
-// and flow into TestRunnerPanel's next ctxRef rebuild. Needed between any two
-// calls to createSpace/deleteSpace/addPin/removePin in the same fixture -
-// without it, the second call's stale closure overwrites the first call's
-// write instead of building on it.
+// Yield long enough for a React state update to commit and flow into
+// TestRunnerPanel's next ctxRef rebuild, for fixtures that read ctx state
+// between two calls rather than building their own list.
+//
+// The pinned-site callbacks no longer need this: usePinnedSites reads
+// pinnedSitesManagerProxy's mirror, which is written before the call returns,
+// so two of them in a row can't lose each other's write. The sleeps around
+// them are left in place rather than removed case by case.
 const FIXTURE_TICK_MS = 100;
 
 async function findChild(parentId: string, title: string): Promise<chrome.bookmarks.BookmarkTreeNode | undefined>
@@ -194,11 +195,9 @@ export async function createTestSubfolderInFolder(
 /**
  * Create a pinned site and wait for it to land in storage, recording its id
  * in ctx.refs. Takes getCtx for signature consistency with createTestSpace,
- * not because it's strictly required: unlike createSpace/deleteSpace/
- * removePin (which close over a snapshot and need a fresh ctx between
- * calls, see createTestSpace's doc comment), usePinnedSites.ts's addPin
- * uses a functional setState updater and is safe to call twice in a row off
- * the same ctx.
+ * not because it's strictly required: every pinned-site mutation applies to
+ * pinnedSitesManagerProxy's mirror rather than to a captured list, so calling
+ * addPin twice in a row off the same ctx is safe.
  */
 export async function createTestPinnedSite(
   getCtx: () => TestContext,
@@ -262,10 +261,11 @@ export async function createTestPinnedSite(
  * of relying on ctx.refs, since resets also need to cover artifacts left
  * over from a run that errored or was abandoned mid-case.
  *
- * Takes getCtx, not a static ctx: deleteSpace/removePin are snapshot-based
- * (see createTestSpace's doc comment), so deleting more than one space or pin
- * needs a fresh ctx per iteration or every delete after the first is a no-op
- * against stale state.
+ * Takes getCtx, not a static ctx: deleteSpace is snapshot-based (see
+ * createTestSpace's doc comment), so deleting more than one space needs a
+ * fresh ctx per iteration or every delete after the first is a no-op against
+ * stale state. removePin no longer has that problem, but it is called the
+ * same way here.
  */
 export async function resetTestData(getCtx: () => TestContext): Promise<void>
 {

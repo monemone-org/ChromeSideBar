@@ -13,7 +13,7 @@ export interface ExportOptions {
 interface ExportDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  pinnedSites: PinnedSite[];
+  pinnedSites: readonly PinnedSite[];
   bookmarks: chrome.bookmarks.BookmarkTreeNode[];
   spaces: readonly Space[];
 }
@@ -76,7 +76,9 @@ export function ExportDialog({
 
       // Add pinned sites if selected
       if (exportPinnedSites && pinnedSites.length > 0) {
-        backup.pinnedSites = pinnedSites;
+        // Copy: pinnedSites is the live array behind the proxy's mirror, and
+        // the backup object owns whatever it holds.
+        backup.pinnedSites = [...pinnedSites];
       }
 
       // Add bookmarks if selected

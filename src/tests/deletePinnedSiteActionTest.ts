@@ -2,7 +2,8 @@
 // Run via the "Unit Test Do/Undo Delete Pinned Sites" menu item (dev mode only)
 
 import { DeletePinnedSiteAction } from '../actions/deletePinnedSiteAction';
-import { PinnedSite } from '../hooks/usePinnedSites';
+import { PinnedSite } from '../managers/shared/pinnedSitesApi';
+import { pinnedSitesManagerProxy } from '../managers/proxies/pinnedSitesManagerProxy';
 import { TestResult } from './testUtils';
 
 // --- Types ---
@@ -37,7 +38,6 @@ interface TestCase
 
 // --- Helpers ---
 
-const STORAGE_KEY = 'pinnedSites';
 const TEST_URL_PREFIX = 'https://example.com/pin-test-';
 const SETTLE_MS = 300;
 
@@ -73,10 +73,12 @@ function testPinToShape(pin: TestPin, index: number): PinShape
   };
 }
 
+// Reads the authoritative list from PinnedSitesManager rather than storage.
+// Same content, but it also proves the manager's in-memory copy matches what
+// the action did - the whole point of routing writes through it.
 async function readPinsFromStorage(): Promise<PinnedSite[]>
 {
-  const result = await chrome.storage.local.get([STORAGE_KEY]);
-  return result[STORAGE_KEY] || [];
+  return await pinnedSitesManagerProxy.getPinnedSites();
 }
 
 function pinsToShapes(pins: PinnedSite[]): PinShape[]
@@ -282,7 +284,7 @@ export async function runDeletePinnedSiteTests(
         customIconName: p.customIconName,
         iconColor: p.iconColor,
       }));
-      await chrome.storage.local.set({ [STORAGE_KEY]: testPins });
+      await pinnedSitesManagerProxy.replaceAll(testPins);
       await settle();
 
       // Create tabs for pins that need them
@@ -422,7 +424,7 @@ export async function runDeletePinnedSiteTests(
         catch { /* ignore */ }
       }
       // Cleanup: clear test pins from storage
-      await chrome.storage.local.set({ [STORAGE_KEY]: [] });
+      await pinnedSitesManagerProxy.replaceAll([]);
       await settle();
     }
   }

@@ -13,7 +13,7 @@ import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getItemsB
 
 interface PinnedBarProps
 {
-  pinnedSites: PinnedSite[];
+  pinnedSites: readonly PinnedSite[];
   removePin: (id: string) => void;
   updatePin: (id: string,
               title: string,

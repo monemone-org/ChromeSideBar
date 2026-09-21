@@ -1,6 +1,7 @@
 import { UndoableAction } from './types';
 import { truncateTitle } from '../utils/truncateTitle';
-import { PinnedSite } from '../hooks/usePinnedSites';
+import { PinnedSite } from '../managers/shared/pinnedSitesApi';
+import { pinnedSitesManagerProxy } from '../managers/proxies/pinnedSitesManagerProxy';
 
 interface PinnedSnapshot
 {
@@ -8,8 +9,6 @@ interface PinnedSnapshot
   index: number;
   tabId?: number;
 }
-
-const STORAGE_KEY = 'pinnedSites';
 
 /**
  * Undoable action for deleting one or more pinned sites.
@@ -21,12 +20,12 @@ export class DeletePinnedSiteAction implements UndoableAction
   description = '';
   private pinnedIds: string[];
   private snapshots: PinnedSnapshot[] = [];
-  private getCurrentPins: () => PinnedSite[];
+  private getCurrentPins: () => readonly PinnedSite[];
   private getTabIdForPinned?: (pinnedId: string) => number | undefined;
 
   constructor(
     pinnedIds: string[],
-    getCurrentPins: () => PinnedSite[],
+    getCurrentPins: () => readonly PinnedSite[],
     getTabIdForPinned?: (pinnedId: string) => number | undefined
   )
   {
@@ -93,9 +92,11 @@ export class DeletePinnedSiteAction implements UndoableAction
       catch { /* tabs may already be closed */ }
     }
 
-    // Remove pins from storage
-    const remaining = currentPins.filter(p => !idSet.has(p.id));
-    await chrome.storage.local.set({ [STORAGE_KEY]: remaining });
+    // Remove the pins, routed through PinnedSitesManager so it stays the only
+    // writer of the list (Case 2 - see the shared-storage decision doc). Naming
+    // the ids rather than sending a filtered list means a favicon background
+    // resolved in the meantime survives this delete.
+    await pinnedSitesManagerProxy.removePins(this.pinnedIds);
   }
 
   async undo(): Promise<void>
@@ -105,20 +106,12 @@ export class DeletePinnedSiteAction implements UndoableAction
       console.log(`[DeletePinnedSiteAction] undo: restoring ${this.snapshots.length} pins`);
     }
 
-    // Read current pins from storage
-    const result = await chrome.storage.local.get([STORAGE_KEY]);
-    const currentPins: PinnedSite[] = result[STORAGE_KEY] || [];
-
-    // Insert snapshots back at their original indices (sort ascending so splice works correctly)
-    const sorted = [...this.snapshots].sort((a, b) => a.index - b.index);
-    for (const snapshot of sorted)
-    {
-      const insertAt = Math.min(snapshot.index, currentPins.length);
-      currentPins.splice(insertAt, 0, snapshot.pin);
-    }
-
-    // Write back to storage
-    await chrome.storage.local.set({ [STORAGE_KEY]: currentPins });
+    // Put each pin back at the index it was deleted from. The manager does the
+    // splicing against its own list, so this needs no read-then-write of the
+    // whole array.
+    await pinnedSitesManagerProxy.insertPins(
+      this.snapshots.map(snapshot => ({ pin: snapshot.pin, index: snapshot.index }))
+    );
 
     if (import.meta.env.DEV)
     {

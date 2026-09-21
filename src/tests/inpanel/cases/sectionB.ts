@@ -4,7 +4,7 @@
 import { CloseTabAction } from '../../../actions/closeTabAction';
 import { TestCase, TestStep } from '../types';
 import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { closeTab, deleteBookmarkNative, openBookmarkTab, openPinnedTab, openRegularTab, pause, switchSpaceVerified } from '../actions';
+import { closeTab, deleteBookmarkNative, openBookmarkTab, openPageForTester, openPinnedTab, openRegularTab, pause, switchSpaceVerified } from '../actions';
 import { assertBookmarkExists, assertBookmarkLoaded, assertPinnedLoaded, assertTabExists, assertTabInSpace } from '../assertions';
 
 export const B1_CLOSE_BOOKMARK_TAB: TestCase = {
@@ -215,11 +215,14 @@ export const B5B_DELETE_BOOKMARK_SIDEBAR_CLOSED: TestCase = {
 
     openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('b5b-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
     assertBookmarkLoaded('bm', true),
+    // Opened before the pause on purpose: the panel is closed for this step, so
+    // the tester has nothing to click in the instructions once they start.
+    openPageForTester({ url: 'chrome://bookmarks', ref: 'bookmarksTab' }),
     pause(
       'Manual step: delete the bookmark via chrome://bookmarks while the panel is closed',
       [
         'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
-        'Open chrome://bookmarks, find "B5b bookmark", and delete it there (not via the extension\'s own tree).',
+        'In the `chrome://bookmarks` tab that just opened, find "B5b bookmark" and **delete** it - through Chrome\'s own bookmark manager, not the extension\'s tree.',
         'Reopen the sidebar panel to resume.',
       ]
     ),

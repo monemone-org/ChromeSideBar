@@ -437,7 +437,7 @@ interface ExportDialogWrapperProps
 {
   isOpen: boolean;
   onClose: () => void;
-  pinnedSites: PinnedSite[];
+  pinnedSites: readonly PinnedSite[];
   bookmarks: chrome.bookmarks.BookmarkTreeNode[];
 }
 
@@ -1271,6 +1271,12 @@ function App() {
             pinnedSites={pinnedSites}
             addPin={addPin}
             removePin={removePin}
+            updatePin={updatePin}
+            resetFavicon={resetFavicon}
+            movePin={movePin}
+            duplicatePin={duplicatePin}
+            replacePinnedSites={replacePinnedSites}
+            appendPinnedSites={appendPinnedSites}
           />
         </Suspense>
       )}

@@ -533,6 +533,60 @@ export function pause(label: string, steps: string[], confirm?: string): TestSte
   return { kind: 'pause', label, instruction, confirm };
 }
 
+/**
+ * Open a page the tester is about to work in, so the instruction next to it
+ * only has to describe what a human actually has to do there.
+ *
+ * `inNewWindow` puts it in its own Chrome window, which is what the
+ * service-worker cases need: their whole point is that the sidebar's own
+ * window is left alone, and a link in an instruction would open in that window
+ * instead.
+ *
+ * The opened tab or window is recorded under `ref` so a later step can close
+ * it. chrome:// pages are not scriptable by an extension, so this gets the
+ * page on screen and no further.
+ */
+export function openPageForTester(opts: { url: string; ref: string; inNewWindow?: boolean }): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Open ${opts.url}${opts.inNewWindow ? ' in a new window' : ''} for the tester`,
+    run: async (ctx) =>
+    {
+      if (opts.inNewWindow)
+      {
+        const window = await chrome.windows.create({ url: opts.url, focused: true });
+        if (window?.id === undefined) throw new Error(`could not open a window on ${opts.url}`);
+        ctx.refs.set(opts.ref, window.id);
+        return;
+      }
+
+      const tab = await chrome.tabs.create({ url: opts.url, active: true });
+      if (tab.id === undefined) throw new Error(`could not open a tab on ${opts.url}`);
+      ctx.refs.set(opts.ref, tab.id);
+    },
+  };
+}
+
+/**
+ * Close a window opened by openPageForTester. Silent when it is already gone,
+ * since the tester may well have closed it by hand.
+ */
+export function closeTesterWindow(windowRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Close the window opened for the tester ("${windowRef}")`,
+    run: async (ctx) =>
+    {
+      const windowId = ctx.refs.get(windowRef);
+      if (typeof windowId !== 'number') return;
+      try { await chrome.windows.remove(windowId); }
+      catch { /* already closed */ }
+    },
+  };
+}
+
 /** Remove a tab from its Chrome group entirely, without joining another one - mirrors native right-click "Remove from group". */
 export function ungroupTab(tabRef: string): TestStep
 {

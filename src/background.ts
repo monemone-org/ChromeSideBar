@@ -9,6 +9,7 @@ import { TabSpaceRegistry } from './managers/impl/tabSpaceRegistry';
 import { SpaceManager } from './managers/impl/spaceManager';
 import { TabHistoryManager } from './managers/impl/tabHistoryManager';
 import { LastAudibleTracker } from './managers/impl/lastAudibleTracker';
+import { PinnedSitesManager } from './managers/impl/pinnedSitesManager';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -276,6 +277,7 @@ const historyManager = new TabHistoryManager({
   getSpaceForTab,
 });
 const groupTracker = new TabGroupTracker();
+const pinnedSitesManager = new PinnedSitesManager();
 // Reads the history manager's activation order, so it has to come after it.
 const lastAudibleTracker = new LastAudibleTracker(historyManager);
 tabSpaceRegistry = new TabSpaceRegistry();
@@ -299,6 +301,7 @@ Promise.all([
   historyManager.load(),
   groupTracker.load(),
   lastAudibleTracker.load(),
+  pinnedSitesManager.load(),
   tabSpaceRegistry.load(),
   newsVersionChecker.load()
 ]).then(() =>
@@ -534,15 +537,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
       try { tabHostname = new URL(tab.url).hostname; }
       catch { return; }
 
-      const PINNED_KEY = 'pinnedSites';
-      const result = await chrome.storage.local.get([PINNED_KEY]);
-      const sites = (result[PINNED_KEY] || []) as Array<{
-        id: string; url: string; favicon?: string;
-        customIconName?: string; emoji?: string;
-      }>;
-
-      // Match by hostname, only sites without favicon and no custom icon/emoji
-      const matchingSites = sites.filter(site =>
+      // Match by hostname, only sites without favicon and no custom icon/emoji.
+      // PinnedSitesManager owns this list now, so this reads its in-memory copy
+      // instead of storage, and hands back a patch instead of a whole rewritten
+      // array - see Case 2 in the shared-storage decision doc.
+      const matchingSites = pinnedSitesManager.getPinnedSites().filter(site =>
       {
         if (site.favicon || site.customIconName || site.emoji) return false;
         try { return new URL(site.url).hostname === tabHostname; }
@@ -557,13 +556,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
         const favicon = await fetchFaviconAsBase64(getFaviconUrl(tab.url));
         if (favicon)
         {
-          const updatedSites = sites.map(site =>
-            matchingSites.some(m => m.id === site.id)
-              ? { ...site, favicon }
-              : site
+          // No originId: this change started here, so every sidebar needs to
+          // hear about it. The manager re-checks each pin's eligibility, since
+          // the fetch above gave the user time to set an icon by hand.
+          pinnedSitesManager.setFavicons(
+            matchingSites.map(site => ({ id: site.id, favicon }))
           );
-
-          await chrome.storage.local.set({ [PINNED_KEY]: updatedSites });
 
           if (import.meta.env.DEV)
           {
@@ -750,6 +748,7 @@ registerManager(spaceStateManager);
 registerManager(spaceManager);
 registerManager(historyManager);
 registerManager(lastAudibleTracker);
+registerManager(pinnedSitesManager);
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 {

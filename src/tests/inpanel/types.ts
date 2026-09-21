@@ -27,7 +27,7 @@ export interface TestContext
 {
   windowId: number;
   spaces: readonly Space[];
-  pinnedSites: PinnedSite[];
+  pinnedSites: readonly PinnedSite[];
   // string/number for tab/bookmark/space/pin ids, or any other value a step
   // needs to hand off to a later step (e.g. a DeleteSpaceAction instance
   // between its do() and undo() steps)
@@ -64,6 +64,9 @@ export interface TestContext
   isBookmarkLoaded: (bookmarkId: string) => boolean;
   isPinnedLoaded: (pinnedId: string) => boolean;
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
+  // What PinnedBar hands DeletePinnedSiteAction, so P.3 can build the action
+  // exactly the way the unpin menu item does.
+  getTabIdForPinned: (pinnedId: string) => number | undefined;
   getItemKeyForTab: (tabId: number) => string | null;
   restoreItemAssociation: (tabId: number, itemKey: string) => Promise<void>;
   associateExistingTab: (tabId: number, bookmarkId: string, spaceId?: string) => Promise<void>;
@@ -71,9 +74,26 @@ export interface TestContext
   // association, leaving the tab open where it is.
   deassociateBookmarkTab: (bookmarkId: string) => void;
 
-  // Pinned sites (usePinnedSites)
+  // Pinned sites (usePinnedSites). The whole hook surface, not just add and
+  // remove: Section P's point is that every one of these reaches
+  // PinnedSitesManager, so the cases drive the hook callbacks the UI uses
+  // rather than calling the proxy underneath them.
   addPin: (url: string, title: string) => Promise<void>;
   removePin: (id: string) => void;
+  updatePin: (
+    id: string,
+    title: string,
+    url: string,
+    favicon?: string,
+    customIconName?: string,
+    iconColor?: string,
+    emoji?: string
+  ) => void;
+  resetFavicon: (id: string) => Promise<void>;
+  movePin: (activeId: string, overId: string, position?: 'before' | 'after') => void;
+  duplicatePin: (id: string, liveUrl?: string, liveTitle?: string, liveFavicon?: string) => void;
+  replacePinnedSites: (sites: PinnedSite[]) => void;
+  appendPinnedSites: (sites: PinnedSite[]) => void;
 }
 
 export type StepRunner = (ctx: TestContext) => Promise<void>;
@@ -93,11 +113,13 @@ export interface TestCase
   id: string;      // matches the doc's case id, e.g. "A.1"
   title: string;
   // Fixture creation, run once before step 0 of a fresh run. Takes a getter
-  // (not a static TestContext) because SpacesContext/usePinnedSites' CRUD
-  // callbacks (createSpace, deleteSpace, removePin) close over a snapshot of
-  // their own state - calling one of them twice with the same stale ctx
-  // silently drops the first call's write. Fixtures that call these more
-  // than once must re-fetch via getCtx() between calls (see fixtures.ts).
+  // (not a static TestContext) because SpacesContext's CRUD callbacks
+  // (createSpace, deleteSpace) close over a snapshot of their own state -
+  // calling one of them twice with the same stale ctx silently drops the
+  // first call's write. Fixtures that call these more than once must
+  // re-fetch via getCtx() between calls (see fixtures.ts). The pinned-site
+  // callbacks are exempt: they write pinnedSitesManagerProxy's mirror, not a
+  // captured list.
   setup?: (getCtx: () => TestContext) => Promise<void>;
   steps: TestStep[];
 }

@@ -13,6 +13,7 @@ import { sleep } from './stepHelpers';
 export const RESUME_STORAGE_KEY = 'testRunnerResumeState';
 export const CASE_RESULTS_STORAGE_KEY = 'testRunnerCaseResults';
 export const BATCH_QUEUE_STORAGE_KEY = 'testRunnerBatchQueue';
+export const BATCH_CASE_IDS_STORAGE_KEY = 'testRunnerBatchCaseIds';
 
 export interface RunOutcome
 {
@@ -162,7 +163,24 @@ export async function readBatchQueue(): Promise<string[] | undefined>
   return stored[BATCH_QUEUE_STORAGE_KEY] as string[] | undefined;
 }
 
+// Every case id the batch was started with (not just what's still left, which
+// is what the queue above holds). Persisted for the same pause/remount reason,
+// so the completion popup can report the whole batch's counts after a resume
+// instead of only the cases that ran since it.
+export async function writeBatchCaseIds(caseIds: string[]): Promise<void>
+{
+  await chrome.storage.local.set({ [BATCH_CASE_IDS_STORAGE_KEY]: caseIds });
+}
+
+export async function readBatchCaseIds(): Promise<string[] | undefined>
+{
+  const stored = await chrome.storage.local.get([BATCH_CASE_IDS_STORAGE_KEY]);
+  return stored[BATCH_CASE_IDS_STORAGE_KEY] as string[] | undefined;
+}
+
+// Clears the queue and the batch's full case list together - both describe
+// the same batch, so they start and end at the same moments.
 export async function clearBatchQueue(): Promise<void>
 {
-  await chrome.storage.local.remove([BATCH_QUEUE_STORAGE_KEY]);
+  await chrome.storage.local.remove([BATCH_QUEUE_STORAGE_KEY, BATCH_CASE_IDS_STORAGE_KEY]);
 }
