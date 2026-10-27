@@ -46,7 +46,17 @@ export const PinnedBar = ({
   onPerformAction,
 }: PinnedBarProps) =>
 {
-  const { openPinnedTab, closePinnedTab, isPinnedLoaded, isPinnedActive, isPinnedAudible, getTabIdForPinned, deassociatePinnedTab } = useBookmarkTabsContext();
+  const {
+    openPinnedTab,
+    closePinnedTab,
+    isPinnedLoaded,
+    isPinnedActive,
+    isPinnedAudible,
+    isPinnedDrifted,
+    resetPinnedTab,
+    getTabIdForPinned,
+    deassociatePinnedTab,
+  } = useBookmarkTabsContext();
   const { windowId } = useSpacesContext();
   const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
 
@@ -226,11 +236,17 @@ export const PinnedBar = ({
                 : (s) => chrome.tabs.create({ url: s.url, active: true, windowId: windowId ?? undefined })
           }
           onClose={bookmarkOpenMode === 'arc' ? closePinnedTab : undefined}
+          onReset={
+            bookmarkOpenMode === 'arc'
+              ? (s) => { void resetPinnedTab(s.id, s.url); }
+              : undefined
+          }
           onMoveToNewWindow={bookmarkOpenMode === 'arc' ? movePinnedToNewWindow : undefined}
           onMoveToTabs={bookmarkOpenMode === 'arc' ? deassociatePinnedTab : undefined}
           isLoaded={bookmarkOpenMode === 'arc' ? isPinnedLoaded(site.id) : false}
           isActive={bookmarkOpenMode === 'arc' ? isPinnedActive(site.id) : false}
           isAudible={bookmarkOpenMode === 'arc' ? isPinnedAudible(site.id) : false}
+          isDrifted={bookmarkOpenMode === 'arc' ? isPinnedDrifted(site.id, site.url) : false}
           iconSize={iconSize}
           windowId={windowId ?? undefined}
           isDropTarget={showDropIndicators && overId === `pin-${site.id}`}

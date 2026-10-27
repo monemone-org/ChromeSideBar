@@ -64,11 +64,13 @@ interface PinnedIconProps
   onDuplicate: (id: string) => void;
   onOpen: (site: PinnedSite) => void;
   onClose?: (id: string) => void;
+  onReset?: (site: PinnedSite) => void;
   onMoveToNewWindow?: (id: string) => void;
   onMoveToTabs?: (id: string) => void;
   isLoaded?: boolean;
   isActive?: boolean;
   isAudible?: boolean;
+  isDrifted?: boolean;
   iconSize: number;
   windowId?: number;
   isDropTarget?: boolean;
@@ -84,11 +86,13 @@ export const PinnedIcon = ({
   onDuplicate,
   onOpen,
   onClose,
+  onReset,
   onMoveToNewWindow,
   onMoveToTabs,
   isLoaded,
   isActive,
   isAudible,
+  isDrifted,
   iconSize,
   windowId,
   isDropTarget,
@@ -150,9 +154,14 @@ export const PinnedIcon = ({
       // Cmd/Ctrl/Option+click: open in new tab
       chrome.tabs.create({ url: site.url, windowId });
     }
+    else if (isDrifted && isActive && onReset)
+    {
+      // Arc-style: when already focused and navigated away, click resets to saved URL
+      onReset(site);
+    }
     else
     {
-      // Normal click: open as new pinned tab
+      // Normal click: open / focus pinned tab
       onOpen(site);
     }
   };
@@ -274,7 +283,7 @@ export const PinnedIcon = ({
             style={{ width: iconSize + 8, height: iconSize + 8 }}
             {...attributes}
             {...listeners}
-            title={site.title}
+            title={isDrifted ? `${site.title}\nNavigated away — click again while active to reset` : site.title}
             data-dnd-id={pinId}
             className={clsx(
               "group/pin relative flex items-center justify-center rounded",
@@ -294,6 +303,16 @@ export const PinnedIcon = ({
             {/* Drop indicator - after */}
             {showDropAfter && (
               <div className="absolute -right-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
+            )}
+
+            {/* Arc-style drift marker when live URL differs from saved pin URL */}
+            {isLoaded && isDrifted && !isDragging && (
+              <span
+                className="absolute -right-0.5 -top-0.5 text-[10px] leading-none font-semibold text-gray-500 dark:text-gray-400 pointer-events-none"
+                aria-hidden
+              >
+                /
+              </span>
             )}
 
             {/* Loaded state indicator - bottom-right corner */}
@@ -346,9 +365,14 @@ export const PinnedIcon = ({
             <ContextMenu.Item onSelect={() => chrome.windows.create({ url: site.url })}>
               <ExternalLink size={14} className="mr-2" /> Open in New Window
             </ContextMenu.Item>
-            {isLoaded && (onMoveToNewWindow || onMoveToTabs) && (
+            {isLoaded && (onMoveToNewWindow || onMoveToTabs || (isDrifted && onReset)) && (
               <>
                 <ContextMenu.Separator />
+                {isDrifted && onReset && (
+                  <ContextMenu.Item onSelect={() => onReset(site)}>
+                    <RotateCcw size={14} className="mr-2" /> Reset Tab
+                  </ContextMenu.Item>
+                )}
                 {onMoveToNewWindow && (
                   <ContextMenu.Item onSelect={() => onMoveToNewWindow(site.id)}>
                     <ExternalLink size={14} className="mr-2" /> Move to New Window

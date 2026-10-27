@@ -39,7 +39,8 @@ import {
   SquareArrowOutUpRight,
   SquareStack,
   ArrowRightFromLine,
-  Link
+  Link,
+  RotateCcw
 } from 'lucide-react';
 import { getRandomGroupColor } from '../utils/groupColors';
 import { SpaceFolderIcon } from './SpaceFolderIcon';
@@ -127,14 +128,17 @@ interface BookmarkRowProps {
   isLoaded?: boolean;
   isAudible?: boolean;
   isActive?: boolean;
+  isDrifted?: boolean;
   liveTitle?: string;
   isSelected?: boolean;
   checkIsLoaded?: (bookmarkId: string) => boolean;
   checkIsAudible?: (bookmarkId: string) => boolean;
   checkIsActive?: (bookmarkId: string) => boolean;
+  checkIsDrifted?: (bookmarkId: string, savedUrl: string) => boolean;
   getLiveTitle?: (bookmarkId: string) => string | undefined;
   onOpenBookmark?: (bookmarkId: string, url: string) => void;
   onCloseBookmark?: (bookmarkId: string) => void;
+  onResetBookmark?: (bookmarkId: string, savedUrl: string) => void;
   onOpenAsTabGroup?: (folderId: string, folderName: string) => void;
   onOpenAllTabs?: (folderId: string) => void;
   onOpenAllTabsInNewWindow?: (folderId: string) => void;
@@ -195,10 +199,12 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   isLoaded,
   isAudible,
   isActive,
+  isDrifted,
   liveTitle,
   isSelected,
   onOpenBookmark,
   onCloseBookmark,
+  onResetBookmark,
   onOpenAsTabGroup,
   onOpenAllTabs,
   onOpenAllTabsInNewWindow,
@@ -299,9 +305,16 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     }
   };
 
-  const icon = isFolder ? (
-    <SpaceFolderIcon space={matchingSpace} />
-  ) : node.url ? (
+  const handleResetClick = (e: React.MouseEvent) =>
+  {
+    e.stopPropagation();
+    if (node.url && onResetBookmark)
+    {
+      onResetBookmark(node.id, node.url);
+    }
+  };
+
+  const faviconImg = node.url ? (
     <img
       src={getFaviconUrl(node.url)}
       alt=""
@@ -311,21 +324,50 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
         e.currentTarget.nextElementSibling?.classList.remove('hidden');
       }}
     />
-  ) : (
-    <Globe size={16} className="text-gray-500" />
-  );
+  ) : null;
 
   // Hidden fallback globe
   const fallbackIcon = !isFolder && node.url && (
     <Globe size={16} className="hidden text-gray-500" />
   );
 
-  const combinedIcon = (
-    <>
-      {icon}
-      {fallbackIcon}
-    </>
+  const icon = isFolder ? (
+    <SpaceFolderIcon space={matchingSpace} />
+  ) : node.url ? (
+    isDrifted && onResetBookmark ? (
+      <button
+        type="button"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={handleResetClick}
+        className="flex items-center justify-center w-4 h-4 border-0 bg-transparent p-0 cursor-pointer"
+        title="Reset to saved URL"
+        aria-label="Reset to saved URL"
+      >
+        {faviconImg}
+        {fallbackIcon}
+      </button>
+    ) : (
+      <>
+        {faviconImg}
+        {fallbackIcon}
+      </>
+    )
+  ) : (
+    <Globe size={16} className="text-gray-500" />
   );
+
+  const combinedIcon = icon;
+
+  // Drift marker sits in TreeRow indicators (between icon and title) so it
+  // gets real gap + vertical centering instead of absolute overflow onto the title.
+  const driftIndicator = !isFolder && isDrifted && onResetBookmark ? (
+    <span
+      className="text-[11px] leading-none font-semibold text-gray-500 dark:text-gray-400 select-none"
+      aria-hidden
+    >
+      /
+    </span>
+  ) : undefined;
 
   const actions = (
     <div className="flex items-center">
@@ -398,9 +440,16 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             <TreeRow
               ref={ref}
               depth={depth}
-              title={bookmarkOpenMode === 'arc' && isLoaded && liveTitle ? liveTitle : node.title}
-              tooltip={node.url ? `${node.title}\n${node.url}` : undefined}
+              title={node.title}
+              tooltip={
+                node.url
+                  ? isDrifted
+                    ? `${node.title}\nSaved: ${node.url}${liveTitle ? `\nNow: ${liveTitle}` : ''}\nClick favicon to reset`
+                    : `${node.title}\n${node.url}`
+                  : undefined
+              }
               icon={combinedIcon}
+              indicators={driftIndicator}
               hasChildren={isFolder}
               isExpanded={expandedState[node.id]}
               onToggle={() => toggleFolder(node.id, !expandedState[node.id])}
@@ -568,6 +617,11 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                   <ArrowRightFromLine size={14} className="mr-2" /> Move To Tabs
                 </ContextMenu.Item>
               )}
+              {isLoaded && isDrifted && onResetBookmark && node.url && (
+                <ContextMenu.Item onSelect={() => onResetBookmark(node.id, node.url!)}>
+                  <RotateCcw size={14} className="mr-2" /> Reset Tab
+                </ContextMenu.Item>
+              )}
             </>
           )}
           {!isSpecialFolder && (
@@ -690,6 +744,7 @@ const BookmarkItem = (props: BookmarkRowProps) => {
     checkIsLoaded,
     checkIsAudible,
     checkIsActive,
+    checkIsDrifted,
     getLiveTitle,
     getMatchingSpace,
     checkIsSelected,
@@ -731,6 +786,7 @@ const BookmarkItem = (props: BookmarkRowProps) => {
                 isLoaded={checkIsLoaded ? checkIsLoaded(child.id) : false}
                 isAudible={checkIsAudible ? checkIsAudible(child.id) : false}
                 isActive={checkIsActive ? checkIsActive(child.id) : false}
+                isDrifted={checkIsDrifted && child.url ? checkIsDrifted(child.id, child.url) : false}
                 liveTitle={getLiveTitle ? getLiveTitle(child.id) : undefined}
                 isSelected={checkIsSelected ? checkIsSelected(child.id) : false}
                 onSelectionClick={onChildSelectionClick
@@ -769,7 +825,21 @@ interface BookmarkTreeProps {
 
 export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderBySegments, getAllBookmarksInFolder, getBookmarkSegments, getBookmark, error } = useBookmarks();
-  const { openBookmarkTab, closeBookmarkTab, isBookmarkLoaded, isBookmarkAudible, isBookmarkActive, getBookmarkLiveTitle, deassociateBookmarkTab, getTabIdForBookmark, getItemKeyForTab, restoreItemAssociation, associateExistingTab } = useBookmarkTabsContext();
+  const {
+    openBookmarkTab,
+    closeBookmarkTab,
+    isBookmarkLoaded,
+    isBookmarkAudible,
+    isBookmarkActive,
+    getBookmarkLiveTitle,
+    isBookmarkDrifted,
+    resetBookmarkTab,
+    deassociateBookmarkTab,
+    getTabIdForBookmark,
+    getItemKeyForTab,
+    restoreItemAssociation,
+    associateExistingTab,
+  } = useBookmarkTabsContext();
   const { spaces, updateSpace, updateSpaceFolderPaths, windowId } = useSpacesContext();
   const findSpaceForFolder = useFindSpaceForFolder(getBookmarkSegments, spaces);
 
@@ -2125,14 +2195,17 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               isLoaded={isBookmarkLoaded(node.id)}
               isAudible={isBookmarkAudible(node.id)}
               isActive={isBookmarkActive(node.id)}
+              isDrifted={node.url ? isBookmarkDrifted(node.id, node.url) : false}
               liveTitle={getBookmarkLiveTitle(node.id)}
               isSelected={isBookmarkSelected(node.id)}
               checkIsLoaded={isBookmarkLoaded}
               checkIsAudible={isBookmarkAudible}
               checkIsActive={isBookmarkActive}
+              checkIsDrifted={isBookmarkDrifted}
               getLiveTitle={getBookmarkLiveTitle}
               onOpenBookmark={(bookmarkId, url) => openBookmarkTab(bookmarkId, url, activeSpace?.id)}
               onCloseBookmark={handleCloseBookmarkTab}
+              onResetBookmark={(bookmarkId, savedUrl) => { void resetBookmarkTab(bookmarkId, savedUrl); }}
               onOpenAsTabGroup={!useSpaces ? handleOpenAsTabGroup : undefined}
               onOpenAllTabs={handleOpenAllTabs}
               onOpenAllTabsInNewWindow={handleOpenAllTabsInNewWindow}
