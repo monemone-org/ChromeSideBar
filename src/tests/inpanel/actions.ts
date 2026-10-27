@@ -7,10 +7,11 @@
 
 import { getOrCreateSpaceGroup, moveTabToSpace, regroupAssociatedTab } from '../../utils/tabOperations';
 import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
+import { BookmarkOpenMode } from '../../components/SettingsDialog';
 import { TestStep } from './types';
 import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, sleep } from './stepHelpers';
 import { assertSidebarShowsSpace } from './assertions';
-import { testUrl } from './fixtures';
+import { ARC_SHOW_TAB_TITLE_WHEN_DRIFTED_KEY, BOOKMARK_OPEN_MODE_KEY, testUrl } from './fixtures';
 import { tabHistoryManagerProxy } from '../../managers/proxies/tabHistoryManagerProxy';
 import { lastAudibleTrackerProxy } from '../../managers/proxies/lastAudibleTrackerProxy';
 
@@ -23,6 +24,32 @@ export function setFollowActiveTabMode(mode: FollowActiveTabMode): TestStep
     run: async () =>
     {
       await chrome.storage.local.set({ [FOLLOW_ACTIVE_TAB_KEY]: mode });
+    },
+  };
+}
+
+/** Set the "Open bookmarks" mode via the same chrome.storage.local key Settings writes - App.tsx's useChromeLocalStorage picks the change up through chrome.storage.onChanged, so this is the real setting, not a UI simulation. */
+export function setBookmarkOpenMode(mode: BookmarkOpenMode): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Set "Open bookmarks" to "${mode}"`,
+    run: async () =>
+    {
+      await chrome.storage.local.set({ [BOOKMARK_OPEN_MODE_KEY]: mode });
+    },
+  };
+}
+
+/** Set "Show tab title after navigating away" via the same chrome.storage.local key (and 'true'/'false' string format) Settings writes. */
+export function setArcShowTabTitleWhenDrifted(enabled: boolean): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Set "Show tab title after navigating away" to ${enabled ? 'on' : 'off'}`,
+    run: async () =>
+    {
+      await chrome.storage.local.set({ [ARC_SHOW_TAB_TITLE_WHEN_DRIFTED_KEY]: enabled.toString() });
     },
   };
 }
@@ -498,6 +525,20 @@ export function renameSpace(spaceRef: string, newName: string): TestStep
     {
       const space = resolveSpace(ctx, spaceRef);
       await ctx.updateSpace(space.id, { name: newName });
+    },
+  };
+}
+
+/** Navigate a tab to another URL via the raw chrome.tabs API - fires the same chrome.tabs.onUpdated url/favicon changes clicking a link in the page would. */
+export function navigateTab(tabRef: string, url: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Navigate tab "${tabRef}" to ${url}`,
+    run: async (ctx) =>
+    {
+      const tabId = resolveTabId(ctx, tabRef);
+      await chrome.tabs.update(tabId, { url });
     },
   };
 }

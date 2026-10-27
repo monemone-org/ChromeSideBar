@@ -65,6 +65,7 @@ interface SidebarContentProps
   externalDropTarget: ExternalDropTarget | null;
   bookmarkOpenMode: BookmarkOpenMode;
   arcSingleClickOpensTab: boolean;
+  arcShowTabTitleWhenDrifted: boolean;
   onResolverReady: (fn: ResolveBookmarkDropTarget) => void;
   filterLiveTabs: boolean;
   filterText: string;
@@ -89,6 +90,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   externalDropTarget,
   bookmarkOpenMode,
   arcSingleClickOpensTab,
+  arcShowTabTitleWhenDrifted,
   onResolverReady,
   filterLiveTabs,
   filterText,
@@ -190,6 +192,7 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         externalDropTarget={externalDropTarget}
         bookmarkOpenMode={bookmarkOpenMode}
         arcSingleClickOpensTab={arcSingleClickOpensTab}
+        arcShowTabTitleWhenDrifted={arcShowTabTitleWhenDrifted}
         onResolverReady={onResolverReady}
         filterLiveTabs={filterLiveTabs}
         filterText={filterText}
@@ -586,6 +589,11 @@ function App() {
     true,
     { parse: (v) => v === 'true', serialize: (v) => v.toString() }
   );
+  const [arcShowTabTitleWhenDrifted, setArcShowTabTitleWhenDrifted] = useChromeLocalStorage(
+    'sidebar-arc-show-tab-title-when-drifted',
+    true,
+    { parse: (v) => v === 'true', serialize: (v) => v.toString() }
+  );
   const [audioQuickJump, setAudioQuickJump] = useChromeLocalStorage(
     'sidebar-audio-quick-jump',
     false,
@@ -732,6 +740,7 @@ function App() {
     setBookmarkOpenMode(newSettings.bookmarkOpenMode);
     setSpacesEnabled(newSettings.useSpaces);
     setArcSingleClickOpensTab(newSettings.arcSingleClickOpensTab);
+    setArcShowTabTitleWhenDrifted(newSettings.arcShowTabTitleWhenDrifted);
     setAudioQuickJump(newSettings.audioQuickJump);
     setUseSpaceColor(newSettings.useSpaceColor);
     setSpaceColorAlpha(newSettings.spaceColorAlpha);
@@ -950,6 +959,7 @@ function App() {
           bookmarkOpenMode,
           useSpaces: spacesEnabled,
           arcSingleClickOpensTab,
+          arcShowTabTitleWhenDrifted,
           audioQuickJump,
           useSpaceColor,
           spaceColorAlpha,
@@ -1215,6 +1225,7 @@ function App() {
         externalDropTarget={externalDropTarget}
         bookmarkOpenMode={bookmarkOpenMode}
         arcSingleClickOpensTab={arcSingleClickOpensTab}
+        arcShowTabTitleWhenDrifted={arcShowTabTitleWhenDrifted}
         onResolverReady={(fn) => { bookmarkDropResolverRef.current = fn; }}
         filterLiveTabs={showFilterArea && filterLiveTabs}
         filterText={filterText}

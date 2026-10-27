@@ -10,7 +10,8 @@ import {
   saveTabAssociationBackup,
   removeTabAssociationBackup,
 } from '../utils/tabAssociations';
-import { isUrlDrifted } from '../utils/urlCompare';
+import { isUrlDrifted, isDomainDrifted } from '../utils/urlCompare';
+import { LiveTabInfoMap } from './liveTabInfo';
 
 // Helper to create item keys
 const makeBookmarkKey = (bookmarkId: string) => `bookmark-${bookmarkId}`;
@@ -41,7 +42,9 @@ interface BookmarkTabsContextValue
   getTabIdForPinned: (pinnedId: string) => number | undefined;
   getPinnedLiveTitle: (pinnedId: string) => string | undefined;
   getPinnedLiveUrl: (pinnedId: string) => string | undefined;
+  getPinnedLiveFavIconUrl: (pinnedId: string) => string | undefined;
   isPinnedDrifted: (pinnedId: string, savedUrl: string) => boolean;
+  isPinnedDomainDrifted: (pinnedId: string, savedUrl: string) => boolean;
   resetPinnedTab: (pinnedId: string, savedUrl: string) => Promise<void>;
   deassociatePinnedTab: (pinnedId: string) => Promise<void>;
   // Active item tracking
@@ -81,8 +84,8 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   const [itemToTab, setItemToTab] = useState<Map<string, number>>(new Map());
   const [tabToItem, setTabToItem] = useState<Map<number, string>>(new Map());
   const [audibleTabs, setAudibleTabs] = useState<Set<number>>(new Set());
-  const [tabTitles, setTabTitles] = useState<Map<number, string>>(new Map());
-  const [tabUrls, setTabUrls] = useState<Map<number, string>>(new Map());
+  // Live title/url/favicon of managed tabs
+  const [liveTabs, setLiveTabs] = useState<LiveTabInfoMap>(() => new LiveTabInfoMap());
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -120,11 +123,10 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
       const newItemToTab = new Map<string, number>();
       const newTabToItem = new Map<number, string>();
-      // Seed live titles/urls/audible from existing tabs so drift detection and
+      // Seed live tab info/audible from existing tabs so drift detection and
       // tooltips work immediately on sidebar reopen — chrome.tabs.onUpdated only
       // fires on future changes, so without this the maps stay empty until navigation.
-      const newTabTitles = new Map<number, string>();
-      const newTabUrls = new Map<number, string>();
+      let newLiveTabs = new LiveTabInfoMap();
       const newAudibleTabs = new Set<number>();
 
       // Validate each stored tabId still exists
@@ -154,14 +156,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
             const itemKey = associations[tabId];
             newItemToTab.set(itemKey, tabId);
             newTabToItem.set(tabId, itemKey);
-            if (tab.title)
-            {
-              newTabTitles.set(tabId, tab.title);
-            }
-            if (tab.url)
-            {
-              newTabUrls.set(tabId, tab.url);
-            }
+            newLiveTabs = newLiveTabs.withTab(tabId, tab);
             if (tab.audible)
             {
               newAudibleTabs.add(tabId);
@@ -185,8 +180,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
 
       setItemToTab(newItemToTab);
       setTabToItem(newTabToItem);
-      setTabTitles(newTabTitles);
-      setTabUrls(newTabUrls);
+      setLiveTabs(newLiveTabs);
       setAudibleTabs(newAudibleTabs);
       setIsInitialized(true);
     }
@@ -225,19 +219,8 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           return newMap;
         });
 
-        // Clean up title / url
-        setTabTitles((prevTitles) =>
-        {
-          const newMap = new Map(prevTitles);
-          newMap.delete(tabId);
-          return newMap;
-        });
-        setTabUrls((prevUrls) =>
-        {
-          const newMap = new Map(prevUrls);
-          newMap.delete(tabId);
-          return newMap;
-        });
+        // Clean up live tab info
+        setLiveTabs((prev) => prev.withoutTab(tabId));
 
         // Clean up audible state
         if (import.meta.env.DEV)
@@ -327,7 +310,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     };
   }, [currentWindowId, removeLocalTabAssociation]);
 
-  // Listen for tab audible, title, and URL changes
+  // Listen for tab audible, title, URL, and favicon changes
   useEffect(() =>
   {
     const handleTabUpdated = (
@@ -353,8 +336,8 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         });
       }
 
-      // Track title/url changes for managed tabs only
-      if (changeInfo.title !== undefined || changeInfo.url !== undefined)
+      // Track title/url/favicon changes for managed tabs only
+      if (changeInfo.title !== undefined || changeInfo.url !== undefined || changeInfo.favIconUrl !== undefined)
       {
         setTabToItem((prev) =>
         {
@@ -362,24 +345,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           {
             return prev;
           }
-          if (changeInfo.title !== undefined)
-          {
-            setTabTitles((prevTitles) =>
-            {
-              const newMap = new Map(prevTitles);
-              newMap.set(tabId, changeInfo.title!);
-              return newMap;
-            });
-          }
-          if (changeInfo.url !== undefined)
-          {
-            setTabUrls((prevUrls) =>
-            {
-              const newMap = new Map(prevUrls);
-              newMap.set(tabId, changeInfo.url!);
-              return newMap;
-            });
-          }
+          setLiveTabs((prevLiveTabs) => prevLiveTabs.withChanges(tabId, changeInfo));
           return prev;
         });
       }
@@ -491,21 +457,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
           newMap.set(tabId, itemKey);
           return newMap;
         });
-        setTabUrls((prev) =>
-        {
-          const newMap = new Map(prev);
-          newMap.set(tabId, createdUrl);
-          return newMap;
-        });
-        if (tab.title)
-        {
-          setTabTitles((prev) =>
-          {
-            const newMap = new Map(prev);
-            newMap.set(tabId, tab.title!);
-            return newMap;
-          });
-        }
+        setLiveTabs((prev) => prev.withTab(tabId, { ...tab, url: createdUrl }));
 
         // Register space with background for bookmark tabs
         if (spaceId && windowId)
@@ -618,14 +570,14 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   const getBookmarkLiveTitle = useCallback((bookmarkId: string): string | undefined =>
   {
     const tabId = itemToTab.get(makeBookmarkKey(bookmarkId));
-    return tabId !== undefined ? tabTitles.get(tabId) : undefined;
-  }, [itemToTab, tabTitles]);
+    return tabId !== undefined ? liveTabs.get(tabId)?.title : undefined;
+  }, [itemToTab, liveTabs]);
 
   const getBookmarkLiveUrl = useCallback((bookmarkId: string): string | undefined =>
   {
     const tabId = itemToTab.get(makeBookmarkKey(bookmarkId));
-    return tabId !== undefined ? tabUrls.get(tabId) : undefined;
-  }, [itemToTab, tabUrls]);
+    return tabId !== undefined ? liveTabs.get(tabId)?.url : undefined;
+  }, [itemToTab, liveTabs]);
 
   const isBookmarkDrifted = useCallback((bookmarkId: string, savedUrl: string): boolean =>
   {
@@ -643,12 +595,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
       {
         handleError('reset');
         // Optimistically mark as back on the saved URL; onUpdated will confirm.
-        setTabUrls((prev) =>
-        {
-          const newMap = new Map(prev);
-          newMap.set(tabId, savedUrl);
-          return newMap;
-        });
+        setLiveTabs((prev) => prev.withUrl(tabId, savedUrl));
         resolve();
       });
     });
@@ -704,24 +651,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     chrome.tabs.get(tabId, (tab) =>
     {
       if (chrome.runtime.lastError || !tab) return;
-      if (tab.url)
-      {
-        setTabUrls((prev) =>
-        {
-          const newMap = new Map(prev);
-          newMap.set(tabId, tab.url!);
-          return newMap;
-        });
-      }
-      if (tab.title)
-      {
-        setTabTitles((prev) =>
-        {
-          const newMap = new Map(prev);
-          newMap.set(tabId, tab.title!);
-          return newMap;
-        });
-      }
+      setLiveTabs((prev) => prev.withTab(tabId, tab));
     });
   }, [storeAssociation, currentWindowId]);
 
@@ -746,24 +676,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     chrome.tabs.get(tabId, (tab) =>
     {
       if (chrome.runtime.lastError || !tab) return;
-      if (tab.url)
-      {
-        setTabUrls((prev) =>
-        {
-          const newMap = new Map(prev);
-          newMap.set(tabId, tab.url!);
-          return newMap;
-        });
-      }
-      if (tab.title)
-      {
-        setTabTitles((prev) =>
-        {
-          const newMap = new Map(prev);
-          newMap.set(tabId, tab.title!);
-          return newMap;
-        });
-      }
+      setLiveTabs((prev) => prev.withTab(tabId, tab));
     });
   }, [storeAssociation]);
 
@@ -809,18 +722,29 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   const getPinnedLiveTitle = useCallback((pinnedId: string): string | undefined =>
   {
     const tabId = itemToTab.get(makePinnedKey(pinnedId));
-    return tabId !== undefined ? tabTitles.get(tabId) : undefined;
-  }, [itemToTab, tabTitles]);
+    return tabId !== undefined ? liveTabs.get(tabId)?.title : undefined;
+  }, [itemToTab, liveTabs]);
 
   const getPinnedLiveUrl = useCallback((pinnedId: string): string | undefined =>
   {
     const tabId = itemToTab.get(makePinnedKey(pinnedId));
-    return tabId !== undefined ? tabUrls.get(tabId) : undefined;
-  }, [itemToTab, tabUrls]);
+    return tabId !== undefined ? liveTabs.get(tabId)?.url : undefined;
+  }, [itemToTab, liveTabs]);
+
+  const getPinnedLiveFavIconUrl = useCallback((pinnedId: string): string | undefined =>
+  {
+    const tabId = itemToTab.get(makePinnedKey(pinnedId));
+    return tabId !== undefined ? liveTabs.get(tabId)?.favIconUrl : undefined;
+  }, [itemToTab, liveTabs]);
 
   const isPinnedDrifted = useCallback((pinnedId: string, savedUrl: string): boolean =>
   {
     return isUrlDrifted(savedUrl, getPinnedLiveUrl(pinnedId));
+  }, [getPinnedLiveUrl]);
+
+  const isPinnedDomainDrifted = useCallback((pinnedId: string, savedUrl: string): boolean =>
+  {
+    return isDomainDrifted(savedUrl, getPinnedLiveUrl(pinnedId));
   }, [getPinnedLiveUrl]);
 
   const resetPinnedTab = useCallback(async (pinnedId: string, savedUrl: string): Promise<void> =>
@@ -902,7 +826,9 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     getTabIdForPinned,
     getPinnedLiveTitle,
     getPinnedLiveUrl,
+    getPinnedLiveFavIconUrl,
     isPinnedDrifted,
+    isPinnedDomainDrifted,
     resetPinnedTab,
     deassociatePinnedTab,
     getActiveItemKey,
@@ -932,7 +858,9 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     getTabIdForPinned,
     getPinnedLiveTitle,
     getPinnedLiveUrl,
+    getPinnedLiveFavIconUrl,
     isPinnedDrifted,
+    isPinnedDomainDrifted,
     resetPinnedTab,
     deassociatePinnedTab,
     getActiveItemKey,

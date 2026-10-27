@@ -9,6 +9,8 @@ import { useSpacesContext } from '../contexts/SpacesContext';
 import { useUnifiedDnd, DropHandler } from '../contexts/UnifiedDndContext';
 import { BookmarkOpenMode } from './SettingsDialog';
 import { matchesFilter } from '../utils/searchParser';
+import { isDomainDrifted } from '../utils/urlCompare';
+import { fetchFaviconAsBase64, getFaviconUrl } from '../utils/favicon';
 import { DragData, DragFormat, DropData, DropPosition, acceptsFormats, getItemsByFormat, getPrimaryItem, hasFormat } from '../types/dragDrop';
 
 interface PinnedBarProps
@@ -20,7 +22,8 @@ interface PinnedBarProps
               url: string,
               favicon?: string,
               customIconName?: string,
-              iconColor?: string) => void;
+              iconColor?: string,
+              emoji?: string) => void;
   resetFavicon: (id: string) => void;
   movePin: (activeId: string, overId: string, position?: 'before' | 'after') => void;
   duplicatePin: (id: string, liveUrl?: string, liveTitle?: string, liveFavicon?: string) => void;
@@ -53,11 +56,30 @@ export const PinnedBar = ({
     isPinnedActive,
     isPinnedAudible,
     isPinnedDrifted,
+    isPinnedDomainDrifted,
     resetPinnedTab,
+    getPinnedLiveTitle,
+    getPinnedLiveUrl,
+    getPinnedLiveFavIconUrl,
     getTabIdForPinned,
     deassociatePinnedTab,
   } = useBookmarkTabsContext();
   const { windowId } = useSpacesContext();
+
+  // "Replace Pinned URL with Current": save the tab's URL as the pin's URL.
+  // A pin stores its favicon as an image, so moving to another domain also
+  // fetches the new site's icon - otherwise the pin keeps the old site's icon
+  // with nothing left (no drift badge) to show the mismatch.
+  const handleReplaceWithCurrent = useCallback(async (site: PinnedSite, liveUrl: string) =>
+  {
+    let favicon = site.favicon;
+    // Custom icons and emoji are the user's choice; only refresh the site's own favicon
+    if (isDomainDrifted(site.url, liveUrl) && !site.customIconName && !site.emoji)
+    {
+      favicon = await fetchFaviconAsBase64(getFaviconUrl(liveUrl)) ?? favicon;
+    }
+    updatePin(site.id, site.title, liveUrl, favicon, site.customIconName, site.iconColor, site.emoji);
+  }, [updatePin]);
   const { activeDragData, overId, dropPosition, registerDropHandler, unregisterDropHandler } = useUnifiedDnd();
 
   // Move pinned tab to a new window
@@ -241,12 +263,21 @@ export const PinnedBar = ({
               ? (s) => { void resetPinnedTab(s.id, s.url); }
               : undefined
           }
+          onReplaceWithCurrent={
+            bookmarkOpenMode === 'arc'
+              ? (s, liveUrl) => { void handleReplaceWithCurrent(s, liveUrl); }
+              : undefined
+          }
           onMoveToNewWindow={bookmarkOpenMode === 'arc' ? movePinnedToNewWindow : undefined}
           onMoveToTabs={bookmarkOpenMode === 'arc' ? deassociatePinnedTab : undefined}
           isLoaded={bookmarkOpenMode === 'arc' ? isPinnedLoaded(site.id) : false}
           isActive={bookmarkOpenMode === 'arc' ? isPinnedActive(site.id) : false}
           isAudible={bookmarkOpenMode === 'arc' ? isPinnedAudible(site.id) : false}
           isDrifted={bookmarkOpenMode === 'arc' ? isPinnedDrifted(site.id, site.url) : false}
+          isDomainDrifted={bookmarkOpenMode === 'arc' ? isPinnedDomainDrifted(site.id, site.url) : false}
+          liveTitle={bookmarkOpenMode === 'arc' ? getPinnedLiveTitle(site.id) : undefined}
+          liveUrl={bookmarkOpenMode === 'arc' ? getPinnedLiveUrl(site.id) : undefined}
+          liveFavIconUrl={bookmarkOpenMode === 'arc' ? getPinnedLiveFavIconUrl(site.id) : undefined}
           iconSize={iconSize}
           windowId={windowId ?? undefined}
           isDropTarget={showDropIndicators && overId === `pin-${site.id}`}

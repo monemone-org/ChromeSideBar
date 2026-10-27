@@ -40,7 +40,8 @@ import {
   SquareStack,
   ArrowRightFromLine,
   Link,
-  RotateCcw
+  RotateCcw,
+  Replace
 } from 'lucide-react';
 import { getRandomGroupColor } from '../utils/groupColors';
 import { SpaceFolderIcon } from './SpaceFolderIcon';
@@ -59,6 +60,8 @@ import { useFindSpaceForFolder } from '../hooks/useFindSpaceForFolder';
 import { UndoableAction } from '../actions/types';
 import { DeleteBookmarkAction } from '../actions/deleteBookmarkAction';
 import { CloseTabAction } from '../actions/closeTabAction';
+import { HoverHint } from './HoverHint';
+import { BOOKMARK_GO_BACK_HINT, buildDriftTooltip } from '../utils/driftTooltip';
 
 // Standard Chrome bookmark folder IDs
 const BOOKMARKS_BAR_ID = '1';
@@ -68,6 +71,16 @@ const MOBILE_BOOKMARKS_ID = '3';
 // Storage key for persisting folder expand/collapse state across restarts (keyed by space only)
 const getExpandedStateKey = (spaceId: string) =>
   `bookmarkExpandedState_${spaceId}`;
+
+// Marker shown between favicon and title when a bookmark's tab has navigated
+// away from the saved URL (reads as "bookmark / current page", like Arc)
+const BOOKMARK_DRIFT_MARKER = '/';
+
+// Instant hover hint on a drifted bookmark's favicon and drift marker
+const BOOKMARK_DRIFT_HINT = 'Click to go back to the bookmarked URL';
+// Align the drift hint with the row's title so the cursor doesn't cover it
+const getBookmarkRowTitle = (anchor: HTMLElement) =>
+  anchor.closest('[data-bookmark-id]')?.querySelector('[data-tree-row-title]');
 
 // Special folder IDs that cannot be edited/deleted
 const SPECIAL_FOLDER_IDS = [BOOKMARKS_BAR_ID, OTHER_BOOKMARKS_ID, MOBILE_BOOKMARKS_ID];
@@ -125,6 +138,7 @@ interface BookmarkRowProps {
   // Bookmark opening behavior
   bookmarkOpenMode?: BookmarkOpenMode;
   arcSingleClickOpensTab?: boolean;
+  arcShowTabTitleWhenDrifted?: boolean;
   isLoaded?: boolean;
   isAudible?: boolean;
   isActive?: boolean;
@@ -139,6 +153,7 @@ interface BookmarkRowProps {
   onOpenBookmark?: (bookmarkId: string, url: string) => void;
   onCloseBookmark?: (bookmarkId: string) => void;
   onResetBookmark?: (bookmarkId: string, savedUrl: string) => void;
+  onReplaceBookmarkWithCurrent?: (bookmarkId: string, title: string) => void;
   onOpenAsTabGroup?: (folderId: string, folderName: string) => void;
   onOpenAllTabs?: (folderId: string) => void;
   onOpenAllTabsInNewWindow?: (folderId: string) => void;
@@ -196,6 +211,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   dropPosition,
   bookmarkOpenMode = 'arc',
   arcSingleClickOpensTab = true,
+  arcShowTabTitleWhenDrifted = true,
   isLoaded,
   isAudible,
   isActive,
@@ -205,6 +221,7 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
   onOpenBookmark,
   onCloseBookmark,
   onResetBookmark,
+  onReplaceBookmarkWithCurrent,
   onOpenAsTabGroup,
   onOpenAllTabs,
   onOpenAllTabsInNewWindow,
@@ -335,17 +352,18 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     <SpaceFolderIcon space={matchingSpace} />
   ) : node.url ? (
     isDrifted && onResetBookmark ? (
-      <button
-        type="button"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={handleResetClick}
-        className="flex items-center justify-center w-4 h-4 border-0 bg-transparent p-0 cursor-pointer"
-        title="Reset to saved URL"
-        aria-label="Reset to saved URL"
-      >
-        {faviconImg}
-        {fallbackIcon}
-      </button>
+      <HoverHint text={BOOKMARK_DRIFT_HINT} getAlignElement={getBookmarkRowTitle} className="flex items-center justify-center">
+        <button
+          type="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={handleResetClick}
+          className="flex items-center justify-center w-4 h-4 border-0 bg-transparent p-0 cursor-pointer"
+          aria-label={BOOKMARK_DRIFT_HINT}
+        >
+          {faviconImg}
+          {fallbackIcon}
+        </button>
+      </HoverHint>
     ) : (
       <>
         {faviconImg}
@@ -360,13 +378,20 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
 
   // Drift marker sits in TreeRow indicators (between icon and title) so it
   // gets real gap + vertical centering instead of absolute overflow onto the title.
+  // Clicking the marker goes back to the bookmarked URL, same as the favicon.
   const driftIndicator = !isFolder && isDrifted && onResetBookmark ? (
-    <span
-      className="text-[11px] leading-none font-semibold text-gray-500 dark:text-gray-400 select-none"
-      aria-hidden
-    >
-      /
-    </span>
+    <HoverHint text={BOOKMARK_DRIFT_HINT} getAlignElement={getBookmarkRowTitle} className="flex items-center">
+      <button
+        type="button"
+        data-testid="bookmark-drift-marker"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={handleResetClick}
+        className="border-0 bg-transparent p-0 ml-0.5 cursor-pointer [font-size:inherit] leading-none font-light text-gray-400 dark:text-gray-500 select-none"
+        aria-label={BOOKMARK_DRIFT_HINT}
+      >
+        {BOOKMARK_DRIFT_MARKER}
+      </button>
+    </HoverHint>
   ) : undefined;
 
   const actions = (
@@ -432,6 +457,9 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
     ? <Volume2 size={SPEAKER_ICON_SIZE} />
     : undefined;
 
+  // Arc mode: once the tab leaves the bookmarked URL, show the tab's title instead of the bookmark name
+  const showLiveTitle = bookmarkOpenMode === 'arc' && arcShowTabTitleWhenDrifted && isLoaded && isDrifted && !!liveTitle;
+
   return (
     <ContextMenu.Root>
       {({ isOpen }) => (
@@ -440,12 +468,18 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
             <TreeRow
               ref={ref}
               depth={depth}
-              title={node.title}
+              title={showLiveTitle ? liveTitle : node.title}
               tooltip={
                 node.url
-                  ? isDrifted
-                    ? `${node.title}\nSaved: ${node.url}${liveTitle ? `\nNow: ${liveTitle}` : ''}\nClick favicon to reset`
-                    : `${node.title}\n${node.url}`
+                  ? buildDriftTooltip({
+                    name: node.title,
+                    savedUrl: node.url,
+                    isDrifted: !!isDrifted,
+                    liveTitle,
+                    // The row already shows the tab's title when showLiveTitle is on
+                    showNowLine: !showLiveTitle,
+                    goBackHint: BOOKMARK_GO_BACK_HINT,
+                  })
                   : undefined
               }
               icon={combinedIcon}
@@ -617,19 +651,26 @@ const BookmarkRow = forwardRef<HTMLDivElement, BookmarkRowProps>(({
                   <ArrowRightFromLine size={14} className="mr-2" /> Move To Tabs
                 </ContextMenu.Item>
               )}
-              {isLoaded && isDrifted && onResetBookmark && node.url && (
-                <ContextMenu.Item onSelect={() => onResetBookmark(node.id, node.url!)}>
-                  <RotateCcw size={14} className="mr-2" /> Reset Tab
-                </ContextMenu.Item>
-              )}
             </>
           )}
           {!isSpecialFolder && (
             <>
               <ContextMenu.Separator />
+              {/* Saved URL: go back to it or replace it (when drifted), or edit it */}
+              {isLoaded && isDrifted && onResetBookmark && node.url && (
+                <ContextMenu.Item onSelect={() => onResetBookmark(node.id, node.url!)}>
+                  <RotateCcw size={14} className="mr-2" /> Back to Bookmarked URL
+                </ContextMenu.Item>
+              )}
+              {isLoaded && isDrifted && onReplaceBookmarkWithCurrent && node.url && (
+                <ContextMenu.Item onSelect={() => onReplaceBookmarkWithCurrent(node.id, node.title)}>
+                  <Replace size={14} className="mr-2" /> Replace Bookmarked URL with Current
+                </ContextMenu.Item>
+              )}
               <ContextMenu.Item onSelect={() => onEdit(node)}>
-                <Pencil size={14} className="mr-2" /> Edit
+                <Pencil size={14} className="mr-2" /> Edit...
               </ContextMenu.Item>
+              <ContextMenu.Separator />
               {isLoaded && !isFolder && onCloseBookmark ? (
                 <>
                   <ContextMenu.Item onSelect={() => onCloseBookmark(node.id)}>
@@ -814,6 +855,7 @@ interface BookmarkTreeProps {
   externalDropTarget?: ExternalDropTarget | null;
   bookmarkOpenMode?: BookmarkOpenMode;
   arcSingleClickOpensTab?: boolean;
+  arcShowTabTitleWhenDrifted?: boolean;
   onResolverReady?: (resolver: ResolveBookmarkDropTarget) => void;
   filterLiveTabs?: boolean;
   filterText?: string;
@@ -823,7 +865,7 @@ interface BookmarkTreeProps {
   useSpaces?: boolean;
 }
 
-export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true }: BookmarkTreeProps) => {
+export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false, externalDropTarget, bookmarkOpenMode = 'arc', arcSingleClickOpensTab = true, arcShowTabTitleWhenDrifted = true, onResolverReady, filterLiveTabs = false, filterText = '', activeSpace, onShowToast, onPerformAction, useSpaces = true }: BookmarkTreeProps) => {
   const { bookmarks, updateBookmark, createFolder, createBookmark, sortBookmarks, moveBookmark, duplicateBookmark, findFolderBySegments, getAllBookmarksInFolder, getBookmarkSegments, getBookmark, error } = useBookmarks();
   const {
     openBookmarkTab,
@@ -832,6 +874,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
     isBookmarkAudible,
     isBookmarkActive,
     getBookmarkLiveTitle,
+    getBookmarkLiveUrl,
     isBookmarkDrifted,
     resetBookmarkTab,
     deassociateBookmarkTab,
@@ -1048,6 +1091,14 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       updateBookmark(id, title, url);
     }
   }, [updateBookmark, editingNode, spaces, getBookmarkSegments, updateSpaceFolderPaths]);
+
+  // Overwrite a drifted bookmark's saved URL with its tab's current URL, keeping the title
+  const handleReplaceBookmarkWithCurrent = useCallback((bookmarkId: string, title: string) =>
+  {
+    const liveUrl = getBookmarkLiveUrl(bookmarkId);
+    if (!liveUrl) return;
+    updateBookmark(bookmarkId, title, liveUrl);
+  }, [getBookmarkLiveUrl, updateBookmark]);
 
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<string | null>(null);
   const [creatingBookmarkParentId, setCreatingBookmarkParentId] = useState<string | null>(null);
@@ -2192,6 +2243,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               dropPosition={dropPosition}
               bookmarkOpenMode={bookmarkOpenMode}
               arcSingleClickOpensTab={arcSingleClickOpensTab}
+              arcShowTabTitleWhenDrifted={arcShowTabTitleWhenDrifted}
               isLoaded={isBookmarkLoaded(node.id)}
               isAudible={isBookmarkAudible(node.id)}
               isActive={isBookmarkActive(node.id)}
@@ -2206,6 +2258,7 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
               onOpenBookmark={(bookmarkId, url) => openBookmarkTab(bookmarkId, url, activeSpace?.id)}
               onCloseBookmark={handleCloseBookmarkTab}
               onResetBookmark={(bookmarkId, savedUrl) => { void resetBookmarkTab(bookmarkId, savedUrl); }}
+              onReplaceBookmarkWithCurrent={handleReplaceBookmarkWithCurrent}
               onOpenAsTabGroup={!useSpaces ? handleOpenAsTabGroup : undefined}
               onOpenAllTabs={handleOpenAllTabs}
               onOpenAllTabsInNewWindow={handleOpenAllTabsInNewWindow}

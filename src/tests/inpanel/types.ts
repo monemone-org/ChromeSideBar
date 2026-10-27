@@ -73,6 +73,11 @@ export interface TestContext
   // What a bookmark row's "Move To Tabs" menu item calls: breaks the
   // association, leaving the tab open where it is.
   deassociateBookmarkTab: (bookmarkId: string) => void;
+  // What the "Back to Bookmarked URL" / "Back to Pinned URL" menu items (and
+  // clicking a drifted bookmark's favicon) call: navigate the tab back to the
+  // saved URL.
+  resetBookmarkTab: (bookmarkId: string, savedUrl: string) => Promise<void>;
+  resetPinnedTab: (pinnedId: string, savedUrl: string) => Promise<void>;
 
   // Pinned sites (usePinnedSites). The whole hook surface, not just add and
   // remove: Section P's point is that every one of these reaches

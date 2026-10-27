@@ -1,5 +1,7 @@
 # TODO
 
+- [] show number of opened tab in Space header
+
 - [] multi-select tabs and "add to bookmark..." behavie differently from single tab selection.  single tab's add to bookmark will move the tab over as assoicated bookmark tab.  multi-select case doesn't.  We should make multi-select be consistent.  And we should probably named the menu item "Move to bookmark(s)..."
 
 - [] a new menu option to clean up duplicated tabs in the active window.
@@ -341,4 +343,20 @@ There are many copies of code to scroll to a bookmark row in bookmarktree and ta
 - [x] add a "Email Us" menu item . email to chrome-dev@monemone.org
 
 - [x] hotkey to jump between spaces
+
+- PR #6
+  - [x] wording:
+    - [x] "Back to Pinned URL"
+    - [x] "Back to Bookmarked URL"
+  - [x] Pinned button -do not show "/".  Show the new domain's favicon instead of bluedot when drifting to a different domain.  
+    - [x] Bookmark- add "Replace Bookmarked URL with Current" below "Edit"
+    - [x] PinnedSite- add "Replace Pinned URL with Current" below "Edit"
+  - Find a new position in popup menu for the "Back to ... URL" menu item in Pinned site and bookmark
+  - [x] Rename "Edit" in context menus to "Edit..."
+  - [x] pinned button - need a better way to present the drifted domain favicon.
+  - [x] the tooltip for bookmark when drifted away needs clean up  
+  - [x] the tooltip for pinned site when drifted away need clean up
+  - [x] new position in popup menu for "Back to Pinned/Bookmarked URL"
+
+
 

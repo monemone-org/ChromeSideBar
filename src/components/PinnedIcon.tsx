@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Globe, Pencil, Trash, X, RotateCcw, Play, Copy, ExternalLink, Link, ArrowRightFromLine } from 'lucide-react';
+import { Globe, Pencil, Trash, X, RotateCcw, Play, Copy, ExternalLink, Link, ArrowRightFromLine, Replace } from 'lucide-react';
 import { Dialog } from './Dialog';
 import { PinnedSite, getFaviconUrl, fetchFaviconAsBase64 } from '../hooks/usePinnedSites';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
@@ -8,6 +8,7 @@ import * as ContextMenu from './menu/ContextMenu';
 import { IconColorPicker, PINNED_SITE_COLORS, DEFAULT_ICON_COLOR } from './IconColorPicker';
 import { iconToDataUrl } from '../utils/iconify';
 import { createPinDragData, DropData, DropPosition, DragFormat, acceptsFormats } from '../types/dragDrop';
+import { buildDriftTooltip, PIN_GO_BACK_HINT } from '../utils/driftTooltip';
 
 /**
  * Shared visual component for pinned icon rendering.
@@ -65,12 +66,17 @@ interface PinnedIconProps
   onOpen: (site: PinnedSite) => void;
   onClose?: (id: string) => void;
   onReset?: (site: PinnedSite) => void;
+  onReplaceWithCurrent?: (site: PinnedSite, liveUrl: string) => void;
   onMoveToNewWindow?: (id: string) => void;
   onMoveToTabs?: (id: string) => void;
   isLoaded?: boolean;
   isActive?: boolean;
   isAudible?: boolean;
   isDrifted?: boolean;
+  isDomainDrifted?: boolean;
+  liveTitle?: string;
+  liveUrl?: string;
+  liveFavIconUrl?: string;
   iconSize: number;
   windowId?: number;
   isDropTarget?: boolean;
@@ -87,12 +93,17 @@ export const PinnedIcon = ({
   onOpen,
   onClose,
   onReset,
+  onReplaceWithCurrent,
   onMoveToNewWindow,
   onMoveToTabs,
   isLoaded,
   isActive,
   isAudible,
   isDrifted,
+  isDomainDrifted,
+  liveUrl,
+  liveFavIconUrl,
+  liveTitle,
   iconSize,
   windowId,
   isDropTarget,
@@ -110,6 +121,8 @@ export const PinnedIcon = ({
   const iconRef = useRef<HTMLDivElement>(null);
 
   const pinId = `pin-${site.id}`;
+
+  const showDomainBadge = isDomainDrifted && !!liveUrl;
 
   // Draggable setup
   const {
@@ -154,15 +167,20 @@ export const PinnedIcon = ({
       // Cmd/Ctrl/Option+click: open in new tab
       chrome.tabs.create({ url: site.url, windowId });
     }
-    else if (isDrifted && isActive && onReset)
-    {
-      // Arc-style: when already focused and navigated away, click resets to saved URL
-      onReset(site);
-    }
     else
     {
       // Normal click: open / focus pinned tab
       onOpen(site);
+    }
+  };
+
+  const handleDoubleClick = (e: React.MouseEvent) =>
+  {
+    // Double-click on a drifted pin navigates back to the pinned URL
+    if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (isDrifted && onReset)
+    {
+      onReset(site);
     }
   };
 
@@ -283,7 +301,15 @@ export const PinnedIcon = ({
             style={{ width: iconSize + 8, height: iconSize + 8 }}
             {...attributes}
             {...listeners}
-            title={isDrifted ? `${site.title}\nNavigated away — click again while active to reset` : site.title}
+            title={buildDriftTooltip({
+              name: site.title,
+              savedUrl: site.url,
+              isDrifted: !!isDrifted,
+              liveTitle,
+              // A pin button shows no title, so the tooltip is the only place to see where the tab went
+              showNowLine: true,
+              goBackHint: PIN_GO_BACK_HINT,
+            })}
             data-dnd-id={pinId}
             className={clsx(
               "group/pin relative flex items-center justify-center rounded",
@@ -292,6 +318,7 @@ export const PinnedIcon = ({
               isActive && !isDragging && "ring-2 ring-cyan-500 dark:ring-cyan-400"
             )}
             onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
           >
             {/* Drop indicator - before */}
             {showDropBefore && (
@@ -305,18 +332,8 @@ export const PinnedIcon = ({
               <div className="absolute -right-1 top-0 bottom-0 w-0.5 bg-blue-500 rounded-full" />
             )}
 
-            {/* Arc-style drift marker when live URL differs from saved pin URL */}
-            {isLoaded && isDrifted && !isDragging && (
-              <span
-                className="absolute -right-0.5 -top-0.5 text-[10px] leading-none font-semibold text-gray-500 dark:text-gray-400 pointer-events-none"
-                aria-hidden
-              >
-                /
-              </span>
-            )}
-
             {/* Loaded state indicator - bottom-right corner */}
-            {/* Play triangle when audible, dot otherwise */}
+            {/* Play triangle when audible, new domain's favicon when navigated to another domain, dot otherwise */}
             {isLoaded && !isDragging && (
               isAudible ? (
                 <Play
@@ -328,8 +345,23 @@ export const PinnedIcon = ({
                       : "text-cyan-500 dark:text-cyan-400"
                   )}
                 />
+              ) : showDomainBadge ? (
+                <img
+                  data-testid="pin-drift-favicon"
+                  src={liveFavIconUrl ?? getFaviconUrl(liveUrl!)}
+                  alt=""
+                  className={clsx(
+                    // Badge sits on a round light chip so it stays readable over the pin's own icon
+                    // and over dark/transparent favicons; the chip is softer in the dark theme
+                    // Overall transparency keeps bold favicons from competing with the pin's own icon
+                    "absolute -bottom-0.5 -right-0.5 w-[13px] h-[13px] p-px rounded-full pointer-events-none opacity-[0.85]",
+                    "bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.08)]",
+                    "dark:bg-white/70 dark:shadow-none"
+                  )}
+                />
               ) : (
                 <span
+                  data-testid="pin-loaded-dot"
                   className={clsx(
                     "absolute bottom-0 right-0 w-2 h-2 rounded-full",
                     isActive
@@ -365,14 +397,9 @@ export const PinnedIcon = ({
             <ContextMenu.Item onSelect={() => chrome.windows.create({ url: site.url })}>
               <ExternalLink size={14} className="mr-2" /> Open in New Window
             </ContextMenu.Item>
-            {isLoaded && (onMoveToNewWindow || onMoveToTabs || (isDrifted && onReset)) && (
+            {isLoaded && (onMoveToNewWindow || onMoveToTabs) && (
               <>
                 <ContextMenu.Separator />
-                {isDrifted && onReset && (
-                  <ContextMenu.Item onSelect={() => onReset(site)}>
-                    <RotateCcw size={14} className="mr-2" /> Reset Tab
-                  </ContextMenu.Item>
-                )}
                 {onMoveToNewWindow && (
                   <ContextMenu.Item onSelect={() => onMoveToNewWindow(site.id)}>
                     <ExternalLink size={14} className="mr-2" /> Move to New Window
@@ -386,9 +413,21 @@ export const PinnedIcon = ({
               </>
             )}
             <ContextMenu.Separator />
+            {/* Saved URL: go back to it or replace it (when drifted), or edit it */}
+            {isLoaded && isDrifted && onReset && (
+              <ContextMenu.Item onSelect={() => onReset(site)}>
+                <RotateCcw size={14} className="mr-2" /> Back to Pinned URL
+              </ContextMenu.Item>
+            )}
+            {isLoaded && isDrifted && liveUrl && onReplaceWithCurrent && (
+              <ContextMenu.Item onSelect={() => onReplaceWithCurrent(site, liveUrl)}>
+                <Replace size={14} className="mr-2" /> Replace Pinned URL with Current
+              </ContextMenu.Item>
+            )}
             <ContextMenu.Item onSelect={handleEdit}>
-              <Pencil size={14} className="mr-2" /> Edit
+              <Pencil size={14} className="mr-2" /> Edit...
             </ContextMenu.Item>
+            <ContextMenu.Separator />
             {isLoaded && onClose && (
               <ContextMenu.Item onSelect={() => onClose(site.id)}>
                 <X size={14} className="mr-2" /> Close Tab

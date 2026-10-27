@@ -10,7 +10,20 @@ import { DEFAULT_FOLLOW_ACTIVE_TAB_MODE, FOLLOW_ACTIVE_TAB_KEY } from '../../uti
 import { TestContext } from './types';
 import { sleep } from './stepHelpers';
 
+// chrome.storage.local key Settings writes for "Show tab title after navigating away"
+// (see the useChromeLocalStorage call for arcShowTabTitleWhenDrifted in App.tsx)
+export const ARC_SHOW_TAB_TITLE_WHEN_DRIFTED_KEY = 'sidebar-arc-show-tab-title-when-drifted';
+
+// chrome.storage.local key Settings writes for "Open bookmarks", and its default
+// (see the useChromeLocalStorage call for bookmarkOpenMode in App.tsx)
+export const BOOKMARK_OPEN_MODE_KEY = 'sidebar-bookmark-open-mode';
+const DEFAULT_BOOKMARK_OPEN_MODE = 'arc';
+
 export const TEST_URL_PREFIX = 'https://example.com/inpanel-test-';
+// Same tagging on a second domain, for cases that navigate a tab off
+// example.com (Section U's URL-drift cases). Not www.example.com: drift
+// detection ignores a leading "www.", so that would count as the same domain.
+export const TEST_OTHER_DOMAIN_URL_PREFIX = 'https://example.org/inpanel-test-';
 export const TEST_ROOT_FOLDER_TITLE = 'InPanel Test Data (safe to delete)';
 export const TEST_PINNED_PREFIX = 'InPanelTest: ';
 const OTHER_BOOKMARKS_ID = '2';
@@ -41,12 +54,20 @@ export const TEST_AUDIO_URL = 'https://www.youtube.com/watch?v=-W2JdSl1v48';
 function isTestTabUrl(url: string | undefined): boolean
 {
   if (!url) return false;
-  return url.startsWith(TEST_URL_PREFIX) || url.startsWith(TEST_AUDIO_URL);
+  return url.startsWith(TEST_URL_PREFIX)
+    || url.startsWith(TEST_OTHER_DOMAIN_URL_PREFIX)
+    || url.startsWith(TEST_AUDIO_URL);
 }
 
 export function testUrl(label: string): string
 {
   return `${TEST_URL_PREFIX}${label}`;
+}
+
+/** A test URL on a different domain than testUrl()'s, for drift-to-another-domain checks. */
+export function testOtherDomainUrl(label: string): string
+{
+  return `${TEST_OTHER_DOMAIN_URL_PREFIX}${label}`;
 }
 
 // Yield long enough for a React state update to commit and flow into
@@ -348,4 +369,11 @@ export async function resetTestData(getCtx: () => TestContext): Promise<void>
   // prior preference was - same as the manual test doc already requires
   // testers to flip this in Settings and expect to reset it back by hand.
   await chrome.storage.local.set({ [FOLLOW_ACTIVE_TAB_KEY]: DEFAULT_FOLLOW_ACTIVE_TAB_MODE });
+
+  // Section U cases set "Open bookmarks" to Arc and flip "Show tab title after
+  // navigating away"; reset both to their defaults (Arc, on) for the same reason
+  await chrome.storage.local.set({
+    [BOOKMARK_OPEN_MODE_KEY]: DEFAULT_BOOKMARK_OPEN_MODE,
+    [ARC_SHOW_TAB_TITLE_WHEN_DRIFTED_KEY]: 'true',
+  });
 }

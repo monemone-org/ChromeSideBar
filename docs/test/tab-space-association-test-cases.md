@@ -98,6 +98,9 @@ Which cases below are automated by the DEV-only in-panel test runner (`src/tests
 | P.8  | Yes - guided |
 | P.9  | Yes - import only; export stays manual |
 | P.10 | Yes - guided |
+| U.1  | Yes     |
+| U.2  | Yes     |
+| U.3  | Yes     |
 
 All of Section P is automated in `src/tests/inpanel/cases/sectionP.ts`. Its
 mutations go through the same `usePinnedSites` callbacks the pinned bar uses,
@@ -830,3 +833,70 @@ own mirror, so every check is machine-made and only the actions are yours.
 | 3    | At the pause: reorder that pin in window 1, and nothing else | Window 2 still shows it |
 | 4    | At the pause: unpin it in window 1, watching it actually disappear there | Window 2's mirror drops it too |
 | 5    | At the pause: add a pin in **window 2** (the runner's own window) | Window 1 shows it. This direction needs your eyes - the runner can't read the other window's mirror - so it is a `confirm` pause |
+
+---
+
+## Section U - URL drift
+
+A pinned site's or bookmark's tab has **drifted** when it navigates away from
+the saved URL. Drift is only tracked when **Open bookmarks** is set to Arc, so
+every case switches to Arc first. Automated in
+`src/tests/inpanel/cases/sectionU.ts`; every check reads the sidebar's DOM.
+
+The two kinds of item react differently to the same navigation:
+
+- **Pins** compare the full URL to decide they have drifted (drift tooltip,
+  **Back to Pinned URL**), but only replace the loaded dot with the new site's
+  favicon when the **domain** changes. A leading `www.` is ignored, so
+  `figma.com` and `www.figma.com` are the same domain, while
+  `mail.google.com` and `accounts.google.com` are not.
+- **Bookmarks** compare the full URL, so a path change on the same domain
+  already counts as drifted. What a drifted row shows depends on the Arc
+  setting **Show tab title after navigating away**. When it is off, the row
+  keeps the bookmark's name (U.2). When it is on, which is the default, the
+  row shows the tab's title instead (U.3). The drift marker shows either way.
+  The bookmark cases set this option themselves, and cleanup turns it back on.
+
+The cases navigate between `https://example.com/inpanel-test-...` and
+`https://example.org/inpanel-test-...`. Both prefixes are test-tagged, so
+cleanup closes a tab left on either one.
+
+### U.1 Pinned site button follows its tab drifting away and back
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Add a pin; don't open it | No indicator in the button's corner; plain tooltip |
+| 2    | Click the pin to open its tab | Loaded dot; plain tooltip |
+| 3    | In the tab, navigate to another path on the same domain | Still the loaded dot; tooltip adds "Now: <tab title>" and "Double-click to go back" |
+| 4    | Navigate to a different domain | The dot is replaced by the new site's favicon; tooltip adds "Now: <tab title>" and "Double-click to go back" |
+| 5    | Right-click the pin → **Back to Pinned URL** | Loaded dot again; plain tooltip |
+| 6    | Navigate to a different domain again | New site's favicon badge again |
+| 7    | Close the tab | No indicator; plain tooltip |
+
+### U.2 Bookmark row follows its tab drifting away and back (tab title setting off)
+
+Turn off **Show tab title after navigating away** in Settings → Behaviour first.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Add a bookmark to a space's folder and switch to that space; don't open it | Not loaded; no drift marker; the bookmark's name |
+| 2    | Click the bookmark to open its tab | Loaded (Close tab button showing); no drift marker; the bookmark's name |
+| 3    | In the tab, navigate to another path on the same domain | Drift marker appears next to the title; still the bookmark's name |
+| 4    | Navigate to a different domain | Drift marker still showing; still the bookmark's name |
+| 5    | Right-click the bookmark → **Back to Bookmarked URL** | Drift marker gone; still loaded |
+| 6    | Navigate to a different domain again | Drift marker again |
+| 7    | Close the tab | Not loaded; no drift marker; the bookmark's name |
+
+### U.3 Bookmark row shows its tab title while drifted (tab title setting on)
+
+Turn on **Show tab title after navigating away** in Settings → Behaviour first (it is on by default).
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Add a bookmark to a space's folder and switch to that space; don't open it | Not loaded; no drift marker; the bookmark's name |
+| 2    | Click the bookmark to open its tab | Loaded; still the bookmark's name, even though the page has its own title |
+| 3    | In the tab, navigate to another path on the same domain | The row shows the tab's title; drift marker appears |
+| 4    | Navigate to a different domain | The row shows the new page's title; drift marker still showing |
+| 5    | Right-click the bookmark → **Back to Bookmarked URL** | The bookmark's name again; drift marker gone; still loaded |
+| 6    | Navigate to a different domain again | The tab's title again; drift marker again |
+| 7    | Close the tab | Not loaded; no drift marker; the bookmark's name |

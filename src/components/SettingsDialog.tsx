@@ -13,6 +13,7 @@ export interface SettingsValues {
   bookmarkOpenMode: BookmarkOpenMode;
   useSpaces: boolean;
   arcSingleClickOpensTab: boolean;
+  arcShowTabTitleWhenDrifted: boolean;
   audioQuickJump: boolean;
   useSpaceColor: boolean;
   spaceColorAlpha: number;  // 1-100 percent
@@ -42,6 +43,7 @@ export function SettingsDialog({
   const [tempBookmarkOpenMode, setTempBookmarkOpenMode] = useState(settings.bookmarkOpenMode);
   const [tempUseSpaces, setTempUseSpaces] = useState(settings.useSpaces);
   const [tempArcSingleClickOpensTab, setTempArcSingleClickOpensTab] = useState(settings.arcSingleClickOpensTab);
+  const [tempArcShowTabTitleWhenDrifted, setTempArcShowTabTitleWhenDrifted] = useState(settings.arcShowTabTitleWhenDrifted);
   const [tempAudioQuickJump, setTempAudioQuickJump] = useState(settings.audioQuickJump);
   const [tempUseSpaceColor, setTempUseSpaceColor] = useState(settings.useSpaceColor);
   const [tempSpaceColorAlpha, setTempSpaceColorAlpha] = useState(settings.spaceColorAlpha);
@@ -70,6 +72,7 @@ export function SettingsDialog({
       setTempBookmarkOpenMode(settings.bookmarkOpenMode);
       setTempUseSpaces(settings.useSpaces);
       setTempArcSingleClickOpensTab(settings.arcSingleClickOpensTab);
+      setTempArcShowTabTitleWhenDrifted(settings.arcShowTabTitleWhenDrifted);
       setTempAudioQuickJump(settings.audioQuickJump);
       setTempUseSpaceColor(settings.useSpaceColor);
       setTempSpaceColorAlpha(settings.spaceColorAlpha);
@@ -88,6 +91,7 @@ export function SettingsDialog({
       bookmarkOpenMode: tempBookmarkOpenMode,
       useSpaces: tempUseSpaces,
       arcSingleClickOpensTab: tempArcSingleClickOpensTab,
+      arcShowTabTitleWhenDrifted: tempArcShowTabTitleWhenDrifted,
       audioQuickJump: tempAudioQuickJump,
       useSpaceColor: tempUseSpaceColor,
       spaceColorAlpha: tempSpaceColorAlpha,
@@ -268,6 +272,26 @@ export function SettingsDialog({
                   {tempArcSingleClickOpensTab
                     ? "Single click opens the bookmark as a live tab"
                     : "Single click selects; use the hover open button to load"}
+                </p>
+              </div>
+            )}
+
+            {/* Bookmark title after navigating away (Arc mode only) */}
+            {tempBookmarkOpenMode === 'arc' && (
+              <div>
+                <label className="flex items-center gap-2 text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={tempArcShowTabTitleWhenDrifted}
+                    onChange={(e) => setTempArcShowTabTitleWhenDrifted(e.target.checked)}
+                    className="rounded border-gray-300 dark:border-gray-600"
+                  />
+                  Show tab title after navigating away
+                </label>
+                <p className="mt-0.5 text-gray-500 dark:text-gray-400 ml-5">
+                  {tempArcShowTabTitleWhenDrifted
+                    ? "A bookmark shows the tab's title once its tab leaves the bookmarked URL"
+                    : "A bookmark always shows its own name"}
                 </p>
               </div>
             )}

@@ -146,7 +146,7 @@ export const TreeRow = forwardRef<HTMLDivElement, TreeRowProps>(({
       )}
 
       {/* Title */}
-      <div className={clsx("flex-1 truncate min-w-0", isActive && "font-semibold underline underline-offset-2")}>
+      <div data-tree-row-title className={clsx("flex-1 truncate min-w-0", isActive && "font-semibold underline underline-offset-2")}>
         {title}
       </div>
 
