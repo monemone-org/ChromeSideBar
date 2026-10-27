@@ -2,8 +2,19 @@
 
 ## Latest Version
 
+- New: pinned sites and bookmarks notice when their tab navigates away from the saved URL (Arc style)
+  - A bookmark shows a "/" before its title; click the icon or the "/" to go back to the bookmarked URL
+  - A pinned site that moves to another site shows that site's icon in its corner; double-click the pin to go back
+  - New menu items "Back to Pinned/Bookmarked URL" and "Replace Pinned/Bookmarked URL with Current"
+- New: "Show tab title after navigating away" setting (Settings > Behaviour, Arc style) - a bookmark whose tab has left the bookmarked URL shows the page's title instead of the bookmark's name
 - Fixed: tab history navigation (including keyboard shortcuts) and audio quick-jump now always take you to the tab, even when "Follow active tab" is Off
 - Fixed: "Show active tab" button now works when the active tab is in another space
+- Fixed: moving a bookmark to another space's folder now moves its open tab into that space's group too
+- Fixed: activating a pinned site's tab no longer switches space when the tab was dragged into a space's group
+- Fixed: a tab's space now follows the Chrome group it is actually in, rather than an outdated record
+- Fixed: spaces imported from Arc or from an older backup now show their bookmarks straight away, instead of "Folder not found" until Chrome was restarted
+- Fixed: a deleted space no longer lingers in the Space Navigator
+- Fixed: pin changes made at the same moment as a background icon update are no longer lost
 
 ## 1.0.326
 
