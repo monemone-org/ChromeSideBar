@@ -1,6 +1,6 @@
 ## Changelog
 
-## Latest Version
+## 1.0.350
 
 - New: pinned sites and bookmarks notice when their tab navigates away from the saved URL (Arc style)
   - A bookmark shows a "/" before its title; click the icon or the "/" to go back to the bookmarked URL

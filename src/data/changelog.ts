@@ -2,6 +2,10 @@
 // Omit a version entirely if it contains only bug fixes or internal changes.
 // Entries are shown in the "What's New" dialog when the user upgrades past them.
 export const CHANGELOG: Record<string, string[]> = {
+  '1.0.350': [
+    'New: pinned sites and bookmarks notice when their tab navigates away from the saved URL, with UI to go back to the saved URL or replace it with the current page',
+    'New: "Show tab title after navigating away" setting - turn off to always show the bookmark\'s name instead of the current tab\'s name',
+  ],
   '1.0.326': [
     'New: "Follow active tab" setting - choose whether switching tabs follows the sidebar to the tab\'s space, scrolls it into view, or does nothing',
     'New: "Show active tab" toolbar button - jump to the currently active tab on demand',
