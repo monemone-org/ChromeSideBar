@@ -6,11 +6,12 @@
 // when two things happen in one particular order, so most of them use
 // background's DEV-only test hooks (backgroundHooks.ts) to hold background at
 // a named point, fail one call, or send a broadcast of the case's choosing.
-// T.1 needs real audio instead, so it is guided.
+// T.1 needs real audio instead, so it is guided, unless the run is
+// unattended and plays the DEV-only tone page itself.
 
 import { TestCase, TestStep } from '../types';
 import { createTestBookmark, createTestSpace, TEST_AUDIO_URL, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { bookmarkExistingTab, closeTab, openBookmarkTab, openRegularTab, pause, switchSpaceVerified } from '../actions';
+import { bookmarkExistingTab, closeTab, openAudioTab, openBookmarkTab, openRegularTab, pause, playTestAudio, switchSpaceVerified } from '../actions';
 import { assertBookmarkLoaded, assertTabAudible } from '../assertions';
 import { resolveStringRef, resolveTabId } from '../stepHelpers';
 import {
@@ -115,7 +116,9 @@ export const T1_PLAYING_TAB_ONTO_BOOKMARK: TestCase = {
   },
   steps: [
     ...switchSpaceVerified('spaceA'),
-    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceA', tabRef: 'audioTab' }),
+    // YouTube, or in unattended mode the tone page the pause below can start
+    // itself (see AudioTestPage)
+    openAudioTab({ spaceRef: 'spaceA', tabRef: 'audioTab' }),
 
     pause(
       'Manual step: start audio playback',
@@ -123,7 +126,8 @@ export const T1_PLAYING_TAB_ONTO_BOOKMARK: TestCase = {
         'Switch to the newly opened YouTube tab in Chrome.',
         'Press play and let it play for a second or two - unmuted, a muted tab does not count as audible.',
         'Come back to the sidebar and click Resume below.',
-      ]
+      ],
+      { auto: playTestAudio('audioTab') }
     ),
     assertTabAudible('audioTab', true),
 

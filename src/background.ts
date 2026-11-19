@@ -16,6 +16,7 @@ import {
   BackgroundTestHookRequest,
   BackgroundTestHookResponse,
 } from './managers/shared/backgroundTestHooksApi';
+import { DEV_TEST_RUN_COMMAND_ACTION, DevTestRunCommandReply } from './utils/devTestCommand';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -877,63 +878,131 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 // Keyboard Shortcuts
 // =============================================================================
 
+// The commands in public/manifest.json's "commands" block that handleCommand
+// acts on (_execute_side_panel is handled by Chrome itself)
+const SHORTCUT_COMMANDS = ['prev-used-tab', 'next-used-tab', 'open-space-navigator'] as const;
+type ShortcutCommand = typeof SHORTCUT_COMMANDS[number];
+
+function isShortcutCommand(command: unknown): command is ShortcutCommand
+{
+  return SHORTCUT_COMMANDS.includes(command as ShortcutCommand);
+}
+
+/**
+ * What a keyboard shortcut does. Resolves once the command has finished,
+ * including the history navigation, so a caller that awaits it can check the
+ * result straight away.
+ *
+ * `windowId` is left out for a real key press, which acts on the active tab
+ * of the current window exactly as before. The DEV-only test trigger below
+ * passes the side panel's own window, because the panel under test is not
+ * necessarily in the window Chrome considers current.
+ *
+ * Returns whether it acted: false for an unknown command, or when there is no
+ * active tab to act from (no such window, or a window without tabs). A key
+ * press ignores that, as it always has; the test trigger reports it.
+ */
+async function handleCommand(command: string, windowId?: number): Promise<boolean>
+{
+  await stateReady;
+
+  const activeTabQuery: chrome.tabs.QueryInfo = windowId === undefined
+    ? { active: true, currentWindow: true }
+    : { active: true, windowId };
+
+  // History Back/Forward: step the active tab's window through its tab history
+  if (command === "prev-used-tab" || command === "next-used-tab")
+  {
+    const tabs = await chrome.tabs.query(activeTabQuery);
+    if (tabs.length === 0) return false;
+    const direction = command === "prev-used-tab" ? -1 : 1;
+    await historyManager.navigate(tabs[0].windowId, direction);
+    return true;
+  }
+
+  // Open Space Navigator as a focused popup window so it reliably receives keyboard input
+  if (command === "open-space-navigator")
+  {
+    const tabs = await chrome.tabs.query(activeTabQuery);
+    if (tabs.length === 0) return false;
+    const targetWindowId = tabs[0].windowId;
+    const win = await chrome.windows.get(targetWindowId);
+
+    // Size the popup to fit all spaces without scrolling (capped at 480px content height).
+    // Measured from SpaceNavigatorApp.tsx / SpaceList.tsx rendering (Tailwind defaults, 1rem = 16px):
+    //   headerHeight = 37   ("Navigate to Space" row: py-2 padding 16 + text-sm line-height 20 + border-b 1)
+    //   searchBoxHeight = 39 (search row: py-1.5 padding 12 + input py-1 padding 8
+    //                         + input text-xs line-height 16 + input border 2 + border-b 1)
+    //   listPadding = 8    (SpaceList's rows container: py-1 padding, top + bottom)
+    //   rowHeight = 28     (each space row: h-7)
+    const spaces = spaceManager.getSpaces();
+    const itemCount = spaces.length + 1; // +1 for the "All" space
+    const popupWidth = 300;
+    const headerHeight = 37;
+    const searchBoxHeight = 39;
+    const listPadding = 8;
+    const rowHeight = 28;
+    const bottomPadding = 10;
+    const contentHeight = headerHeight + searchBoxHeight + listPadding + itemCount * rowHeight + bottomPadding;
+    const popupHeight = Math.min(contentHeight, 480) + 30; // +30 for OS title bar
+
+    // Center the popup within the browser window
+    const left = Math.round((win.left ?? 0) + ((win.width ?? 1200) - popupWidth) / 2);
+    const top = Math.round((win.top ?? 0) + ((win.height ?? 800) - popupHeight) / 2);
+
+    await chrome.windows.create({
+      url: chrome.runtime.getURL(`navigator.html?windowId=${targetWindowId}`),
+      type: 'popup',
+      focused: true,
+      width: popupWidth,
+      height: popupHeight,
+      left,
+      top,
+    });
+    return true;
+  }
+
+  return false;
+}
+
 chrome.commands.onCommand.addListener((command) =>
 {
-  (async () =>
+  handleCommand(command).catch((error) =>
   {
-    await stateReady;
-
-    if (command === "prev-used-tab" || command === "next-used-tab")
+    if (import.meta.env.DEV)
     {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) =>
-      {
-        if (tabs.length === 0) return;
-        const direction = command === "prev-used-tab" ? -1 : 1;
-        historyManager.navigate(tabs[0].windowId, direction);
-      });
+      console.log(`[commands] "${command}" failed:`, error);
     }
-
-    // Open Space Navigator as a focused popup window so it reliably receives keyboard input
-    if (command === "open-space-navigator")
-    {
-      chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) =>
-      {
-        if (tabs.length === 0) return;
-        const windowId = tabs[0].windowId;
-        const win = await chrome.windows.get(windowId);
-
-        // Size the popup to fit all spaces without scrolling (capped at 480px content height).
-        // Measured from SpaceNavigatorApp.tsx / SpaceList.tsx rendering (Tailwind defaults, 1rem = 16px):
-        //   headerHeight = 37   ("Navigate to Space" row: py-2 padding 16 + text-sm line-height 20 + border-b 1)
-        //   searchBoxHeight = 39 (search row: py-1.5 padding 12 + input py-1 padding 8
-        //                         + input text-xs line-height 16 + input border 2 + border-b 1)
-        //   listPadding = 8    (SpaceList's rows container: py-1 padding, top + bottom)
-        //   rowHeight = 28     (each space row: h-7)
-        const spaces = spaceManager.getSpaces();
-        const itemCount = spaces.length + 1; // +1 for the "All" space
-        const popupWidth = 300;
-        const headerHeight = 37;
-        const searchBoxHeight = 39;
-        const listPadding = 8;
-        const rowHeight = 28;
-        const bottomPadding = 10;
-        const contentHeight = headerHeight + searchBoxHeight + listPadding + itemCount * rowHeight + bottomPadding;
-        const popupHeight = Math.min(contentHeight, 480) + 30; // +30 for OS title bar
-
-        // Center the popup within the browser window
-        const left = Math.round((win.left ?? 0) + ((win.width ?? 1200) - popupWidth) / 2);
-        const top = Math.round((win.top ?? 0) + ((win.height ?? 800) - popupHeight) / 2);
-
-        chrome.windows.create({
-          url: chrome.runtime.getURL(`navigator.html?windowId=${windowId}`),
-          type: 'popup',
-          focused: true,
-          width: popupWidth,
-          height: popupHeight,
-          left,
-          top,
-        });
-      });
-    }
-  })();
+  });
 });
+
+// DEV-only stand-in for pressing a shortcut, for the in-panel test runner's
+// unattended mode (C.2c): an extension cannot press its own keys, so the
+// runner sends this message and background runs the same handleCommand a key
+// press reaches. That covers everything after Chrome dispatches the command,
+// not the key binding or the onCommand registration, which manual mode still
+// exercises. Compiled out of release builds.
+if (import.meta.env.DEV)
+{
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
+  {
+    if (message?.action !== DEV_TEST_RUN_COMMAND_ACTION) return;
+    const reply = (r: DevTestRunCommandReply) => sendResponse(r);
+
+    // Only the commands the manifest defines, acting on the window the test names
+    if (!isShortcutCommand(message.command) || typeof message.windowId !== 'number')
+    {
+      reply({ error: `${DEV_TEST_RUN_COMMAND_ACTION}: expected one of [${SHORTCUT_COMMANDS.join(', ')}] and a numeric windowId, got command "${message.command}", windowId ${message.windowId}` });
+      return;
+    }
+
+    // Reply only after the command has finished, so the test's next
+    // assertion does not race the navigation
+    handleCommand(message.command, message.windowId)
+      .then((acted) => reply(acted
+        ? { ok: true }
+        : { error: `"${message.command}" did nothing: window ${message.windowId} has no active tab (or no longer exists)` }))
+      .catch((error) => reply({ error: String(error) }));
+    return true;  // async response
+  });
+}

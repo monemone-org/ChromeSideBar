@@ -107,15 +107,60 @@ export interface TestContext
 
 export type StepRunner = (ctx: TestContext) => Promise<void>;
 
+// The ids a ResumeState checkpoint carries (see its doc comment below) - all
+// a closed-panel runner has to go on, since it runs with no TestContext.
+export type SavedRefs = Record<string, string | number>;
+
+// Does a pause's action on the parked page (test-parked.html, see parked.ts),
+// where the sidebar app is unloaded and no React context exists - so it gets
+// only the checkpoint's saved refs and must use raw chrome.* calls.
+export type ClosedPanelRunner = (refs: SavedRefs) => Promise<void>;
+
+// What a pause asks of the tester, and how unattended mode can stand in for
+// them. A pause keeps its written instruction either way: with unattended
+// mode off, it behaves as it always has.
+//
+// - `confirm` turns a pause into a question the tester answers Pass or Fail,
+//   for checks the runner structurally cannot make (does a row render a
+//   favicon? did a dropdown appear?). The answer becomes a TestResult like
+//   any assert. Omit it for pauses that only ask for an action to be
+//   performed, e.g. reloading the extension.
+// - `auto` runs inline inside the panel, like an action step, for actions
+//   the panel can do while alive. On a `confirm` pause it replaces the
+//   tester's judgement, so it throws when the answer would have been Fail.
+// - `whilePanelClosed` runs on the parked page, for actions that have to
+//   happen while nothing of the sidebar app is listening.
+// - `external` names an action only something outside the extension can do
+//   (see ExternalAction). The panel treats such a pause exactly like a
+//   manual one - banner, written instruction, Resume button - and only the
+//   driver script (tools/run-inpanel-tests.mjs) acts on it, by reading the
+//   checkpoint, doing the action and clicking Resume.
+//
+// The union allows at most one of `auto`, `whilePanelClosed` and `external`,
+// and no `confirm` next to `whilePanelClosed` or `external`: neither has
+// anybody to ask, and the panel only comes back once the step is over.
+export type PauseAutomation =
+  | { confirm?: string; auto?: StepRunner; whilePanelClosed?: undefined; external?: undefined }
+  | { confirm?: undefined; auto?: undefined; whilePanelClosed?: ClosedPanelRunner; external?: undefined }
+  | { confirm?: undefined; auto?: undefined; whilePanelClosed?: undefined; external: ExternalAction };
+
+// What the driver script does for a pause marked `external`, from outside
+// the extension over the DevTools protocol:
+// - 'stop-service-worker': closes the extension's service worker target,
+//   which stops it the way DevTools' Stop button does.
+// - 'reload-extension': reloads the extension from chrome://extensions, then
+//   reopens the side panel in the test window.
+// - 'clear-browsing-data': deletes Chrome's browsing history for all time
+//   through the Clear browsing data dialog, which also drops the stored
+//   favicons. The driver does this only when Chrome runs on a profile inside
+//   the project's tools/tmp/ folder and is not signed in to any account;
+//   otherwise it leaves the pause to a person.
+export type ExternalAction = 'stop-service-worker' | 'reload-extension' | 'clear-browsing-data';
+
 export type TestStep =
   | { kind: 'action'; label: string; run: StepRunner }
   | { kind: 'assert'; label: string; run: StepRunner }
-  // `confirm` turns a pause into a question the tester answers Pass or Fail,
-  // for checks the runner structurally cannot make (does a row render a
-  // favicon? did a dropdown appear?). The answer becomes a TestResult like
-  // any assert. Omit it for pauses that only ask for an action to be
-  // performed, e.g. reloading the extension.
-  | { kind: 'pause'; label: string; instruction: string; confirm?: string };
+  | ({ kind: 'pause'; label: string; instruction: string } & PauseAutomation);
 
 export interface TestCase
 {
@@ -143,5 +188,17 @@ export interface ResumeState
   caseId: string;
   stepIndex: number;               // index of the pause step just completed
   results: TestResult[];           // results accumulated before the pause
-  refs: Record<string, string | number>;
+  refs: SavedRefs;
+  // Written by the parked page (parked.ts) after it ran the pause step's
+  // whilePanelClosed. Exactly one is set once it has run: parkedError when
+  // the action threw, so the resumed run records a failed step instead of
+  // carrying on as though the action had happened; parkedCompleted when it
+  // succeeded. Neither is set on a checkpoint the parked page never touched,
+  // which is how the panel tells a parked step from a manual one on mount.
+  parkedError?: string;
+  parkedCompleted?: boolean;
+  // Copied from the pause step's `external` when it has one, so the driver
+  // script can tell from storage alone which pauses it should act on. Absent
+  // on every other checkpoint.
+  external?: ExternalAction;
 }

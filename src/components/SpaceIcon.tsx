@@ -145,6 +145,8 @@ export const SpaceIcon: React.FC<SpaceIconProps> = ({
       data-space-id={space.id}
       data-space-button="true"
       data-dnd-id={spaceId}
+      // Mirrors the drop-target ring below; read by the in-panel test runner's F.1 drag
+      data-test-drop-target={isDropTarget || undefined}
       className={clsx(
         "relative",
         "hover:scale-105 focus:outline-none",

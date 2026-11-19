@@ -4,8 +4,8 @@
 import { TestCase, TestStep } from '../types';
 import { tabHistoryManagerProxy } from '../../../managers/proxies/tabHistoryManagerProxy';
 import { resolveTabId } from '../stepHelpers';
-import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_AUDIO_URL, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { activateTabNative, closeTesterWindow, navigateTabHistory, openBookmarkTab, openPageForTester, openPinnedTab, openRegularTab, pause, switchSpaceVerified } from '../actions';
+import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import { activateTabNative, closeTesterWindow, navigateTabHistory, openAudioTab, openBookmarkTab, openPageForTester, openPinnedTab, openRegularTab, pause, playTestAudio, stopTestAudio, switchSpaceVerified } from '../actions';
 import { assertAudioListIncludes, assertBookmarkLoaded, assertPinnedLoaded, assertTabActive, assertTabAudible, assertTabInSpace } from '../assertions';
 
 // The runner's pause/resume checkpoint (runner.ts) persists to
@@ -44,7 +44,8 @@ export const E1_RELOAD_EXTENSION: TestCase = {
       [
         'In the `chrome://extensions` tab that just opened, find this extension and click its **reload** button (circular arrow icon).',
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { external: 'reload-extension' }
     ),
 
     // Same browser session, so Chrome keeps the tab ids stable across an
@@ -76,7 +77,9 @@ function assertPreviousHistoryEntry(tabRef: string): TestStep
     {
       const tabId = resolveTabId(ctx, tabRef);
       const history = await tabHistoryManagerProxy.getHistoryDetails(ctx.windowId);
-      const previous = history.before[history.before.length - 1];
+      // getHistoryDetails lists `before` most recent first (the order the
+      // Previous dropdown shows), so the entry Previous goes to is the first
+      const previous = history.before[0];
 
       if (!previous)
       {
@@ -87,11 +90,16 @@ function assertPreviousHistoryEntry(tabRef: string): TestStep
 
       if (previous.tabId !== tabId)
       {
-        const entries = [...history.before, ...history.after]
-          .map(item => `${item.index}:${item.tabId} "${item.title}"`)
-          .join(', ');
+        // Oldest first, with the current position marked: `before` is
+        // reversed back into stack order so the listing reads left to right
+        const describe = (item: { index: number; tabId: number; title: string }) => `${item.index}:${item.tabId} "${item.title}"`;
+        const entries = [
+          ...[...history.before].reverse().map(describe),
+          `${history.currentIndex}: (current)`,
+          ...history.after.map(describe),
+        ].join(', ');
         throw new Error(`expected the previous entry to be tab ${tabId}, got ${previous.tabId} ("${previous.title}"). `
-          + `Full history: [${entries}], currentIndex ${history.currentIndex}`);
+          + `Full history, oldest first: [${entries}]`);
       }
     },
   };
@@ -133,7 +141,9 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
     activateTabNative('tab1'),
 
     ...switchSpaceVerified('spaceB'),
-    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceB', tabRef: 'audioTab' }),
+    // YouTube, or in unattended mode the DEV-only tone page that the two
+    // pauses below can start and stop themselves (see AudioTestPage)
+    openAudioTab({ spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
     pause(
       'Manual step: start audio playback',
@@ -141,7 +151,8 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
         'Switch to the newly opened YouTube tab in Chrome.',
         'Press play and let it play for a second or two (unmuted - a muted tab does not count as audible).',
         'Come back to the sidebar and click Resume below.',
-      ]
+      ],
+      { auto: playTestAudio('audioTab') }
     ),
     assertTabAudible('audioTab', true),
 
@@ -151,7 +162,8 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
         'Switch back to the YouTube tab and pause it, so the tab goes silent.',
         'Leave the tab open - it has to survive into the restart.',
         'Come back to the sidebar and click Resume below.',
-      ]
+      ],
+      { auto: stopTestAudio('audioTab') }
     ),
     assertTabAudible('audioTab', false),
 
@@ -178,7 +190,8 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
         'In those DevTools, go to **Application** -> **Service Workers** and click **Stop** - waiting a minute or so for it to idle out works too.',
         'Do NOT click the extension\'s **reload** button - that is a fresh extension load and clears chrome.storage.session, which is exactly what this case needs kept.',
         'Come back to this window by clicking inside the sidebar, not a tab, and click Resume below.',
-      ]
+      ],
+      { external: 'stop-service-worker' }
     ),
     // The first proxy call wakes the worker, which runs load() on every
     // manager before the router dispatches anything. Reading the history

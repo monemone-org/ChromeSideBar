@@ -21,19 +21,25 @@ import { PinnedSite } from '../../hooks/usePinnedSites';
 import { useFindSpaceForFolder } from '../../hooks/useFindSpaceForFolder';
 import { ResumeState, TestCase, TestContext, TestResult } from './types';
 import {
+  claimParkedCheckpoint,
   clearAllCaseResults,
   clearBatchQueue,
   clearResumeState,
+  isParkedStepResult,
   readAllCaseResults,
   readBatchCaseIds,
   readBatchQueue,
   readResumeState,
+  resumedStart,
   runFrom,
+  RunOutcome,
+  UNATTENDED_STORAGE_KEY,
+  UnattendedMode,
   writeBatchCaseIds,
   writeBatchQueue,
   writeCaseResult,
 } from './runner';
-import { resetTestData } from './fixtures';
+import { AudioTestPage, resetTestData } from './fixtures';
 import { sleep } from './stepHelpers';
 import { ALL_CASES } from './cases';
 
@@ -46,6 +52,16 @@ import { ALL_CASES } from './cases';
 // resetTestData()/setup() don't read still-empty context state right after a
 // remount.
 const RESUME_SETTLE_MS = 800;
+
+// How long an automatic resume (unattended mode, back from the parked page)
+// waits for the panel's contexts to finish loading (see waitForPanelReady)
+// before going ahead anyway.
+const AUTO_RESUME_READY_TIMEOUT_MS = 10000;
+const AUTO_RESUME_READY_POLL_MS = 100;
+
+// The DEV-only page the panel parks on while a panel-closed step runs in
+// unattended mode - see src/tests/inpanel/parked.ts.
+const PARKED_PAGE_PATH = 'test-parked.html';
 
 interface TestRunnerPanelProps
 {
@@ -105,10 +121,49 @@ function summarize(results: TestResult[]): CaseSummary
  * in Chrome's own UI (usually with the panel closed) before resuming. Worth
  * surfacing in the list: it's the difference between a case you can kick off
  * and walk away from and one that will sit waiting for you.
+ *
+ * In unattended mode a pause with an `auto` or `whilePanelClosed` stand-in
+ * no longer waits for anyone, so only the pauses with neither count. A pause
+ * marked `external` still counts: inside the panel it is a manual pause, and
+ * only the driver script (tools/run-inpanel-tests.mjs) can stand in for it.
  */
-function requiresManualSteps(testCase: TestCase): boolean
+function requiresManualSteps(testCase: TestCase, unattended: boolean): boolean
 {
-  return testCase.steps.some(step => step.kind === 'pause');
+  return testCase.steps.some(step =>
+    step.kind === 'pause' && (!unattended || (!step.auto && !step.whilePanelClosed))
+  );
+}
+
+/** Whether the step is a pause with a `whilePanelClosed` action - the steps unattended mode parks the panel for. */
+function hasPanelClosedAction(testCase: TestCase, stepIndex: number): boolean
+{
+  const step = testCase.steps[stepIndex];
+  return step?.kind === 'pause' && step.whilePanelClosed !== undefined;
+}
+
+/**
+ * Replaces the panel's own document with the parked page, unloading the
+ * sidebar app while a panel-closed step runs. Checks first that the page was
+ * built (it only is in development mode, see vite.config.ts) and returns
+ * false without navigating when it was not, so the caller can show the
+ * normal banner rather than leave the panel on a dead page.
+ */
+async function parkPanel(): Promise<boolean>
+{
+  const url = chrome.runtime.getURL(PARKED_PAGE_PATH);
+  try
+  {
+    const response = await fetch(url, { method: 'HEAD' });
+    if (!response.ok) return false;
+  }
+  catch
+  {
+    // A missing extension file fails the fetch outright rather than 404ing.
+    return false;
+  }
+
+  window.location.replace(url);
+  return true;
 }
 
 // Section a case belongs to, derived from its id's leading letter (e.g. "A"
@@ -451,6 +506,19 @@ export const TestRunnerPanel = ({
     appendPinnedSites,
   };
 
+  // Whether the data a resumed run reads first has loaded since this mount:
+  // SpacesContext's mirrors (with at least one space in them - every case
+  // that pauses works in spaces) and BookmarkTabsContext's association
+  // rebuild, both of which flag isInitialized when done. Rebuilt every
+  // render, like ctxRef, so an async wait reads the current value.
+  // useBookmarks has no equivalent signal, but no step right after a pause
+  // reads its tree.
+  const panelReadyRef = useRef(false);
+  panelReadyRef.current = ctxRef.current !== null
+    && spacesCtx.isInitialized
+    && spacesCtx.spaces.length > 0
+    && bookmarkTabsCtx.isInitialized;
+
   const [pausedState, setPausedState] = useState<ResumeState | null>(null);
   // What the tester typed at a 'confirm' pause. Cleared on resume so the next
   // question starts blank rather than inheriting the previous answer's text.
@@ -491,6 +559,15 @@ export const TestRunnerPanel = ({
   // as-is. The list always shows every case; this only decides what runs.
   const [deselectedCaseIds, setDeselectedCaseIds] = useChromeLocalStorage<string[]>(DESELECTED_CASES_STORAGE_KEY, []);
   const selection = useMemo(() => new CaseSelection(deselectedCaseIds), [deselectedCaseIds]);
+  // "Unattended" checkbox. Persisted so it survives the panel remounting -
+  // including the round trip through the parked page, which is exactly when
+  // it is needed. runner.ts's UnattendedMode reads the same key directly.
+  const [unattended, setUnattended] = useChromeLocalStorage<boolean>(UNATTENDED_STORAGE_KEY, false);
+  // Set once the mount effect has started an automatic resume, so it starts
+  // only one: React StrictMode runs the mount effect twice in dev, and both
+  // runs read the same checkpoint. A ref (not state) because StrictMode keeps
+  // refs across its simulated remount and the check must not wait a render.
+  const autoResumeStartedRef = useRef(false);
 
   function updateSelection(next: CaseSelection)
   {
@@ -516,12 +593,19 @@ export const TestRunnerPanel = ({
   {
     (async () =>
     {
-      const [resume, allResults, queue, batchIds] = await Promise.all([
+      const [resume, allResults, queue, batchIds, unattendedOn] = await Promise.all([
         readResumeState(),
         readAllCaseResults(),
         readBatchQueue(),
         readBatchCaseIds(),
+        UnattendedMode.isOn(),
       ]);
+
+      // StrictMode's second run of this effect, arriving after the first has
+      // already started an automatic resume: that run owns the panel's state
+      // now, and re-applying the checkpoint here would bring back a banner
+      // for a step the resumed run has moved past.
+      if (autoResumeStartedRef.current) return;
 
       const merged = { ...allResults };
       if (resume) merged[resume.caseId] = resume.results;
@@ -538,6 +622,58 @@ export const TestRunnerPanel = ({
         setBatchCaseIds(batchIds ?? null);
         setExpandedCaseIds(new Set([resume.caseId, ...failedCaseIds]));
         onOpenChange(true);
+
+        // Back from the parked page in unattended mode: carry on by itself.
+        // Only for a checkpoint the parked page actually ran (it records an
+        // outcome either way) - a pause left by a manual run, even on a step
+        // that has whilePanelClosed, still waits for the tester's click.
+        // Passes the values read above rather than going through
+        // handleResume, whose state this render's closure does not have yet.
+        const pausedCase = ALL_CASES.find(c => c.id === resume.caseId);
+        const parkedHasRun = resume.parkedCompleted === true || resume.parkedError !== undefined;
+        if (unattendedOn && parkedHasRun && pausedCase && hasPanelClosedAction(pausedCase, resume.stepIndex))
+        {
+          // Set before the first await below, so StrictMode's second run of
+          // this effect sees it and backs off.
+          autoResumeStartedRef.current = true;
+          // Disable the banner's buttons at once, so a click during the wait
+          // below cannot start a second resume.
+          setRunningAll(true);
+
+          // Disarm the checkpoint before anything else, so an interrupted
+          // resume can only be continued by hand from here on. If the claim's
+          // storage writes fail, say so and give the banner's buttons back
+          // rather than leaving the panel stuck busy. The StrictMode guard
+          // stays set: the checkpoint is now the banner's to handle.
+          let claimed: ResumeState | undefined;
+          try
+          {
+            claimed = await claimParkedCheckpoint(pausedCase, resume);
+          }
+          catch (err)
+          {
+            setPanelError(`Could not resume automatically after the parked step: ${err instanceof Error ? err.message : String(err)}`);
+            setRunningAll(false);
+            return;
+          }
+
+          // The parked action failed and the case is already finished with
+          // it recorded - only the rest of a batch, if any, is left to run.
+          if (!claimed)
+          {
+            setPausedState(null);
+            setCaseResults(prev => ({ ...prev, [pausedCase.id]: resumedStart(pausedCase, resume).results }));
+            await waitForPanelReady();
+            await continueBatch(queue ?? null, batchIds ?? null);
+            return;
+          }
+
+          const claimedState = claimed;
+          setPausedState(claimedState);
+          setCaseResults(prev => ({ ...prev, [pausedCase.id]: claimedState.results }));
+          await waitForPanelReady();
+          void resumeRun(pausedCase, claimedState, queue ?? null, batchIds ?? null);
+        }
       }
       else if (failedCaseIds.length > 0)
       {
@@ -562,40 +698,66 @@ export const TestRunnerPanel = ({
       return false;
     }
 
+    // Where a resumed run picks up, including the parked page's own result
+    // for the pause step when it ran one (see resumedStart in runner.ts).
+    const start = resume ? resumedStart(testCase, resume) : { results: [], stopCase: false };
+
     setPanelError(null);
     setRunningCaseId(testCase.id);
     setPausedState(null);
     setBatchSummary(null);
-    setCaseResults(prev => ({ ...prev, [testCase.id]: resume?.results ?? [] }));
+    setCaseResults(prev => ({ ...prev, [testCase.id]: start.results }));
     setExpandedCaseIds(prev => new Set(prev).add(testCase.id));
 
     const getCtx = () => ctxRef.current ?? ctx;
+    // Cleared only when the run stops at a pause, which keeps the case's tabs
+    let caseOver = true;
 
     try
     {
+      // Restore the checkpoint's refs on a resume, or start from a clean
+      // slate; either way take the run's Unattended snapshot after that, so
+      // setup and every step see the mode this run started with
       if (resume)
       {
         Object.entries(resume.refs).forEach(([key, value]) => ctx.refs.set(key, value));
+        await UnattendedMode.snapshotForRun(getCtx());
       }
       else
       {
         await resetTestData(getCtx);
+        await UnattendedMode.snapshotForRun(getCtx());
         await testCase.setup?.(getCtx);
       }
 
       const fromIndex = resume ? resume.stepIndex + 1 : 0;
-      const priorResults = resume ? resume.results : [];
 
-      const outcome = await runFrom(
-        testCase,
-        fromIndex,
-        priorResults,
-        getCtx,
-        (result) => setCaseResults(prev => ({ ...prev, [testCase.id]: [...(prev[testCase.id] ?? []), result] }))
-      );
+      // A failed parked action ends the case where it stands, like a failed
+      // action step; otherwise run on from the step after the pause.
+      const outcome: RunOutcome = start.stopCase
+        ? { results: start.results }
+        : await runFrom(
+          testCase,
+          fromIndex,
+          start.results,
+          getCtx,
+          (result) => setCaseResults(prev => ({ ...prev, [testCase.id]: [...(prev[testCase.id] ?? []), result] }))
+        );
 
       if (outcome.pausedAt)
       {
+        caseOver = false;
+
+        // Unattended mode, at a step that has to happen with the panel
+        // closed: park instead of showing the banner. The checkpoint (and,
+        // in a batch, the queue) is already persisted, so the remount after
+        // the parked page sends the panel back resumes from it. Falls through
+        // to the banner if the parked page is missing from this build.
+        if (hasPanelClosedAction(testCase, outcome.pausedAt.stepIndex) && await UnattendedMode.forRun(getCtx()) && await parkPanel())
+        {
+          return false;
+        }
+
         const stored = await readResumeState();
         setPausedState(stored ?? null);
         return false;
@@ -613,6 +775,19 @@ export const TestRunnerPanel = ({
     }
     finally
     {
+      // A finished case (passed, failed or errored) leaves no tone page
+      // playing, including after the last case of a run, which no later
+      // resetTestData would clean up
+      if (caseOver)
+      {
+        await AudioTestPage.closeAll().catch((err) =>
+        {
+          if (import.meta.env.DEV)
+          {
+            console.log('[TestRunner] closing tone-page tabs failed:', err);
+          }
+        });
+      }
       setRunningCaseId(null);
     }
   }
@@ -674,6 +849,18 @@ export const TestRunnerPanel = ({
     }
   }
 
+  // A row's own "Run" button: one case, outside any batch. Clears whatever
+  // batch queue an earlier batch left behind (one that errored keeps its
+  // queue persisted), or a resume of this case - automatic after a parked
+  // step, or the banner's - would carry on into that old batch's cases.
+  async function runSingleCase(testCase: TestCase)
+  {
+    await clearBatchQueue();
+    setBatchQueue(null);
+    setBatchCaseIds(null);
+    await runCase(testCase);
+  }
+
   // Runs the checked cases, in registry order (see CaseSelection.selectedCases).
   function runAll()
   {
@@ -717,6 +904,19 @@ export const TestRunnerPanel = ({
     }
     setConfirmNote('');
 
+    await resumeRun(pausedCase, state, batchQueue, batchCaseIds);
+  }
+
+  /**
+   * The body of a resume, taking everything it needs as arguments rather than
+   * reading component state. handleResume passes its state; the mount
+   * effect's automatic resume passes the values it just read from storage,
+   * because the state it set has not reached its own render's closure.
+   * Everything this calls (runCase, runQueue) reads only refs, setters and
+   * its own arguments, so a call from the first render's closure is safe.
+   */
+  async function resumeRun(testCase: TestCase, state: ResumeState, queue: string[] | null, wholeBatchCaseIds: string[] | null)
+  {
     // setRunningAll (not runningCaseId - runCase hasn't started yet) so the
     // buttons are already disabled during the settle wait below, not just
     // once runCase begins.
@@ -725,18 +925,58 @@ export const TestRunnerPanel = ({
     {
       await sleep(RESUME_SETTLE_MS);
 
-      if (batchQueue === null)
+      if (queue === null)
       {
-        await runCase(pausedCase, state);
+        await runCase(testCase, state);
         return;
       }
 
-      const completed = await runCase(pausedCase, state);
-      if (completed) await runQueue(batchQueue, batchCaseIds ?? undefined);
+      const completed = await runCase(testCase, state);
+      if (completed) await runQueue(queue, wholeBatchCaseIds ?? undefined);
     }
     finally
     {
       setRunningAll(false);
+    }
+  }
+
+  /**
+   * Continues a batch whose current case has already been finished, without
+   * resuming any case first - the automatic resume's path after a failed
+   * parked action. A no-op apart from releasing the busy flag when there is
+   * no batch.
+   */
+  async function continueBatch(queue: string[] | null, wholeBatchCaseIds: string[] | null)
+  {
+    setRunningAll(true);
+    try
+    {
+      if (queue === null) return;
+      await sleep(RESUME_SETTLE_MS);
+      await runQueue(queue, wholeBatchCaseIds ?? undefined);
+    }
+    finally
+    {
+      setRunningAll(false);
+    }
+  }
+
+  /**
+   * Waits (up to AUTO_RESUME_READY_TIMEOUT_MS) until the panel has what the
+   * first steps after a pause read: this window's TestContext, the Space list
+   * and BookmarkTabsContext's rebuilt tab associations (see panelReadyRef).
+   * A click on Resume comes long after all of that; an automatic resume right
+   * after a remount may not. Returns either way at the deadline - runCase
+   * reports a context that never arrived, and a late association shows up as
+   * a failed assertion rather than a stuck run.
+   */
+  async function waitForPanelReady()
+  {
+    const deadline = Date.now() + AUTO_RESUME_READY_TIMEOUT_MS;
+    // Poll until everything is loaded or the deadline passes.
+    while (!panelReadyRef.current && Date.now() < deadline)
+    {
+      await sleep(AUTO_RESUME_READY_POLL_MS);
     }
   }
 
@@ -817,6 +1057,13 @@ export const TestRunnerPanel = ({
   // Set only on a pause that asks the tester to judge something. Its presence
   // is what swaps the banner's single Resume button for Pass/Fail.
   const pausedConfirm = pausedStep?.kind === 'pause' ? pausedStep.confirm : undefined;
+  // A claimed parked checkpoint ends with the parked step's own result (see
+  // claimParkedCheckpoint), which is how the banner knows the action is done.
+  // An unclaimed one (Unattended turned off while parked) still says so by
+  // its parkedCompleted flag.
+  const lastPausedResult = pausedState ? pausedState.results[pausedState.results.length - 1] : undefined;
+  const pausedStepDoneOnParkedPage = pausedState?.parkedCompleted === true
+    || (lastPausedResult !== undefined && isParkedStepResult(lastPausedResult));
   const hasAnyResults = Object.keys(caseResults).length > 0;
   const hasAnyFailedResults = Object.values(caseResults).some(results => results.some(r => !r.passed));
 
@@ -953,7 +1200,19 @@ export const TestRunnerPanel = ({
               />
             ))}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <label
+              className="flex items-center gap-1 cursor-pointer select-none"
+              title="Run pauses that have an automated stand-in without waiting for you. Panel-closed steps park the panel on a blank page while they run, then come back and resume by themselves."
+            >
+              <input
+                type="checkbox"
+                checked={unattended}
+                onChange={(e) => setUnattended(e.target.checked)}
+                disabled={isBusy}
+              />
+              <span>Unattended</span>
+            </label>
             <button
               className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
               onClick={() => updateSelection(CaseSelection.onlyChecking(failedCaseIds, ALL_CASES))}
@@ -1011,7 +1270,7 @@ export const TestRunnerPanel = ({
                     </span>
                     <span className="font-mono text-xs text-gray-500 mr-1">{testCase.id}</span>
                     <span>{testCase.title}</span>
-                    {requiresManualSteps(testCase) && (
+                    {requiresManualSteps(testCase, unattended) && (
                       <span
                         className="ml-1 px-1 rounded text-[10px] leading-4 flex-shrink-0 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
                         title="Pauses partway and needs you to do something in Chrome (usually with the panel closed), then reopen to resume"
@@ -1029,7 +1288,7 @@ export const TestRunnerPanel = ({
                   </div>
                   <button
                     className="px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 flex-shrink-0"
-                    onClick={() => runCase(testCase)}
+                    onClick={() => runSingleCase(testCase)}
                     disabled={runningCaseId !== null || runningAll}
                   >
                     {runningCaseId === testCase.id ? 'Running…' : 'Run'}
@@ -1072,6 +1331,12 @@ export const TestRunnerPanel = ({
           {batchQueue !== null && (
             <div className="mb-1 text-xs text-amber-700 dark:text-amber-400">
               Part of a Run All batch - {batchQueue.length} more case{batchQueue.length === 1 ? '' : 's'} queued after this one.
+            </div>
+          )}
+          {/* An automatic resume that was interrupted after the parked page had already done this step - repeating it by hand would act twice. */}
+          {pausedStepDoneOnParkedPage && (
+            <div className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+              This step was already done automatically on the parked page - don't repeat it, just Resume.
             </div>
           )}
           <div className="mb-2 text-gray-700 dark:text-gray-300">
