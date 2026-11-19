@@ -2,6 +2,7 @@
 // Run via the "Unit Test Do/Undo Delete Space" menu item (dev mode only)
 
 import { DeleteSpaceAction } from '../actions/deleteSpaceAction';
+import { spaceManagerProxy } from '../managers/proxies/spaceManagerProxy';
 import { Space } from '../contexts/SpacesContext';
 import { toChromeColor } from '../utils/groupColors';
 import { TestResult } from './testUtils';
@@ -318,8 +319,11 @@ export async function runDeleteSpaceTests(
 
     try
     {
-      // Setup: write test spaces to storage
-      await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: testCase.spaces });
+      // Setup: seed the test spaces through SpaceManager rather than writing
+      // storage directly. DeleteSpaceAction's do()/undo() are per-operation
+      // (removeSpace/addSpace), so they act on background's in-memory list,
+      // which a direct storage write would leave holding something else.
+      await spaceManagerProxy.replaceAll(testCase.spaces);
       await settle();
 
       // Create tabs in a Chrome group matching the target space name
@@ -472,8 +476,9 @@ export async function runDeleteSpaceTests(
         catch { /* ignore */ }
       }
 
-      // Cleanup: clear test spaces from storage
-      await chrome.storage.local.set({ [SPACES_STORAGE_KEY]: [] });
+      // Cleanup: clear test spaces, through SpaceManager for the same reason
+      // as the setup above
+      await spaceManagerProxy.replaceAll([]);
       await settle();
     }
   }

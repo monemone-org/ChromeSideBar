@@ -1,15 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore, ReactNode } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
 import { tabSpaceRegistryProxy } from '../managers/proxies/tabSpaceRegistryProxy';
-import { SpaceMessageAction } from '../utils/spaceMessages';
-import {
-  getTabAssociations,
-  storeTabAssociation,
-  removeTabAssociation as removeStoredAssociation,
-  setTabAssociations,
-  saveTabAssociationBackup,
-  removeTabAssociationBackup,
-} from '../utils/tabAssociations';
+import { tabAssociationsProxy } from '../managers/proxies/tabAssociationsProxy';
+import { TabAssociations } from '../managers/shared/tabAssociationsApi';
 import { isUrlDrifted, isDomainDrifted } from '../utils/urlCompare';
 import { LiveTabInfoMap } from './liveTabInfo';
 
@@ -80,9 +73,8 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   // Current window ID for window-scoped storage
   const [currentWindowId, setCurrentWindowId] = useState<number | null>(null);
 
-  // In-memory mappings for fast lookup (key is "bookmark-{id}" or "pinned-{id}")
-  const [itemToTab, setItemToTab] = useState<Map<string, number>>(new Map());
-  const [tabToItem, setTabToItem] = useState<Map<number, string>>(new Map());
+  // Sidebar-only state. None of it belongs to background: it is what this
+  // panel has noticed about the tabs it is showing, keyed by tab id.
   const [audibleTabs, setAudibleTabs] = useState<Set<number>>(new Set());
   // Live title/url/favicon of managed tabs
   const [liveTabs, setLiveTabs] = useState<LiveTabInfoMap>(() => new LiveTabInfoMap());
@@ -90,7 +82,41 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  const isRebuilding = useRef(false);
+  // The associations themselves are background's, mirrored here read-only -
+  // TabAssociationManager is their single writer. This context asks for
+  // changes through the proxy and finds out what happened by re-reading the
+  // mirror, rather than keeping its own copy in useState and hand-patching it
+  // from six different call sites.
+  const associations = useSyncExternalStore(
+    tabAssociationsProxy.store.subscribe,
+    tabAssociationsProxy.store.getSnapshot
+  );
+
+  // The two lookup directions every consumer below wants, derived from the one
+  // mirrored map so they cannot disagree with it or with each other.
+  const { itemToTab, tabToItem } = useMemo(() =>
+  {
+    const itemToTab = new Map<string, number>();
+    const tabToItem = new Map<number, string>();
+
+    // Tab ids come back as strings once the map has been through JSON
+    for (const [id, itemKey] of Object.entries(associations))
+    {
+      const tabId = Number(id);
+      itemToTab.set(itemKey, tabId);
+      tabToItem.set(tabId, itemKey);
+    }
+
+    return { itemToTab, tabToItem };
+  }, [associations]);
+
+  // Read by the onUpdated listener, which registers once and must not be torn
+  // down and rebuilt every time the mirror changes.
+  const tabToItemRef = useRef(tabToItem);
+  useEffect(() =>
+  {
+    tabToItemRef.current = tabToItem;
+  }, [tabToItem]);
 
   // Get current window ID on mount
   useEffect(() =>
@@ -109,206 +135,93 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     []
   );
 
-  // Rebuild associations from storage on init
-  // Just validates that stored tabIds still exist - no URL matching
-  const rebuildAssociations = useCallback(async (windowId: number) =>
+  // Seed live tab info/audible state from the tabs that are already open, so
+  // drift detection and tooltips work immediately on sidebar reopen -
+  // chrome.tabs.onUpdated only fires on future changes, so without this the
+  // maps stay empty until navigation.
+  const seedLiveTabState = async (windowId: number, current: TabAssociations): Promise<void> =>
   {
-    if (isRebuilding.current) return;
-    isRebuilding.current = true;
+    const tabs = await chrome.tabs.query({ windowId });
 
-    try
+    let live = new LiveTabInfoMap();
+    const audible = new Set<number>();
+
+    // Only tracked tabs matter here - the rest are never looked up by tab id
+    for (const tab of tabs)
     {
-      // Get stored associations from session storage
-      const associations = await getTabAssociations(windowId);
-
-      const newItemToTab = new Map<string, number>();
-      const newTabToItem = new Map<number, string>();
-      // Seed live tab info/audible from existing tabs so drift detection and
-      // tooltips work immediately on sidebar reopen — chrome.tabs.onUpdated only
-      // fires on future changes, so without this the maps stay empty until navigation.
-      let newLiveTabs = new LiveTabInfoMap();
-      const newAudibleTabs = new Set<number>();
-
-      // Validate each stored tabId still exists
-      const tabIds = Object.keys(associations).map(id => parseInt(id, 10));
-
-      for (const tabId of tabIds)
-      {
-        try
-        {
-          const tab = await new Promise<chrome.tabs.Tab | null>((resolve) =>
-          {
-            chrome.tabs.get(tabId, (t) =>
-            {
-              if (chrome.runtime.lastError)
-              {
-                resolve(null);
-              }
-              else
-              {
-                resolve(t);
-              }
-            });
-          });
-
-          if (tab)
-          {
-            const itemKey = associations[tabId];
-            newItemToTab.set(itemKey, tabId);
-            newTabToItem.set(tabId, itemKey);
-            newLiveTabs = newLiveTabs.withTab(tabId, tab);
-            if (tab.audible)
-            {
-              newAudibleTabs.add(tabId);
-            }
-          }
-          else
-          {
-            // Tab no longer exists - remove from storage
-            delete associations[tabId];
-          }
-        }
-        catch
-        {
-          // Tab doesn't exist
-          delete associations[tabId];
-        }
-      }
-
-      // Update storage with cleaned associations
-      await setTabAssociations(windowId, associations);
-
-      setItemToTab(newItemToTab);
-      setTabToItem(newTabToItem);
-      setLiveTabs(newLiveTabs);
-      setAudibleTabs(newAudibleTabs);
-      setIsInitialized(true);
+      if (tab.id === undefined || current[tab.id] === undefined) continue;
+      live = live.withTab(tab.id, tab);
+      if (tab.audible) audible.add(tab.id);
     }
-    catch (err)
-    {
-      console.error('Failed to rebuild associations:', err);
-      setIsInitialized(true);
-    }
-    finally
-    {
-      isRebuilding.current = false;
-    }
-  }, []);
 
-  // Initialize when windowId is available
+    setLiveTabs(live);
+    setAudibleTabs(audible);
+  };
+
+  // Bind the mirror to this window and fill it. mirrorWindow reconciles first,
+  // so anything that went stale while the sidebar was closed (a tab closed, or
+  // dragged into another window) is already gone from what comes back -
+  // background validates against its own map rather than this context reading
+  // a snapshot, walking a slow loop and writing it back over whatever changed
+  // underneath.
   useEffect(() =>
   {
-    if (currentWindowId !== null)
-    {
-      rebuildAssociations(currentWindowId);
-    }
-  }, [currentWindowId, rebuildAssociations]);
+    if (currentWindowId === null) return;
 
-  // Helper to remove association for a tab
-  const removeLocalTabAssociation = useCallback((tabId: number, windowId: number) =>
-  {
-    setTabToItem((prev) =>
-    {
-      const itemKey = prev.get(tabId);
-      if (itemKey)
+    let cancelled = false;
+
+    tabAssociationsProxy.mirrorWindow(currentWindowId)
+      .then(async (current) =>
       {
-        setItemToTab((prevIT) =>
-        {
-          const newMap = new Map(prevIT);
-          newMap.delete(itemKey);
-          return newMap;
-        });
+        if (cancelled) return;
+        await seedLiveTabState(currentWindowId, current);
+        if (!cancelled) setIsInitialized(true);
+      })
+      .catch((err) =>
+      {
+        console.error('Failed to mirror tab associations:', err);
+        if (!cancelled) setIsInitialized(true);
+      });
 
-        // Clean up live tab info
-        setLiveTabs((prev) => prev.withoutTab(tabId));
+    return () =>
+    {
+      cancelled = true;
+    };
+  }, [currentWindowId]);
 
-        // Clean up audible state
-        if (import.meta.env.DEV)
-        {
-          console.log(`[removeLocalTabAssociation] cleaned up audibleTabs for tab=${tabId}`);
-        }
-        setAudibleTabs((prev) =>
-        {
-          const newSet = new Set(prev);
-          newSet.delete(tabId);
-          return newSet;
-        });
+  // Drop what this panel remembered about tabs that have left the mirror.
+  // Background removes an association for all sorts of reasons now - the tab
+  // closed, it was dragged to another window or another space's group, a
+  // reconcile found it gone - and none of them come through a call site here
+  // that could clean up after itself, so the cleanup watches the mirror
+  // instead.
+  useEffect(() =>
+  {
+    setLiveTabs((prev) => prev.withOnlyTabs(tabId => tabToItem.has(tabId)));
 
-        // Clean up from session storage and local backup
-        removeStoredAssociation(windowId, tabId);
-        removeTabAssociationBackup(windowId, itemKey);
+    setAudibleTabs((prev) =>
+    {
+      const stale = [...prev].filter(tabId => !tabToItem.has(tabId));
+      if (stale.length === 0) return prev;
 
-        const newMap = new Map(prev);
-        newMap.delete(tabId);
-        return newMap;
-      }
-      return prev;
+      const next = new Set(prev);
+      for (const tabId of stale) next.delete(tabId);
+      return next;
     });
-  }, []);
+  }, [tabToItem]);
 
-  // Listen for tab removal
-  useEffect(() =>
+  // Break one tab's association. Background does the work and broadcasts the
+  // result, so there is nothing to update here - the mirror already shows the
+  // change by the time this returns.
+  const deassociateTab = useCallback((tabId: number): void =>
   {
     if (currentWindowId === null) return;
 
-    const handleTabRemoved = (tabId: number) =>
+    tabAssociationsProxy.deassociate(currentWindowId, tabId).catch((err) =>
     {
-      removeLocalTabAssociation(tabId, currentWindowId);
-    };
-
-    chrome.tabs?.onRemoved?.addListener(handleTabRemoved);
-
-    return () =>
-    {
-      chrome.tabs?.onRemoved?.removeListener(handleTabRemoved);
-    };
-  }, [currentWindowId, removeLocalTabAssociation]);
-
-  // Listen for tab detached (moved to another window)
-  // When a tab is detached from this window, treat it as closed in this window
-  useEffect(() =>
-  {
-    if (currentWindowId === null) return;
-
-    const handleTabDetached = (tabId: number, detachInfo: chrome.tabs.TabDetachInfo) =>
-    {
-      // Only remove if detached from our window
-      if (detachInfo.oldWindowId === currentWindowId)
-      {
-        removeLocalTabAssociation(tabId, currentWindowId);
-      }
-    };
-
-    chrome.tabs?.onDetached?.addListener(handleTabDetached);
-
-    return () =>
-    {
-      chrome.tabs?.onDetached?.removeListener(handleTabDetached);
-    };
-  }, [currentWindowId, removeLocalTabAssociation]);
-
-  // Listen for background telling us a tracked tab was dragged into a
-  // different space's Chrome group - break the association, same as the user
-  // manually choosing "Move to Tabs" (see DEASSOCIATE_TAB in spaceMessages.ts)
-  useEffect(() =>
-  {
-    if (currentWindowId === null) return;
-
-    const handleMessage = (message: { action?: string; windowId?: number; tabId?: number }) =>
-    {
-      if (message.action !== SpaceMessageAction.DEASSOCIATE_TAB) return;
-      if (message.windowId !== currentWindowId || message.tabId === undefined) return;
-
-      removeLocalTabAssociation(message.tabId, currentWindowId);
-    };
-
-    chrome.runtime.onMessage.addListener(handleMessage);
-
-    return () =>
-    {
-      chrome.runtime.onMessage.removeListener(handleMessage);
-    };
-  }, [currentWindowId, removeLocalTabAssociation]);
+      console.error('Failed to deassociate tab:', err);
+    });
+  }, [currentWindowId]);
 
   // Listen for tab audible, title, URL, and favicon changes
   useEffect(() =>
@@ -337,17 +250,9 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
       }
 
       // Track title/url/favicon changes for managed tabs only
-      if (changeInfo.title !== undefined || changeInfo.url !== undefined || changeInfo.favIconUrl !== undefined)
+      if (tabToItemRef.current.has(tabId))
       {
-        setTabToItem((prev) =>
-        {
-          if (!prev.has(tabId))
-          {
-            return prev;
-          }
-          setLiveTabs((prevLiveTabs) => prevLiveTabs.withChanges(tabId, changeInfo));
-          return prev;
-        });
+        setLiveTabs((prev) => prev.withChanges(tabId, changeInfo));
       }
     };
 
@@ -384,9 +289,10 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     };
   }, []);
 
-  // Store association in session storage and local backup
+  // Store association in session storage and local backup, as one call.
   // tabUrl and tabIndex can be passed directly (e.g. from tab creation callback) to avoid
-  // an extra chrome.tabs.get call and its async yield point
+  // the manager having to look the tab up for the backup entry; left out, it looks them
+  // up itself rather than every caller remembering to.
   const storeAssociation = useCallback(async (
     tabId: number,
     itemKey: string,
@@ -396,28 +302,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   {
     if (currentWindowId === null) return;
 
-    await storeTabAssociation(currentWindowId, tabId, itemKey);
-
-    let url = tabUrl;
-    let index = tabIndex;
-
-    if (url === undefined || index === undefined)
-    {
-      const tab = await new Promise<chrome.tabs.Tab | null>((resolve) =>
-      {
-        chrome.tabs.get(tabId, (t) =>
-        {
-          resolve(chrome.runtime.lastError ? null : t);
-        });
-      });
-      url = tab?.url ?? '';
-      index = tab?.index;
-    }
-
-    if (url !== undefined && index !== undefined)
-    {
-      saveTabAssociationBackup(currentWindowId, itemKey, { tabId, url, tabIndex: index });
-    }
+    await tabAssociationsProxy.associate(currentWindowId, tabId, itemKey, tabUrl, tabIndex);
   }, [currentWindowId]);
 
   // Create a new tab for an item (no grouping)
@@ -441,22 +326,12 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         const tabId = tab.id;
         const windowId = currentWindowId ?? tab.windowId;
 
-        // Store association (pass url+index to avoid extra chrome.tabs.get call)
+        // Store association (pass url+index so the backup entry needs no extra lookup)
         const createdUrl = tab.url ?? url;
         await storeAssociation(tabId, itemKey, createdUrl, tab.index);
 
-        setItemToTab((prev) =>
-        {
-          const newMap = new Map(prev);
-          newMap.set(itemKey, tabId);
-          return newMap;
-        });
-        setTabToItem((prev) =>
-        {
-          const newMap = new Map(prev);
-          newMap.set(tabId, itemKey);
-          return newMap;
-        });
+        // Seed live info now - onUpdated events that fired before the mirror
+        // knew this tab was managed were dropped
         setLiveTabs((prev) => prev.withTab(tabId, { ...tab, url: createdUrl }));
 
         // Register space with background for bookmark tabs
@@ -635,19 +510,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
       });
     }
 
-    setItemToTab((prev) =>
-    {
-      const newMap = new Map(prev);
-      newMap.set(itemKey, tabId);
-      return newMap;
-    });
-    setTabToItem((prev) =>
-    {
-      const newMap = new Map(prev);
-      newMap.set(tabId, itemKey);
-      return newMap;
-    });
-
+    // Seed live info for the newly managed tab
     chrome.tabs.get(tabId, (tab) =>
     {
       if (chrome.runtime.lastError || !tab) return;
@@ -660,19 +523,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   {
     await storeAssociation(tabId, itemKey);
 
-    setItemToTab((prev) =>
-    {
-      const newMap = new Map(prev);
-      newMap.set(itemKey, tabId);
-      return newMap;
-    });
-    setTabToItem((prev) =>
-    {
-      const newMap = new Map(prev);
-      newMap.set(tabId, itemKey);
-      return newMap;
-    });
-
+    // Seed live info for the newly managed tab
     chrome.tabs.get(tabId, (tab) =>
     {
       if (chrome.runtime.lastError || !tab) return;
@@ -683,14 +534,12 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   // Deassociate a bookmark from its tab (tab stays alive, bookmark becomes unloaded)
   const deassociateBookmarkTab = useCallback((bookmarkId: string): void =>
   {
-    if (currentWindowId === null) return;
-    const itemKey = makeBookmarkKey(bookmarkId);
-    const tabId = itemToTab.get(itemKey);
+    const tabId = itemToTab.get(makeBookmarkKey(bookmarkId));
     if (tabId !== undefined)
     {
-      removeLocalTabAssociation(tabId, currentWindowId);
+      deassociateTab(tabId);
     }
-  }, [itemToTab, currentWindowId, removeLocalTabAssociation]);
+  }, [itemToTab, deassociateTab]);
 
   // --- Pinned site-specific wrappers ---
   const openPinnedTab = useCallback(async (pinnedId: string, url: string): Promise<number | undefined> =>
@@ -753,22 +602,20 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   }, [resetItemTab]);
 
   // Deassociate a pinned site from its tab (tab stays alive, becomes unmanaged).
-  // Awaits the storage removal before queueing grouping, so the background's
-  // isPinnedManagedTab check (which reads that same storage) no longer sees this
-  // tab as pin-managed and will group it into the active space instead of leaving
-  // it ungrouped.
+  // Awaits the deassociate before queueing grouping: the manager has removed the
+  // entry from the in-memory map background's isPinnedManagedTab reads by the time
+  // the call returns, so grouping no longer sees this tab as pin-managed and will
+  // group it into the active space instead of leaving it ungrouped.
   const deassociatePinnedTab = useCallback(async (pinnedId: string): Promise<void> =>
   {
     if (currentWindowId === null) return;
-    const itemKey = makePinnedKey(pinnedId);
-    const tabId = itemToTab.get(itemKey);
+    const tabId = itemToTab.get(makePinnedKey(pinnedId));
     if (tabId !== undefined)
     {
-      await removeStoredAssociation(currentWindowId, tabId);
-      removeLocalTabAssociation(tabId, currentWindowId);
+      await tabAssociationsProxy.deassociate(currentWindowId, tabId);
       chrome.runtime.sendMessage({ action: 'queue-tab-for-grouping', tabId, windowId: currentWindowId });
     }
-  }, [itemToTab, currentWindowId, removeLocalTabAssociation]);
+  }, [itemToTab, currentWindowId]);
 
   // --- Active state functions ---
   const isBookmarkActive = useCallback((bookmarkId: string): boolean =>

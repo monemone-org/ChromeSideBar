@@ -59,9 +59,9 @@ export class SpaceWindowStateManager implements RoutedManager, SpaceWindowStateA
   // State Mutations
   // ─────────────────────────────────────────────────────────────────────────
 
-  // originId identifies the context that asked for this change, so the
-  // broadcast below can be recognised as an echo by whoever sent it. Absent
-  // for background-internal callers, whose broadcasts are news to everyone.
+  // originId identifies the context that asked for this change, and rides
+  // along on the broadcast below as senderId - a label saying a sidebar
+  // caused it. Absent for background-internal callers.
   setActiveSpace(windowId: number, spaceId: string, originId?: string): SpaceWindowState
   {
     const state = this.getState(windowId);
@@ -79,8 +79,8 @@ export class SpaceWindowStateManager implements RoutedManager, SpaceWindowStateA
     this.#states.set(windowId, state);
     chrome.storage.session.set({ [this.getStorageKey(windowId)]: state });
 
-    // Notify sidebar of state change. senderId is echoed back so the context
-    // that requested the change can ignore its own echo - see CONTEXT_ID in
+    // Notify sidebar of state change. senderId is a provenance label only -
+    // every proxy applies the broadcast regardless of it. See CONTEXT_ID in
     // proxies/messageRouting.ts.
     chrome.runtime.sendMessage({
       action: SPACE_WINDOW_STATE_CHANGED,

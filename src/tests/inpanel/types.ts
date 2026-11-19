@@ -63,6 +63,10 @@ export interface TestContext
   openPinnedTab: (pinnedId: string, url: string) => Promise<number | undefined>;
   isBookmarkLoaded: (bookmarkId: string) => boolean;
   isPinnedLoaded: (pinnedId: string) => boolean;
+  // What the bookmark row reads for its speaker icon and its drift check:
+  // both come from this panel's per-tab state, not from Chrome directly.
+  isBookmarkAudible: (bookmarkId: string) => boolean;
+  getBookmarkLiveUrl: (bookmarkId: string) => string | undefined;
   getTabIdForBookmark: (bookmarkId: string) => number | undefined;
   // What PinnedBar hands DeletePinnedSiteAction, so P.3 can build the action
   // exactly the way the unpin menu item does.

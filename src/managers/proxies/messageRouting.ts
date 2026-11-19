@@ -22,6 +22,7 @@ export const ManagerId = {
   TAB_HISTORY: 'TabHistoryManager',
   LAST_AUDIBLE: 'LastAudibleTracker',
   PINNED_SITES: 'PinnedSitesManager',
+  TAB_ASSOCIATIONS: 'TabAssociationManager',
 } as const;
 
 export type ManagerIdType = typeof ManagerId[keyof typeof ManagerId];
@@ -63,25 +64,17 @@ export function parseManagerActionId(action: unknown): ParsedManagerAction | und
 /**
  * Identifies THIS extension context (one sidebar, one popup, the service
  * worker) for the life of the page. callManager stamps it on every outgoing
- * message, and a manager echoes it back on the broadcast that the message
- * caused.
+ * message as `senderId`, and a manager copies it onto the broadcast that the
+ * message caused.
  *
- * That lets a proxy tell its own broadcast apart from another window's, which
- * is what keeps an echo from overwriting a newer local write:
- *
- *   updateSpaces([Work])          mirror [Work],        message 1 sent
- *   updateSpaces([Work, Video])   mirror [Work, Video], message 2 sent
- *   broadcast for message 1       ours, ignored
- *   broadcast for message 2       ours, ignored
- *
- * Without it, the broadcast for message 1 lands on top of message 2's write
- * and Video disappears from the mirror. Anything reading the list in that
- * window (createSpace reads it on every call) then writes the loss back out
- * permanently.
- *
- * A broadcast with no senderId, or with somebody else's, is always applied -
- * that's either another window's write or a background-internal change, and
- * both are news to us.
+ * It is a provenance label, nothing more: a broadcast with a senderId was
+ * caused by some sidebar's request, and one without was a change background
+ * made on its own (favicon patching, a tab listener). No proxy reads it -
+ * every proxy applies every broadcast, its own echo included, since each
+ * broadcast carries the manager's whole resulting value and the latest one to
+ * arrive is always the truth. The in-panel tests use the label to tell the
+ * two kinds of change apart (see watchForBackgroundFaviconBroadcast in
+ * tests/inpanel/cases/sectionP.ts).
  */
 export const CONTEXT_ID = `ctx_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
@@ -113,6 +106,36 @@ export async function callManager<R>(
   }
 
   return response as R;
+}
+
+// Every broadcast action this context already listens for - see
+// subscribeToBroadcast.
+const registeredActions = new Set<string>();
+
+/**
+ * Registers `handler` for one manager's broadcast action, at most once per
+ * action for the life of this context. A second registration for the same
+ * action is ignored, so a proxy can call this from its mount entry point
+ * (load(), mirrorWindow()) and React StrictMode double-invoking that mount
+ * effect doesn't stack listeners.
+ *
+ * Deliberately never unsubscribed - proxies are module singletons that
+ * outlive every component that mirrors through them. Registered from those
+ * entry points rather than at module scope, so a context that never mirrors
+ * (SpaceNavigatorApp) doesn't wake up for broadcasts it would only discard.
+ */
+export function subscribeToBroadcast(
+  action: string,
+  handler: (message: Record<string, unknown>) => void
+): void
+{
+  if (registeredActions.has(action)) return;
+  registeredActions.add(action);
+
+  chrome.runtime.onMessage.addListener((message) =>
+  {
+    if (message?.action === action) handler(message as Record<string, unknown>);
+  });
 }
 
 /**

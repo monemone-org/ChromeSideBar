@@ -265,7 +265,7 @@ function renderPausedLine(line: string, key: number): JSX.Element
 // Fixed section letters shown as select-all checkboxes, not derived from
 // ALL_CASES - keeps the checkbox order stable (A before B before C...)
 // regardless of case registration order.
-const ALL_SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'P', 'U'];
+const ALL_SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'P', 'T', 'U'];
 
 // chrome.storage.local key for the ids of cases the tester has unchecked.
 const DESELECTED_CASES_STORAGE_KEY = 'testRunnerDeselectedCaseIds';
@@ -431,6 +431,8 @@ export const TestRunnerPanel = ({
     openPinnedTab: bookmarkTabsCtx.openPinnedTab,
     isBookmarkLoaded: bookmarkTabsCtx.isBookmarkLoaded,
     isPinnedLoaded: bookmarkTabsCtx.isPinnedLoaded,
+    isBookmarkAudible: bookmarkTabsCtx.isBookmarkAudible,
+    getBookmarkLiveUrl: bookmarkTabsCtx.getBookmarkLiveUrl,
     getTabIdForBookmark: bookmarkTabsCtx.getTabIdForBookmark,
     getTabIdForPinned: bookmarkTabsCtx.getTabIdForPinned,
     getItemKeyForTab: bookmarkTabsCtx.getItemKeyForTab,

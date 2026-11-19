@@ -42,9 +42,9 @@ export class PinnedSitesManager implements RoutedManager, PinnedSitesApi
   async dispatch(method: string, message: Record<string, unknown>): Promise<unknown>
   {
     // originId is the calling context's CONTEXT_ID, stamped by callManager. It
-    // rides along on the broadcast each mutation sends, so the context that
-    // asked for the change can recognise its own echo. Pulled out once here
-    // rather than in every case below.
+    // rides along on the broadcast each mutation sends, as a label saying a
+    // sidebar caused the change. Pulled out once here rather than in every
+    // case below.
     const originId = message.senderId as string | undefined;
 
     switch (method)
@@ -165,10 +165,10 @@ export class PinnedSitesManager implements RoutedManager, PinnedSitesApi
    * every listening context. Every mutation above ends here, so persisting
    * and broadcasting have exactly one implementation.
    *
-   * originId identifies the context that asked for this change, so the
-   * broadcast can be recognised as an echo by whoever sent it. Absent for
-   * background-internal callers (favicon patching), whose broadcasts are news
-   * to everyone.
+   * originId identifies the context that asked for this change, and rides
+   * along on the broadcast as senderId - a label saying a sidebar caused it.
+   * Absent for background-internal callers (favicon patching). See
+   * CONTEXT_ID in proxies/messageRouting.ts.
    */
   #commit(sites: PinnedSite[], originId?: string): PinnedSite[]
   {
@@ -176,9 +176,8 @@ export class PinnedSitesManager implements RoutedManager, PinnedSitesApi
 
     chrome.storage.local.set({ [PINNED_SITES_STORAGE_KEY]: sites });
 
-    // Notify every sidebar of the change. senderId is echoed back so the
-    // context that requested it can ignore its own echo - see CONTEXT_ID in
-    // proxies/messageRouting.ts.
+    // Notify every sidebar of the change. senderId is the provenance label
+    // described above; every proxy applies the broadcast regardless of it.
     chrome.runtime.sendMessage({
       action: PINNED_SITES_CHANGED,
       sites,

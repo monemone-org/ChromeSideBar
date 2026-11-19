@@ -96,8 +96,8 @@ export interface PinnedSiteFaviconPatch
  * in time. See docs/decisions/2026-07-30-shared-storage-multiple-writers.md,
  * Case 2.
  *
- * Every method returns the resulting list, which becomes the ack payload the
- * proxy uses to resync once its in-flight writes drain.
+ * Every method returns the resulting list, which becomes the ack payload, for
+ * callers that need to know a write actually landed.
  */
 export interface PinnedSitesApi
 {

@@ -182,22 +182,21 @@ export const D3_BACKGROUND_SPACE_CACHE_DROPS_DELETED_SPACE: TestCase = {
   ],
 };
 
-// D.4 exercises SpaceManager.updateSpaces()'s self-heal for a space that has
+// D.4 exercises SpaceManager.replaceAll()'s self-heal for a space that has
 // bookmarkFolderPath but no bookmarkFolderSegments - the exact shape Arc
 // import and any pre-bookmarkFolderSegments backup both produce (see the
 // "Case" writeup in docs/decisions/2026-07-30-shared-storage-multiple-writers.md).
-// Feeds spaceManagerProxy.updateSpaces() directly with that shape rather than
+// Feeds spaceManagerProxy.replaceAll() directly with that shape rather than
 // driving the actual Import dialog (which needs a real file picker this
-// panel can't automate) - updateSpaces() is the exact same real message-
-// passing call import ultimately makes (SpacesContext.replaceSpaces/
-// appendSpaces -> writeSpaces -> spaceManagerProxy.updateSpaces()), so this
-// exercises the identical proxy <-> impl wiring, broadcast back to this same
-// window included.
+// panel can't automate) - replaceAll() is the exact same real message-
+// passing call import's replace option makes (SpacesContext.replaceSpaces ->
+// spaceManagerProxy.replaceAll()), so this exercises the identical proxy <->
+// impl wiring, broadcast back to this same window included.
 function stripSegmentsAndWrite(spaceRef: string): TestStep
 {
   return {
     kind: 'action',
-    label: `Strip bookmarkFolderSegments from "${spaceRef}" and write via updateSpaces (simulates Arc import / a legacy backup)`,
+    label: `Strip bookmarkFolderSegments from "${spaceRef}" and write via replaceAll (simulates Arc import / a legacy backup)`,
     run: async (ctx) =>
     {
       const space = resolveSpace(ctx, spaceRef);
@@ -209,7 +208,7 @@ function stripSegmentsAndWrite(spaceRef: string): TestStep
       delete legacyShape.bookmarkFolderSegments;
 
       const nextList = spaceManagerProxy.snapshot.map(s => s.id === space.id ? legacyShape : s);
-      await spaceManagerProxy.updateSpaces(nextList);
+      await spaceManagerProxy.replaceAll(nextList);
     },
   };
 }
@@ -218,11 +217,11 @@ function stripSegmentsAndWrite(spaceRef: string): TestStep
  * Confirms bookmarkFolderSegments came back matching what it was before
  * stripSegmentsAndWrite removed it. `fromBackground` picks which copy to
  * read: background's own live list (spaceManagerProxy.getSpaces(), a fresh
- * round trip - exercises SpaceManager.updateSpaces()'s self-heal itself) or
+ * round trip - exercises SpaceManager.replaceAll()'s self-heal itself) or
  * this context's own mirror (ctx.getSpaceById, what BookmarkTree.tsx
  * actually renders from - the check that exercises the proxy/broadcast
- * wiring, not automatic by default, see the shared-storage decision doc's
- * section 4 for why this needs its own deliberate handling).
+ * wiring: the corrected list reaches this mirror only through the ordinary
+ * SPACES_CHANGED broadcast, since the proxy never applies its own ack).
  */
 function assertSegmentsRestored(spaceRef: string, fromBackground: boolean): TestStep
 {
@@ -251,7 +250,7 @@ function assertSegmentsRestored(spaceRef: string, fromBackground: boolean): Test
 
 export const D4_MIGRATE_LEGACY_SPACE_ON_UPDATE: TestCase = {
   id: 'D.4',
-  title: 'Legacy space (bookmarkFolderPath, no bookmarkFolderSegments) self-heals through updateSpaces',
+  title: 'Legacy space (bookmarkFolderPath, no bookmarkFolderSegments) self-heals through replaceAll',
   setup: async (getCtx) =>
   {
     await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
@@ -259,13 +258,14 @@ export const D4_MIGRATE_LEGACY_SPACE_ON_UPDATE: TestCase = {
   steps: [
     stripSegmentsAndWrite('spaceA'),
     // Background's own list gets the segments back immediately, no reload
-    // needed - the actual self-heal, in SpaceManager.updateSpaces().
+    // needed - the actual self-heal, in SpaceManager.replaceAll().
     assertSegmentsRestored('spaceA', true),
     // This window's OWN mirror - what BookmarkTree.tsx renders from - must
-    // also end up correct, not just background's copy. Without the
-    // broadcast's `migrated` flag this context would skip the correction as
-    // an echo of the (unmigrated) list it just sent, and BookmarkTree would
-    // keep showing "Folder not found" until reload.
+    // also end up correct, not just background's copy. The proxy's optimistic
+    // write showed the (unmigrated) list it just sent; the correction arrives
+    // as the ordinary SPACES_CHANGED broadcast, which the proxy applies like
+    // any other since it differs from the mirror. If it didn't, BookmarkTree
+    // would keep showing "Folder not found" until reload.
     assertSegmentsRestored('spaceA', false),
   ],
 };

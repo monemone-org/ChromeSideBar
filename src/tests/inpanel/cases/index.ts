@@ -6,6 +6,7 @@ import { SECTION_D_CASES } from './sectionD';
 import { SECTION_E_CASES } from './sectionE';
 import { SECTION_F_CASES } from './sectionF';
 import { SECTION_P_CASES } from './sectionP';
+import { SECTION_T_CASES } from './sectionT';
 import { SECTION_U_CASES } from './sectionU';
 
 export const ALL_CASES: TestCase[] = [
@@ -16,5 +17,6 @@ export const ALL_CASES: TestCase[] = [
   ...SECTION_E_CASES,
   ...SECTION_F_CASES,
   ...SECTION_P_CASES,
+  ...SECTION_T_CASES,
   ...SECTION_U_CASES,
 ];

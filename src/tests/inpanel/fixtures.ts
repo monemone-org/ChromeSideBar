@@ -9,6 +9,7 @@ import { PINNED_SITES_STORAGE_KEY } from '../../hooks/usePinnedSites';
 import { DEFAULT_FOLLOW_ACTIVE_TAB_MODE, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
 import { TestContext } from './types';
 import { sleep } from './stepHelpers';
+import { resetBackgroundTestHooks } from './backgroundHooks';
 
 // chrome.storage.local key Settings writes for "Show tab title after navigating away"
 // (see the useChromeLocalStorage call for arcShowTabTitleWhenDrifted in App.tsx)
@@ -291,6 +292,10 @@ export async function createTestPinnedSite(
 export async function resetTestData(getCtx: () => TestContext): Promise<void>
 {
   const ctx = getCtx();
+
+  // A case that failed half way can leave a gate armed or a failure waiting
+  // in background, and the next case would trip over it
+  await resetBackgroundTestHooks();
 
   // Close any OTHER window holding a test-tagged tab (e.g. left behind by
   // moveTabToNewWindow in A.6/A.6b/A.6c) - chrome.windows.remove() takes its

@@ -119,9 +119,9 @@ export class DeleteSpaceAction implements UndoableAction
 
     // Remove space from storage, routed through SpaceManager so its
     // in-memory cache stays in sync (Case 3 - see the shared-storage
-    // decision doc)
-    const remaining = currentSpaces.filter(s => s.id !== this.spaceId);
-    await spaceManagerProxy.updateSpaces(remaining);
+    // decision doc). Awaited so an undo straight afterwards can't reach
+    // background before the removal does.
+    await spaceManagerProxy.removeSpace(this.spaceId);
 
     // Build description
     this.description = `Deleted space "${truncateTitle(space.name)}"`;
@@ -147,14 +147,10 @@ export class DeleteSpaceAction implements UndoableAction
         + `with ${this.snapshot.tabs.length} tabs`);
     }
 
-    // Restore space in storage at original index. Round-trips through
-    // getSpaces() rather than reading a store snapshot: this action can run
-    // with no mounted SpacesContext (see deleteSpaceActionTest.ts), so there
-    // is no populated mirror to read in that case.
-    const currentSpaces = await spaceManagerProxy.getSpaces();
-    const insertAt = Math.min(this.snapshot.index, currentSpaces.length);
-    currentSpaces.splice(insertAt, 0, this.snapshot.space);
-    await spaceManagerProxy.updateSpaces(currentSpaces);
+    // Restore space in storage at its original index, or at the end if the
+    // list has since shrunk below it. SpaceManager does the insert against
+    // its own list, so nothing here has to read the current list first.
+    await spaceManagerProxy.addSpace(this.snapshot.space, this.snapshot.index);
 
     // Recreate tabs sorted by index ascending
     if (this.snapshot.tabs.length > 0)

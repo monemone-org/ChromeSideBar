@@ -63,8 +63,8 @@ interface SpacesContextValue
   // readonly: this is the live array behind spaceManagerProxy's mirror, not
   // a copy. Sorting or pushing it in place would change what every consumer
   // sees without notifying any of them, since only the store's set() fires
-  // listeners - and the next CRUD call would then persist that accident.
-  // Build a new list and go through the context's own mutators instead.
+  // listeners - and the next optimistic write would build on that accident.
+  // Go through the context's own mutators instead.
   spaces: readonly Space[];
   allSpaces: Space[];  // Includes "All" space at the beginning
   activeSpace: Space;
@@ -108,10 +108,10 @@ interface SpacesContextValue
 const SpacesContext = createContext<SpacesContextValue | null>(null);
 
 /**
- * Hands a new Space list to the proxy and deliberately drops the rejection -
- * a failed write doesn't surface as an unhandled promise rejection, since the
- * proxy has already logged the failure and resynced its mirror from
- * background by the time this settles.
+ * Takes one spaceManagerProxy mutation's promise and deliberately drops the
+ * rejection - a failed write doesn't surface as an unhandled promise
+ * rejection, since the proxy has already logged the failure and resynced its
+ * mirror from background by the time this settles.
  *
  * Returns the (always-resolving) promise so replaceSpaces/appendSpaces can
  * await it - import needs SpaceManager's segment self-heal (see the
@@ -123,9 +123,9 @@ const SpacesContext = createContext<SpacesContextValue | null>(null);
  * DeleteSpaceAction is the exception and calls the proxy directly, since an
  * undo right after a delete does have to know the delete arrived.
  */
-const writeSpaces = (spaces: Space[]): Promise<void> =>
+const ignoreWriteFailure = (write: Promise<Space[]>): Promise<void> =>
 {
-  return spaceManagerProxy.updateSpaces(spaces).then(() => {}, () => {});
+  return write.then(() => {}, () => {});
 };
 
 // =============================================================================
@@ -176,7 +176,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const debugSpaces = getDebugSpaces();
             if (debugSpaces.length > 0)
             {
-              writeSpaces(debugSpaces);
+              ignoreWriteFailure(spaceManagerProxy.replaceAll(debugSpaces));
             }
           }
 
@@ -216,11 +216,9 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       bookmarkFolderSegments,
     };
 
-    // Read the store snapshot at call time, not the render-captured `spaces`
-    // const, so back-to-back calls each see the previous call's write (the
-    // whole point of this refactor - see decision 4 in the shared-storage doc)
-    const updatedSpaces = [...spaceManagerProxy.snapshot, newSpace];
-    writeSpaces(updatedSpaces);
+    // Per-operation, so SpaceManager appends to its own list - nothing here
+    // reads the current list, so back-to-back calls can't overwrite each other
+    ignoreWriteFailure(spaceManagerProxy.addSpace(newSpace));
     return newSpace;
   }, []);
 
@@ -246,13 +244,10 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       console.error('[updateSpace] bookmarkFolderSegments required when bookmarkFolderPath is set');
     }
 
-    // Update Space in storage - read the store snapshot at call time, not the
-    // render-captured `spaces` const, so this doesn't clobber a write another
-    // call made after this callback was created
-    const updatedSpaces = spaceManagerProxy.snapshot.map(s =>
-      s.id === id ? { ...s, ...updates } : s
-    );
-    writeSpaces(updatedSpaces);
+    // Update Space in storage - per-operation, so only this Space's fields
+    // change and a write another call made after this callback was created
+    // is left alone
+    ignoreWriteFailure(spaceManagerProxy.updateSpace(id, updates));
 
     // Sync name/color changes to Chrome group
     if (windowId && (updates.name || updates.color))
@@ -280,48 +275,32 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const updateSpaceFolderPaths = useCallback((updates: { id: string; bookmarkFolderPath: string; bookmarkFolderSegments: string[] }[]) =>
   {
     if (updates.length === 0) return;
-    const updatedSpaces = spaceManagerProxy.snapshot.map(s =>
-    {
-      const update = updates.find(u => u.id === s.id);
-      return update
-        ? { ...s, bookmarkFolderPath: update.bookmarkFolderPath, bookmarkFolderSegments: update.bookmarkFolderSegments }
-        : s;
-    });
-    writeSpaces(updatedSpaces);
+    ignoreWriteFailure(spaceManagerProxy.updateSpaceFolderPaths(updates));
   }, []);
 
   const deleteSpaceBase = useCallback((id: string) =>
   {
     if (id === 'all') return; // Cannot delete "All" space
-    const updatedSpaces = spaceManagerProxy.snapshot.filter(s => s.id !== id);
-    writeSpaces(updatedSpaces);
+    ignoreWriteFailure(spaceManagerProxy.removeSpace(id));
   }, []);
 
+  // Unknown ids and no-op moves are handled by the shared transform, which
+  // leaves the list unchanged for them
   const moveSpace = useCallback((activeId: string, overId: string) =>
   {
-    const currentSpaces = spaceManagerProxy.snapshot;
-    const oldIndex = currentSpaces.findIndex(s => s.id === activeId);
-    const newIndex = currentSpaces.findIndex(s => s.id === overId);
-
-    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
-
-    const updatedSpaces = [...currentSpaces];
-    const [removed] = updatedSpaces.splice(oldIndex, 1);
-    updatedSpaces.splice(newIndex, 0, removed);
-
-    writeSpaces(updatedSpaces);
+    ignoreWriteFailure(spaceManagerProxy.moveSpace(activeId, overId));
   }, []);
 
   // Replace all spaces (for import with "Replace" option). Awaits the write
   // so the caller (import) only reports success once SpaceManager's segment
-  // self-heal has actually landed - see writeSpaces' doc comment.
+  // self-heal has actually landed - see ignoreWriteFailure's doc comment.
   const replaceSpaces = useCallback(async (newSpaces: Space[]): Promise<void> =>
   {
     const spacesWithNewIds = newSpaces.map(space => ({
       ...space,
       id: generateId(),
     }));
-    await writeSpaces(spacesWithNewIds);
+    await ignoreWriteFailure(spaceManagerProxy.replaceAll(spacesWithNewIds));
   }, []);
 
   // Append spaces to existing (for import with "Add" option). Awaits for the
@@ -332,8 +311,7 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       ...space,
       id: generateId(),
     }));
-    const combined = [...spaceManagerProxy.snapshot, ...spacesWithNewIds];
-    await writeSpaces(combined);
+    await ignoreWriteFailure(spaceManagerProxy.addSpaces(spacesWithNewIds));
   }, []);
 
   // ---------------------------------------------------------------------------

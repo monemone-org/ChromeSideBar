@@ -1,6 +1,5 @@
 import { SpaceMessageAction, Space } from './utils/spaceMessages';
 import { FOLLOW_ACTIVE_TAB_KEY, parseFollowActiveTabMode } from './utils/followActiveTab';
-import { isPinnedManagedTab, getTabAssociations, saveTabAssociationBackup, removeTabAssociationBackup, updateTabAssociationBackupIndices, removeWindowAssociationBackup, restoreTabAssociationBackup } from './utils/tabAssociations';
 import { toChromeColor } from './utils/groupColors';
 import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
 import { parseManagerActionId, RoutedManager } from './managers/proxies/messageRouting';
@@ -10,6 +9,13 @@ import { SpaceManager } from './managers/impl/spaceManager';
 import { TabHistoryManager } from './managers/impl/tabHistoryManager';
 import { LastAudibleTracker } from './managers/impl/lastAudibleTracker';
 import { PinnedSitesManager } from './managers/impl/pinnedSitesManager';
+import { TabAssociationManager } from './managers/impl/tabAssociationManager';
+import { backgroundTestHooks } from './managers/impl/backgroundTestHooks';
+import {
+  BACKGROUND_TEST_HOOK_ACTION,
+  BackgroundTestHookRequest,
+  BackgroundTestHookResponse,
+} from './managers/shared/backgroundTestHooksApi';
 
 // Set side panel to open when clicking the extension toolbar button
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -174,7 +180,9 @@ let tabSpaceRegistry: TabSpaceRegistry;
 // after a bookmark tab is created before auto-grouping completes).
 async function getSpaceForTab(windowId: number, tabId: number): Promise<string | undefined>
 {
-  if (await isPinnedManagedTab(windowId, tabId)) return undefined;
+  // A plain in-memory lookup on TabAssociationManager's map - no yield point
+  // on a path every tab activation walks.
+  if (tabAssociationManager.isPinnedManagedTab(windowId, tabId)) return undefined;
 
   try
   {
@@ -278,6 +286,7 @@ const historyManager = new TabHistoryManager({
 });
 const groupTracker = new TabGroupTracker();
 const pinnedSitesManager = new PinnedSitesManager();
+const tabAssociationManager = new TabAssociationManager();
 // Reads the history manager's activation order, so it has to come after it.
 const lastAudibleTracker = new LastAudibleTracker(historyManager);
 tabSpaceRegistry = new TabSpaceRegistry();
@@ -302,12 +311,13 @@ Promise.all([
   groupTracker.load(),
   lastAudibleTracker.load(),
   pinnedSitesManager.load(),
+  tabAssociationManager.load(),
   tabSpaceRegistry.load(),
   newsVersionChecker.load()
 ]).then(() =>
 {
   stateReadyResolve();
-  restoreTabAssociationBackup();
+  tabAssociationManager.restoreFromBackup();
 });
 
 // =============================================================================
@@ -386,33 +396,8 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
   }
 });
 
-// Refresh tab indices in local backup for all managed tabs in a window.
-// Called after any tab move or removal that may shift indices.
-async function refreshBackupIndices(windowId: number): Promise<void>
-{
-  const associations = await getTabAssociations(windowId);
-  if (Object.keys(associations).length === 0) return;
-
-  const allTabs = await chrome.tabs.query({ windowId });
-  const tabIndexMap = new Map(allTabs.map(t => [t.id!, t.index]));
-
-  const updates: Record<string, number> = {};
-  for (const [id, itemKey] of Object.entries(associations))
-  {
-    const newIndex = tabIndexMap.get(Number(id));
-    if (newIndex !== undefined)
-    {
-      updates[itemKey] = newIndex;
-    }
-  }
-
-  if (Object.keys(updates).length > 0)
-  {
-    await updateTabAssociationBackupIndices(windowId, updates);
-  }
-}
-
-// Clean up history, last audible tracker, tab registry, and local backup when tab is closed
+// Clean up history, last audible tracker, tab registry, and the tab's
+// association when a tab is closed
 chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
 {
   await stateReady;
@@ -422,16 +407,28 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
 
   if (!removeInfo.isWindowClosing)
   {
-    const associations = await getTabAssociations(removeInfo.windowId);
-    const itemKey = associations[tabId];
-    if (itemKey)
-    {
-      await removeTabAssociationBackup(removeInfo.windowId, itemKey);
-    }
+    // Drops the session entry and its backup entry together. The sidebar used
+    // to do the session half from its own onRemoved listener, which only ran
+    // while it was open - background owns both halves now.
+    tabAssociationManager.deassociate(removeInfo.windowId, tabId);
 
     // Any tab removal shifts indices of tabs after it
-    await refreshBackupIndices(removeInfo.windowId);
+    await tabAssociationManager.refreshBackupIndices(removeInfo.windowId);
   }
+});
+
+// A tracked tab dragged into a different window is no longer this window's
+// tab, so its association here goes. Background has the correct oldWindowId
+// on the event; before this, the only onDetached listener lived in the sidebar
+// and so did nothing while it was closed - see G2/A.6 in
+// docs/test/issues/G2-association-survives-sidebar-closed.md.
+chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
+{
+  await stateReady;
+  tabAssociationManager.deassociate(detachInfo.oldWindowId, tabId);
+
+  // Removing a tab from the window shifts the indices of the tabs after it
+  await tabAssociationManager.refreshBackupIndices(detachInfo.oldWindowId);
 });
 
 // Clean up in-memory maps and local backup when a window is closed
@@ -449,7 +446,7 @@ chrome.windows.onRemoved.addListener(async (windowId) =>
   historyManager.removeWindow(windowId);
   groupTracker.removeWindow(windowId);
   tabSpaceRegistry.removeWindow(windowId);
-  await removeWindowAssociationBackup(windowId);
+  await tabAssociationManager.removeWindow(windowId);
 });
 
 // Update tab indices in local backup when any tab is moved.
@@ -458,7 +455,7 @@ chrome.windows.onRemoved.addListener(async (windowId) =>
 chrome.tabs.onMoved.addListener(async (_tabId, moveInfo) =>
 {
   await stateReady;
-  await refreshBackupIndices(moveInfo.windowId);
+  await tabAssociationManager.refreshBackupIndices(moveInfo.windowId);
 });
 
 // Favicon loading Scenario 5 — see docs/favicon-loading-strategy.md
@@ -484,12 +481,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
   {
     try
     {
-      const associations = await getTabAssociations(tab.windowId);
-      const itemKey = associations[tabId];
-      if (itemKey)
-      {
-        saveTabAssociationBackup(tab.windowId, itemKey, { tabId, url: changeInfo.url, tabIndex: tab.index });
-      }
+      await tabAssociationManager.noteTabNavigated(tab.windowId, tabId, changeInfo.url, tab.index);
     }
     catch { /* tab may have been closed */ }
   }
@@ -514,14 +506,11 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
         if (space?.id !== registeredSpaceId)
         {
           tabSpaceRegistry.unregister(tab.windowId, tabId);
-          chrome.runtime.sendMessage({
-            action: SpaceMessageAction.DEASSOCIATE_TAB,
-            windowId: tab.windowId,
-            tabId
-          }).catch(() =>
-          {
-            // Sidepanel may not be open - ignore error
-          });
+
+          // Straight to the owner rather than a fire-and-forget message to a
+          // sidebar that may not be open. The manager's own broadcast tells
+          // whichever sidebars are around - see G2/A.3.
+          tabAssociationManager.deassociate(tab.windowId, tabId);
         }
       }
     }
@@ -632,8 +621,10 @@ async function processGroupingRequest(request: TabGroupingRequest): Promise<void
 {
   const { tabId, windowId, spaceId, force } = request;
 
-  // Check if this is a pinned-site managed tab (keep ungrouped)
-  if (await isPinnedManagedTab(windowId, tabId))
+  // Check if this is a pinned-site managed tab (keep ungrouped).
+  // An in-memory lookup on TabAssociationManager's map, so no yield point
+  // between the check and the ungroup below.
+  if (tabAssociationManager.isPinnedManagedTab(windowId, tabId))
   {
     // Ungroup if currently in a group
     try
@@ -749,9 +740,72 @@ registerManager(spaceManager);
 registerManager(historyManager);
 registerManager(lastAudibleTracker);
 registerManager(pinnedSitesManager);
+registerManager(tabAssociationManager);
+
+// Answers one DEV-only test hook message from the in-panel test runner - see
+// managers/shared/backgroundTestHooksApi.ts.
+async function handleBackgroundTestHook(request: BackgroundTestHookRequest): Promise<BackgroundTestHookResponse>
+{
+  try
+  {
+    switch (request.op)
+    {
+      case 'armGate':
+        backgroundTestHooks.armGate(request.gate);
+        return { ok: true };
+
+      case 'waitForGate':
+        return { ok: true, value: await backgroundTestHooks.waitForGate(request.gate, request.timeoutMs) };
+
+      case 'releaseGate':
+        backgroundTestHooks.releaseGate(request.gate);
+        return { ok: true };
+
+      case 'failNextCall':
+        backgroundTestHooks.failNextCall(request.managerId, request.method);
+        return { ok: true };
+
+      case 'broadcast':
+        // No listener is not an error here, same as every other broadcast
+        await chrome.runtime.sendMessage(request.message).catch(() => {});
+        return { ok: true };
+
+      case 'forgetTabAssociationSession':
+        tabAssociationManager.forgetSessionForTest(request.windowId);
+        return { ok: true };
+
+      case 'runTabAssociationRestore':
+        await tabAssociationManager.restoreFromBackup();
+        return { ok: true };
+
+      case 'readTabAssociationBackup':
+        return { ok: true, value: await tabAssociationManager.readBackupForTest(request.windowId) };
+
+      case 'reset':
+        backgroundTestHooks.reset();
+        return { ok: true };
+    }
+  }
+  catch (error)
+  {
+    return { ok: false, error: String(error) };
+  }
+}
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
 {
+  // Test hooks only exist in a debug build, so a release build ignores them
+  // like any other unknown message
+  if (import.meta.env.DEV && message?.action === BACKGROUND_TEST_HOOK_ACTION)
+  {
+    (async () =>
+    {
+      await stateReady;
+      sendResponse(await handleBackgroundTestHook(message.request as BackgroundTestHookRequest));
+    })();
+    return true;  // async response
+  }
+
   // Manager-routed messages come first: anything shaped "<Manager>_msg_<method>"
   // belongs to exactly one manager and never falls through to the flat
   // orchestration handlers below.
@@ -772,6 +826,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
       await stateReady;
       try
       {
+        if (import.meta.env.DEV)
+        {
+          backgroundTestHooks.throwIfFailureArmed(routed.managerId, routed.method);
+        }
+
         sendResponse(await manager.dispatch(routed.method, message));
       }
       catch (error)

@@ -43,8 +43,12 @@ export const ALL_SPACE: Space = {
  * through spaceManagerProxy the same way. SpacesContext.tsx holds a read-only
  * mirror that syncs via that proxy, not via the flat actions below.
  *
- * What remains here are the two orchestration broadcasts that no single
- * manager owns.
+ * Tab associations belong to TabAssociationManager the same way, and it is
+ * background that breaks an association when a tracked tab is dragged into
+ * another space's group, rather than any message from here.
+ *
+ * What remains here is the one orchestration broadcast that no single manager
+ * owns.
  */
 export const SpaceMessageAction = {
   // ─────────────────────────────────────────────────────────────────────────
@@ -68,19 +72,6 @@ export const SpaceMessageAction = {
    * Payload: { windowId: number, tabId: number, spaceSwitched: boolean, explicit?: boolean }
    */
   TAB_ACTIVATED: 'tab-activated',
-
-  /**
-   * background.ts → BookmarkTabsContext.tsx
-   *
-   * A tracked Arc-style bookmark/pinned tab was dragged into a Chrome group
-   * belonging to a different space than the one it's associated with. The
-   * sidebar breaks the bookmark association for this tab - equivalent to the
-   * user choosing "Move to Tabs" and then moving a regular tab to that space -
-   * since the tab no longer lives in its bookmark's space.
-   *
-   * Payload: { windowId: number, tabId: number }
-   */
-  DEASSOCIATE_TAB: 'deassociate-tab',
 } as const;
 
 // Type for the action values

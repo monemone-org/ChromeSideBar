@@ -1,4 +1,5 @@
-// Plain observable store used by proxy-owned mirrors, outside React state.
+// One proxy's mirror of a manager's value: a plain observable store, outside
+// React state, with a no-op check on write.
 //
 // See docs/decisions/2026-07-30-shared-storage-multiple-writers.md, "The
 // mirror is a plain store, not React state": read-after-write (decision 4)
@@ -7,6 +8,10 @@
 // not change the const a running function captured at render time. So each
 // proxy owns one of these, and components read it with useSyncExternalStore
 // instead of useState.
+//
+// Each mirroring proxy holds one of these as a field rather than inheriting
+// it. What a proxy writes into it (an optimistic transform, a broadcast, a
+// reply) and which broadcasts it listens to stay in the proxy itself.
 
 /**
  * The half of a store that consumers get: enough for useSyncExternalStore,
@@ -28,7 +33,7 @@ export interface ReadableStore<T>
  * One manager's mirrored state in this context. The matching proxy is the
  * only thing that writes it.
  */
-export class ExternalStore<T> implements ReadableStore<T>
+export class MirrorStore<T> implements ReadableStore<T>
 {
   #value: T;
   #listeners = new Set<() => void>();
@@ -36,6 +41,26 @@ export class ExternalStore<T> implements ReadableStore<T>
   constructor(initial: T)
   {
     this.#value = initial;
+  }
+
+  /** Read-only handle on the mirror, for useSyncExternalStore. */
+  get store(): ReadableStore<T>
+  {
+    return this;
+  }
+
+  /**
+   * The mirrored value as this context sees it. Same value as getSnapshot(),
+   * for proxy code that reads it inline.
+   *
+   * Treat what comes back as immutable: it is the live value behind the
+   * mirror, not a copy, so changing it in place would change what every
+   * subscriber sees WITHOUT notifying any of them - the store only fires
+   * listeners from set().
+   */
+  get snapshot(): T
+  {
+    return this.#value;
   }
 
   /**
@@ -61,12 +86,19 @@ export class ExternalStore<T> implements ReadableStore<T>
     return () => this.#listeners.delete(onChange);
   };
 
-  set(next: T): void
+  /**
+   * The single writer of the mirror. Skips a value equal to the one already
+   * held, so a no-op write (a broadcast carrying what an optimistic write
+   * already showed, say) doesn't re-render every consumer.
+   *
+   * The JSON comparison is deliberate and scoped to this use: these are short,
+   * flat, JSON-derived values that just came off the message channel. It is
+   * not a general deep-equality utility.
+   */
+  set(value: T): void
   {
-    // Object.is guard: bail when the value hasn't actually changed, so
-    // subscribers don't re-render for a no-op write.
-    if (Object.is(next, this.#value)) return;
-    this.#value = next;
+    if (JSON.stringify(value) === JSON.stringify(this.#value)) return;
+    this.#value = value;
 
     // Notify every subscriber that the snapshot changed.
     for (const listener of this.#listeners) listener();

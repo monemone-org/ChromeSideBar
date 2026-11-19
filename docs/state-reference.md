@@ -104,8 +104,8 @@ Active space per window
 
 ### `tabAssociations_${windowId}`
 Bookmark/pinned site → tab ID mapping (Record: itemKey → tabId)
-- Owner: `src/contexts/BookmarkTabsContext.tsx`
-- Consumers: `src/components/PinnedBar.tsx`, `src/components/TabList.tsx`
+- Owner: `src/background.ts` (TabAssociationManager class)
+- Consumers: `src/contexts/BookmarkTabsContext.tsx` (read-only mirror synced via `tabAssociationsProxy`), and through it `src/components/PinnedBar.tsx`, `src/components/TabList.tsx`, `src/components/BookmarkTree.tsx`
 - Instances: 1 per window
 
 ### `bookmarkExpandedState_${windowId}`
@@ -158,6 +158,21 @@ Array<{
 ```
 - Owner: `src/hooks/usePinnedSites.ts`
 - Consumers: `src/components/PinnedBar.tsx`
+- Instances: 1 per extension (shared across windows)
+
+### `tabAssociationsBackup_${windowId}`
+Backup of one window's tab associations, so they survive a browser restart that session storage does not (Record: itemKey → `{ tabId, url, tabIndex }`)
+- Owner: `src/background.ts` (TabAssociationManager class)
+- Consumers: `src/background.ts` only - restored into `tabAssociations_${windowId}` at startup by matching backed-up windows to the windows Chrome brought back
+- Instances: 1 per window that has at least one tracked tab
+
+### `tabAssociationsBackupWindowIds`
+Index of the window IDs that currently have a `tabAssociationsBackup_${windowId}` entry, since the entries themselves cannot be enumerated by prefix
+```typescript
+number[]
+```
+- Owner: `src/background.ts` (TabAssociationManager class)
+- Consumers: `src/background.ts`
 - Instances: 1 per extension (shared across windows)
 
 ---

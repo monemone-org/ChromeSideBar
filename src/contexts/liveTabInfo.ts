@@ -88,6 +88,18 @@ export class LiveTabInfoMap
     return new LiveTabInfoMap(infos);
   }
 
+  /** Drop every tab the predicate rejects; returns this instance if nothing was dropped. */
+  withOnlyTabs(isKept: (tabId: number) => boolean): LiveTabInfoMap
+  {
+    const stale = [...this.infos.keys()].filter(tabId => !isKept(tabId));
+    if (stale.length === 0) return this;
+
+    const infos = new Map(this.infos);
+    // Remove each tab that is no longer kept
+    for (const tabId of stale) infos.delete(tabId);
+    return new LiveTabInfoMap(infos);
+  }
+
   private withInfo(tabId: number, info: LiveTabInfo): LiveTabInfoMap
   {
     const infos = new Map(this.infos);

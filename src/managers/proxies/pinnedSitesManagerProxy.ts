@@ -1,19 +1,21 @@
 // Sidebar-side client for background.ts's PinnedSitesManager.
 //
-// Same shape as spaceManagerProxy (step 3), with two differences that come
-// from pinned sites having a writer the Space list doesn't: background patches
-// favicons on its own.
+// Same shape as spaceManagerProxy, with pinned sites having a writer the
+// Space list doesn't: background patches favicons on its own.
 //
-// 1. Mutations are per-operation, not "here is the whole new list". The
-//    manager applies each one to its own authoritative list, so a reorder sent
-//    from here can't wipe out a favicon background added a moment ago.
-//    Optimistic writes call the very same transform from shared/pinnedSitesApi
-//    that the manager will, so the mirror and the stored list agree.
+// Mutations are per-operation, not "here is the whole new list". The manager
+// applies each one to its own authoritative list, so a reorder sent from here
+// can't wipe out a favicon background added a moment ago. Optimistic writes
+// call the very same transform from shared/pinnedSitesApi that the manager
+// will, so the mirror and the stored list agree.
 //
-// 2. Broadcasts that arrive while this context has writes in flight are held
-//    rather than applied - see #onBroadcast.
+// Every broadcast is applied, our own echo included - each one carries the
+// manager's whole resulting list, so the latest to arrive is the truth. A
+// foreign broadcast landing while one of our writes is in flight can briefly
+// show the list without our change, until our own echo arrives a moment later
+// and puts it back.
 
-import { ManagerId, callManager, CONTEXT_ID, Remote } from './messageRouting';
+import { ManagerId, callManager, subscribeToBroadcast, Remote } from './messageRouting';
 import {
   PinnedSite,
   PinnedSiteDropPosition,
@@ -32,7 +34,7 @@ import {
   applySetFavicons,
   applyUpdatePin,
 } from '../shared/pinnedSitesApi';
-import { ExternalStore, ReadableStore } from '../../stores/externalStore';
+import { MirrorStore, ReadableStore } from '../../stores/mirrorStore';
 
 /**
  * Extends the plain Remote<Api> shape with the pieces this manager has no
@@ -41,40 +43,30 @@ import { ExternalStore, ReadableStore } from '../../stores/externalStore';
 class PinnedSitesManagerProxy implements Remote<PinnedSitesApi>
 {
   // This context's mirror of the pinned site list. Private so every write
-  // goes through #applySites; consumers read it via the store or the snapshot
+  // goes through this proxy; consumers read it via the store or snapshot
   // getter.
-  #store = new ExternalStore<readonly PinnedSite[]>([]);
-
-  // Whether the broadcast listener is already registered - see
-  // #subscribeToBroadcasts.
-  #subscribed = false;
-
-  // How many of this context's mutations are waiting for their ack. Used to
-  // decide whether an incoming broadcast is safe to apply - see #onBroadcast.
-  #pendingWrites = 0;
-
-  // Whether a broadcast was dropped while #pendingWrites was above zero, so
-  // the drain knows it has to re-read instead of trusting its own ack.
-  #missedBroadcast = false;
+  #mirror = new MirrorStore<readonly PinnedSite[]>([]);
 
   /** Read-only handle on the mirror, for useSyncExternalStore. */
   get store(): ReadableStore<readonly PinnedSite[]>
   {
-    return this.#store;
+    return this.#mirror.store;
   }
 
   /**
    * The pinned site list as this context sees it.
    *
+   * Every mutation below applies its change here before the message goes
+   * out, so a caller reading this on the next line sees its own write -
+   * PinnedBar's drag handling and the fixtures depend on that.
+   *
    * Returned readonly on purpose: this is the live array behind the mirror,
-   * not a copy, so splicing it would change what every subscriber sees
-   * WITHOUT notifying any of them - the store only fires listeners from
-   * set(). Callers ask for a change through one of the mutations below, which
-   * is the only supported way to modify this state.
+   * not a copy. Callers ask for a change through one of the mutations below,
+   * which is the only supported way to modify this state.
    */
   get snapshot(): readonly PinnedSite[]
   {
-    return this.#store.getSnapshot();
+    return this.#mirror.snapshot;
   }
 
   /**
@@ -83,175 +75,23 @@ class PinnedSitesManagerProxy implements Remote<PinnedSitesApi>
    * usePinnedSites at mount.
    *
    * Safe to call more than once: React StrictMode double-invokes the mount
-   * effect in dev, and re-loading must not stack listeners.
+   * effect in dev, and subscribeToBroadcast ignores the second registration.
    */
   async load(): Promise<PinnedSite[]>
   {
-    this.#subscribeToBroadcasts();
+    subscribeToBroadcast(PINNED_SITES_CHANGED, (message) =>
+    {
+      this.#mirror.set(message.sites as PinnedSite[]);
+    });
+
     const sites = await this.getPinnedSites();
-    this.#applySites(sites);
+    this.#mirror.set(sites);
     return sites;
   }
 
   /**
-   * Subscribes to the manager's "changed" broadcasts, at most once for the
-   * life of this context. Deliberately never unsubscribed - the proxy is a
-   * module singleton that outlives every component that loads through it.
-   */
-  #subscribeToBroadcasts(): void
-  {
-    if (this.#subscribed) return;
-    this.#subscribed = true;
-
-    chrome.runtime.onMessage.addListener((message) =>
-    {
-      if (message?.action === PINNED_SITES_CHANGED)
-      {
-        this.#onBroadcast(message.sites as PinnedSite[], message.senderId as string | undefined);
-      }
-    });
-  }
-
-  /**
-   * Decides what to do with one incoming "the list changed" broadcast.
-   *
-   * Our own echo is always dropped: it describes the list at the time our
-   * message was handled, which a newer local write may already have moved
-   * past. See CONTEXT_ID in messageRouting.ts for the worked example.
-   *
-   * Someone else's broadcast (another window, or background's favicon
-   * patching) is news - but only safe to apply when nothing of ours is in
-   * flight. Otherwise it describes a list background built BEFORE it saw our
-   * pending change, and applying it would undo that change in this window
-   * only:
-   *
-   *   mirror [A B C D]
-   *   user unpins D        mirror [A B C], removePins([D]) sent
-   *   background patches B's favicon and broadcasts [A B* C D]
-   *     -> applied, D is back on screen
-   *   background handles the remove, broadcasts [A B* C] with OUR senderId
-   *     -> dropped as our own echo
-   *   D stays on screen until some unrelated later broadcast
-   *
-   * So it is dropped and the fact recorded; #mutate resyncs once the last
-   * in-flight write returns.
-   */
-  #onBroadcast(sites: PinnedSite[], senderId: string | undefined): void
-  {
-    if (senderId === CONTEXT_ID) return;
-
-    if (this.#pendingWrites > 0)
-    {
-      this.#missedBroadcast = true;
-      return;
-    }
-
-    this.#applySites(sites);
-  }
-
-  /**
-   * The single writer of the mirror. Skips a list equal to the one already
-   * held, so a no-op write doesn't re-render every consumer.
-   *
-   * The JSON comparison is deliberate and scoped to this use: these are
-   * short, flat, JSON-derived objects that just came off the message channel.
-   * It is not a general deep-equality utility.
-   */
-  #applySites(sites: readonly PinnedSite[]): void
-  {
-    if (JSON.stringify(sites) === JSON.stringify(this.#store.getSnapshot())) return;
-
-    this.#store.set(sites);
-  }
-
-  /**
-   * Runs one mutation: apply it to the mirror now, then ask background to
-   * apply it to the real list.
-   *
-   * `optimistic` is the same pure transform the manager will run, so the
-   * mirror shows the outcome immediately and a caller reading snapshot on the
-   * next line sees its own write - PinnedBar's drag handling and the
-   * fixtures depend on that. The ack is NOT applied on top of it in the
-   * normal case: we already know the result, and a reply that a newer write
-   * has superseded would only move the mirror backwards.
-   *
-   * The exception is the drain. If a foreign broadcast was dropped while our
-   * writes were in flight (see #onBroadcast), the mirror is missing whatever
-   * that broadcast carried, and our own ack may not include it either -
-   * background could have sent the reply before that other change landed.
-   * So the last write out re-reads the list rather than guessing.
-   */
-  async #mutate(
-    method: string,
-    payload: Record<string, unknown>,
-    optimistic: (sites: readonly PinnedSite[]) => PinnedSite[]
-  ): Promise<PinnedSite[]>
-  {
-    this.#applySites(optimistic(this.snapshot));
-    this.#pendingWrites++;
-
-    try
-    {
-      const result = await callManager<PinnedSite[]>(ManagerId.PINNED_SITES, method, payload);
-      this.#pendingWrites--;
-      await this.#drain(result);
-      return result;
-    }
-    catch (error)
-    {
-      // The optimistic write above is now showing a change that never
-      // happened. Ask background what the truth is rather than rolling back
-      // to a remembered list, which could undo a LATER write that did
-      // succeed. A failed resync means the worker is gone and this page is
-      // about to be torn down anyway, so there is nothing further to do.
-      this.#pendingWrites--;
-      console.error(`[pinnedSitesManagerProxy] ${method} failed, resyncing:`, error);
-      this.getPinnedSites()
-        .then((current) => { if (this.#pendingWrites === 0) this.#applySites(current); })
-        .catch(() => {});
-      throw error;
-    }
-  }
-
-  /**
-   * Called as each write returns. Does nothing while other writes of ours are
-   * still out - the last one to come back is the one that can safely settle
-   * the mirror.
-   */
-  async #drain(ack: PinnedSite[]): Promise<void>
-  {
-    if (this.#pendingWrites > 0) return;
-
-    if (!this.#missedBroadcast)
-    {
-      // Nothing was dropped, so the mirror already holds what this ack says.
-      return;
-    }
-
-    this.#missedBroadcast = false;
-
-    try
-    {
-      const current = await this.getPinnedSites();
-
-      // A write started while the re-read was in flight, and its optimistic
-      // write is newer than what came back. Leave the mirror to that write's
-      // own drain.
-      if (this.#pendingWrites > 0) return;
-
-      this.#applySites(current);
-    }
-    catch
-    {
-      // Re-reading failed, so fall back to the ack. It is at worst missing
-      // the change we know we dropped, which the next broadcast will bring.
-      if (this.#pendingWrites === 0) this.#applySites(ack);
-    }
-  }
-
-  /**
-   * Plain read - does NOT touch the mirror. Used by load() and the drain, and
-   * by contexts that keep no mirror at all (the unit test in
+   * Plain read - does NOT touch the mirror. Used by load() and the failure
+   * resync, and by contexts that keep no mirror at all (the unit test in
    * tests/deletePinnedSiteActionTest.ts).
    */
   async getPinnedSites(): Promise<PinnedSite[]>
@@ -259,29 +99,63 @@ class PinnedSitesManagerProxy implements Remote<PinnedSitesApi>
     return await callManager<PinnedSite[]>(ManagerId.PINNED_SITES, 'getPinnedSites');
   }
 
+  /**
+   * Sends one mutation whose optimistic change is already on the mirror.
+   *
+   * The ack is NOT applied to the mirror: the broadcast the same change
+   * causes does that, in order with every other broadcast. The promise still
+   * resolves with the manager's reply, for callers that need the write to
+   * have actually landed.
+   */
+  async #send(method: string, payload: Record<string, unknown>): Promise<PinnedSite[]>
+  {
+    try
+    {
+      return await callManager<PinnedSite[]>(ManagerId.PINNED_SITES, method, payload);
+    }
+    catch (error)
+    {
+      // The optimistic write is now showing a change that never happened.
+      // Ask background what the truth is rather than rolling back to a
+      // remembered list, which could undo a LATER write that did succeed. A
+      // failed resync means the worker is gone and this page is about to be
+      // torn down anyway, so there is nothing further to do.
+      console.error(`[pinnedSitesManagerProxy] ${method} failed, resyncing:`, error);
+      this.getPinnedSites()
+        .then((current) => this.#mirror.set(current))
+        .catch(() => {});
+      throw error;
+    }
+  }
+
   async addPins(pins: PinnedSite[], atIndex?: number): Promise<PinnedSite[]>
   {
-    return this.#mutate('addPins', { pins, atIndex }, sites => applyAddPins(sites, pins, atIndex));
+    this.#mirror.set(applyAddPins(this.#mirror.snapshot, pins, atIndex));
+    return this.#send('addPins', { pins, atIndex });
   }
 
   async removePins(ids: string[]): Promise<PinnedSite[]>
   {
-    return this.#mutate('removePins', { ids }, sites => applyRemovePins(sites, ids));
+    this.#mirror.set(applyRemovePins(this.#mirror.snapshot, ids));
+    return this.#send('removePins', { ids });
   }
 
   async insertPins(placements: PinnedSitePlacement[]): Promise<PinnedSite[]>
   {
-    return this.#mutate('insertPins', { placements }, sites => applyInsertPins(sites, placements));
+    this.#mirror.set(applyInsertPins(this.#mirror.snapshot, placements));
+    return this.#send('insertPins', { placements });
   }
 
   async updatePin(id: string, edit: PinnedSiteEdit): Promise<PinnedSite[]>
   {
-    return this.#mutate('updatePin', { id, edit }, sites => applyUpdatePin(sites, id, edit));
+    this.#mirror.set(applyUpdatePin(this.#mirror.snapshot, id, edit));
+    return this.#send('updatePin', { id, edit });
   }
 
   async resetFavicon(id: string, favicon?: string): Promise<PinnedSite[]>
   {
-    return this.#mutate('resetFavicon', { id, favicon }, sites => applyResetFavicon(sites, id, favicon));
+    this.#mirror.set(applyResetFavicon(this.#mirror.snapshot, id, favicon));
+    return this.#send('resetFavicon', { id, favicon });
   }
 
   async movePin(
@@ -290,11 +164,8 @@ class PinnedSitesManagerProxy implements Remote<PinnedSitesApi>
     position: PinnedSiteDropPosition
   ): Promise<PinnedSite[]>
   {
-    return this.#mutate(
-      'movePin',
-      { activeId, overId, position },
-      sites => applyMovePin(sites, activeId, overId, position)
-    );
+    this.#mirror.set(applyMovePin(this.#mirror.snapshot, activeId, overId, position));
+    return this.#send('movePin', { activeId, overId, position });
   }
 
   async duplicatePin(
@@ -303,21 +174,20 @@ class PinnedSitesManagerProxy implements Remote<PinnedSitesApi>
     overrides?: PinnedSiteDuplicateOverrides
   ): Promise<PinnedSite[]>
   {
-    return this.#mutate(
-      'duplicatePin',
-      { id, newId, overrides },
-      sites => applyDuplicatePin(sites, id, newId, overrides)
-    );
+    this.#mirror.set(applyDuplicatePin(this.#mirror.snapshot, id, newId, overrides));
+    return this.#send('duplicatePin', { id, newId, overrides });
   }
 
   async replaceAll(sites: PinnedSite[]): Promise<PinnedSite[]>
   {
-    return this.#mutate('replaceAll', { sites }, () => sites);
+    this.#mirror.set(sites);
+    return this.#send('replaceAll', { sites });
   }
 
   async setFavicons(patches: PinnedSiteFaviconPatch[]): Promise<PinnedSite[]>
   {
-    return this.#mutate('setFavicons', { patches }, sites => applySetFavicons(sites, patches));
+    this.#mirror.set(applySetFavicons(this.#mirror.snapshot, patches));
+    return this.#send('setFavicons', { patches });
   }
 }
 
