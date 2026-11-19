@@ -2,8 +2,10 @@
 // Runs the in-panel test suite (src/tests/inpanel/) unattended in the test
 // Chrome started by tools/start-test-chrome.sh, and does the few pause steps
 // only something outside the extension can do: stopping the service worker
-// (E.3, P.8) and reloading the extension (E.1). See "Phase 4b: the driver
-// script" in docs/test/test-runner-automation-plan.md.
+// (E.3, P.8), reloading the extension (E.1) and, only on a Chrome profile
+// inside tools/tmp/ that is not signed in, deleting the browsing history (P.6,
+// see ProfileGuard).
+// See "Phase 4b: the driver script" in docs/test/test-runner-automation-plan.md.
 //
 // Run it as exactly `node tools/run-inpanel-tests.mjs`, with no arguments: the
 // sandbox exclusion for it matches the bare command. Options come from
@@ -39,12 +41,13 @@
 //
 // Exit code: 0 when every case that ran passed, failed only at its known-gap
 // step (KNOWN_GAP_FAILING_STEPS), or was skipped as expected
-// (EXPECTED_MANUAL_CASE_IDS); 1 otherwise, including when a selected case
+// (EXPECTED_MANUAL_CASE_IDS, or P.6 when the profile guard refused to clear
+// browsing data); 1 otherwise, including when a selected case
 // never produced a result or the driver itself failed. 130/143 when stopped
 // by SIGINT/SIGTERM.
 
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { basename, dirname, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -68,10 +71,22 @@ const KNOWN_GAP_FAILING_STEPS = {
   'B.5b': ['Bookmark "bm" is not loaded'],
 };
 
-// Cases with a pause no driver can do (P.6 needs Chrome's Clear browsing data,
-// P.10 a second sidebar). Skipping these is expected; any other skip fails
-// the run.
-const EXPECTED_MANUAL_CASE_IDS = ['P.6', 'P.10'];
+// Cases with a pause no driver can do (P.10 needs a pin made in a second
+// window's sidebar). Skipping these is expected. A skip because the profile
+// guard refused to clear browsing data (P.6, see ProfileGuard) is expected
+// too. Any other skip fails the run.
+const EXPECTED_MANUAL_CASE_IDS = ['P.10'];
+
+// The Clear browsing data dialog's pref for the "Browsing history" checkbox:
+// the only data type the driver deletes. Deleting history for all time also
+// drops Chrome's stored favicons, which is what P.6 needs.
+const BROWSING_HISTORY_PREF = 'browser.clear_data.browsing_history';
+// The time period pref the dialog uses when its picker does not name one.
+const DEFAULT_TIME_PERIOD_PREF = 'browser.clear_data.time_period';
+// Chrome's TimePeriod value for "All time".
+const TIME_PERIOD_ALL_TIME = 4;
+// How long Chrome gets to delete the data once Delete is clicked.
+const CLEAR_DATA_TIMEOUT_MS = 60000;
 
 // URL prefixes of the pages test cases open, mirroring isTestUrl() in
 // src/tests/inpanel/fixtures.ts. A window opened during the run whose tabs are
@@ -743,6 +758,568 @@ class ExtensionsAdminPage
   }
 }
 
+/**
+ * A page the driver opens in a window of its own and talks to by its own
+ * target id, so it can never be mixed up with a page a test case opened on
+ * the same URL (P.6 opens its own Clear browsing data tab for the tester).
+ */
+class OwnedWindowPage
+{
+  constructor(browser, pool, targetId)
+  {
+    this.browser = browser;
+    this.pool = pool;
+    this.targetId = targetId;
+  }
+
+  static async open(browser, pool, url)
+  {
+    return new OwnedWindowPage(browser, pool, await createWindowTarget(browser, url));
+  }
+
+  call(fn, ...args)
+  {
+    return this.pool.evaluate(this.targetId, pageCall(fn, ...args), { retryOnNavigate: false });
+  }
+
+  async close()
+  {
+    this.pool.forget(this.targetId);
+    await closeTarget(this.browser, this.targetId);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Clearing browsing data (P.6), only on a profile inside tools/tmp/
+// ---------------------------------------------------------------------------
+
+/** Scripts run in chrome://version. */
+const VersionPageScripts = {
+  profilePath: function profilePath()
+  {
+    const text = document.getElementById('profile_path')?.textContent?.trim();
+    return text || null;
+  },
+};
+
+/** Scripts run in chrome://sync-internals. */
+const SyncInternalsScripts = {
+  // The About section's rows, read from the page text, where each row is
+  // "label<TAB>value". Null until the "Transport State" row has a value,
+  // since the page fills its values in after it loads.
+  signInFields: function signInFields()
+  {
+    // The page text, plus the text inside any shadow roots
+    const texts = [document.body?.innerText ?? ''];
+    const visit = (root) =>
+    {
+      // Collect each shadow root's text and look further down inside it
+      for (const element of root.querySelectorAll('*'))
+      {
+        if (!element.shadowRoot) continue;
+        texts.push([...element.shadowRoot.children].map(child => child.innerText ?? '').join('\n'));
+        visit(element.shadowRoot);
+      }
+    };
+    visit(document);
+
+    const rows = {};
+    // Keep the first value seen for each label
+    for (const line of texts.join('\n').split('\n'))
+    {
+      const cells = line.split('\t');
+      const label = cells[0].trim();
+      if (!label || label in rows) continue;
+      rows[label] = cells.slice(1).join(' ').trim();
+    }
+
+    if (!rows['Transport State']) return null;
+    return {
+      transportState: rows['Transport State'],
+      username: rows['Username'] ?? null,
+      disableReasons: rows['Disable Reasons'] ?? null,
+      syncFeatureEnabled: rows['Sync Feature Enabled'] ?? null,
+      lastSynced: rows['Last Synced'] ?? null,
+    };
+  },
+};
+
+/**
+ * Decides whether the driver may clear browsing data. Both conditions must
+ * hold, and anything that cannot be read counts as a refusal:
+ * - The Chrome it is connected to runs on a profile inside this checkout's
+ *   tools/tmp/ folder (where start-test-chrome.sh puts it).
+ * - That profile is not signed in to any account, even with sync off. On a
+ *   signed-in profile with history sync, deleting history for all time also
+ *   deletes the account's history on every synced device.
+ * The decision is made at the start of the run and cached. The clearing
+ * itself asks again with a fresh reading.
+ */
+class ProfileGuard
+{
+  constructor(browser, pool)
+  {
+    this.browser = browser;
+    this.pool = pool;
+    this.decision = null;
+  }
+
+  /**
+   * Null when clearing is allowed; otherwise the skip reason ("profile not in
+   * <tools/tmp path>", "profile is signed in to <account>", "sign-in state
+   * unknown"). `fresh` reads Chrome again instead of using the cached
+   * decision. Never throws.
+   */
+  async refusalReason({ fresh = false } = {})
+  {
+    if (!this.decision || fresh) this.decision = await this.#decide();
+    return this.decision.allowed ? null : this.decision.reason;
+  }
+
+  async #decide()
+  {
+    // Both pages in windows of the driver's own, read side by side
+    const [pathResult, signInResult] = await Promise.allSettled([this.#readProfilePath(), this.#readSignInFields()]);
+
+    const refusal = this.#pathRefusal(pathResult) ?? this.#signInRefusal(signInResult);
+    if (refusal)
+    {
+      log(`profile guard: will NOT clear browsing data - ${refusal.detail}`);
+      return { allowed: false, reason: refusal.reason };
+    }
+
+    log('profile guard: clearing browsing data is allowed - the profile is inside tools/tmp/ and not signed in');
+    return { allowed: true, reason: null };
+  }
+
+  /** Null when the profile is inside tools/tmp/; otherwise { reason, detail }. Logs the paths it compared. */
+  #pathRefusal(pathResult)
+  {
+    let tmpReal = TMP_DIR;
+    try
+    {
+      tmpReal = realpathSync(TMP_DIR);
+    }
+    catch
+    {
+      // No tools/tmp/ at all: no profile can be inside it, so the check below refuses
+    }
+    const refuse = (detail) => ({ reason: `profile not in ${tmpReal}`, detail });
+
+    if (pathResult.status === 'rejected')
+    {
+      return refuse(`could not read the profile path from chrome://version (${errorText(pathResult.reason)})`);
+    }
+    const profilePath = pathResult.value;
+
+    let profileReal;
+    try
+    {
+      profileReal = realpathSync(profilePath);
+    }
+    catch
+    {
+      return refuse(`the profile path ${profilePath} does not resolve on this machine`);
+    }
+
+    // Inside means: a path below tools/tmp/, not tools/tmp/ itself and not a sibling
+    const below = relative(tmpReal, profileReal);
+    const inside = below !== '' && below !== '..' && !below.startsWith(`..${sep}`) && !isAbsolute(below);
+    log(`profile guard: profile ${profileReal}, tools/tmp ${tmpReal} - ${inside ? 'inside' : 'NOT inside'}`);
+    return inside ? null : refuse(`the profile is ${profileReal}, which is not inside ${tmpReal}`);
+  }
+
+  /**
+   * Null only when chrome://sync-internals shows an empty Username and
+   * "Not signed in" among the Disable Reasons; otherwise { reason, detail }.
+   * Logs the fields it read.
+   */
+  #signInRefusal(signInResult)
+  {
+    if (signInResult.status === 'rejected')
+    {
+      return { reason: 'sign-in state unknown', detail: `could not read chrome://sync-internals (${errorText(signInResult.reason)})` };
+    }
+    const fields = signInResult.value;
+    log(`profile guard: sync-internals shows Username "${fields.username ?? '(no row)'}", Disable Reasons "${fields.disableReasons ?? '(no row)'}", `
+      + `Transport State "${fields.transportState}", Sync Feature Enabled "${fields.syncFeatureEnabled ?? '(no row)'}", Last Synced "${fields.lastSynced ?? '(no row)'}"`);
+
+    // A username, even with sync off, means an account is signed in
+    if (fields.username)
+    {
+      return { reason: `profile is signed in to ${fields.username}`, detail: `the profile is signed in to ${fields.username}` };
+    }
+    if (fields.username === null || fields.disableReasons === null)
+    {
+      return { reason: 'sign-in state unknown', detail: 'chrome://sync-internals has no Username or Disable Reasons row' };
+    }
+    if (!fields.disableReasons.includes('Not signed in'))
+    {
+      return { reason: 'profile is signed in to an account', detail: `Disable Reasons is "${fields.disableReasons}", without "Not signed in"` };
+    }
+    return null;
+  }
+
+  /** Opens a page in a window of the driver's own, polls `fn` there until it answers, and closes the window. */
+  async #readFromOwnPage(url, fn, what, hint)
+  {
+    const page = await OwnedWindowPage.open(this.browser, this.pool, url);
+    try
+    {
+      return await waitFor(what, () => page.call(fn), { timeoutMs: 15000, hint });
+    }
+    finally
+    {
+      await page.close();
+    }
+  }
+
+  #readProfilePath()
+  {
+    return this.#readFromOwnPage('chrome://version/', VersionPageScripts.profilePath,
+      'chrome://version to show the profile path', 'chrome://version has no #profile_path element with text.');
+  }
+
+  #readSignInFields()
+  {
+    return this.#readFromOwnPage('chrome://sync-internals/', SyncInternalsScripts.signInFields,
+      'chrome://sync-internals to show its Transport State row', 'The page text never had a "Transport State<TAB>value" row.');
+  }
+}
+
+/**
+ * Scripts run in chrome://settings/clearBrowserData. The page is built from
+ * nested shadow roots, so every lookup searches through all of them. One
+ * function with a command keeps the search helpers in one place, since each
+ * page script has to carry everything it uses.
+ */
+const ClearDataScripts = {
+  run: async function run(command, arg)
+  {
+    // Every element matching `selector` in `root` and in every shadow root below it
+    const deepAll = (selector, root) =>
+    {
+      const found = [];
+      const visit = (node) =>
+      {
+        found.push(...node.querySelectorAll(selector));
+        // Descend into each shadow root under this node
+        for (const element of node.querySelectorAll('*'))
+        {
+          if (element.shadowRoot) visit(element.shadowRoot);
+        }
+      };
+      visit(root ?? document);
+      return found;
+    };
+    const text = (element) => (element?.textContent ?? '').replace(/\s+/g, ' ').trim();
+    const missing = (what) => new Error(`Clear browsing data page: no ${what} found - Chrome's UI may have changed`);
+    const isSelected = (chip) => !!chip.selected || chip.hasAttribute('selected')
+      || chip.getAttribute('aria-pressed') === 'true' || chip.getAttribute('aria-selected') === 'true';
+
+    const dialog = deepAll('cr-dialog#deleteBrowsingDataDialog')[0] ?? null;
+    const toast = deepAll('cr-toast#deleteBrowsingDataToast')[0] ?? null;
+    const host = deepAll('settings-clear-browsing-data-dialog')[0] ?? null;
+    const scope = host?.shadowRoot ?? null;
+    const boxes = scope ? deepAll('settings-checkbox', scope) : [];
+    const innerBox = (box) => box.shadowRoot?.querySelector('cr-checkbox#checkbox') ?? null;
+    const picker = scope ? (deepAll('settings-clear-browsing-data-time-picker', scope)[0] ?? null) : null;
+    const chips = picker?.shadowRoot ? deepAll('cr-chip', picker.shadowRoot) : [];
+    const deleteButton = scope ? (deepAll('cr-button#deleteButton', scope)[0] ?? null) : null;
+
+    switch (command)
+    {
+      case 'ready':
+        return !!host && !!dialog?.open;
+
+      case 'progress':
+        return {
+          dialogOpen: !!dialog?.open,
+          toastOpen: !!toast?.open,
+          deleteDisabled: !!deleteButton?.disabled,
+          spinner: deepAll('paper-spinner-lite, cr-spinner, [role=progressbar]').some(spinner => spinner.active === true || spinner.hasAttribute('active')),
+        };
+
+      case 'state':
+        if (!host) throw missing('settings-clear-browsing-data-dialog');
+        return {
+          boxes: boxes.map(box => ({
+            key: box.pref?.key ?? null,
+            label: box.label || text(box),
+            checked: !!innerBox(box)?.checked,
+            outerChecked: box.checked === true,
+            hasCheckbox: !!innerBox(box),
+          })),
+          picker: !!picker,
+          timePeriodPrefKey: picker?.pref?.key ?? null,
+          timePeriodValue: picker?.pref?.value ?? null,
+          chips: chips.map(chip => ({ id: chip.id, text: text(chip), selected: isSelected(chip) })),
+          deleteButton: !!deleteButton,
+        };
+
+      case 'toggleCheckbox':
+      {
+        const box = boxes.find(candidate => candidate.pref?.key === arg);
+        if (!box) throw missing(`settings-checkbox for ${arg}`);
+        const inner = innerBox(box);
+        if (!inner) throw missing(`cr-checkbox#checkbox inside the settings-checkbox for ${arg}`);
+        inner.click();
+        return true;
+      }
+
+      // `arg` is a chip's text, or "#id" for a chip's id
+      case 'clickChip':
+      {
+        const chip = arg.startsWith('#') ? chips.find(c => c.id === arg.slice(1)) : chips.find(c => text(c) === arg);
+        if (!chip) throw missing(`cr-chip ${arg} in settings-clear-browsing-data-time-picker`);
+        chip.click();
+        return true;
+      }
+
+      // An item of the "More" menu (cr-lazy-render-lit#moreTimePeriodsMenu), found by its text
+      case 'clickMenuItem':
+      {
+        const items = deepAll('button, cr-button, .dropdown-item, [role=menuitem], [role=menuitemradio], [role=option]')
+          .filter(element => element.tagName !== 'CR-CHIP' && text(element) === arg);
+        if (items.length === 0) return false;
+        items[0].click();
+        return true;
+      }
+
+      // The irreversible click, gated on a reading taken in this same call:
+      // `arg` is { historyPref, allTimeValue }
+      case 'clickDelete':
+      {
+        if (!deleteButton) throw missing('cr-button#deleteButton');
+        if (deleteButton.disabled) throw new Error('Clear browsing data page: the delete button is disabled');
+        if (boxes.length === 0) throw missing('settings-checkbox');
+
+        const problems = [];
+        // Every checkbox must be unticked, except browsing history, which must be ticked
+        for (const box of boxes)
+        {
+          const key = box.pref?.key;
+          const inner = innerBox(box);
+          if (!key || !inner)
+          {
+            problems.push(`the "${box.label || text(box)}" settings-checkbox has no pref key or cr-checkbox#checkbox`);
+            continue;
+          }
+          // Both the outer settings-checkbox (what Chrome's delete reads) and
+          // the inner cr-checkbox (what the tester sees) must show the wanted state
+          const wanted = key === arg.historyPref;
+          if (box.checked !== wanted) problems.push(`${key} settings-checkbox.checked is ${box.checked}`);
+          if (inner.checked !== wanted) problems.push(`${key} cr-checkbox#checkbox.checked is ${inner.checked}`);
+        }
+        if (!boxes.some(box => box.pref?.key === arg.historyPref)) problems.push(`there is no settings-checkbox for ${arg.historyPref}`);
+
+        const allTime = picker?.pref?.value === arg.allTimeValue || chips.some(chip => isSelected(chip) && text(chip) === 'All time');
+        if (!allTime) problems.push('"All time" is not the selected time range');
+
+        if (problems.length > 0) throw new Error(`Clear browsing data page: not clicking delete, because ${problems.join(', ')}`);
+        deleteButton.click();
+        return text(deleteButton);
+      }
+
+      // The dialog's own prefs, through the settings page's chrome.settingsPrivate API
+      case 'readPrefs':
+      {
+        if (!chrome.settingsPrivate?.getPref) return { available: false, values: {} };
+        const values = {};
+        // Read each pref the dialog uses
+        for (const key of arg)
+        {
+          const pref = await new Promise(resolve => chrome.settingsPrivate.getPref(key, resolve));
+          if (pref) values[key] = pref.value;
+        }
+        return { available: true, values };
+      }
+
+      case 'writePrefs':
+        if (!chrome.settingsPrivate?.setPref) return false;
+        // Write each saved pref back
+        for (const [key, value] of Object.entries(arg))
+        {
+          await new Promise(resolve => chrome.settingsPrivate.setPref(key, value, '', resolve));
+        }
+        return true;
+
+      default:
+        throw new Error(`unknown Clear browsing data command "${command}"`);
+    }
+  },
+};
+
+/**
+ * chrome://settings/clearBrowserData in a window the driver owns. Drives the
+ * dialog the way a tester would: ticks only "Browsing history", picks "All
+ * time" and clicks the delete button. Cookies, cache and download history
+ * stay, so a sign-in in the test profile survives. Afterwards it puts the
+ * dialog's checkboxes and time period back the way they were.
+ */
+class ClearBrowsingDataPage
+{
+  constructor(page)
+  {
+    this.page = page;
+  }
+
+  static async open(browser, pool)
+  {
+    const page = await OwnedWindowPage.open(browser, pool, 'chrome://settings/clearBrowserData');
+    const clearPage = new ClearBrowsingDataPage(page);
+    try
+    {
+      await waitFor('the Clear browsing data dialog to open', () => clearPage.command('ready'), {
+        timeoutMs: 20000,
+        hint: 'chrome://settings/clearBrowserData loaded, but no open cr-dialog#deleteBrowsingDataDialog inside settings-clear-browsing-data-dialog was found.',
+      });
+    }
+    catch (error)
+    {
+      await page.close();
+      throw error;
+    }
+    return clearPage;
+  }
+
+  command(name, arg = null)
+  {
+    return this.page.call(ClearDataScripts.run, name, arg);
+  }
+
+  async close()
+  {
+    await this.page.close();
+  }
+
+  async deleteBrowsingHistoryForAllTime()
+  {
+    const before = await this.command('state');
+    // Every checkbox needs its pref key: it is how the driver tells them apart
+    const unnamed = before.boxes.find(box => !box.key || !box.hasCheckbox);
+    if (unnamed) throw new Error(`Clear browsing data page: the "${unnamed.label}" settings-checkbox has no pref key or no cr-checkbox#checkbox - Chrome's UI may have changed`);
+    if (!before.boxes.some(box => box.key === BROWSING_HISTORY_PREF)) throw new Error(`Clear browsing data page: no settings-checkbox for ${BROWSING_HISTORY_PREF} - Chrome's UI may have changed`);
+    if (!before.picker) throw new Error('Clear browsing data page: no settings-clear-browsing-data-time-picker found - Chrome\'s UI may have changed');
+    log(`  dialog before: ${before.boxes.map(box => `${box.label}=${box.checked ? 'on' : 'off'}`).join(', ')}; time: ${before.chips.find(chip => chip.selected)?.text ?? before.timePeriodValue ?? 'unknown'}`);
+
+    const timePrefKey = before.timePeriodPrefKey ?? DEFAULT_TIME_PERIOD_PREF;
+    const saved = await this.command('readPrefs', [...before.boxes.map(box => box.key), timePrefKey]);
+    let clicked = false;
+    let started = false;
+    let finished = false;
+    try
+    {
+      await this.#tickOnlyBrowsingHistory();
+      await this.#chooseAllTime();
+
+      // The page script checks the checkboxes and the time range again in the same call as the click
+      const label = await this.command('clickDelete', { historyPref: BROWSING_HISTORY_PREF, allTimeValue: TIME_PERIOD_ALL_TIME });
+      clicked = true;
+      log(`  clicked "${label}"; waiting for Chrome to start and finish`);
+
+      await waitFor('the delete to start', async () =>
+      {
+        const progress = await this.command('progress');
+        return progress.deleteDisabled || progress.spinner || !progress.dialogOpen || progress.toastOpen;
+      }, {
+        timeoutMs: 10000,
+        intervalMs: 100,
+        hint: 'After the click, the delete button stayed enabled, no spinner showed, the dialog stayed open and no toast showed.',
+      });
+      started = true;
+
+      await waitFor('Chrome to finish deleting the browsing history', async () =>
+      {
+        const progress = await this.command('progress');
+        return !progress.dialogOpen || progress.toastOpen;
+      }, {
+        timeoutMs: CLEAR_DATA_TIMEOUT_MS,
+        intervalMs: 500,
+        hint: 'After the delete started, the dialog stayed open and cr-toast#deleteBrowsingDataToast never showed.',
+      });
+      finished = true;
+      log('  browsing history deleted for all time');
+    }
+    finally
+    {
+      // Changing the prefs before the delete has started, or while an
+      // aborted run leaves it in flight, could change what it deletes
+      const deleteMayBeInFlight = clicked && (!started || (AbortState.requested && !finished));
+      if (deleteMayBeInFlight)
+      {
+        log('  the delete may still be running - leaving the dialog\'s choices as the driver set them (only Browsing history, All time)');
+      }
+      else
+      {
+        await this.#restorePrefs(saved).catch(error => log(`  warning: could not put back the dialog's choices: ${errorText(error)}`));
+      }
+    }
+  }
+
+  /** Clicks checkboxes until only "Browsing history" is ticked, one click per round. */
+  async #tickOnlyBrowsingHistory()
+  {
+    await waitFor('only "Browsing history" to be ticked', async () =>
+    {
+      const state = await this.command('state');
+      // Click only where the visible checkbox is wrong; an outer settings-checkbox that lags behind is waited for
+      const wrong = state.boxes.find(box => box.checked !== (box.key === BROWSING_HISTORY_PREF));
+      if (wrong)
+      {
+        await this.command('toggleCheckbox', wrong.key);
+        return false;
+      }
+      return state.boxes.every(box => box.outerChecked === (box.key === BROWSING_HISTORY_PREF));
+    }, { timeoutMs: 10000, intervalMs: 200, hint: 'A cr-checkbox#checkbox and its settings-checkbox did not both end up in the wanted state.' });
+  }
+
+  /** Picks "All time": a chip of that name if there is one, otherwise from the "More" menu. */
+  async #chooseAllTime()
+  {
+    const isAllTime = (state) => state.timePeriodValue === TIME_PERIOD_ALL_TIME
+      || state.chips.some(chip => chip.selected && chip.text === 'All time');
+
+    await waitFor('"All time" to be the time range', async () =>
+    {
+      const state = await this.command('state');
+      if (isAllTime(state)) return true;
+
+      // A visible "All time" chip: click it directly
+      if (state.chips.some(chip => chip.text === 'All time'))
+      {
+        await this.command('clickChip', 'All time');
+        return false;
+      }
+
+      if (!state.chips.some(chip => chip.id === 'moreButton'))
+      {
+        throw new Error('Clear browsing data page: no cr-chip#moreButton ("More") in the time picker - Chrome\'s UI may have changed');
+      }
+      await this.command('clickChip', '#moreButton');
+      await sleep(400);
+      const clicked = await this.command('clickMenuItem', 'All time');
+      if (!clicked) throw new Error('Clear browsing data page: the "More" menu (cr-lazy-render-lit#moreTimePeriodsMenu) has no "All time" item - Chrome\'s UI may have changed');
+      return false;
+    }, {
+      timeoutMs: 15000,
+      intervalMs: 500,
+      hint: `"All time" was clicked, but neither a selected "All time" cr-chip nor the picker's pref value ${TIME_PERIOD_ALL_TIME} showed it.`,
+    });
+  }
+
+  async #restorePrefs(saved)
+  {
+    if (!saved.available)
+    {
+      log('  warning: chrome.settingsPrivate is not available on the settings page - the dialog keeps the driver\'s choices');
+      return;
+    }
+    await this.command('writePrefs', saved.values);
+    log('  put back the dialog\'s checkboxes and time range');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // The helper tab
 // ---------------------------------------------------------------------------
@@ -1322,9 +1899,10 @@ class RunReport
     this.plannedCases = cases;
   }
 
-  recordSkip(checkpoint, stepTitle)
+  /** A case discarded at a pause the driver did not do. `expected` says whether that skip is fine for the exit code. */
+  recordSkip(checkpoint, stepTitle, { reason, expected })
   {
-    this.skipped.set(checkpoint.caseId, { stepIndex: checkpoint.stepIndex, step: stepTitle, results: checkpoint.results ?? [] });
+    this.skipped.set(checkpoint.caseId, { stepIndex: checkpoint.stepIndex, step: stepTitle, results: checkpoint.results ?? [], reason, expected });
   }
 
   /** A case given up on mid-run (error, stuck, abort): its results so far, from the checkpoint. The first reason recorded is kept. */
@@ -1371,7 +1949,7 @@ class RunReport
       }
 
       const skip = this.skipped.get(id);
-      if (skip) return { id, title, status: 'skipped', skip, unexpected: !EXPECTED_MANUAL_CASE_IDS.includes(id) };
+      if (skip) return { id, title, status: 'skipped', skip, unexpected: !skip.expected };
       return { id, title, status: 'missing', abandoned: this.abandoned.get(id) ?? null, unexpected: true };
     });
   }
@@ -1407,7 +1985,7 @@ class RunReport
         skipped: outcomes.filter(o => o.status === 'skipped').map(o => ({
           id: o.id,
           title: o.title,
-          reason: 'needs a person',
+          reason: o.skip.reason,
           expected: !o.unexpected,
           pausedAtStep: o.skip.stepIndex + 1,
           step: o.skip.step,
@@ -1463,7 +2041,7 @@ class RunReport
     for (const outcome of skipped)
     {
       const tag = outcome.unexpected ? '   [UNEXPECTED skip]' : '';
-      console.log(`  SKIP ${outcome.id} ${outcome.title} - needs a person at step ${outcome.skip.stepIndex + 1} (${outcome.skip.step})${tag}`);
+      console.log(`  SKIP ${outcome.id} ${outcome.title} - ${outcome.skip.reason}, at step ${outcome.skip.stepIndex + 1} (${outcome.skip.step})${tag}`);
     }
 
     // Selected cases that never produced a result
@@ -1521,6 +2099,7 @@ class TestRunDriver
     this.originalSettings = null;
     this.availableCaseIds = [];
     this.initialWindowIds = null;
+    this.profileGuard = new ProfileGuard(browser, this.pool);
     this.batchFinished = false;
     this.runPromise = null;
     this.finishing = null;
@@ -1782,6 +2361,58 @@ class TestRunDriver
     log('  helper, panel and Test Runner are back');
   }
 
+  /**
+   * Deletes Chrome's browsing history for all time, in a Clear browsing data
+   * dialog the driver opens in a window of its own. Only called after the
+   * profile guard allowed it (see watchRun), and checked again here with a
+   * fresh reading of the profile path and the sign-in state.
+   */
+  async clearBrowsingHistory()
+  {
+    try
+    {
+      // Last line of defence: watchRun has just checked with a fresh reading
+      // (guardRefusalAtPause) and skips the case on a refusal. A refusal here
+      // means the state changed in the moments between those two readings,
+      // which is a real race worth reporting, so it stays an error.
+      const refusal = await this.profileGuard.refusalReason({ fresh: true });
+      if (refusal) throw new Error(`refusing to clear browsing data: ${refusal}`);
+
+      const page = await ClearBrowsingDataPage.open(this.browser, this.pool);
+      try
+      {
+        await page.deleteBrowsingHistoryForAllTime();
+      }
+      finally
+      {
+        await page.close();
+      }
+    }
+    finally
+    {
+      // The driver's own windows took focus; tests open tabs in the focused window
+      await this.helper?.call(HelperScripts.focusWindow, this.testWindowId).catch(() => {});
+    }
+  }
+
+  /**
+   * The guard's answer for a clear-browsing-data pause, with a fresh reading
+   * of the profile path and the sign-in state. A refusal (including a page
+   * that could not be read in time) is an expected skip, not an error.
+   */
+  async guardRefusalAtPause()
+  {
+    try
+    {
+      return await this.profileGuard.refusalReason({ fresh: true });
+    }
+    finally
+    {
+      // The guard's own windows took focus; tests open tabs in the focused window
+      await this.helper?.call(HelperScripts.focusWindow, this.testWindowId).catch(() => {});
+    }
+  }
+
   async performExternal(checkpoint)
   {
     log(`${checkpoint.caseId} paused at step ${checkpoint.stepIndex + 1} for the driver: ${checkpoint.external}`);
@@ -1789,6 +2420,7 @@ class TestRunDriver
 
     if (checkpoint.external === 'stop-service-worker') await this.stopServiceWorker();
     else if (checkpoint.external === 'reload-extension') await this.reloadExtension();
+    else if (checkpoint.external === 'clear-browsing-data') await this.clearBrowsingHistory();
     else throw new Error(`unknown external action "${checkpoint.external}" on ${checkpoint.caseId}`);
   }
 
@@ -1839,16 +2471,23 @@ class TestRunDriver
     await waitFor('the paused run to be discarded', async () => !(await RunState.read(this.helper)).checkpoint, { timeoutMs: 10000 });
   }
 
-  /** Discards a pause that needs a person, and starts the rest of its batch again. */
-  async skipPause(state, view)
+  /**
+   * Discards a pause that needs a person, and starts the rest of its batch
+   * again. `reason` and `expected` are what the report records; by default
+   * the skip is expected only for EXPECTED_MANUAL_CASE_IDS.
+   */
+  async skipPause(state, view, { reason = 'needs a person', expected } = {})
   {
     const checkpoint = state.checkpoint;
     // The queue has to be read before Discard, which clears it with the checkpoint
     const queue = state.queue ?? [];
     // The banner shows the step's instruction, not its label; its first line says what was asked
     const firstLine = (view.banner.instruction || view.banner.title).split('\n')[0].slice(0, 160);
-    log(`SKIP ${checkpoint.caseId}: paused at step ${checkpoint.stepIndex + 1}, which needs a person (${firstLine})`);
-    this.report.recordSkip(checkpoint, firstLine);
+    log(`SKIP ${checkpoint.caseId}: paused at step ${checkpoint.stepIndex + 1}, ${reason} (${firstLine})`);
+    this.report.recordSkip(checkpoint, firstLine, {
+      reason,
+      expected: expected ?? EXPECTED_MANUAL_CASE_IDS.includes(checkpoint.caseId),
+    });
 
     await this.discardPause();
     await this.restartRemaining(queue);
@@ -2064,9 +2703,19 @@ class TestRunDriver
           const key = state.checkpointKey;
           const attempts = resumeAttempts.get(key) ?? 0;
 
+          // Clearing browsing data on a profile outside tools/tmp/ is refused:
+          // the pause is left to a person, which is an expected skip
+          const guardRefusal = state.checkpoint.external === 'clear-browsing-data' && attempts === 0
+            ? await this.guardRefusalAtPause()
+            : null;
+
+          if (guardRefusal)
+          {
+            await this.skipPause(state, view, { reason: guardRefusal, expected: true });
+          }
           // A pause the driver owns: do the action once, then click Resume
           // (a repeat visit only needs Resume clicked again)
-          if (state.checkpoint.external && view.banner.hasResume && attempts < MAX_RESUME_ATTEMPTS)
+          else if (state.checkpoint.external && view.banner.hasResume && attempts < MAX_RESUME_ATTEMPTS)
           {
             resumeAttempts.set(key, attempts + 1);
             try
@@ -2140,6 +2789,9 @@ class TestRunDriver
     this.initialWindowIds = new Set((await WindowCensus.take(this.browser)).windowIds());
 
     await this.findExtension();
+    // Decide now whether P.6 may clear browsing data, so its chrome://version
+    // window comes and goes before the test window exists and has focus
+    await this.profileGuard.refusalReason();
 
     await this.openHelper();
     const testWindowId = await this.helper.call(HelperScripts.createTestWindow);

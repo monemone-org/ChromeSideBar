@@ -146,7 +146,12 @@ export type PauseAutomation =
 //   which stops it the way DevTools' Stop button does.
 // - 'reload-extension': reloads the extension from chrome://extensions, then
 //   reopens the side panel in the test window.
-export type ExternalAction = 'stop-service-worker' | 'reload-extension';
+// - 'clear-browsing-data': deletes Chrome's browsing history for all time
+//   through the Clear browsing data dialog, which also drops the stored
+//   favicons. The driver does this only when Chrome runs on a profile inside
+//   the project's tools/tmp/ folder and is not signed in to any account;
+//   otherwise it leaves the pause to a person.
+export type ExternalAction = 'stop-service-worker' | 'reload-extension' | 'clear-browsing-data';
 
 export type TestStep =
   | { kind: 'action'; label: string; run: StepRunner }

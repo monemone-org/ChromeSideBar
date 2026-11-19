@@ -28,14 +28,15 @@ All phases are complete. When the Unattended checkbox of the panel is on, these 
 - The shortcut cases C.2c and C.2c (same space), the four C.2e variants, and C.2f. The panel presses the shortcuts and plays the audio itself.
 - The gesture cases C.2g, F.1, and P.7. In C.2g, the panel does the press-and-hold and tests the history dropdown through the DOM of the sidebar. In F.1, the panel does the drag and tests the result in the same way. In P.7, the question "did the pin get the favicon?" becomes a test that reads the stored icon of the pin. The test reads it from the list in background and from the mirror of this window.
 
-Three cases also need the driver, because one of their pauses needs Chrome itself. E.1 needs a reload of the extension. E.3 and P.8 need a stop of the service worker. If you run these three cases from the panel alone, they stop at that pause and wait for a person.
+Four cases also need the driver, because one of their pauses needs Chrome itself. E.1 needs a reload of the extension. E.3 and P.8 need a stop of the service worker. P.6 needs Chrome to clear its stored favicons. If you run these four cases from the panel alone, they stop at that pause and wait for a person.
 
-Two cases stay manual:
+The driver clears the browsing data for P.6 only when two conditions are true. Chrome uses a profile inside `tools/tmp/`, and that profile is not signed in to any account. If the profile is signed in with history sync, the delete also removes the history of the account on every other device. If either condition is false, P.6 stays manual. The extension itself must not ship with the `browsingData` permission, so the driver uses the **Clear browsing data** dialog of Chrome.
 
-- P.6 needs Chrome to clear its stored favicons. Only the **Clear browsing data** dialog or the `browsingData` permission can do this, and the extension must not ship with that permission.
+One case stays manual:
+
 - P.10 needs a pin that somebody makes in the sidebar of a second window. Automation needs runner hooks in that other panel. These hooks are worth the work only if people run P.10 often.
 
-On 2026-11-18, a run of the full suite through the driver did 74 cases in about 10.5 minutes. 66 cases passed. The six known-gap cases (A.3, A.5, A.6, A.6c, B.5, and B.5b) failed at their known steps and at no other steps. The driver skipped P.6 and P.10 as expected, and it stopped with exit code 0.
+On 2026-11-18, a run of the full suite through the driver did 74 cases in about 10.5 minutes. 66 cases passed. The six known-gap cases (A.3, A.5, A.6, A.6c, B.5, and B.5b) failed at their known steps and at no other steps. At that time the driver could not clear browsing data, so it skipped P.6 and P.10 as expected. It stopped with exit code 0.
 
 ### Known issue found during the work
 
@@ -139,7 +140,7 @@ The answers tell us if a driver outside the extension can do four things:
 
 The answers showed that such a driver is possible. Phase 4b describes it.
 
-P.6 needs the `browsingData` permission, and the extension must not ship with it. P.6 therefore stays manual. P.10 needs a second sidebar. Phase 4b explains why P.10 also stays manual.
+P.6 needs the `browsingData` permission, and the extension must not ship with it. For this reason, the panel cannot do P.6 alone. Phase 4b later gave P.6 to the driver, which uses the Clear browsing data dialog. P.10 needs a second sidebar. Phase 4b explains why P.10 also stays manual.
 
 #### Spike results (2026-11-18)
 
@@ -152,7 +153,7 @@ The answer to questions 1 and 3 was yes. The answer to question 2 was no, but th
 The spike also showed two other facts:
 
 - Chrome slows down a covered window or a window in the background. The delay is enough to break steps that depend on timing. For this reason, `start-test-chrome.sh` now gives Chrome the flags `--disable-backgrounding-occluded-windows`, `--disable-background-timer-throttling`, and `--disable-renderer-backgrounding`.
-- The test profile now contains other extensions, which Chrome sync installed. A script that looks for a target must therefore match the id of this extension. It must never match only `background.js` or `index.html`.
+- The test profile has pages and service workers of other extensions. These are the component extensions that are built into Chrome, and Google Docs Offline, which Chrome installs by default. The profile was never signed in, so Chrome sync installed nothing. A script that looks for a target must therefore match the id of this extension. It must never match only `background.js` or `index.html`.
 
 The spike also made `tools/cdp.mjs`, a small CDP client. The phases above were tested with it. Its connection code is now in `tools/cdp-client.mjs`, and both `cdp.mjs` and the driver use that file.
 
@@ -165,20 +166,22 @@ The driver is `tools/run-inpanel-tests.mjs`. It uses `tools/cdp-client.mjs` and 
 3. It reads the state of the run in `chrome.storage.local` through the helper tab. When a case stops at a pause that is marked for the driver, the driver does the action and clicks Resume:
    - For E.3 and P.8, it stops the service worker with `Target.closeTarget`.
    - For E.1, it reloads the extension, opens the panel again, and continues. The checkpoint stays through the reload, because the runner keeps its state in `chrome.storage.local`.
+   - For P.6, it deletes the browsing history of Chrome for all time in the Clear browsing data dialog. It does this only when Chrome uses a profile inside `tools/tmp/` of this checkout, and that profile is not signed in to any account. At the start of the run, the driver reads the profile path in `chrome://version` and compares the real paths. It also reads `chrome://sync-internals`. The **Username** value must be empty, and **Disable Reasons** must contain "Not signed in". Right before the clear, it reads both pages again. If a check fails, or a page cannot be read, the driver does not clear anything. It then treats the pause as a pause that needs a person.
 
    Some pauses still need a person. At such a pause, the driver discards the run of that case and records the case as skipped. It then starts the remaining cases of the batch again.
 4. It writes the results to `tools/tmp/` in the same format as the **Download Results** file of the panel, and it prints a summary. The exit code is not zero in each of these conditions:
    - A case fails at a step that is not in its list of known-gap failures. The list is `KNOWN_GAP_FAILING_STEPS`, and today it covers A.3, A.5, A.6, A.6c, B.5, and B.5b.
-   - The driver skips a case other than P.6 or P.10.
+   - The driver skips a case other than P.10. A skip of P.6 is expected only when the profile guard refused to clear browsing data.
    - A case gives no result.
    - The driver itself gets an error.
 5. It closes the windows that it opened. It puts back the Test Runner settings of the tester: the ticked cases and the Unattended checkbox.
 
-The driver must know which pauses it controls. For this reason, the pause step has a third optional stand-in field, `external: 'stop-service-worker' | 'reload-extension'`. The runner writes this field into the checkpoint. In the panel, a pause with `external` works the same as a manual pause. Only the driver acts on it.
+The driver must know which pauses it controls. For this reason, the pause step has a third optional stand-in field, `external: 'stop-service-worker' | 'reload-extension' | 'clear-browsing-data'`. The runner writes this field into the checkpoint. In the panel, a pause with `external` works the same as a manual pause. Only the driver acts on it.
 
-These cases stay manual:
+P.6 (clear the stored favicons of Chrome) runs through the driver when the profile is inside `tools/tmp/` and is not signed in to any account. Otherwise P.6 stays manual.
 
-- P.6 (clear the stored favicons of Chrome). Only `chrome.browsingData` or the Clear browsing data dialog can do this, and the extension must not ship with that permission.
+This case stays manual:
+
 - P.10 (a pin made in the sidebar of a second window). A second panel can do this, but it needs runner hooks in that other panel. The work is worth it only if people run P.10 often.
 
 This plan does not use a real close of the panel for sections A and B. The results with the parked page were the same as the manual results. A real close and open of the panel also adds a slow cycle to thirteen cases.

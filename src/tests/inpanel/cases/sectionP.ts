@@ -858,7 +858,10 @@ export const P6_BACKGROUND_FILLS_MISSING_FAVICON: TestCase = {
         'In the Clear browsing data dialog that just opened, tick **Browsing history**.',
         'Set the time range to **All time** - anything shorter leaves the icon for this case\'s site in place.',
         'Click **Delete data**, then come back and click Resume.',
-      ]
+      ],
+      // The driver does this in a window of its own, and only on a test
+      // profile inside tools/tmp/ (see tools/run-inpanel-tests.mjs)
+      { external: 'clear-browsing-data' }
     ),
     closeTabRef('clearDataTab'),
     addColdFaviconPin('P6 pin', P6_FAVICON_SITE, 'pin', 'pinUrl'),

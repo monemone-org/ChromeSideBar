@@ -31,7 +31,7 @@ The driver looks for the extension in the `dist` folder of the checkout that you
 
 ## run-inpanel-tests.mjs
 
-This script, the driver, runs the in-panel test suite (`src/tests/inpanel/`) in the test Chrome with nobody at the keyboard. It also does the pause steps that only a program outside the extension can do. It stops the service worker for E.3 and P.8, and it reloads the extension for E.1. The driver uses only the built-in `fetch` and `WebSocket` of Node, through `cdp-client.mjs`. It needs Node 22 or later and no npm package.
+This script, the driver, runs the in-panel test suite (`src/tests/inpanel/`) in the test Chrome with nobody at the keyboard. It also does the pause steps that only a program outside the extension can do. It stops the service worker for E.3 and P.8, and it reloads the extension for E.1. For P.6, it clears the browsing history of Chrome, but only when Chrome uses a profile that is inside `tools/tmp/` and is not signed in to any account. The section "P.6 and the profile guard" below gives the details. The driver uses only the built-in `fetch` and `WebSocket` of Node, through `cdp-client.mjs`. It needs Node 22 or later and no npm package.
 
 To run the driver:
 
@@ -82,8 +82,25 @@ The exit code tells you the result of the run:
 
 Two lists near the top of the script tell the driver which results are expected:
 
-- `EXPECTED_MANUAL_CASE_IDS` contains P.6 and P.10. Each of these cases has a pause that no driver can do. P.6 needs the **Clear browsing data** dialog of Chrome to delete the stored favicons. The extension must not get the `browsingData` permission only for a test. P.10 needs a pin that somebody makes in the sidebar of a second window. When the driver gets to a pause that needs a person, it discards the run of that case and records the case as skipped. It then starts the remaining cases of the batch again. A skip of P.6 or P.10 is expected. A skip of any other case fails the run.
+- `EXPECTED_MANUAL_CASE_IDS` contains P.10. P.10 has a pause that no driver can do: it needs a pin that somebody makes in the sidebar of a second window. When the driver gets to a pause that needs a person, it discards the run of that case and records the case as skipped. It then starts the remaining cases of the batch again. A skip of P.10 is expected. A skip of P.6 is expected only when the profile guard refused to clear browsing data. A skip of any other case fails the run.
 - `KNOWN_GAP_FAILING_STEPS` gives the exact names of the steps that are expected to fail, for each case with a documented known gap. Today these cases are A.3, A.5, A.6, A.6c, B.5, and B.5b. A failure at one of those steps does not fail the run. A failure at any other step of the same case fails the run. When a known-gap case starts to pass, the summary tells you. When a gap is fixed, remove its case from this list. When a new gap is documented, add it.
+
+### P.6 and the profile guard
+
+P.6 needs Chrome to have no stored favicon for its test site. Its pause asks a person to delete the browsing history of Chrome for all time. The driver can do this step, but the delete removes data from the profile that Chrome uses. If the profile is signed in to a Google account with history sync, the delete also removes the history of that account on every other device. For these reasons, the driver clears history only on a profile that is inside `tools/tmp/` and is not signed in to any account.
+
+At the start of the run, a guard checks both conditions. It opens `chrome://version` and `chrome://sync-internals` in windows of its own:
+
+- It reads the profile path in `chrome://version`. It compares the real path of the profile with the real path of the `tools/tmp/` folder next to the script. `start-test-chrome.sh` puts its profile in that folder.
+- It reads the About section of `chrome://sync-internals`. The **Username** value must be empty, and the **Disable Reasons** value must contain "Not signed in". A profile that is signed in with sync off fails this check too.
+
+If both checks pass, the guard allows the clear. When P.6 gets to its pause, the driver reads both pages again. If a check fails at the start or at the pause, or the driver cannot read a page, the guard refuses. The driver then discards the run of P.6 and records it as skipped. The reason is "profile not in <path of tools/tmp>", "profile is signed in to <account>", or "sign-in state unknown". This skip is expected. The driver writes its decision, the paths, and the sign-in values in the log.
+
+The driver also reads both pages a third time, just before it opens the dialog. A refusal at that point means that the profile changed in the few seconds after the check at the pause. The driver reports this as an error, and the run fails.
+
+When the guard allows the clear, the driver opens `chrome://settings/clearBrowserData` in a window of its own. It ticks only **Browsing history** and clears the other checkboxes. It sets the time range to **All time**. Right before the click on the delete button, the driver reads the checkboxes and the time range again in the same step. If anything is different, it does not click. After the click, it waits until the delete starts and then until the dialog closes or the confirmation toast shows. It then puts back the checkboxes and the time range of the dialog, and it closes its window. If you stop the run while the delete can still be in progress, the driver does not put back the choices. The dialog then keeps only **Browsing history** and **All time**.
+
+If a control of the dialog is missing, the error names that control. This makes a change in the Chrome UI easy to find. When the clear fails, the driver records the error, discards the run of P.6, and continues with the next case.
 
 ## cdp.mjs
 
@@ -100,7 +117,7 @@ The request is one JSON object. If the first argument is JSON text or the path t
 
 The script prints `{ "ok": true, "result": ... }` or `{ "ok": false, "error": "..." }`. The exit code is 0 only when `ok` is true.
 
-The test profile also contains other extensions, which Chrome sync installed. A short `target` such as `background.js` or `index.html` can match a page of another extension. Put the id of this extension in the match, or use the target id from a `targets` list.
+The test profile also has pages and service workers of other extensions. These are the component extensions that are built into Chrome, and Google Docs Offline, which Chrome installs by default. A short `target` such as `background.js` or `index.html` can match a page of another extension. Put the id of this extension in the match, or use the target id from a `targets` list.
 
 `chrome.sidePanel.open()` does not work in the service worker, also with the simulated user gesture. It works in an extension page that is open in a tab, such as `chrome-extension://<id>/icon.png`.
 
