@@ -5,7 +5,7 @@ import { TestCase, TestStep } from '../types';
 import { tabHistoryManagerProxy } from '../../../managers/proxies/tabHistoryManagerProxy';
 import { resolveTabId } from '../stepHelpers';
 import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { activateTabNative, closeTesterWindow, navigateTabHistory, openAudioTab, openBookmarkTab, openPageForTester, openPinnedTab, openRegularTab, pause, playTestAudio, stopTestAudio, switchSpaceVerified } from '../actions';
+import { actionStep, activateTabNative, closeTesterWindow, navigateTabHistory, openAudioTab, openBookmarkTab, openPageForTester, openPinnedTab, openRegularTab, pause, playTestAudio, stopTestAudio, switchSpaceVerified } from '../actions';
 import { assertAudioListIncludes, assertBookmarkLoaded, assertPinnedLoaded, assertTabActive, assertTabAudible, assertTabInSpace } from '../assertions';
 
 // The runner's pause/resume checkpoint (runner.ts) persists to
@@ -129,7 +129,7 @@ function assertPreviousHistoryEntry(tabRef: string): TestStep
 // appear, via historyTabIds, purely because load() restored the list.
 export const E3_SERVICE_WORKER_RESTART: TestCase = {
   id: 'E.3',
-  title: 'Service worker restart repopulates tab history and audible tracking (guided)',
+  title: 'Service worker restart repopulates tab history and audible tracking (needs the driver or a person)',
   setup: async (getCtx) =>
   {
     await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
@@ -141,30 +141,15 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
     activateTabNative('tab1'),
 
     ...switchSpaceVerified('spaceB'),
-    // YouTube, or in unattended mode the DEV-only tone page that the two
-    // pauses below can start and stop themselves (see AudioTestPage)
+    // The DEV-only tone page, which the steps below start and stop (see
+    // AudioTestPage)
     openAudioTab({ spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
-    pause(
-      'Manual step: start audio playback',
-      [
-        'Switch to the newly opened YouTube tab in Chrome.',
-        'Press play and let it play for a second or two (unmuted - a muted tab does not count as audible).',
-        'Come back to the sidebar and click Resume below.',
-      ],
-      { auto: playTestAudio('audioTab') }
-    ),
+    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab')),
     assertTabAudible('audioTab', true),
 
-    pause(
-      'Manual step: stop the audio playback',
-      [
-        'Switch back to the YouTube tab and pause it, so the tab goes silent.',
-        'Leave the tab open - it has to survive into the restart.',
-        'Come back to the sidebar and click Resume below.',
-      ],
-      { auto: stopTestAudio('audioTab') }
-    ),
+    // The tab stays open - it has to survive into the restart
+    actionStep('Stop audio playback in the tone tab', stopTestAudio('audioTab')),
     assertTabAudible('audioTab', false),
 
     // The tracker keeps a silent tab in its list (nothing clears it until the

@@ -5,6 +5,7 @@
 import { TestStep } from './types';
 import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, sleep } from './stepHelpers';
 import { lastAudibleTrackerProxy } from '../../managers/proxies/lastAudibleTrackerProxy';
+import { hasShortcutListener } from './backgroundHooks';
 
 async function tabGroupTitle(tabId: number): Promise<string | undefined>
 {
@@ -365,9 +366,8 @@ export function assertAudioListIncludes(tabRefs: string[]): TestStep
  * Catches the failure modes a message-driven test structurally cannot see:
  * the command renamed or dropped from public/manifest.json's "commands"
  * block, or its shortcut left unassigned / lost to a conflict with another
- * extension. Does NOT prove chrome.commands.onCommand is wired up or that
- * pressing the key does anything - only a real keypress shows that, which is
- * why C.2c still has manual steps.
+ * extension. Does NOT prove chrome.commands.onCommand is wired up -
+ * assertShortcutListenerRegistered covers that.
  */
 export function assertCommandShortcutBound(commandName: string): TestStep
 {
@@ -380,6 +380,27 @@ export function assertCommandShortcutBound(commandName: string): TestStep
       const command = commands.find(c => c.name === commandName);
       if (!command) throw new Error(`command "${commandName}" is not registered - check public/manifest.json's "commands" block`);
       if (!command.shortcut) throw new Error(`command "${commandName}" is registered but has no key bound - unassigned, or conflicting with another extension (see chrome://extensions/shortcuts)`);
+    },
+  };
+}
+
+/**
+ * Confirms background listens on chrome.commands.onCommand, so a real key
+ * press reaches handleCommand. With assertCommandShortcutBound and
+ * pressShortcut, this leaves only Chrome's own delivery of the key press
+ * untested.
+ */
+export function assertShortcutListenerRegistered(): TestStep
+{
+  return {
+    kind: 'assert',
+    label: 'Background listens for keyboard commands',
+    run: async () =>
+    {
+      if (!await hasShortcutListener())
+      {
+        throw new Error('background has no chrome.commands.onCommand listener, so no keyboard shortcut would do anything');
+      }
     },
   };
 }

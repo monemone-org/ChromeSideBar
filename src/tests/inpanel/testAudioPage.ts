@@ -1,9 +1,9 @@
 // DEV-only tone page for the in-panel test runner (see test-audio.html and
 // docs/test/test-runner-automation-plan.md, Phase 2). The audio cases need a
-// tab Chrome marks `audible`, which only real, unmuted playback does. With
-// unattended mode on they open this page instead of a YouTube video, and the
-// runner tells it to play and stop (actions.ts, playTestAudio and
-// stopTestAudio) instead of asking a tester to press play.
+// tab Chrome marks `audible`, which only real, unmuted playback does. Every
+// audio case opens this page, and the runner tells it to play and stop
+// (actions.ts, playTestAudio and stopTestAudio). Its Play and Stop buttons
+// are there for someone trying the page by hand.
 //
 // Starting an AudioContext without a user gesture is subject to Chrome's
 // autoplay policy. tools/start-test-chrome.sh launches the test profile with
@@ -122,7 +122,7 @@ function isControlMessage(message: unknown): message is TestAudioControlMessage
   return (message as TestAudioControlMessage | undefined)?.action === TEST_AUDIO_CONTROL_ACTION;
 }
 
-// The buttons, for a tester who meets this page on a manual pause
+// The buttons, for trying the page by hand
 document.getElementById('play')?.addEventListener('click', () => { runCommand('play'); });
 document.getElementById('stop')?.addEventListener('click', () => { runCommand('stop'); });
 

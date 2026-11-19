@@ -42,6 +42,9 @@ export type BackgroundTestHookRequest =
   | { op: 'runTabAssociationRestore' }
   // One window's backup, read once every backup write queued before it is done
   | { op: 'readTabAssociationBackup'; windowId: number }
+  // Whether anything listens on chrome.commands.onCommand, i.e. whether a
+  // real key press would reach handleCommand
+  | { op: 'hasShortcutListener' }
   // Release every gate and forget every armed failure
   | { op: 'reset' };
 

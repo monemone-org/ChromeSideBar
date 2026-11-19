@@ -38,6 +38,19 @@ One case stays manual:
 
 On 2026-11-18, a run of the full suite through the driver did 74 cases in about 10.5 minutes. 66 cases passed. The six known-gap cases (A.3, A.5, A.6, A.6c, B.5, and B.5b) failed at their known steps and at no other steps. At that time the driver could not clear browsing data, so it skipped P.6 and P.10 as expected. It stopped with exit code 0.
 
+### The manual path for automated steps is removed
+
+After the merge with the step-6 branch, a review found that each stand-in except the external ones runs and checks its step as reliably as a person. The manual path for those steps is therefore removed:
+
+- The Unattended checkbox is gone, and the driver no longer sets it.
+- A pause with `auto` is now an action step (`actionStep`), or an assert step (`assertStep`) when it had a `confirm` question.
+- A pause with `whilePanelClosed` is now a `closedPanel` step (`closedPanelStep`). The panel always parks for it.
+- A pause is now only for an `external` action or for an action that only a person can do (P.10).
+- C.2c checks that background listens for keyboard commands (`assertShortcutListenerRegistered`). Only the delivery of a real key press by Chrome is left untested.
+- The audio cases need the Chrome profile that `tools/start-test-chrome.sh` starts, because only that profile lets the tone page play with no click.
+
+`docs/test/writing-test-cases.md` describes the current step kinds. The rest of this document describes the work as it was done.
+
 ### Known issue found during the work
 
 Sometimes a step that opens tabs into a test space fails with the error "No group with id". This happened once in A.1 and once in C.2e. When it happens, the case fails at the step that opens the tabs, for example "Open filler tabs in space ...". Nobody has examined the cause yet. `docs/test/issues/N1-no-group-with-id-when-adding-tab-to-space.md` describes the failures, a possible cause, and the steps to reproduce it.
@@ -108,7 +121,7 @@ Result to get: with unattended on, sections A and B run to the completion popup 
 ### Phase 2: shortcuts and audio
 
 1. In `background.ts`, move the body of the `chrome.commands.onCommand` listener into a named function. Add a message that exists only in development builds and calls that function with a command name. The four pauses of C.2c get an `auto` that sends that message.
-2. Add `test-audio.html`, an extension page that exists only in development builds. It plays a tone through Web Audio and stops on request. In unattended mode, the audio cases open this page in place of YouTube. `isTestUrl` in `fixtures.ts` knows the page, so cleanup still finds the tab.
+2. Add `test-audio.html`, an extension page that exists only in development builds. It plays a tone through Web Audio and stops on request. The audio cases open this page in both modes. In unattended mode the runner starts and stops the tone. With unattended off, you click the Play and Stop buttons on the page. `isTestUrl` in `fixtures.ts` knows the page, so cleanup still finds the tab.
 3. In `tools/start-test-chrome.sh`, add `--autoplay-policy=no-user-gesture-required`. The audio cases passed with this flag on. Nobody tested whether the tone page plays without it. If the audio does not start, the `auto` step fails with a message that says so, and you can run the case manually.
 4. In `sectionC.ts` and `sectionE.ts`, add `auto` to the pauses that start and stop the audio.
 

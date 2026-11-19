@@ -45,7 +45,7 @@ The cases use these terms:
 
 The in-panel test runner automates each case marked "Yes" below. The runner exists only in a DEV build, in `src/tests/inpanel/`. To open it, use the DEV dropdown of the sidebar → "Test Runner…". Each case marked "No" is manual only.
 
-A guided case stops at a pause and asks you to do one action. Then the runner checks the result.
+A guided case stops at a pause and asks you to do one action. Then the runner checks the result. Some cases have one pause that needs Chrome itself: a reload of the extension, a stop of the service worker, or a clear of browsing data. The driver script `tools/run-inpanel-tests.mjs` does that action when it runs the suite. When you run the case from the panel, you do it.
 
 | Case | Covered |
 | ---- | ------- |
@@ -86,9 +86,9 @@ A guided case stops at a pause and asks you to do one action. Then the runner ch
 | D.2  | Yes     |
 | D.3  | Yes     |
 | D.4  | Yes     |
-| E.1  | Yes     |
+| E.1  | Yes, needs the driver or a person |
 | E.2  | No      |
-| E.3  | Yes     |
+| E.3  | Yes, needs the driver or a person |
 | F.1  | Yes     |
 | F.2  | Yes     |
 | F.3  | Yes     |
@@ -98,12 +98,12 @@ A guided case stops at a pause and asks you to do one action. Then the runner ch
 | P.3  | Yes     |
 | P.4  | Yes     |
 | P.5  | Yes     |
-| P.6  | Yes, guided, needs the network |
-| P.7  | Yes, guided |
-| P.8  | Yes, guided |
+| P.6  | Yes, needs the driver or a person, and the network |
+| P.7  | Yes, needs the network |
+| P.8  | Yes, needs the driver or a person |
 | P.9  | Yes, import only. Export is manual |
 | P.10 | Yes, guided |
-| T.1  | Yes, guided |
+| T.1  | Yes     |
 | T.2  | Yes     |
 | T.3  | Yes     |
 | T.4  | Yes     |
@@ -120,15 +120,15 @@ Some "Yes" rows cover the main flow of a case but not every step. These parts ar
 
 - D.1 step 3. It needs the sidebar of a second window.
 - The press-and-hold gesture of C.2d. The automated case makes the two proxy calls that the dropdown makes (`getHistoryDetails`, `navigateToIndex`). Thus it covers only the background half. C.2g covers the other half: the 300 ms hold timer, the branch between a quick click and a hold in `handleHistoryMouseUp` of `Toolbar.tsx`, the dropdown display, and the click on an entry.
-- The gestures of C.2g, the worker stop of E.3, and the drag of F.1. You do these at a pause, and the runner checks the result. See those cases.
+- The reload of the extension in E.1, the stop of the service worker in E.3 and P.8, and the clear of browsing data in P.6. The driver does these. Without the driver, you do them at a pause, and the runner checks the result.
 
 B.4 and E.2 are manual. B.4 closes the window that holds the panel, and E.2 restarts the browser. Both stop the runner in the middle of the case. Also, in E.2 Chrome gives new tab IDs to the restored tabs. The saved references of the runner cannot find those tabs again.
 
 Section P is automated, but four of its cases have a limit:
 
-- P.6 needs the network. It starts with a guided step that asks you to clear the browsing history of Chrome. Chrome keeps favicons there, and the extension cannot clear favicons without also deleting real history. The case tells a write by background apart from a write by the sidebar resolver. It watches for a `PINNED_SITES_CHANGED` broadcast that has no `senderId`. P.6 uses wikipedia.org and P.7 uses mozilla.org. Thus a run of one case does not load the icon for the other case.
-- P.7 sets up and checks itself. But nothing can make a background write occur in the few milliseconds that a sidebar write is in progress. Thus a pass can mean that the race did not occur. Run the case, but do not use a pass as proof. Its site must also be cleared from the history, as in P.6. If not, the background write that the case races never occurs.
-- P.8 needs you to stop the service worker, as in E.3.
+- P.6 needs the network. It starts with a pause that clears the browsing history of Chrome. The driver does this step only on a profile inside `tools/tmp/` that is not signed in. In every other case, you do it. Chrome keeps favicons there, and the extension cannot clear favicons without also deleting real history. The case tells a write by background apart from a write by the sidebar resolver. It watches for a `PINNED_SITES_CHANGED` broadcast that has no `senderId`. P.6 uses wikipedia.org and P.7 uses mozilla.org. Thus a run of one case does not load the icon for the other case.
+- P.7 opens the page and unpins the other pin at the same moment, then checks the result. But nothing can make a background write occur in the few milliseconds that a sidebar write is in progress. Thus a pass can mean that the race did not occur. Run the case, but do not use a pass as proof. Its site must also be cleared from the history, as in P.6. If not, the background write that the case races never occurs.
+- P.8 needs a stop of the service worker, as in E.3. The driver does it. Without the driver, you do it.
 - P.9 calls `importFullBackup` with a fixture file in the repository (`src/tests/inpanel/data/pinned-sites-backup.json`). The import dialog uses the same path below its file picker. The replace step deletes the full pin list on purpose. A `finally` block puts the list back, so a stopped run cannot leave your pins deleted. Export is manual. The custom-icon step needs the network, as in P.6.
 - P.10 needs a sidebar open in two windows, and you change the pins by hand in the other window. Run the case from the receiving window. It reads its own mirror (the copy of the pin list that a window keeps), so the runner makes every check. Only the last step, the reverse direction, is a `confirm` pause (a pause where you answer Pass or Fail).
 
@@ -508,7 +508,7 @@ Not covered: the window that receives a history request or an audio request. Eve
 
 #### C.2g History dropdown press-and-hold gesture
 
-This is a guided case. The runner does the setup and every check. It pauses for you to do each gesture. It is automated in `src/tests/inpanel/cases/sectionC.ts`.
+The runner does the setup, does each gesture with simulated mouse events, and checks each result in the DOM of the sidebar. The case is automated in `src/tests/inpanel/cases/sectionC.ts`.
 
 C.2d covers the background half of the same dropdown. It calls `getHistoryDetails` and `navigateToIndex` directly. Thus this case adds the `Toolbar.tsx` half: the hold timer, the branch between a quick click and a hold in `handleHistoryMouseUp`, the dropdown display, and the click on an entry.
 
@@ -592,7 +592,7 @@ Manual-only gap: some data has no `bookmarkFolderSegments` and never went throug
 
 ### E.3 Service worker restart repopulates tab history and audible tracking
 
-This is a guided case. The runner pauses for you to stop the service worker by hand. Then it checks the recovery itself. It is automated in `src/tests/inpanel/cases/sectionE.ts`.
+The runner plays and stops the audio itself. For the stop of the service worker, it pauses. The driver does that step. Without the driver, you stop the worker by hand. Then the runner checks the recovery itself. The case is automated in `src/tests/inpanel/cases/sectionE.ts`.
 
 This case is a regression check for step 4 of `docs/decisions/2026-07-30-shared-storage-multiple-writers.md`. Both managers moved out of `background.ts`. `LastAudibleTracker` holds a `TabHistoryManager`, so it must now be constructed after it. A wiring fault there shows only on a cold start (a start of the service worker from the stopped state), when `load()` runs.
 
@@ -610,7 +610,7 @@ Do not use E.1 instead of this case. A reload of the extension is a new load of 
 
 ## Section F - Regression check on pre-existing behavior
 
-This section checks related behavior that must not break. It is automated in `src/tests/inpanel/cases/sectionF.ts`. F.1 is guided.
+This section checks related behavior that must not break. It is automated in `src/tests/inpanel/cases/sectionF.ts`. F.1 does its drag with simulated mouse events.
 
 | #   | Action | Expected Result |
 | --- | ------ | --------------- |
@@ -625,7 +625,7 @@ This section checks related behavior that must not break. It is automated in `sr
 
 These cases are for step 5 of `docs/decisions/2026-07-30-shared-storage-multiple-writers.md`. `PinnedSitesManager` is now the only writer of `chrome.storage.local['pinnedSites']`. The sidebar reaches it through `pinnedSitesManagerProxy`. The section letter is P, not G, so that the IDs are not confused with the known gaps G1 to G3.
 
-This section is automated in `src/tests/inpanel/cases/sectionP.ts`. P.7, P.8 and P.10 are guided. P.6 and one step of P.9 need the network.
+This section is automated in `src/tests/inpanel/cases/sectionP.ts`. P.10 is guided. P.6 and P.8 each have one pause that the driver does, or that you do without the driver. P.6, P.7 and one step of P.9 need the network.
 
 Most of these cases check the same two things, and the rows use these two names for them:
 
@@ -692,7 +692,7 @@ This is a regression check for the provenance in `PinnedSiteFaviconPatch`. The p
 
 This case is the reason that the manager needs a writer in background.
 
-The case needs a site whose favicon Chrome does not hold. Thus it starts with a guided step that clears the favicon. You must clear "Browsing history", because Chrome keeps favicons there. If Chrome has no icon for the exact address, it uses the icon that it holds for the site. Thus a unique query string cannot replace the clear.
+The case needs a site whose favicon Chrome does not hold. Thus it starts with a pause that clears the favicon. The driver does this pause only on a safe profile, as the list at the start of this document says. You must clear "Browsing history", because Chrome keeps favicons there. If Chrome has no icon for the exact address, it uses the icon that it holds for the site. Thus a unique query string cannot replace the clear.
 
 The automated case uses `https://www.wikipedia.org/`. P.7 uses `https://www.mozilla.org/`. Thus a run of one case does not give the site of the other case an icon.
 
@@ -707,14 +707,14 @@ The writer of the favicon matters, and the two possible writers look the same. T
 
 ### P.7 A background favicon patch must not resurrect an unpinned pin
 
-This is the in-flight broadcast case (decision 2 in the step 5 plan). An in-flight broadcast is one that background sends while a sidebar write is in progress. The case is guided: the runner does the setup and the checks, and you supply the timing.
+This is the in-flight broadcast case (decision 2 in the step 5 plan). An in-flight broadcast is one that background sends while a sidebar write is in progress. The runner does the setup, starts the page load and the unpin at the same moment, and does the checks.
 
 A pass here is weaker than a pass in other cases. Nothing can make background patch a favicon in the few milliseconds that a sidebar write is in progress. Thus the race can fail to occur, and then the case passes with no test done. Run it anyway. The fault that it looks for is specific, and the runner can detect it: this window does not agree with background.
 
 | Step | Action | Expected Result |
 | ---- | ------ | --------------- |
 | 1    | Set up as in P.6: pin A on a site that Chrome holds no icon for, and a second pin B | Neither pin has a favicon. The clear step of P.6 also covers the site of this case |
-| 2    | At the pause, open a tab on the URL of A and unpin B at the same time, as near as you can | - |
+| 2    | Open a tab on the URL of A and unpin B at the same time, as near as possible | - |
 | 3    | Wait until both are complete. Then look at the bar | A has its favicon, and B is gone. If B comes back and stays, that is the fault that this case looks for |
 | 4    | Compare the mirror of this window with background's list, entry by entry | They are the same. A difference means that this window is stale while storage is correct. That is the exact form of the fault |
 
@@ -782,7 +782,7 @@ The tables below describe each case with these actions.
 
 | Step | Action | Expected Result |
 | ---- | ------ | --------------- |
-| 1    | Open a regular tab on a video and press play | The tab plays audio |
+| 1    | Open the test tone page (`test-audio.html`) in a regular tab and click "Play" | The tab plays audio |
 | 2    | Open a different bookmark | Its tab opens |
 | 3    | Drag the tab that plays audio onto the bookmark tree | The new bookmark is loaded and shows the audio indicator immediately |
 

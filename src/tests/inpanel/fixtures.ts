@@ -10,7 +10,6 @@ import { DEFAULT_FOLLOW_ACTIVE_TAB_MODE, FOLLOW_ACTIVE_TAB_KEY } from '../../uti
 import { TestContext } from './types';
 import { sleep } from './stepHelpers';
 import { resetBackgroundTestHooks } from './backgroundHooks';
-import { UnattendedMode } from './runner';
 import { TEST_AUDIO_PAGE_PATH } from './testAudioProtocol';
 
 // chrome.storage.local key Settings writes for "Show tab title after navigating away"
@@ -32,26 +31,13 @@ export const TEST_PINNED_PREFIX = 'InPanelTest: ';
 const OTHER_BOOKMARKS_ID = '2';
 
 /**
- * A page that can actually produce sound, for C.2e/C.2f. Every other fixture
- * uses a synthetic example.com URL, but those can't be made audible, and
- * chrome.tabs' `audible` flag (which the audio quick-jump and audio dropdown
- * are built on) only gets set by genuine playback - autoplay is blocked
- * without a user gesture, and muted playback doesn't count. Hence the real
- * video, plus a manual "press play" step in those two cases.
- *
- * Swap this for any video with sound. Keep it a bare watch?v= link: a
- * &list=... playlist auto-advances to the next video when this one ends,
- * rewriting the tab's URL mid-run and defeating the cleanup match below.
- */
-export const TEST_AUDIO_URL = 'https://www.youtube.com/watch?v=-W2JdSl1v48';
-
-/**
- * Which page an audio case plays sound from. With unattended mode off it is
- * TEST_AUDIO_URL, and a tester presses play. With it on it is the DEV-only
- * tone page (test-audio.html), which the runner can start and stop itself
- * (playTestAudio/stopTestAudio in actions.ts). Decided when the case runs,
- * not when its steps are built, so a case's step list stays the same in both
- * modes.
+ * The page every audio case plays sound from: the DEV-only tone page
+ * (test-audio.html). Every other fixture uses a synthetic example.com URL,
+ * but those can't be made audible, and chrome.tabs' `audible` flag (which the
+ * audio quick-jump and audio dropdown are built on) only gets set by genuine,
+ * unmuted playback. The runner starts and stops the tone itself
+ * (playTestAudio/stopTestAudio in actions.ts), which needs the Chrome profile
+ * tools/start-test-chrome.sh starts: it lets audio play without a click.
  */
 export class AudioTestPage
 {
@@ -64,12 +50,6 @@ export class AudioTestPage
   static isTonePage(url: string | undefined): boolean
   {
     return url?.startsWith(AudioTestPage.tonePageUrl()) ?? false;
-  }
-
-  /** Goes by the mode the run started with (UnattendedMode.forRun), not the setting's current value. */
-  static async urlForThisRun(ctx: TestContext): Promise<string>
-  {
-    return (await UnattendedMode.forRun(ctx)) ? AudioTestPage.tonePageUrl() : TEST_AUDIO_URL;
   }
 
   /**
@@ -93,19 +73,18 @@ export class AudioTestPage
 
 /**
  * Whether a tab belongs to the test suite and is safe to close during
- * cleanup. Deliberately matches TEST_AUDIO_URL as a full-URL prefix rather
- * than something loose like "any youtube.com tab" - cleanup closes whatever
- * it matches, and a broad pattern would take the user's own tabs with it
- * (same collision hazard the namespaced test space names avoid). The
- * tradeoff: if the page navigates somewhere else entirely, that tab is
- * leaked rather than closed, which is the safe direction to fail.
+ * cleanup. Matches only the test URL prefixes and this install's own tone
+ * page - cleanup closes whatever it matches, and a broad pattern would take
+ * the user's own tabs with it (same collision hazard the namespaced test
+ * space names avoid). The tradeoff: if the page navigates somewhere else
+ * entirely, that tab is leaked rather than closed, which is the safe
+ * direction to fail.
  */
 function isTestTabUrl(url: string | undefined): boolean
 {
   if (!url) return false;
   return url.startsWith(TEST_URL_PREFIX)
     || url.startsWith(TEST_OTHER_DOMAIN_URL_PREFIX)
-    || url.startsWith(TEST_AUDIO_URL)
     || AudioTestPage.isTonePage(url);
 }
 

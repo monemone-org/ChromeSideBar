@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Runs the in-panel test suite (src/tests/inpanel/) unattended in the test
-// Chrome started by tools/start-test-chrome.sh, and does the few pause steps
+// Runs the in-panel test suite (src/tests/inpanel/) with nobody at the
+// keyboard in the test Chrome started by tools/start-test-chrome.sh, and does
+// the few pause steps
 // only something outside the extension can do: stopping the service worker
 // (E.3, P.8), reloading the extension (E.1) and, only on a Chrome profile
 // inside tools/tmp/ that is not signed in, deleting the browsing history (P.6,
@@ -31,8 +32,8 @@
 // enables it if it is disabled), opens a helper tab in a window of its own
 // and a fresh test window, opens the side panel there, opens the Test Runner
 // from the sidebar's Menu, clears away a leftover popup or paused run,
-// selects the cases and turns Unattended on (by writing the panel's own
-// storage keys), and clicks Run Tests. It then watches the run through
+// selects the cases (by writing the panel's own storage key), and clicks Run
+// Tests. It then watches the run through
 // chrome.storage.local from the helper tab, performs pauses marked
 // `external`, and discards (skips) any pause that still needs a person,
 // restarting the rest of the batch after it. At the end, or on Ctrl-C, it
@@ -95,7 +96,6 @@ const CLEAR_DATA_TIMEOUT_MS = 60000;
 const TEST_PAGE_PREFIXES = [
   'https://example.com/inpanel-test-',
   'https://example.org/inpanel-test-',
-  'https://www.youtube.com/watch?v=-W2JdSl1v48',
   'chrome://extensions',
   'chrome://settings',
 ];
@@ -106,7 +106,6 @@ const STORAGE_KEYS = {
   caseResults: 'testRunnerCaseResults',
   batchQueue: 'testRunnerBatchQueue',
   batchCaseIds: 'testRunnerBatchCaseIds',
-  unattended: 'testRunnerUnattended',
   deselected: 'testRunnerDeselectedCaseIds',
 };
 
@@ -1521,9 +1520,6 @@ const PanelScripts = {
     }
 
     const popup = document.querySelector('[role=alertdialog]');
-    const unattendedLabel = [...document.querySelectorAll('label')].find(l => text(l) === 'Unattended');
-    const unattendedBox = unattendedLabel?.querySelector('input');
-
     const cases = [...document.querySelectorAll('input[aria-label^="Include "]')].map(box =>
     {
       const id = box.getAttribute('aria-label').replace(/^Include /, '').replace(/ in Run Tests$/, '');
@@ -1542,7 +1538,6 @@ const PanelScripts = {
       banner,
       popup: popup ? text(popup) : null,
       panelError: text(document.querySelector('.bg-red-100')) || null,
-      unattended: unattendedBox ? { checked: unattendedBox.checked, disabled: unattendedBox.disabled } : null,
       // Every step result row in the case list: grows by one per finished step
       resultRows: document.querySelectorAll('ul.font-mono li').length,
       cases,
@@ -1616,12 +1611,11 @@ class PanelView
     return this.isApp && this.runnerOpen && !this.busy && !this.banner;
   }
 
-  /** Whether the case checkboxes, the Run Tests count and the Unattended box show exactly this selection. */
+  /** Whether the case checkboxes and the Run Tests count show exactly this selection. */
   showsSelection(caseIds)
   {
     const wanted = new Set(caseIds);
     return this.runButton?.label === `Run Tests (${caseIds.length})`
-      && this.unattended?.checked === true
       && this.cases.every(c => c.checked === wanted.has(c.id));
   }
 
@@ -1640,7 +1634,6 @@ class PanelView
       runnerOpen: this.runnerOpen,
       busy: this.busyLabel,
       runButton: this.runButton?.label ?? null,
-      unattended: this.unattended?.checked ?? null,
       banner: this.banner?.title ?? null,
       popup: this.popup ? this.popup.slice(0, 60) : null,
       panelError: this.panelError,
@@ -2229,7 +2222,7 @@ class TestRunDriver
   /** Remembers the tester's own checkbox choices, to put them back at the end. */
   async saveSettings()
   {
-    this.originalSettings = await this.helper.readStorage([STORAGE_KEYS.deselected, STORAGE_KEYS.unattended]);
+    this.originalSettings = await this.helper.readStorage([STORAGE_KEYS.deselected]);
   }
 
   async restoreSettings()
@@ -2237,7 +2230,6 @@ class TestRunDriver
     if (!this.originalSettings) return;
     await this.writeStorageTolerantly({
       [STORAGE_KEYS.deselected]: this.originalSettings[STORAGE_KEYS.deselected] ?? null,
-      [STORAGE_KEYS.unattended]: this.originalSettings[STORAGE_KEYS.unattended] ?? null,
     });
   }
 
@@ -2258,9 +2250,9 @@ class TestRunDriver
   }
 
   /**
-   * Selects exactly `caseIds` and turns Unattended on, by writing the two
-   * keys the panel's useChromeLocalStorage hooks read (each stored as JSON
-   * text, as the hook's setter writes it); the hooks pick the change up from
+   * Selects exactly `caseIds`, by writing the key the panel's
+   * useChromeLocalStorage hook reads (stored as JSON text, as the hook's
+   * setter writes it); the hook picks the change up from
    * chrome.storage.onChanged. The deselected list is built from the panel's
    * own case list, so any case not named stays checked as it would by default.
    */
@@ -2270,9 +2262,8 @@ class TestRunDriver
     const deselected = this.availableCaseIds.filter(id => !wanted.has(id));
     await this.helper.call(HelperScripts.writeStorage, {
       [STORAGE_KEYS.deselected]: JSON.stringify(deselected),
-      [STORAGE_KEYS.unattended]: JSON.stringify(true),
     });
-    await this.panel.waitForView(`the Test Runner to show "Run Tests (${caseIds.length})" with Unattended on`, v => v.showsSelection(caseIds), {
+    await this.panel.waitForView(`the Test Runner to show "Run Tests (${caseIds.length})"`, v => v.showsSelection(caseIds), {
       timeoutMs: 15000,
       hint: 'The selection was written to chrome.storage.local but the panel did not show it.',
     });

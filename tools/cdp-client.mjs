@@ -3,7 +3,7 @@
 // needs Node 22+ and no npm package.
 //
 // Shared by tools/cdp.mjs (a one-shot CLI) and tools/run-inpanel-tests.mjs
-// (the unattended test driver).
+// (the test driver).
 
 export const DEFAULT_DEBUG_PORT = '9333';
 export const DEFAULT_TIMEOUT_MS = 30000;

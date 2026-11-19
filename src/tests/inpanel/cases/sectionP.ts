@@ -22,7 +22,7 @@ import { FullBackup, ImportOptions, importFullBackup } from '../../../utils/back
 import { iconToDataUrl } from '../../../utils/iconify';
 import { StepRunner, TestCase, TestContext, TestStep } from '../types';
 import { createTestPinnedSite, TEST_PINNED_PREFIX, testUrl } from '../fixtures';
-import { closeTesterWindow, openPageForTester, openPinnedTab, pause } from '../actions';
+import { actionStep, assertStep, closeTesterWindow, openPageForTester, openPinnedTab, pause } from '../actions';
 import { resolveStringRef, resolveTabId, sleep, waitFor } from '../stepHelpers';
 import backupFixture from '../data/pinned-sites-backup.json';
 
@@ -845,7 +845,7 @@ function closeTabRef(tabRef: string): TestStep
 
 export const P6_BACKGROUND_FILLS_MISSING_FAVICON: TestCase = {
   id: 'P.6',
-  title: 'Scenario 5 - background fills in a missing favicon (guided, needs network)',
+  title: 'Scenario 5 - background fills in a missing favicon (needs the driver or a person, and the network)',
   steps: [
     // The runner opens the settings page; the dialog itself is a chrome://
     // page, which an extension cannot script, so the three choices inside it
@@ -893,12 +893,11 @@ export const P6_BACKGROUND_FILLS_MISSING_FAVICON: TestCase = {
 
 // P.7 races a background favicon write against an unpin, so it needs a site
 // whose icon Chrome does not already hold - the same precondition as P.6, and
-// the same guided clear at the start of P.6 covers it. If Chrome does already
+// the same clear at the start of P.6 covers it. If Chrome does already
 // have this site's icon, the case still checks that this window's list agrees
 // with background's, but the background write it wants to race never happens,
 // so a pass proves less than usual.
 const P7_RACE_URL = P7_FAVICON_SITE;
-const P7_PIN_B_TITLE = `${TEST_PINNED_PREFIX}P7 pin B`;
 
 /**
  * The assertion this case exists for: this window and background hold the
@@ -928,7 +927,7 @@ function assertMirrorMatchesBackground(): TestStep
 // How long P.7 gives a real site to load and its favicon to reach pin A, the
 // same allowance P.6 gives the background broadcast
 const P7_FAVICON_TIMEOUT_MS = 20000;
-// The confirm check's wait when openRaceTabAndUnpin already waited the full
+// The favicon check's wait when openRaceTabAndUnpin already waited the full
 // allowance in vain, so an offline run fails after ~20s rather than ~40s
 const P7_FAVICON_RECHECK_MS = 2000;
 
@@ -952,15 +951,14 @@ async function backgroundFaviconOf(pinId: string): Promise<string | undefined>
 }
 
 /**
- * The race the manual step asks for: open the race URL in a background tab
- * and unpin the other pin "the moment you click it". Both calls are started
- * before either is awaited, which is as close together as the instruction
- * means. The unpin is the menu item's own action (unpinActionLikeMenuItem).
+ * The race: open the race URL in a background tab and unpin the other pin
+ * at the same moment. Both calls are started before either is awaited, which
+ * is as close together as the panel can make them. The unpin is the menu item's own action (unpinActionLikeMenuItem).
  *
  * Then waits, bounded, for background to give pin A its favicon, so the
- * assertions after this pause look at the state after the favicon broadcast
+ * assertions after this step look at the state after the favicon broadcast
  * has landed, which is the point of the race. It does not fail when no
- * favicon arrives: the action itself happened, and the confirm check that
+ * favicon arrives: the action itself happened, and the favicon check that
  * follows reports the missing favicon and whether the network is the likely
  * cause.
  *
@@ -1011,13 +1009,12 @@ function openRaceTabAndUnpin(opts: { urlRef: string; unpinRef: string; faviconPi
 }
 
 /**
- * Stands in for "Did pin A pick up the site favicon?": background's own list
+ * Checks that pin A picked up the site favicon: background's own list
  * has a favicon for the pin, and this window's mirror - what the pinned bar
  * draws - has the same one. Both are polled with a deadline.
  *
  * On failure it reads the race tab too, which separates a page that never
- * loaded (most likely the network, which the manual instruction also says to
- * answer Fail for) from a page that loaded with a favicon that never reached
+ * loaded (most likely the network) from a page that loaded with a favicon that never reached
  * the pin (a code problem).
  */
 function assertPinPickedUpSiteFavicon(pinRef: string, raceTabRef: string): StepRunner
@@ -1069,7 +1066,7 @@ async function describeRaceTab(ctx: TestContext, raceTabRef: string): Promise<st
 
 export const P7_FAVICON_PATCH_DOES_NOT_RESURRECT: TestCase = {
   id: 'P.7',
-  title: 'A background favicon patch must not resurrect an unpinned pin (guided)',
+  title: 'A background favicon patch must not resurrect an unpinned pin (needs network)',
   setup: async (getCtx) =>
   {
     const ctx = getCtx();
@@ -1081,35 +1078,18 @@ export const P7_FAVICON_PATCH_DOES_NOT_RESURRECT: TestCase = {
     assertPinPresent('pinA', true),
     assertPinPresent('pinB', true),
 
-    pause(
-      'Manual step: race a background favicon write against an unpin',
-      [
-        `Click this link to open the page in a background tab: ${P7_RACE_URL}`,
-        `The moment you click it, unpin "${P7_PIN_B_TITLE}" from the pinned bar (right-click it, then Unpin) - closer together is better, but do not worry about being exact.`,
-        'Come back to the sidebar and click Resume.',
-      ],
-      { auto: openRaceTabAndUnpin({ urlRef: 'pinAUrl', unpinRef: 'pinB', faviconPinRef: 'pinA', raceTabRef: 'raceTab' }) }
-    ),
+    actionStep('Race a background favicon write against an unpin', openRaceTabAndUnpin({ urlRef: 'pinAUrl', unpinRef: 'pinB', faviconPinRef: 'pinA', raceTabRef: 'raceTab' })),
 
-    // B was unpinned by hand, so the refs still hold its id - the assertion
-    // is that it stayed gone rather than being brought back by the favicon
-    // broadcast landing after the unpin.
+    // B was unpinned through the menu action, so the refs still hold its id -
+    // the assertion is that it stayed gone rather than being brought back by
+    // the favicon broadcast landing after the unpin.
     assertPinPresent('pinB', false),
     assertMirrorMatchesBackground(),
 
-    pause(
-      'Check the pinned bar',
-      [
-        'Look at pin A in the pinned bar - a pass means its icon became the site favicon, and if the network is down or the page did not load, answer Fail and note why.',
-      ],
-      {
-        confirm: 'Did pin A pick up the site favicon?',
-        auto: assertPinPickedUpSiteFavicon('pinA', 'raceTab'),
-      }
-    ),
+    assertStep('Pin A picked up the site favicon', assertPinPickedUpSiteFavicon('pinA', 'raceTab')),
 
-    // The tester opened this one by hand, on a real site, so cleanup's
-    // URL-prefix match will not close it.
+    // The race tab is on a real site, so cleanup's URL-prefix match will not
+    // close it.
     {
       kind: 'action',
       label: 'Close any tab left open on the race URL',
@@ -1118,8 +1098,8 @@ export const P7_FAVICON_PATCH_DOES_NOT_RESURRECT: TestCase = {
         const url = resolveStringRef(ctx, 'pinAUrl');
         const tabs = await chrome.tabs.query({ url: `${P7_FAVICON_SITE}*` });
         const raceTabIds = tabs.filter(t => t.url === url && t.id !== undefined).map(t => t.id!);
-        // The unattended run records its race tab, which may have been
-        // redirected away from the exact race URL by now
+        // The recorded race tab too, which may have been redirected away from
+        // the exact race URL by now
         const recorded = ctx.refs.get('raceTab');
         if (typeof recorded === 'number' && !raceTabIds.includes(recorded)) raceTabIds.push(recorded);
         // One at a time, so a tab already closed does not stop the others
@@ -1149,7 +1129,7 @@ export const P7_FAVICON_PATCH_DOES_NOT_RESURRECT: TestCase = {
 // checking the list is non-empty.
 export const P8_PINS_SURVIVE_WORKER_RESTART: TestCase = {
   id: 'P.8',
-  title: 'Pins survive a service worker restart (guided)',
+  title: 'Pins survive a service worker restart (needs the driver or a person)',
   setup: async (getCtx) =>
   {
     await createTestPinnedSite(getCtx, 'P8 pin one', testUrl('p8-one'), 'pinOne');

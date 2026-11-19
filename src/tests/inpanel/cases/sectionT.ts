@@ -6,12 +6,11 @@
 // when two things happen in one particular order, so most of them use
 // background's DEV-only test hooks (backgroundHooks.ts) to hold background at
 // a named point, fail one call, or send a broadcast of the case's choosing.
-// T.1 needs real audio instead, so it is guided, unless the run is
-// unattended and plays the DEV-only tone page itself.
+// T.1 needs real audio instead, which it plays on the DEV-only tone page.
 
 import { TestCase, TestStep } from '../types';
-import { createTestBookmark, createTestSpace, TEST_AUDIO_URL, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { bookmarkExistingTab, closeTab, openAudioTab, openBookmarkTab, openRegularTab, pause, playTestAudio, switchSpaceVerified } from '../actions';
+import { AudioTestPage, createTestBookmark, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import { actionStep, bookmarkExistingTab, closeTab, openAudioTab, openBookmarkTab, openRegularTab, playTestAudio, switchSpaceVerified } from '../actions';
 import { assertBookmarkLoaded, assertTabAudible } from '../assertions';
 import { resolveStringRef, resolveTabId } from '../stepHelpers';
 import {
@@ -108,7 +107,7 @@ function waitForTabLoaded(tabRef: string): TestStep
 // all along.
 export const T1_PLAYING_TAB_ONTO_BOOKMARK: TestCase = {
   id: 'T.1',
-  title: 'A tab already playing audio, dragged onto a bookmark, shows the audio indicator (guided)',
+  title: 'A tab already playing audio, dragged onto a bookmark, shows the audio indicator',
   setup: async (getCtx) =>
   {
     await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
@@ -116,30 +115,21 @@ export const T1_PLAYING_TAB_ONTO_BOOKMARK: TestCase = {
   },
   steps: [
     ...switchSpaceVerified('spaceA'),
-    // YouTube, or in unattended mode the tone page the pause below can start
-    // itself (see AudioTestPage)
+    // The DEV-only tone page, which the next step starts (see AudioTestPage)
     openAudioTab({ spaceRef: 'spaceA', tabRef: 'audioTab' }),
 
-    pause(
-      'Manual step: start audio playback',
-      [
-        'Switch to the newly opened YouTube tab in Chrome.',
-        'Press play and let it play for a second or two - unmuted, a muted tab does not count as audible.',
-        'Come back to the sidebar and click Resume below.',
-      ],
-      { auto: playTestAudio('audioTab') }
-    ),
+    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab')),
     assertTabAudible('audioTab', true),
 
     // Any change to the mirror will do; this is the ordinary way to cause one
     openBookmarkTab({ bookmarkRef: 'otherBookmark', url: testUrl('t1-other'), spaceRef: 'spaceA', tabRef: 'otherTab' }),
 
     // What dragging the tab onto the bookmark tree does
-    bookmarkExistingTab({ tabRef: 'audioTab', spaceRef: 'spaceA', title: 'T1 audio', url: TEST_AUDIO_URL, bookmarkRef: 'audioBookmark' }),
+    bookmarkExistingTab({ tabRef: 'audioTab', spaceRef: 'spaceA', title: 'T1 audio', url: AudioTestPage.tonePageUrl(), bookmarkRef: 'audioBookmark' }),
     assertTabAudible('audioTab', true),
     assertBookmarkAudible('audioBookmark', true),
 
-    // Closing the tab stops the audio too, so no second pause is needed
+    // Closing the tab stops the audio too, so no stop step is needed
     closeTab('audioTab'),
   ],
 };

@@ -8,7 +8,7 @@
 import { getOrCreateSpaceGroup, moveTabToSpace, regroupAssociatedTab } from '../../utils/tabOperations';
 import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
 import { BookmarkOpenMode } from '../../components/SettingsDialog';
-import { ClosedPanelRunner, PauseAutomation, SavedRefs, StepRunner, TestContext, TestStep } from './types';
+import { ClosedPanelRunner, PauseOptions, SavedRefs, StepRunner, TestContext, TestStep } from './types';
 import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, SimulatedMouse, sleep, waitFor } from './stepHelpers';
 import { assertSidebarShowsSpace } from './assertions';
 import { ARC_SHOW_TAB_TITLE_WHEN_DRIFTED_KEY, AudioTestPage, BOOKMARK_OPEN_MODE_KEY, testUrl } from './fixtures';
@@ -127,7 +127,7 @@ export function audioQuickJump(): TestStep
       const { playingTabIds, historyTabIds } = await lastAudibleTrackerProxy.getAudioTabLists(ctx.windowId);
 
       const targetTabId = playingTabIds[0] ?? historyTabIds[0];
-      if (targetTabId === undefined) throw new Error('background reports no audible tab - did the manual "press play" step actually start playback?');
+      if (targetTabId === undefined) throw new Error('background reports no audible tab - did the "click Play" step actually start playback?');
 
       await chrome.runtime.sendMessage({ action: 'set-active-tab-and-space', tabId: targetTabId, skipHistory: false });
     },
@@ -394,17 +394,17 @@ async function openTabInSpace(ctx: TestContext, url: string, spaceRef: string, t
 }
 
 /**
- * openRegularTab for the audio cases: opens TEST_AUDIO_URL, or the tone page
- * in unattended mode, chosen when the step runs (see AudioTestPage).
+ * openRegularTab for the audio cases: opens the DEV-only tone page (see
+ * AudioTestPage).
  */
 export function openAudioTab(opts: { spaceRef: string; tabRef: string }): TestStep
 {
   return {
     kind: 'action',
-    label: `Open audio tab (YouTube, or the test tone page in unattended mode) in space "${opts.spaceRef}"`,
+    label: `Open the test tone page in space "${opts.spaceRef}"`,
     run: async (ctx) =>
     {
-      await openTabInSpace(ctx, await AudioTestPage.urlForThisRun(ctx), opts.spaceRef, opts.tabRef);
+      await openTabInSpace(ctx, AudioTestPage.tonePageUrl(), opts.spaceRef, opts.tabRef);
     },
   };
 }
@@ -432,9 +432,9 @@ async function openBookmarkTabAt(ctx: TestContext, bookmarkRef: string, url: str
 }
 
 /**
- * openBookmarkTab for an audio bookmark, whose URL the case's setup chose at
- * run time (AudioTestPage.urlForThisRun) - so it opens whatever the bookmark
- * itself points at rather than a URL fixed when the steps were built.
+ * openBookmarkTab for an audio bookmark, whose URL (the tone page's, see
+ * AudioTestPage) is only known at run time - so it opens whatever the
+ * bookmark itself points at rather than a URL fixed when the steps were built.
  */
 export function openAudioBookmarkTab(opts: { bookmarkRef: string; spaceRef?: string; tabRef: string }): TestStep
 {
@@ -474,8 +474,9 @@ export function openPinnedTab(opts: { pinRef: string; url: string; tabRef: strin
  * bottom out in the same helper, this step currently produces an identical
  * event to moveTabSidebar - it verifies background.ts reacts correctly to a
  * group-membership change regardless of who caused it, but does NOT catch a
- * future divergence between the two paths on its own. A true native-gesture
- * test needs a real user action, which (like A.3) means a manual pause step.
+ * future divergence between the two paths on its own. Chrome reports a drag
+ * in its own tab strip to background as the same group-change events, which
+ * is why the closed-panel steps (A.3) use the API too.
  */
 export function moveTabNative(opts: { tabRef: string; targetSpaceRef: string }): TestStep
 {
@@ -606,8 +607,8 @@ export function closeTab(tabRef: string): TestStep
 }
 
 /**
- * Pause for a manual step, rendering `steps` as a numbered list rather than one run-on
- * paragraph. TestRunnerPanel's paused banner renders each "N. " line on its own row, dims
+ * Pause for something only Chrome itself or a person can do, rendering
+ * `steps` as a numbered list rather than one run-on paragraph. TestRunnerPanel's paused banner renders each "N. " line on its own row, dims
  * anything after a " - " as an explanation/aside, and turns chrome://... mentions into
  * clickable links - see renderPausedLine there.
  *
@@ -618,11 +619,14 @@ export function closeTab(tabRef: string): TestStep
  * off for a pause that only asks for an action to be carried out.
  *
  * The third argument is either that confirm question on its own or an
- * options object, which can also carry the pause's unattended-mode stand-in:
- * `auto` or `whilePanelClosed` (see PauseAutomation in types.ts), or
- * `external` for an action the driver script performs from outside the
- * extension. The written steps stay the instruction either way - they are
- * what a tester follows with unattended mode off or without the driver.
+ * options object, which can instead carry `external` for an action the
+ * driver script performs from outside the extension (see PauseOptions in
+ * types.ts). The written steps are what a tester follows when the driver is
+ * not running the suite.
+ *
+ * Anything the panel can do itself belongs in an action or assert step, and
+ * anything that must happen with the sidebar unloaded in a closedPanel step,
+ * not in a pause.
  */
 export function pause(label: string, steps: string[], options?: string | PauseOptions): TestStep
 {
@@ -631,18 +635,36 @@ export function pause(label: string, steps: string[], options?: string | PauseOp
   return { kind: 'pause', label, instruction, ...resolved };
 }
 
-// `confirm` is part of PauseAutomation, which is what keeps it off a
-// whilePanelClosed or external pause.
-export type PauseOptions = PauseAutomation;
+/** An action step whose work is a StepRunner built elsewhere, such as the stand-ins below. */
+export function actionStep(label: string, run: StepRunner): TestStep
+{
+  return { kind: 'action', label, run };
+}
+
+/** An assert step whose check is a StepRunner built elsewhere, such as the gesture checks below. */
+export function assertStep(label: string, run: StepRunner): TestStep
+{
+  return { kind: 'assert', label, run };
+}
+
+/**
+ * A step that runs on the parked page with the sidebar app unloaded - from
+ * the extension's side, the same state as a closed panel. See the
+ * closed-panel actions below for what `run` can be.
+ */
+export function closedPanelStep(label: string, run: ClosedPanelRunner): TestStep
+{
+  return { kind: 'closedPanel', label, run };
+}
 
 // ---------------------------------------------------------------------------
-// Closed-panel actions, for a pause's `whilePanelClosed`. These run on the
-// parked page (parked.ts), with the sidebar app unloaded, so they get no
-// TestContext: only the checkpoint's saved refs, and raw chrome.* calls. Each
-// one mirrors the in-panel action of the same effect above (moveTabNative,
-// ungroupTab, moveTabToNewWindow, closeTab, deleteBookmarkNative) so the
-// automated step does what the pause's written instruction asks a tester to
-// do in Chrome's own tab strip or bookmark manager.
+// Closed-panel actions, for closedPanelStep. These run on the parked page
+// (parked.ts), with the sidebar app unloaded, so they get no TestContext:
+// only the checkpoint's saved refs, and raw chrome.* calls. Each one mirrors
+// the in-panel action of the same effect above (moveTabNative, ungroupTab,
+// moveTabToNewWindow, closeTab, deleteBookmarkNative). Chrome reports the
+// same tab and bookmark events to background for these calls as for the
+// matching gesture in its own tab strip or bookmark manager.
 // ---------------------------------------------------------------------------
 
 /** Reads typed ids back out of a checkpoint's saved refs - the closed-panel counterpart of resolveTabId/resolveStringRef. */
@@ -725,9 +747,8 @@ export function removeBookmarkWhileClosed(bookmarkRef: string): ClosedPanelRunne
 }
 
 // ---------------------------------------------------------------------------
-// In-panel stand-ins, for a pause's `auto`. These run inside the panel in
-// unattended mode and do what the pause's written instruction asks a tester
-// to do: press a shortcut, start or stop audio.
+// In-panel stand-ins, for actionStep. These do inside the panel what would
+// otherwise need a person: press a shortcut, start or stop audio.
 // ---------------------------------------------------------------------------
 
 /**
@@ -736,8 +757,9 @@ export function removeBookmarkWhileClosed(bookmarkRef: string): ClosedPanelRunne
  * the same function chrome.commands.onCommand calls on a real key press. It
  * acts on this panel's window, and background replies only once the command
  * has finished, so the next assertion sees its result. What it cannot cover
- * is the key binding and the listener registration; assertCommandShortcutBound
- * covers the first, and only a real key press (unattended mode off) the second.
+ * is the key binding and the listener registration. assertCommandShortcutBound
+ * covers the first and assertShortcutListenerRegistered the second, which
+ * leaves only Chrome's delivery of the key press itself untested.
  */
 export function pressShortcut(command: 'prev-used-tab' | 'next-used-tab'): StepRunner
 {
@@ -758,7 +780,7 @@ export function pressShortcut(command: 'prev-used-tab' | 'next-used-tab'): StepR
 const TONE_PAGE_REPLY_TIMEOUT_MS = 10000;
 const AUDIBLE_CHANGE_TIMEOUT_MS = 10000;
 const AUDIO_POLL_MS = 200;
-const RERUN_MANUALLY_HINT = 'Check the profile was started by tools/start-test-chrome.sh (it allows autoplay), or rerun the case with Unattended off and play the audio by hand.';
+const AUTOPLAY_HINT = 'Check the profile was started by tools/start-test-chrome.sh, which allows audio to start without a click.';
 
 /** Remote control for the tone page (test-audio.html) open in one test tab. */
 class TonePageTab
@@ -769,11 +791,10 @@ class TonePageTab
   {
     const tabId = resolveTabId(ctx, tabRef);
     const tab = await chrome.tabs.get(tabId);
-    // The tab was opened with unattended mode off (a YouTube tab), or has
-    // navigated away: nothing here can play it
+    // The tab has navigated away from the tone page: nothing here can play it
     if (!AudioTestPage.isTonePage(tab.url ?? tab.pendingUrl))
     {
-      throw new Error(`tab "${tabRef}" is not the test tone page (it is on ${tab.url ?? tab.pendingUrl}), so it cannot be played automatically - rerun the case with Unattended off and press play by hand`);
+      throw new Error(`tab "${tabRef}" is not the test tone page (it is on ${tab.url ?? tab.pendingUrl}), so it cannot be played`);
     }
     return new TonePageTab(tabRef, tabId);
   }
@@ -814,10 +835,10 @@ class TonePageTab
       }
 
       if (reply?.ok) return;
-      if (reply && !reply.ok) throw new Error(`the tone page in tab "${this.tabRef}" could not ${command}: ${reply.error}. ${RERUN_MANUALLY_HINT}`);
+      if (reply && !reply.ok) throw new Error(`the tone page in tab "${this.tabRef}" could not ${command}: ${reply.error}. ${AUTOPLAY_HINT}`);
       await sleep(AUDIO_POLL_MS);
     }
-    throw new Error(`the tone page in tab "${this.tabRef}" never answered the ${command} command (${lastProblem}). ${RERUN_MANUALLY_HINT}`);
+    throw new Error(`the tone page in tab "${this.tabRef}" never answered the ${command} command (${lastProblem}). ${AUTOPLAY_HINT}`);
   }
 
   /** Polls the tab's `audible` flag until it matches, or the deadline passes. */
@@ -856,7 +877,7 @@ export function playTestAudio(...tabRefs: string[]): StepRunner
       await tonePage.send('play');
       if (!await tonePage.waitUntilAudible(true))
       {
-        throw new Error(`playback never started in tab "${tabRef}": the tone page says it is playing, but Chrome did not mark the tab audible within ${AUDIBLE_CHANGE_TIMEOUT_MS / 1000}s. ${RERUN_MANUALLY_HINT}`);
+        throw new Error(`playback never started in tab "${tabRef}": the tone page says it is playing, but Chrome did not mark the tab audible within ${AUDIBLE_CHANGE_TIMEOUT_MS / 1000}s. ${AUTOPLAY_HINT}`);
       }
     }
   };
@@ -878,16 +899,16 @@ export function stopTestAudio(tabRef: string): StepRunner
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar gestures, for a pause's `auto`: press-and-hold and click on the
-// toolbar's history buttons (C.2g) and dragging a tab row onto a space icon
-// (F.1). They go through SimulatedMouse (stepHelpers.ts), which dispatches the
+// Sidebar gestures, for actionStep and assertStep: press-and-hold and click
+// on the toolbar's history buttons (C.2g) and dragging a tab row onto a space
+// icon (F.1). They go through SimulatedMouse (stepHelpers.ts), which dispatches the
 // pointer and mouse events a real mouse would, so the component's own
 // handlers, timers and dnd-kit's sensor all run as they do for a person.
 // ---------------------------------------------------------------------------
 
 type HistoryDirection = 'prev' | 'next';
 
-// How long the auto runners wait for each visible effect of a gesture
+// How long the gesture runners wait for each visible effect of a gesture
 const GESTURE_EFFECT_TIMEOUT_MS = 3000;
 const NAVIGATION_TIMEOUT_MS = 5000;
 

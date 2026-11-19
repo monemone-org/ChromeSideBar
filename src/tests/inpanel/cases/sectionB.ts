@@ -5,14 +5,13 @@ import { CloseTabAction } from '../../../actions/closeTabAction';
 import { TestCase, TestStep } from '../types';
 import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
 import {
+  closedPanelStep,
   closeTab,
   closeTabWhileClosed,
   deleteBookmarkNative,
   openBookmarkTab,
-  openPageForTester,
   openPinnedTab,
   openRegularTab,
-  pause,
   removeBookmarkWhileClosed,
   switchSpaceVerified,
 } from '../actions';
@@ -36,15 +35,7 @@ export const B1_CLOSE_BOOKMARK_TAB: TestCase = {
 
     openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('b1-bookmark'), spaceRef: 'spaceA', tabRef: 'tab2' }),
     assertBookmarkLoaded('bm', true),
-    pause(
-      'Manual step: close the bookmark tab while the panel is closed',
-      [
-        'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
-        `In Chrome's own tab strip, close the tab for "${testUrl('b1-bookmark')}" (X button or Cmd+W).`,
-        'Reopen the sidebar panel to resume.',
-      ],
-      { whilePanelClosed: closeTabWhileClosed('tab2') }
-    ),
+    closedPanelStep('Close the bookmark tab, panel closed', closeTabWhileClosed('tab2')),
     assertBookmarkLoaded('bm', false),
   ],
 };
@@ -67,15 +58,7 @@ export const B2_CLOSE_PINNED_TAB: TestCase = {
 
     openPinnedTab({ pinRef: 'pin', url: testUrl('b2-pin'), tabRef: 'tab2' }),
     assertPinnedLoaded('pin', true),
-    pause(
-      'Manual step: close the pinned tab while the panel is closed',
-      [
-        'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
-        `In Chrome's own tab strip, close the tab for "${testUrl('b2-pin')}" (X button or Cmd+W).`,
-        'Reopen the sidebar panel to resume.',
-      ],
-      { whilePanelClosed: closeTabWhileClosed('tab2') }
-    ),
+    closedPanelStep('Close the pinned tab, panel closed', closeTabWhileClosed('tab2')),
     assertPinnedLoaded('pin', false),
   ],
 };
@@ -97,15 +80,7 @@ export const B2B_CLOSE_REGULAR_TAB: TestCase = {
 
     openRegularTab({ url: testUrl('b2b-regular-2'), spaceRef: 'spaceA', tabRef: 'tab2' }),
     assertTabInSpace('tab2', 'spaceA'),
-    pause(
-      'Manual step: close the regular tab while the panel is closed',
-      [
-        'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
-        `In Chrome's own tab strip, close the tab for "${testUrl('b2b-regular-2')}" (X button or Cmd+W).`,
-        'Reopen the sidebar panel to resume.',
-      ],
-      { whilePanelClosed: closeTabWhileClosed('tab2') }
-    ),
+    closedPanelStep('Close the regular tab, panel closed', closeTabWhileClosed('tab2')),
     assertTabExists('tab2', false),
   ],
 };
@@ -185,10 +160,10 @@ export const B3_MULTI_CLOSE_TABS: TestCase = {
 };
 
 // B.5's own intro in the doc calls this "a same-sidebar-state variant of
-// B.5b" - deliberately no pause step here (unlike B.5b). deleteBookmarkNative
-// fires the same chrome.bookmarks.onRemoved event the native chrome://bookmarks
-// manager would, so there's nothing a pause would add for this half of the
-// gap; B.5b below is what actually needs the sidebar closed.
+// B.5b" - deliberately no closed-panel step here (unlike B.5b).
+// deleteBookmarkNative fires the same chrome.bookmarks.onRemoved event the
+// native chrome://bookmarks manager would; B.5b below is what actually needs
+// the sidebar closed.
 export const B5_DELETE_BOOKMARK_TAB_OPEN: TestCase = {
   id: 'B.5',
   title: 'Delete a bookmark while its tab is open (known gap G1)',
@@ -229,18 +204,7 @@ export const B5B_DELETE_BOOKMARK_SIDEBAR_CLOSED: TestCase = {
 
     openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('b5b-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
     assertBookmarkLoaded('bm', true),
-    // Opened before the pause on purpose: the panel is closed for this step, so
-    // the tester has nothing to click in the instructions once they start.
-    openPageForTester({ url: 'chrome://bookmarks', ref: 'bookmarksTab' }),
-    pause(
-      'Manual step: delete the bookmark via chrome://bookmarks while the panel is closed',
-      [
-        'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
-        'In the `chrome://bookmarks` tab that just opened, find "B5b bookmark" and **delete** it - through Chrome\'s own bookmark manager, not the extension\'s tree.',
-        'Reopen the sidebar panel to resume.',
-      ],
-      { whilePanelClosed: removeBookmarkWhileClosed('bm') }
-    ),
+    closedPanelStep('Delete the bookmark through chrome.bookmarks, panel closed', removeBookmarkWhileClosed('bm')),
     assertBookmarkExists('bm', false),
     assertTabExists('tab1', true),
     // Same gap as B.5 (G1), reproduced with the sidebar actually closed this

@@ -75,6 +75,12 @@ export async function readTabAssociationBackup(windowId: number): Promise<Window
   return await sendHook({ op: 'readTabAssociationBackup', windowId }) as WindowAssociationBackup;
 }
 
+/** Whether background has a chrome.commands.onCommand listener, so a real key press would reach handleCommand. */
+export async function hasShortcutListener(): Promise<boolean>
+{
+  return await sendHook({ op: 'hasShortcutListener' }) === true;
+}
+
 /** Release every gate and drop every armed failure, so one case can't leak into the next. */
 export async function resetBackgroundTestHooks(): Promise<void>
 {

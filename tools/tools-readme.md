@@ -22,8 +22,8 @@ This script starts Chrome with a separate test profile in `tools/tmp/chrome-test
 
 - `--remote-debugging-port=9333` opens the Chrome DevTools Protocol (CDP) on port 9333. CDP is the protocol that lets a program control Chrome. `cdp.mjs` and `run-inpanel-tests.mjs` use it.
 - `--no-default-browser-check` and `--no-first-run` stop the prompts that Chrome shows when it starts.
-- `--autoplay-policy=no-user-gesture-required` lets a page play audio with no click. In unattended mode, the audio cases of the in-panel test runner play the tone page, `test-audio.html`. The audio cases passed with this flag on. Nobody tested them without it.
-- `--disable-backgrounding-occluded-windows`, `--disable-background-timer-throttling`, and `--disable-renderer-backgrounding` stop Chrome from slowing down a window that is covered or not in front. Without these flags, Chrome slows down an unattended run in the background. The delay is enough to break steps that depend on timing. With the flags, a run does the same thing when somebody watches it and when nobody does.
+- `--autoplay-policy=no-user-gesture-required` lets a page play audio with no click. The audio cases of the in-panel test runner play the tone page, `test-audio.html`, with no click, so they need this flag. Without it, the step that starts the audio fails with a message that names this script.
+- `--disable-backgrounding-occluded-windows`, `--disable-background-timer-throttling`, and `--disable-renderer-backgrounding` stop Chrome from slowing down a window that is covered or not in front. Without these flags, Chrome slows down a run in a window that is in the background. The delay is enough to break steps that depend on timing. With the flags, a run does the same thing when somebody watches it and when nobody does.
 
 The tools below need the extension loaded unpacked in this Chrome. To load it, turn on Developer mode in `chrome://extensions` and click **Load unpacked**. Build the extension with `npm run build:debug` first. The test runner, the tone page, the parked page, and the shortcut message are only in a development build.
 
@@ -65,10 +65,10 @@ The driver does these steps:
 
 1. It finds the unpacked build of this worktree in `chrome://extensions`. If the extension is disabled, the driver enables it.
 2. It opens two windows of its own. The first window holds a helper tab, which is an extension page that gives the driver the `chrome.*` API outside the panel. The second window is a new test window with the side panel open.
-3. It opens the Test Runner, selects the cases, turns on **Unattended**, and clicks **Run Tests**.
+3. It opens the Test Runner, selects the cases, and clicks **Run Tests**.
 4. During the run, it reads the state of the runner in `chrome.storage.local`. When a pause has the `external` mark, the driver does the action and clicks Resume.
 5. At the end, it closes the windows that it opened. It also closes new windows that the run left open, but only when every tab in them is a test page or an extension page. It never closes a window that was open before the run started.
-6. It puts back your own Test Runner settings: the cases that you ticked, and the state of the Unattended checkbox. A later manual run then starts the way that you left it.
+6. It puts back the cases that you ticked in the Test Runner. A later run from the panel then starts the way that you left it.
 
 The driver writes the results to `tools/tmp/test-results-<timestamp>.json`. The file has the same format as the **Download Results** file of the panel, plus a `driver` section. The `driver` section lists the skipped cases and the cases that gave no result. It also lists the external actions that the driver did, and the errors in the driver itself. The driver also prints a summary in the terminal.
 

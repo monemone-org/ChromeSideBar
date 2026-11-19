@@ -782,6 +782,9 @@ async function handleBackgroundTestHook(request: BackgroundTestHookRequest): Pro
       case 'readTabAssociationBackup':
         return { ok: true, value: await tabAssociationManager.readBackupForTest(request.windowId) };
 
+      case 'hasShortcutListener':
+        return { ok: true, value: chrome.commands.onCommand.hasListeners() };
+
       case 'reset':
         backgroundTestHooks.reset();
         return { ok: true };
@@ -976,12 +979,13 @@ chrome.commands.onCommand.addListener((command) =>
   });
 });
 
-// DEV-only stand-in for pressing a shortcut, for the in-panel test runner's
-// unattended mode (C.2c): an extension cannot press its own keys, so the
-// runner sends this message and background runs the same handleCommand a key
-// press reaches. That covers everything after Chrome dispatches the command,
-// not the key binding or the onCommand registration, which manual mode still
-// exercises. Compiled out of release builds.
+// DEV-only stand-in for pressing a shortcut, for the in-panel test runner
+// (C.2c): an extension cannot press its own keys, so the runner sends this
+// message and background runs the same handleCommand a key press reaches.
+// That covers everything after Chrome dispatches the command. The key binding
+// and the onCommand registration have their own checks in C.2c
+// (assertCommandShortcutBound, assertShortcutListenerRegistered). Compiled out
+// of release builds.
 if (import.meta.env.DEV)
 {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
