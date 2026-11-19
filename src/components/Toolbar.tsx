@@ -5,6 +5,7 @@ import { useShowActiveTab } from '../hooks/useFollowActiveTab';
 import { useSpacesContext } from '../contexts/SpacesContext';
 import { tabHistoryManagerProxy } from '../managers/proxies/tabHistoryManagerProxy';
 import { TabHistoryItem } from '../managers/shared/tabHistoryManagerApi';
+import { TAB_HISTORY_HOLD_MS } from '../utils/tabHistoryHold';
 
 interface ToolbarProps
 {
@@ -197,13 +198,13 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
       clearTimeout(holdTimerRef.current);
     }
 
-    // Start hold timer (300ms to show dropdown)
+    // Start hold timer (TAB_HISTORY_HOLD_MS, 300ms, to show dropdown)
     holdTimerRef.current = setTimeout(() =>
     {
       fetchTabHistory();
       setHistoryDropdown(direction);
       holdTimerRef.current = null;
-    }, 300);
+    }, TAB_HISTORY_HOLD_MS);
   }, [fetchTabHistory, historyDropdown]);
 
   const handleHistoryMouseUp = useCallback((direction: 'prev' | 'next') =>
@@ -515,17 +516,19 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
               <RotateCcwSquare size={16} className="-rotate-90" />
             </button>
 
-            <DropdownMenu.Content className="min-w-48 max-w-72 max-h-64 overflow-y-auto">
+            {/* data-testid hooks: read by the in-panel test runner's C.2g (src/tests/inpanel) */}
+            <DropdownMenu.Content className="min-w-48 max-w-72 max-h-64 overflow-y-auto" data-testid="tab-history-dropdown-prev">
               {historyBefore.length > 0 ? (
                 historyBefore.map((item) => (
                   <DropdownMenu.Item
                     key={item.tabId}
                     onSelect={() => handleHistoryItemClick(item.index)}
+                    data-testid="tab-history-row"
                   >
                     {item.favIconUrl ? (
                       <img src={item.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0 mr-2" />
                     ) : (
-                      <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded mr-2" />
+                      <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded mr-2" data-testid="tab-history-favicon-fallback" />
                     )}
                     <span className="truncate">{item.title}</span>
                   </DropdownMenu.Item>
@@ -557,17 +560,19 @@ export const Toolbar = forwardRef<HTMLButtonElement, ToolbarProps>(({
               <RotateCwSquare size={16} className="rotate-90" />
             </button>
 
-            <DropdownMenu.Content className="min-w-48 max-w-72 max-h-64 overflow-y-auto">
+            {/* data-testid hooks: read by the in-panel test runner's C.2g (src/tests/inpanel) */}
+            <DropdownMenu.Content className="min-w-48 max-w-72 max-h-64 overflow-y-auto" data-testid="tab-history-dropdown-next">
               {historyAfter.length > 0 ? (
                 historyAfter.map((item) => (
                   <DropdownMenu.Item
                     key={item.tabId}
                     onSelect={() => handleHistoryItemClick(item.index)}
+                    data-testid="tab-history-row"
                   >
                     {item.favIconUrl ? (
                       <img src={item.favIconUrl} alt="" className="w-4 h-4 flex-shrink-0 mr-2" />
                     ) : (
-                      <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded mr-2" />
+                      <div className="w-4 h-4 flex-shrink-0 bg-gray-300 dark:bg-gray-600 rounded mr-2" data-testid="tab-history-favicon-fallback" />
                     )}
                     <span className="truncate">{item.title}</span>
                   </DropdownMenu.Item>

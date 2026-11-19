@@ -36,8 +36,8 @@
 
 import { FollowActiveTabMode } from '../../../utils/followActiveTab';
 import { TestCase } from '../types';
-import { createTestBookmark, createTestBookmarkInFolder, createTestPinnedSite, createTestSpace, createTestSubfolder, TEST_AUDIO_URL, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { activateTabNative, audioQuickJump, closeTab, navigateTabHistory, openBookmarkTab, openFillerBookmarksUntilScrollable, openFillerTabsUntilScrollable, openPinnedTab, openRegularTab, pause, scrollRowOutOfView, selectAudioTabFromDropdown, selectTabFromHistoryDropdown, setFollowActiveTabMode, showActiveTab, switchSpaceVerified } from '../actions';
+import { AudioTestPage, createTestBookmark, createTestBookmarkInFolder, createTestPinnedSite, createTestSpace, createTestSubfolder, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import { activateTabNative, audioQuickJump, closeTab, dismissHistoryDropdownWithClick, holdHistoryButtonAndPickTopRow, navigateTabHistory, openAudioBookmarkTab, openAudioTab, openBookmarkTab, openFillerBookmarksUntilScrollable, openFillerTabsUntilScrollable, openPinnedTab, openRegularTab, pause, playTestAudio, pressShortcut, quickClickHistoryButton, scrollRowOutOfView, selectAudioTabFromDropdown, selectTabFromHistoryDropdown, setFollowActiveTabMode, showActiveTab, switchSpaceVerified } from '../actions';
 import { assertAudioListIncludes, assertBookmarkRowExists, assertCommandShortcutBound, assertSidebarShowsSpace, assertTabActive, assertTabAudible, assertTabRowVisible } from '../assertions';
 
 const MODES: FollowActiveTabMode[] = ['off', 'space', 'space-and-scroll'];
@@ -538,6 +538,13 @@ export const C2B_HISTORY_TOOLBAR_BUTTONS_SAME_SPACE: TestCase = {
 // These do NOT ask you to close the panel - chrome.commands fires globally,
 // so the shortcut works with the sidebar open and the run resumes on the
 // button alone.
+//
+// In unattended mode each pause's `auto` (pressShortcut) has background run
+// handleCommand, the function the onCommand listener calls, through a
+// DEV-only message. That is closer than C.2b, since it goes through the
+// command-name dispatch and the active-tab lookup, but it still skips the
+// keypress and the listener itself, so the manual run stays the only full
+// check of those.
 export const C2C_HISTORY_SHORTCUTS: TestCase = {
   id: 'C.2c',
   title: 'History keyboard shortcuts (Previous/Next Used Tab)',
@@ -571,7 +578,8 @@ export const C2C_HISTORY_SHORTCUTS: TestCase = {
         'Press the "Previous Used Tab" shortcut (default Cmd+Shift+Comma - check chrome://extensions/shortcuts if unsure).',
         'Leave the sidebar panel open.',
         'Click Resume below.',
-      ]
+      ],
+      { auto: pressShortcut('prev-used-tab') }
     ),
     assertSidebarShowsSpace('spaceA'),
     assertTabRowVisible('tab1', true),
@@ -582,7 +590,8 @@ export const C2C_HISTORY_SHORTCUTS: TestCase = {
         'Press the "Next Used Tab" shortcut (default Cmd+Shift+Period).',
         'Leave the sidebar panel open.',
         'Click Resume below.',
-      ]
+      ],
+      { auto: pressShortcut('next-used-tab') }
     ),
     assertSidebarShowsSpace('spaceB'),
     assertTabRowVisible('tab2', true),
@@ -619,7 +628,8 @@ export const C2C_HISTORY_SHORTCUTS_SAME_SPACE: TestCase = {
         'Press the "Previous Used Tab" shortcut (default Cmd+Shift+Comma - check chrome://extensions/shortcuts if unsure).',
         'Leave the sidebar panel open.',
         'Click Resume below.',
-      ]
+      ],
+      { auto: pressShortcut('prev-used-tab') }
     ),
     assertTabActive('tab1'),
     assertSidebarShowsSpace('spaceA'),
@@ -633,7 +643,8 @@ export const C2C_HISTORY_SHORTCUTS_SAME_SPACE: TestCase = {
         'Press the "Next Used Tab" shortcut (default Cmd+Shift+Period).',
         'Leave the sidebar panel open.',
         'Click Resume below.',
-      ]
+      ],
+      { auto: pressShortcut('next-used-tab') }
     ),
     assertTabActive('tab2'),
     assertSidebarShowsSpace('spaceA'),
@@ -724,6 +735,10 @@ export const C2D_HISTORY_DROPDOWN_SAME_SPACE: TestCase = {
 // the pause is what keeps that honest: skip the play click and the case fails
 // there, at the cause, instead of drifting on and possibly locking onto some
 // unrelated audible tab elsewhere in the browser.
+//
+// In unattended mode the same steps open the DEV-only tone page instead (see
+// AudioTestPage in fixtures.ts), and the pause's `auto` (playTestAudio) starts
+// it and waits for Chrome to mark the tab audible.
 export const C2E_AUDIO_QUICK_JUMP: TestCase = {
   id: 'C.2e',
   title: 'Audio quick-jump (single click on audio button)',
@@ -736,7 +751,7 @@ export const C2E_AUDIO_QUICK_JUMP: TestCase = {
     setFollowActiveTabMode('off'),
     ...switchSpaceVerified('spaceB'),
     openFillerTabsUntilScrollable('spaceB'),
-    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceB', tabRef: 'audioTab' }),
+    openAudioTab({ spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
     pause(
       'Manual step: start audio playback',
@@ -744,7 +759,8 @@ export const C2E_AUDIO_QUICK_JUMP: TestCase = {
         'Switch to the newly opened YouTube tab in Chrome.',
         'Press play and leave it playing (unmuted - a muted tab does not count as audible).',
         'Come back to the sidebar and click Resume below.',
-      ]
+      ],
+      { auto: playTestAudio('audioTab') }
     ),
     assertTabAudible('audioTab', true),
     scrollRowOutOfView('audioTab'),
@@ -772,13 +788,13 @@ export const C2E_AUDIO_QUICK_JUMP_BOOKMARK: TestCase = {
   {
     await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
     await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
-    await createTestBookmark(getCtx(), 'spaceB', 'C2e audio bookmark', TEST_AUDIO_URL, 'bm');
+    await createTestBookmark(getCtx(), 'spaceB', 'C2e audio bookmark', await AudioTestPage.urlForThisRun(getCtx()), 'bm');
   },
   steps: [
     setFollowActiveTabMode('off'),
     ...switchSpaceVerified('spaceB'),
     openFillerBookmarksUntilScrollable('spaceB'),
-    openBookmarkTab({ bookmarkRef: 'bm', url: TEST_AUDIO_URL, spaceRef: 'spaceB', tabRef: 'audioTab' }),
+    openAudioBookmarkTab({ bookmarkRef: 'bm', spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
     pause(
       'Manual step: start audio playback',
@@ -786,7 +802,8 @@ export const C2E_AUDIO_QUICK_JUMP_BOOKMARK: TestCase = {
         'Switch to the newly opened YouTube tab in Chrome.',
         'Press play and leave it playing (unmuted - a muted tab does not count as audible).',
         'Come back to the sidebar and click Resume below.',
-      ]
+      ],
+      { auto: playTestAudio('audioTab') }
     ),
     assertTabAudible('audioTab', true),
     scrollRowOutOfView('audioTab'),
@@ -817,7 +834,7 @@ export const C2E_AUDIO_QUICK_JUMP_SAME_SPACE: TestCase = {
     setFollowActiveTabMode('off'),
     ...switchSpaceVerified('spaceB'),
     openFillerTabsUntilScrollable('spaceB'),
-    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceB', tabRef: 'audioTab' }),
+    openAudioTab({ spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
     pause(
       'Manual step: start audio playback',
@@ -825,7 +842,8 @@ export const C2E_AUDIO_QUICK_JUMP_SAME_SPACE: TestCase = {
         'Switch to the newly opened YouTube tab in Chrome.',
         'Press play and leave it playing (unmuted - a muted tab does not count as audible).',
         'Come back to the sidebar and click Resume below.',
-      ]
+      ],
+      { auto: playTestAudio('audioTab') }
     ),
     assertTabAudible('audioTab', true),
     scrollRowOutOfView('audioTab'),
@@ -851,13 +869,13 @@ export const C2E_AUDIO_QUICK_JUMP_SAME_SPACE_COLLAPSED: TestCase = {
     await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
     await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
     await createTestSubfolder(getCtx(), 'spaceB', 'C2e subfolder', 'subfolder');
-    await createTestBookmarkInFolder(getCtx(), 'subfolder', 'C2e audio bookmark', TEST_AUDIO_URL, 'bm');
+    await createTestBookmarkInFolder(getCtx(), 'subfolder', 'C2e audio bookmark', await AudioTestPage.urlForThisRun(getCtx()), 'bm');
   },
   steps: [
     setFollowActiveTabMode('off'),
     ...switchSpaceVerified('spaceB'),
     openFillerBookmarksUntilScrollable('spaceB'),
-    openBookmarkTab({ bookmarkRef: 'bm', url: TEST_AUDIO_URL, spaceRef: 'spaceB', tabRef: 'audioTab' }),
+    openAudioBookmarkTab({ bookmarkRef: 'bm', spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
     pause(
       'Manual step: start audio playback',
@@ -865,7 +883,8 @@ export const C2E_AUDIO_QUICK_JUMP_SAME_SPACE_COLLAPSED: TestCase = {
         'Switch to the newly opened YouTube tab in Chrome.',
         'Press play and leave it playing (unmuted - a muted tab does not count as audible).',
         'Come back to the sidebar and click Resume below.',
-      ]
+      ],
+      { auto: playTestAudio('audioTab') }
     ),
     assertTabAudible('audioTab', true),
     // Precondition: switching to the tab to press play must not have expanded
@@ -897,11 +916,11 @@ export const C2F_AUDIO_DROPDOWN: TestCase = {
     setFollowActiveTabMode('off'),
     ...switchSpaceVerified('spaceA'),
     openFillerTabsUntilScrollable('spaceA'),
-    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceA', tabRef: 'audioTabA' }),
+    openAudioTab({ spaceRef: 'spaceA', tabRef: 'audioTabA' }),
 
     ...switchSpaceVerified('spaceB'),
     openFillerTabsUntilScrollable('spaceB'),
-    openRegularTab({ url: TEST_AUDIO_URL, spaceRef: 'spaceB', tabRef: 'audioTabB' }),
+    openAudioTab({ spaceRef: 'spaceB', tabRef: 'audioTabB' }),
 
     pause(
       'Manual step: start playback on BOTH audio tabs',
@@ -909,7 +928,9 @@ export const C2F_AUDIO_DROPDOWN: TestCase = {
         'Two YouTube tabs were opened. Press play on both, leaving both unmuted.',
         `Play the ${TEST_SPACE_WORK_NAME} one FIRST, then the ${TEST_SPACE_VIDEO_NAME} one - the ${TEST_SPACE_VIDEO_NAME} tab must be the more recent, so selecting the ${TEST_SPACE_WORK_NAME} entry is a real choice rather than the default.`,
         'Come back to the sidebar and click Resume below.',
-      ]
+      ],
+      // Same order as the written steps: the Work tab first, the Video tab second
+      { auto: playTestAudio('audioTabA', 'audioTabB') }
     ),
     assertTabAudible('audioTabA', true),
     assertTabAudible('audioTabB', true),
@@ -949,9 +970,12 @@ export const C2F_AUDIO_DROPDOWN: TestCase = {
 // quick-click-versus-hold branch in handleHistoryMouseUp, the dropdown
 // rendering, and the wiring from a clicked row to navigateToIndex.
 //
-// None of that can be driven from here - the runner moves chrome APIs and
-// React state, not real pointer timing - so this is a guided case. Each
-// gesture is a pause; every check around it is automatic.
+// The gestures are guided pauses; every check around them is automatic. In
+// unattended mode each pause's `auto` performs the gesture with simulated
+// pointer and mouse events (SimulatedMouse in stepHelpers.ts), so Toolbar's
+// own handlers and hold timer run, and checks the dropdown's DOM in place of
+// the tester's answer. What that cannot cover is real hit-testing by Chrome's
+// input pipeline, which only a manual run exercises.
 //
 // Identifying the target row: every test tab is an example.com URL, so all the
 // dropdown rows carry the same title and the tester cannot pick one by name.
@@ -995,7 +1019,10 @@ export const C2G_HISTORY_DROPDOWN_GESTURE: TestCase = {
         'Click the TOP row. The list is most-recent-first, so that is the tab activated just before the current one.',
         'Come back to the sidebar and answer below.',
       ],
-      'Did the dropdown appear on the hold, and did every row show a title plus either a favicon or the grey fallback square?'
+      {
+        confirm: 'Did the dropdown appear on the hold, and did every row show a title plus either a favicon or the grey fallback square?',
+        auto: holdHistoryButtonAndPickTopRow('prev'),
+      }
     ),
 
     // Clicking the top row runs the same navigateToIndex C.2d calls directly,
@@ -1012,7 +1039,10 @@ export const C2G_HISTORY_DROPDOWN_GESTURE: TestCase = {
         'No dropdown should appear - a quick click navigates instead of opening the list.',
         'Come back to the sidebar and answer below.',
       ],
-      'Did the quick click navigate WITHOUT opening the dropdown?'
+      {
+        confirm: 'Did the quick click navigate WITHOUT opening the dropdown?',
+        auto: quickClickHistoryButton('prev'),
+      }
     ),
 
     // The history index sits on tab2 after the dropdown jump, so one step back
@@ -1033,7 +1063,10 @@ export const C2G_HISTORY_DROPDOWN_GESTURE: TestCase = {
         'The dropdown should close, and nothing should navigate.',
         'Come back to the sidebar and answer below.',
       ],
-      'Did the click dismiss the open dropdown without navigating anywhere?'
+      {
+        confirm: 'Did the click dismiss the open dropdown without navigating anywhere?',
+        auto: dismissHistoryDropdownWithClick('prev'),
+      }
     ),
 
     assertTabActive('tab1'),
@@ -1049,7 +1082,10 @@ export const C2G_HISTORY_DROPDOWN_GESTURE: TestCase = {
         'Click the TOP row.',
         'Come back to the sidebar and answer below.',
       ],
-      'Did the Next dropdown list the entries AHEAD of the current position, with titles and favicons?'
+      {
+        confirm: 'Did the Next dropdown list the entries AHEAD of the current position, with titles and favicons?',
+        auto: holdHistoryButtonAndPickTopRow('next'),
+      }
     ),
 
     // Forward from tab1 is tab2, the entry the backward pass left behind.

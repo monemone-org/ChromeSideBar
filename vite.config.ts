@@ -3,7 +3,7 @@ import { resolve } from 'path'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   build: {
     outDir: 'dist',
@@ -12,6 +12,12 @@ export default defineConfig({
         sidepanel: 'index.html',
         navigator: resolve(__dirname, 'navigator.html'),
         background: resolve(__dirname, 'src/background.ts'),
+        // DEV-only page the in-panel test runner parks on in unattended mode
+        // (src/tests/inpanel/parked.ts) - kept out of release builds.
+        ...(mode === 'development' ? { parked: resolve(__dirname, 'test-parked.html') } : {}),
+        // DEV-only tone page the audio cases play in unattended mode
+        // (src/tests/inpanel/testAudioPage.ts) - kept out of release builds.
+        ...(mode === 'development' ? { testAudio: resolve(__dirname, 'test-audio.html') } : {}),
       },
       output: {
         entryFileNames: (chunkInfo) =>
@@ -26,4 +32,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

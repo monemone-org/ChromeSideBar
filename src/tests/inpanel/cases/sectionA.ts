@@ -10,12 +10,15 @@ import {
   moveTabNative,
   moveTabSidebar,
   moveTabToNewWindow,
+  moveTabToNewWindowWhileClosed,
+  moveTabToSpaceGroupWhileClosed,
   openBookmarkTab,
   openPinnedTab,
   openRegularTab,
   pause,
   switchSpaceVerified,
   ungroupTab,
+  ungroupTabWhileClosed,
 } from '../actions';
 import {
   assertBookmarkLoaded,
@@ -67,7 +70,8 @@ export const A1_REGULAR_TAB_MOVED: TestCase = {
         'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
         `In Chrome's own tab strip, drag the tab for "${testUrl('a1-closed')}" into the "${TEST_SPACE_VIDEO_NAME}" group (there's a dummy tab there already).`,
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: moveTabToSpaceGroupWhileClosed({ tabRef: 'closedTab', spaceName: TEST_SPACE_VIDEO_NAME }) }
     ),
     assertTabInSpace('closedTab', 'spaceB'),
   ],
@@ -139,7 +143,8 @@ export const A3_BOOKMARK_MOVED_SIDEBAR_CLOSED: TestCase = {
         `In Chrome's own tab strip, find the tab for "${testUrl('a3-bookmark')}".`,
         `Drag it (or right-click → Add tab to group) into the "${TEST_SPACE_VIDEO_NAME}" group - there's already a dummy tab sitting in it.`,
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: moveTabToSpaceGroupWhileClosed({ tabRef: 'tab', spaceName: TEST_SPACE_VIDEO_NAME }) }
     ),
     // Correct behavior: moving the tab out should deassociate the bookmark,
     // same as A.2 - regardless of whether the panel was open to see it
@@ -189,7 +194,8 @@ export const A4_PINNED_TAB_MOVED: TestCase = {
         'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
         `In Chrome's own tab strip, drag the tab for "${testUrl('a4-pin')}" into the "${TEST_SPACE_VIDEO_NAME}" group (there's a dummy tab there already).`,
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: moveTabToSpaceGroupWhileClosed({ tabRef: 'pinTab', spaceName: TEST_SPACE_VIDEO_NAME }) }
     ),
     assertPinnedLoaded('pin', true),
     assertTabExists('pinTab', true),
@@ -242,7 +248,8 @@ export const A5_BOOKMARK_TAB_UNGROUP: TestCase = {
         `In Chrome's own tab strip, right-click the tab for "${testUrl('a5-closed')}" → Remove from group.`,
         'If that option is greyed out, dragging the tab out of the group strip has the same effect.',
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: ungroupTabWhileClosed('tabClosed') }
     ),
     assertTabUngrouped('tabClosed'),
     // Same G3 gap as the panel-open half above - expected to currently FAIL.
@@ -277,7 +284,8 @@ export const A5B_REGULAR_TAB_UNGROUP: TestCase = {
         `In Chrome's own tab strip, right-click the tab for "${testUrl('a5b-closed')}" → Remove from group.`,
         'If that option is greyed out, dragging the tab out of the group strip has the same effect.',
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: ungroupTabWhileClosed('tabClosed') }
     ),
     assertTabUngrouped('tabClosed'),
   ],
@@ -315,7 +323,8 @@ export const A5C_PINNED_TAB_UNGROUP: TestCase = {
         `In Chrome's own tab strip, right-click the tab for "${testUrl('a5c-closed')}" → Remove from group.`,
         'If that option is greyed out, dragging the tab out of the group strip has the same effect.',
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: ungroupTabWhileClosed('tabClosed') }
     ),
     // Without this, "still loaded" was already true before the pause and
     // would pass even if the manual ungroup was skipped entirely - this is
@@ -358,7 +367,8 @@ export const A6_BOOKMARK_TAB_MOVED_TO_WINDOW: TestCase = {
         'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
         `In Chrome's own tab strip, drag the tab for "${testUrl('a6-closed')}" out of the window entirely (e.g. down onto the desktop) to pop it into its own new window.`,
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: moveTabToNewWindowWhileClosed('tabClosed') }
     ),
     // Doc step 6 only asks to "confirm whether closing the sidebar changes
     // this vs. step 3" - an open question, not a stated requirement. Correct
@@ -403,7 +413,8 @@ export const A6B_REGULAR_TAB_MOVED_TO_WINDOW: TestCase = {
         'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
         `In Chrome's own tab strip, drag the tab for "${testUrl('a6b-closed')}" out of the window entirely to pop it into its own new window.`,
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: moveTabToNewWindowWhileClosed('tabClosed') }
     ),
     assertTabInOtherWindow('tabClosed'),
   ],
@@ -437,7 +448,8 @@ export const A6C_PINNED_TAB_MOVED_TO_WINDOW: TestCase = {
         'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
         `In Chrome's own tab strip, drag the tab for "${testUrl('a6c-closed')}" out of the window entirely to pop it into its own new window.`,
         'Reopen the sidebar panel to resume.',
-      ]
+      ],
+      { whilePanelClosed: moveTabToNewWindowWhileClosed('tabClosed') }
     ),
     // Same reasoning as A.6's closed-panel block: correct behavior is still
     // deassociation, but the onDetached listener that makes the open-panel

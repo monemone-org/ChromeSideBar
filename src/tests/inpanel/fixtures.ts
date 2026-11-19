@@ -9,6 +9,8 @@ import { PINNED_SITES_STORAGE_KEY } from '../../hooks/usePinnedSites';
 import { DEFAULT_FOLLOW_ACTIVE_TAB_MODE, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
 import { TestContext } from './types';
 import { sleep } from './stepHelpers';
+import { UnattendedMode } from './runner';
+import { TEST_AUDIO_PAGE_PATH } from './testAudioProtocol';
 
 // chrome.storage.local key Settings writes for "Show tab title after navigating away"
 // (see the useChromeLocalStorage call for arcShowTabTitleWhenDrifted in App.tsx)
@@ -43,6 +45,52 @@ const OTHER_BOOKMARKS_ID = '2';
 export const TEST_AUDIO_URL = 'https://www.youtube.com/watch?v=-W2JdSl1v48';
 
 /**
+ * Which page an audio case plays sound from. With unattended mode off it is
+ * TEST_AUDIO_URL, and a tester presses play. With it on it is the DEV-only
+ * tone page (test-audio.html), which the runner can start and stop itself
+ * (playTestAudio/stopTestAudio in actions.ts). Decided when the case runs,
+ * not when its steps are built, so a case's step list stays the same in both
+ * modes.
+ */
+export class AudioTestPage
+{
+  /** The tone page's URL in this install - chrome-extension://<id>/test-audio.html. */
+  static tonePageUrl(): string
+  {
+    return chrome.runtime.getURL(TEST_AUDIO_PAGE_PATH);
+  }
+
+  static isTonePage(url: string | undefined): boolean
+  {
+    return url?.startsWith(AudioTestPage.tonePageUrl()) ?? false;
+  }
+
+  /** Goes by the mode the run started with (UnattendedMode.forRun), not the setting's current value. */
+  static async urlForThisRun(ctx: TestContext): Promise<string>
+  {
+    return (await UnattendedMode.forRun(ctx)) ? AudioTestPage.tonePageUrl() : TEST_AUDIO_URL;
+  }
+
+  /**
+   * Closes every tone-page tab, so none is left playing once a case is over.
+   * Run when a case finishes, not when it pauses: a paused case may still
+   * need its tab (E.3 keeps its silent one across the service-worker stop).
+   */
+  static async closeAll(): Promise<void>
+  {
+    const tabs = await chrome.tabs.query({});
+    const toneTabIds = tabs
+      .filter(t => AudioTestPage.isTonePage(t.url ?? t.pendingUrl))
+      .map(t => t.id)
+      .filter((id): id is number => id !== undefined);
+    if (toneTabIds.length > 0)
+    {
+      await chrome.tabs.remove(toneTabIds);
+    }
+  }
+}
+
+/**
  * Whether a tab belongs to the test suite and is safe to close during
  * cleanup. Deliberately matches TEST_AUDIO_URL as a full-URL prefix rather
  * than something loose like "any youtube.com tab" - cleanup closes whatever
@@ -56,7 +104,8 @@ function isTestTabUrl(url: string | undefined): boolean
   if (!url) return false;
   return url.startsWith(TEST_URL_PREFIX)
     || url.startsWith(TEST_OTHER_DOMAIN_URL_PREFIX)
-    || url.startsWith(TEST_AUDIO_URL);
+    || url.startsWith(TEST_AUDIO_URL)
+    || AudioTestPage.isTonePage(url);
 }
 
 export function testUrl(label: string): string
@@ -277,8 +326,9 @@ export async function createTestPinnedSite(
 
 /**
  * Remove every test artifact this runner could have created, regardless of
- * which case created it - run before each case (clean slate) and once after
- * a full suite. Looks state up directly (storage, chrome.bookmarks) instead
+ * which case created it - run before each case (clean slate), so the last
+ * case's artifacts stay until the next run; only tone-page tabs are closed as
+ * each case finishes (AudioTestPage.closeAll). Looks state up directly (storage, chrome.bookmarks) instead
  * of relying on ctx.refs, since resets also need to cover artifacts left
  * over from a run that errored or was abandoned mid-case.
  *

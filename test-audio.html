@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test tone (inpanel-test)</title>
+    <!-- DEV-only page for the in-panel test runner's audio cases in unattended
+         mode: plays a tone when the runner asks, so Chrome marks the tab
+         audible without anyone pressing play. Only built in development mode
+         (see vite.config.ts). -->
+    <style>
+      body { margin: 0; padding: 16px; font: 14px system-ui, sans-serif; color: #1f2937; background: #f0f9ff; }
+      @media (prefers-color-scheme: dark) { body { color: #f3f4f6; background: #1f2937; } }
+      button { margin-right: 8px; }
+    </style>
+  </head>
+  <body>
+    <p id="status">Test tone: stopped</p>
+    <!-- For a tester who meets this page on a manual pause -->
+    <button id="play" type="button">Play</button>
+    <button id="stop" type="button">Stop</button>
+    <script type="module" src="/src/tests/inpanel/testAudioPage.ts"></script>
+  </body>
+</html>

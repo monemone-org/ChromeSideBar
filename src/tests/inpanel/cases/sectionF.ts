@@ -3,14 +3,16 @@
 
 import { TestCase } from '../types';
 import { createTestBookmark, createTestBookmarkInFolder, createTestSpace, createTestSubfolder, createTestSubfolderInFolder, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { activateTabNative, moveBookmarkTabToTabs, openBookmarkTab, openFillerBookmarksUntilScrollable, openNewTabNative, openRegularTab, pause, setFollowActiveTabMode, showActiveTab, switchSpaceVerified } from '../actions';
+import { activateTabNative, dragTabRowToSpaceIcon, moveBookmarkTabToTabs, openBookmarkTab, openFillerBookmarksUntilScrollable, openNewTabNative, openRegularTab, pause, setFollowActiveTabMode, showActiveTab, switchSpaceVerified } from '../actions';
 import { assertBookmarkLoaded, assertBookmarkRowExists, assertSidebarShowsSpace, assertTabExists, assertTabInSpace, assertTabInSpaceWithin, assertTabRowVisible } from '../assertions';
 
 // F.1 - dragging a tab row onto a space in the space bar. The move that drop
 // triggers (moveTabToSpace) already runs in Section A through moveTabSidebar,
 // so what this case adds is the drag-and-drop wiring itself: SpaceBar.tsx's
 // DragFormat.TAB drop handler. The drag is a real pointer gesture, so it's a
-// pause; the runner checks where the tab ended up.
+// pause; the runner checks where the tab ended up. In unattended mode the
+// pause's `auto` performs the drag with simulated pointer events through
+// dnd-kit's own sensor (dragTabRowToSpaceIcon in actions.ts).
 //
 // spaceA gets exactly one tab, so "the only tab row" identifies it without
 // relying on titles - every test tab is an example.com page with the same one.
@@ -34,7 +36,8 @@ export const F1_DRAG_TAB_TO_SPACE: TestCase = {
         `The sidebar is showing "${TEST_SPACE_WORK_NAME}", which has exactly one tab.`,
         `Drag that tab row onto the "${TEST_SPACE_VIDEO_NAME}" space icon in the space bar (hover an icon to see its name) and drop it there.`,
         'Click Resume below.',
-      ]
+      ],
+      { auto: dragTabRowToSpaceIcon({ tabRef: 'tab', spaceRef: 'spaceB' }) }
     ),
 
     assertTabInSpace('tab', 'spaceB'),

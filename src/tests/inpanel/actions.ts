@@ -8,11 +8,15 @@
 import { getOrCreateSpaceGroup, moveTabToSpace, regroupAssociatedTab } from '../../utils/tabOperations';
 import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
 import { BookmarkOpenMode } from '../../components/SettingsDialog';
-import { TestStep } from './types';
-import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, sleep } from './stepHelpers';
+import { ClosedPanelRunner, PauseAutomation, SavedRefs, StepRunner, TestContext, TestStep } from './types';
+import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, SimulatedMouse, sleep, waitFor } from './stepHelpers';
 import { assertSidebarShowsSpace } from './assertions';
-import { ARC_SHOW_TAB_TITLE_WHEN_DRIFTED_KEY, BOOKMARK_OPEN_MODE_KEY, testUrl } from './fixtures';
+import { ARC_SHOW_TAB_TITLE_WHEN_DRIFTED_KEY, AudioTestPage, BOOKMARK_OPEN_MODE_KEY, testUrl } from './fixtures';
+import { DEV_TEST_RUN_COMMAND_ACTION, DevTestRunCommandMessage, DevTestRunCommandReply } from '../../utils/devTestCommand';
+import { TEST_AUDIO_CONTROL_ACTION, TestAudioCommand, TestAudioControlMessage, TestAudioControlReply } from './testAudioProtocol';
 import { tabHistoryManagerProxy } from '../../managers/proxies/tabHistoryManagerProxy';
+import { TabHistoryItem } from '../../managers/shared/tabHistoryManagerApi';
+import { TAB_HISTORY_HOLD_MS } from '../../utils/tabHistoryHold';
 import { lastAudibleTrackerProxy } from '../../managers/proxies/lastAudibleTrackerProxy';
 
 /** Set the "Follow active tab" mode via the same chrome.storage.local key Settings writes - background.ts (space-switch) and useFollowActiveTab (scroll) both read this key directly, so this is the real setting, not a UI simulation. */
@@ -374,12 +378,33 @@ export function openRegularTab(opts: { url: string; spaceRef: string; tabRef: st
     label: `Open regular tab ${opts.url} in space "${opts.spaceRef}"`,
     run: async (ctx) =>
     {
-      const space = resolveSpace(ctx, opts.spaceRef);
-      const tab = await chrome.tabs.create({ url: opts.url, active: false, windowId: ctx.windowId });
-      if (tab.id === undefined) throw new Error('chrome.tabs.create did not return an id');
+      await openTabInSpace(ctx, opts.url, opts.spaceRef, opts.tabRef);
+    },
+  };
+}
 
-      await getOrCreateSpaceGroup(tab.id, space, ctx.windowId);
-      ctx.refs.set(opts.tabRef, tab.id);
+async function openTabInSpace(ctx: TestContext, url: string, spaceRef: string, tabRef: string): Promise<void>
+{
+  const space = resolveSpace(ctx, spaceRef);
+  const tab = await chrome.tabs.create({ url, active: false, windowId: ctx.windowId });
+  if (tab.id === undefined) throw new Error('chrome.tabs.create did not return an id');
+
+  await getOrCreateSpaceGroup(tab.id, space, ctx.windowId);
+  ctx.refs.set(tabRef, tab.id);
+}
+
+/**
+ * openRegularTab for the audio cases: opens TEST_AUDIO_URL, or the tone page
+ * in unattended mode, chosen when the step runs (see AudioTestPage).
+ */
+export function openAudioTab(opts: { spaceRef: string; tabRef: string }): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Open audio tab (YouTube, or the test tone page in unattended mode) in space "${opts.spaceRef}"`,
+    run: async (ctx) =>
+    {
+      await openTabInSpace(ctx, await AudioTestPage.urlForThisRun(ctx), opts.spaceRef, opts.tabRef);
     },
   };
 }
@@ -392,11 +417,35 @@ export function openBookmarkTab(opts: { bookmarkRef: string; url: string; spaceR
     label: `Open bookmark tab for "${opts.bookmarkRef}"`,
     run: async (ctx) =>
     {
-      const bookmarkId = resolveStringRef(ctx, opts.bookmarkRef);
-      const spaceId = opts.spaceRef ? resolveSpace(ctx, opts.spaceRef).id : undefined;
-      const tabId = await ctx.openBookmarkTab(bookmarkId, opts.url, spaceId);
-      if (tabId === undefined) throw new Error('openBookmarkTab did not return a tab id');
-      ctx.refs.set(opts.tabRef, tabId);
+      await openBookmarkTabAt(ctx, opts.bookmarkRef, opts.url, opts.spaceRef, opts.tabRef);
+    },
+  };
+}
+
+async function openBookmarkTabAt(ctx: TestContext, bookmarkRef: string, url: string, spaceRef: string | undefined, tabRef: string): Promise<void>
+{
+  const bookmarkId = resolveStringRef(ctx, bookmarkRef);
+  const spaceId = spaceRef ? resolveSpace(ctx, spaceRef).id : undefined;
+  const tabId = await ctx.openBookmarkTab(bookmarkId, url, spaceId);
+  if (tabId === undefined) throw new Error('openBookmarkTab did not return a tab id');
+  ctx.refs.set(tabRef, tabId);
+}
+
+/**
+ * openBookmarkTab for an audio bookmark, whose URL the case's setup chose at
+ * run time (AudioTestPage.urlForThisRun) - so it opens whatever the bookmark
+ * itself points at rather than a URL fixed when the steps were built.
+ */
+export function openAudioBookmarkTab(opts: { bookmarkRef: string; spaceRef?: string; tabRef: string }): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Open audio bookmark tab for "${opts.bookmarkRef}"`,
+    run: async (ctx) =>
+    {
+      const [bookmark] = await chrome.bookmarks.get(resolveStringRef(ctx, opts.bookmarkRef));
+      if (!bookmark?.url) throw new Error(`bookmark "${opts.bookmarkRef}" has no URL to open`);
+      await openBookmarkTabAt(ctx, opts.bookmarkRef, bookmark.url, opts.spaceRef, opts.tabRef);
     },
   };
 }
@@ -567,11 +616,679 @@ export function closeTab(tabRef: string): TestStep
  * The banner then offers Pass/Fail plus a note box instead of a single Resume
  * button, and the answer is recorded as a result under that question. Leave it
  * off for a pause that only asks for an action to be carried out.
+ *
+ * The third argument is either that confirm question on its own or an
+ * options object, which can also carry the pause's unattended-mode stand-in:
+ * `auto` or `whilePanelClosed` (see PauseAutomation in types.ts), or
+ * `external` for an action the driver script performs from outside the
+ * extension. The written steps stay the instruction either way - they are
+ * what a tester follows with unattended mode off or without the driver.
  */
-export function pause(label: string, steps: string[], confirm?: string): TestStep
+export function pause(label: string, steps: string[], options?: string | PauseOptions): TestStep
 {
   const instruction = steps.map((step, i) => `${i + 1}. ${step}`).join('\n');
-  return { kind: 'pause', label, instruction, confirm };
+  const resolved: PauseOptions = typeof options === 'string' ? { confirm: options } : options ?? {};
+  return { kind: 'pause', label, instruction, ...resolved };
+}
+
+// `confirm` is part of PauseAutomation, which is what keeps it off a
+// whilePanelClosed or external pause.
+export type PauseOptions = PauseAutomation;
+
+// ---------------------------------------------------------------------------
+// Closed-panel actions, for a pause's `whilePanelClosed`. These run on the
+// parked page (parked.ts), with the sidebar app unloaded, so they get no
+// TestContext: only the checkpoint's saved refs, and raw chrome.* calls. Each
+// one mirrors the in-panel action of the same effect above (moveTabNative,
+// ungroupTab, moveTabToNewWindow, closeTab, deleteBookmarkNative) so the
+// automated step does what the pause's written instruction asks a tester to
+// do in Chrome's own tab strip or bookmark manager.
+// ---------------------------------------------------------------------------
+
+/** Reads typed ids back out of a checkpoint's saved refs - the closed-panel counterpart of resolveTabId/resolveStringRef. */
+class SavedRefReader
+{
+  constructor(private readonly refs: SavedRefs) {}
+
+  tabId(ref: string): number
+  {
+    const value = this.refs[ref];
+    if (typeof value !== 'number') throw new Error(`no saved tab ref "${ref}" in the checkpoint`);
+    return value;
+  }
+
+  string(ref: string): string
+  {
+    const value = this.refs[ref];
+    if (typeof value !== 'string') throw new Error(`no saved ref "${ref}" in the checkpoint`);
+    return value;
+  }
+}
+
+/**
+ * Add a tab to the existing Chrome group of a test space, found by the
+ * space's name in the tab's own window - what dragging the tab into that
+ * group in the tab strip does. Same query and chrome.tabs.group call as
+ * getOrCreateSpaceGroup's existing-group path (moveTabNative), minus the
+ * create branch: every pause using this has opened a dummy tab in the target
+ * group first, so a missing group means the case set up the wrong state, and
+ * that should fail rather than be papered over.
+ */
+export function moveTabToSpaceGroupWhileClosed(opts: { tabRef: string; spaceName: string }): ClosedPanelRunner
+{
+  return async (refs) =>
+  {
+    const tabId = new SavedRefReader(refs).tabId(opts.tabRef);
+    const tab = await chrome.tabs.get(tabId);
+    const groups = await chrome.tabGroups.query({ windowId: tab.windowId, title: opts.spaceName });
+    if (groups.length === 0) throw new Error(`no "${opts.spaceName}" tab group in window ${tab.windowId} to move tab "${opts.tabRef}" into`);
+    await chrome.tabs.group({ tabIds: [tabId], groupId: groups[0].id });
+  };
+}
+
+/** Remove a tab from its group - right-click "Remove from group" (same call as ungroupTab). */
+export function ungroupTabWhileClosed(tabRef: string): ClosedPanelRunner
+{
+  return async (refs) =>
+  {
+    await chrome.tabs.ungroup(new SavedRefReader(refs).tabId(tabRef));
+  };
+}
+
+/** Pop a tab out into its own new window - dragging it out of the tab strip (same call as moveTabToNewWindow). */
+export function moveTabToNewWindowWhileClosed(tabRef: string): ClosedPanelRunner
+{
+  return async (refs) =>
+  {
+    const tabId = new SavedRefReader(refs).tabId(tabRef);
+    const win = await chrome.windows.create({ tabId, focused: false });
+    if (win?.id === undefined) throw new Error('chrome.windows.create did not return a window id');
+  };
+}
+
+/** Close a tab - its X button or Cmd+W (same call as closeTab). */
+export function closeTabWhileClosed(tabRef: string): ClosedPanelRunner
+{
+  return async (refs) =>
+  {
+    await chrome.tabs.remove(new SavedRefReader(refs).tabId(tabRef));
+  };
+}
+
+/** Delete a bookmark - Chrome's own bookmark manager calls this same API (same call as deleteBookmarkNative). */
+export function removeBookmarkWhileClosed(bookmarkRef: string): ClosedPanelRunner
+{
+  return async (refs) =>
+  {
+    await chrome.bookmarks.remove(new SavedRefReader(refs).string(bookmarkRef));
+  };
+}
+
+// ---------------------------------------------------------------------------
+// In-panel stand-ins, for a pause's `auto`. These run inside the panel in
+// unattended mode and do what the pause's written instruction asks a tester
+// to do: press a shortcut, start or stop audio.
+// ---------------------------------------------------------------------------
+
+/**
+ * Press a keyboard shortcut - runs background's handleCommand for `command`
+ * through its DEV-only "dev-test-run-command" message (see background.ts),
+ * the same function chrome.commands.onCommand calls on a real key press. It
+ * acts on this panel's window, and background replies only once the command
+ * has finished, so the next assertion sees its result. What it cannot cover
+ * is the key binding and the listener registration; assertCommandShortcutBound
+ * covers the first, and only a real key press (unattended mode off) the second.
+ */
+export function pressShortcut(command: 'prev-used-tab' | 'next-used-tab'): StepRunner
+{
+  return async (ctx) =>
+  {
+    const message: DevTestRunCommandMessage = { action: DEV_TEST_RUN_COMMAND_ACTION, command, windowId: ctx.windowId };
+    const reply: DevTestRunCommandReply | undefined = await chrome.runtime.sendMessage(message);
+    if (!reply?.ok)
+    {
+      throw new Error(`background did not run the "${command}" command: ${reply?.error ?? 'no reply - is this a development build?'}`);
+    }
+  };
+}
+
+// How long the tone page gets to load and answer, and then how long Chrome
+// gets to flip the tab's `audible` flag. Chrome holds `audible` on for a
+// couple of seconds after sound stops, so the stop wait needs the margin too.
+const TONE_PAGE_REPLY_TIMEOUT_MS = 10000;
+const AUDIBLE_CHANGE_TIMEOUT_MS = 10000;
+const AUDIO_POLL_MS = 200;
+const RERUN_MANUALLY_HINT = 'Check the profile was started by tools/start-test-chrome.sh (it allows autoplay), or rerun the case with Unattended off and play the audio by hand.';
+
+/** Remote control for the tone page (test-audio.html) open in one test tab. */
+class TonePageTab
+{
+  constructor(private readonly tabRef: string, private readonly tabId: number) {}
+
+  static async resolve(ctx: TestContext, tabRef: string): Promise<TonePageTab>
+  {
+    const tabId = resolveTabId(ctx, tabRef);
+    const tab = await chrome.tabs.get(tabId);
+    // The tab was opened with unattended mode off (a YouTube tab), or has
+    // navigated away: nothing here can play it
+    if (!AudioTestPage.isTonePage(tab.url ?? tab.pendingUrl))
+    {
+      throw new Error(`tab "${tabRef}" is not the test tone page (it is on ${tab.url ?? tab.pendingUrl}), so it cannot be played automatically - rerun the case with Unattended off and press play by hand`);
+    }
+    return new TonePageTab(tabRef, tabId);
+  }
+
+  /**
+   * Makes the tab the active one, as the written step's "switch to the tab"
+   * does. That is not cosmetic: activation is what puts the tab into
+   * background's tab history (tabs.onActivated), which later steps rely on,
+   * e.g. E.3's "Previous goes back to the audio tab".
+   */
+  async activate(): Promise<void>
+  {
+    await chrome.tabs.update(this.tabId, { active: true });
+  }
+
+  /**
+   * Sends a play or stop command and waits for the page's answer. The page
+   * only starts listening once it has loaded, so a message that finds no
+   * receiver is retried until the deadline.
+   */
+  async send(command: TestAudioCommand): Promise<void>
+  {
+    const message: TestAudioControlMessage = { action: TEST_AUDIO_CONTROL_ACTION, tabId: this.tabId, command };
+    const deadline = Date.now() + TONE_PAGE_REPLY_TIMEOUT_MS;
+    let lastProblem = 'no reply';
+
+    // Retry until the page answers or the deadline passes
+    while (Date.now() < deadline)
+    {
+      let reply: TestAudioControlReply | undefined;
+      try
+      {
+        reply = await chrome.runtime.sendMessage(message);
+      }
+      catch (err)
+      {
+        lastProblem = err instanceof Error ? err.message : String(err);
+      }
+
+      if (reply?.ok) return;
+      if (reply && !reply.ok) throw new Error(`the tone page in tab "${this.tabRef}" could not ${command}: ${reply.error}. ${RERUN_MANUALLY_HINT}`);
+      await sleep(AUDIO_POLL_MS);
+    }
+    throw new Error(`the tone page in tab "${this.tabRef}" never answered the ${command} command (${lastProblem}). ${RERUN_MANUALLY_HINT}`);
+  }
+
+  /** Polls the tab's `audible` flag until it matches, or the deadline passes. */
+  async waitUntilAudible(expected: boolean): Promise<boolean>
+  {
+    const deadline = Date.now() + AUDIBLE_CHANGE_TIMEOUT_MS;
+
+    // Poll Chrome's own flag - it is what the sidebar's audio features read
+    while (Date.now() < deadline)
+    {
+      const tab = await chrome.tabs.get(this.tabId);
+      if ((tab.audible ?? false) === expected) return true;
+      await sleep(AUDIO_POLL_MS);
+    }
+    return false;
+  }
+}
+
+/**
+ * Start audio in each tone-page tab, one after another in the order given:
+ * switch to the tab, play, and wait for it to turn audible before moving on to
+ * the next - so when order matters (C.2f's "play the Work one first"), the
+ * later tab is also the later one activated and the later one to start
+ * playing, as in the written steps. The last tab stays active afterwards, as
+ * it does for a tester who then just clicks back into the sidebar.
+ */
+export function playTestAudio(...tabRefs: string[]): StepRunner
+{
+  return async (ctx) =>
+  {
+    // One tab at a time, in the order the case asks for
+    for (const tabRef of tabRefs)
+    {
+      const tonePage = await TonePageTab.resolve(ctx, tabRef);
+      await tonePage.activate();
+      await tonePage.send('play');
+      if (!await tonePage.waitUntilAudible(true))
+      {
+        throw new Error(`playback never started in tab "${tabRef}": the tone page says it is playing, but Chrome did not mark the tab audible within ${AUDIBLE_CHANGE_TIMEOUT_MS / 1000}s. ${RERUN_MANUALLY_HINT}`);
+      }
+    }
+  };
+}
+
+/** Switch to a tone-page tab, stop its audio and wait for Chrome to mark it silent. */
+export function stopTestAudio(tabRef: string): StepRunner
+{
+  return async (ctx) =>
+  {
+    const tonePage = await TonePageTab.resolve(ctx, tabRef);
+    await tonePage.activate();
+    await tonePage.send('stop');
+    if (!await tonePage.waitUntilAudible(false))
+    {
+      throw new Error(`tab "${tabRef}" was still audible ${AUDIBLE_CHANGE_TIMEOUT_MS / 1000}s after the tone page stopped`);
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Sidebar gestures, for a pause's `auto`: press-and-hold and click on the
+// toolbar's history buttons (C.2g) and dragging a tab row onto a space icon
+// (F.1). They go through SimulatedMouse (stepHelpers.ts), which dispatches the
+// pointer and mouse events a real mouse would, so the component's own
+// handlers, timers and dnd-kit's sensor all run as they do for a person.
+// ---------------------------------------------------------------------------
+
+type HistoryDirection = 'prev' | 'next';
+
+// How long the auto runners wait for each visible effect of a gesture
+const GESTURE_EFFECT_TIMEOUT_MS = 3000;
+const NAVIGATION_TIMEOUT_MS = 5000;
+
+/**
+ * The toolbar's tab-history Previous/Next buttons and the dropdown a
+ * press-and-hold opens (Toolbar.tsx), as a tester sees them.
+ *
+ * The buttons are found by their tooltip ("Previous used tab ... Hold for
+ * history"), the dropdown and its rows by the data-testid hooks Toolbar puts
+ * on them for this purpose.
+ */
+class TabHistoryToolbar
+{
+  // The written instruction's "about half a second": Toolbar opens the
+  // dropdown once the button has been held for TAB_HISTORY_HOLD_MS (300ms),
+  // and the margin keeps this a hold if that threshold is ever raised
+  static readonly #HOLD_MS = TAB_HISTORY_HOLD_MS + 200;
+
+  readonly #mouse = new SimulatedMouse();
+
+  constructor(private readonly windowId: number) {}
+
+  static label(direction: HistoryDirection): string
+  {
+    return direction === 'prev' ? 'Previous' : 'Next';
+  }
+
+  button(direction: HistoryDirection): HTMLElement
+  {
+    const titlePrefix = direction === 'prev' ? 'Previous used tab' : 'Next used tab';
+    const button = document.querySelector<HTMLElement>(`button[title^="${titlePrefix}"]`);
+    if (!button) throw new Error(`the toolbar's "${TabHistoryToolbar.label(direction)}" button (title starting "${titlePrefix}") is not in the sidebar`);
+    return button;
+  }
+
+  openDropdown(direction: HistoryDirection): HTMLElement | null
+  {
+    return document.querySelector<HTMLElement>(`[data-testid="tab-history-dropdown-${direction}"]`);
+  }
+
+  isAnyDropdownOpen(): boolean
+  {
+    return this.openDropdown('prev') !== null || this.openDropdown('next') !== null;
+  }
+
+  /** Press and hold the button for about half a second, then release. */
+  async hold(direction: HistoryDirection): Promise<void>
+  {
+    await this.#mouse.pressAndHold(this.button(direction), TabHistoryToolbar.#HOLD_MS, `the toolbar's "${TabHistoryToolbar.label(direction)}" button`);
+  }
+
+  /** Click and release immediately. */
+  async quickClick(direction: HistoryDirection): Promise<void>
+  {
+    await this.#mouse.click(this.button(direction), `the toolbar's "${TabHistoryToolbar.label(direction)}" button`);
+  }
+
+  /**
+   * Click where the button is drawn, landing on whatever covers it - while
+   * the dropdown is open, that is the menu's full-panel overlay.
+   */
+  async clickWhereButtonIs(direction: HistoryDirection): Promise<void>
+  {
+    await this.#mouse.clickWhereDrawn(this.button(direction));
+  }
+
+  async waitForDropdown(direction: HistoryDirection): Promise<HTMLElement>
+  {
+    return waitFor(() => this.openDropdown(direction) ?? undefined, GESTURE_EFFECT_TIMEOUT_MS,
+      () => `holding "${TabHistoryToolbar.label(direction)}" for ${TabHistoryToolbar.#HOLD_MS}ms did not open its history dropdown`);
+  }
+
+  async waitForDropdownClosed(direction: HistoryDirection, cause: string): Promise<void>
+  {
+    await waitFor(() => this.openDropdown(direction) === null, GESTURE_EFFECT_TIMEOUT_MS,
+      () => `the "${TabHistoryToolbar.label(direction)}" dropdown was still open ${GESTURE_EFFECT_TIMEOUT_MS / 1000}s after ${cause}`);
+  }
+
+  /**
+   * Waits until the dropdown lists exactly the entries background holds on
+   * that side of the current position - `before` for Previous, `after` for
+   * Next, both nearest first - then checks every row the way the confirm
+   * question asks: a title, and either a favicon that actually loaded or the
+   * grey fallback square. Returns the rows, top first.
+   *
+   * Polls rather than reading once: Toolbar opens the dropdown first and
+   * fills it when its own getHistoryDetails call returns, so for a moment it
+   * can still show the rows from the last time it was open.
+   */
+  async checkRows(direction: HistoryDirection, dropdown: HTMLElement): Promise<HTMLElement[]>
+  {
+    const side = direction === 'prev' ? 'before' : 'after';
+    const history = await tabHistoryManagerProxy.getHistoryDetails(this.windowId);
+    const expected = history[side];
+    if (expected.length === 0)
+    {
+      throw new Error(`background's tab history has no entries ${side} the current position (index ${history.currentIndex}), so the dropdown has nothing to list - the case's earlier steps did not build the history it expects`);
+    }
+
+    const rowsNow = () => this.rowsIn(dropdown);
+    const titlesOf = (rows: HTMLElement[]) => rows.map(row => (row.textContent ?? '').trim());
+    const expectedTitles = expected.map(item => item.title);
+
+    const rows = await waitFor(() =>
+    {
+      const current = rowsNow();
+      const titles = titlesOf(current);
+      const matches = titles.length === expectedTitles.length && titles.every((title, i) => title === expectedTitles[i]);
+      return matches ? current : false;
+    }, GESTURE_EFFECT_TIMEOUT_MS, () => `the "${TabHistoryToolbar.label(direction)}" dropdown lists ${rowsNow().length} row(s) [${titlesOf(rowsNow()).map(t => `"${t}"`).join(', ')}], `
+      + `but background's history has ${expected.length} entr${expected.length === 1 ? 'y' : 'ies'} ${side} the current position: [${expected.map(item => `${item.index}:${item.tabId} "${item.title}"`).join(', ')}]`);
+
+    // Every row needs a title and an icon of one of the two allowed kinds
+    for (let i = 0; i < rows.length; i++)
+    {
+      await TabHistoryToolbar.#checkRowIcon(rows[i], i, expected[i]);
+    }
+    return rows;
+  }
+
+  /** The rows the dropdown shows right now, top first. */
+  rowsIn(dropdown: HTMLElement): HTMLElement[]
+  {
+    return [...dropdown.querySelectorAll<HTMLElement>('[data-testid="tab-history-row"]')];
+  }
+
+  static async #checkRowIcon(row: HTMLElement, position: number, entry: TabHistoryItem): Promise<void>
+  {
+    const where = `row ${position + 1} ("${entry.title}", tab ${entry.tabId})`;
+    if ((row.textContent ?? '').trim() === '') throw new Error(`${where} shows no title`);
+
+    const favicon = row.querySelector<HTMLImageElement>('img');
+    const fallback = row.querySelector('[data-testid="tab-history-favicon-fallback"]');
+
+    // A favicon has to have actually loaded; a broken image is neither of
+    // the two things the tester is told are acceptable
+    if (favicon)
+    {
+      await waitFor(() => favicon.complete, GESTURE_EFFECT_TIMEOUT_MS,
+        () => `${where}: its favicon (${favicon.src}) was still loading after ${GESTURE_EFFECT_TIMEOUT_MS / 1000}s`);
+      if (favicon.naturalWidth === 0) throw new Error(`${where}: its favicon (${favicon.src}) failed to load, so the row shows a broken image rather than a favicon or the grey square`);
+      return;
+    }
+
+    if (!fallback) throw new Error(`${where} shows neither a favicon nor the grey fallback square`);
+  }
+
+  async clickRow(row: HTMLElement, description: string): Promise<void>
+  {
+    await this.#mouse.click(row, description);
+  }
+
+  async activeTabId(): Promise<number | undefined>
+  {
+    const [tab] = await chrome.tabs.query({ active: true, windowId: this.windowId });
+    return tab?.id;
+  }
+
+  async currentIndex(): Promise<number>
+  {
+    return (await tabHistoryManagerProxy.getHistoryDetails(this.windowId)).currentIndex;
+  }
+
+  /**
+   * After a click that should navigate, waits for the active tab to change so
+   * the case's own assertions that follow (which tab, which space) read the
+   * settled result. Does not throw: those assertions report where it landed.
+   */
+  async settleAfterNavigationFrom(activeBefore: number | undefined): Promise<void>
+  {
+    try
+    {
+      await waitFor(async () => (await this.activeTabId()) !== activeBefore, NAVIGATION_TIMEOUT_MS, () => 'no navigation');
+    }
+    catch
+    {
+      // Reported by the assertions after this pause
+    }
+  }
+
+  /**
+   * For a failure path: closes any dropdown left open (Escape, which
+   * DropdownMenu handles), so its full-panel overlay does not swallow the
+   * clicks of the steps after it. Waits a little first and checks twice,
+   * because a dropdown can open just after a check timed out waiting for it.
+   */
+  async closeLeftoverDropdown(): Promise<void>
+  {
+    const LATE_OPEN_GRACE_MS = 300;
+    const RECHECK_MS = 150;
+
+    await sleep(LATE_OPEN_GRACE_MS);
+    this.#pressEscapeIfOpen();
+    await sleep(RECHECK_MS);
+    this.#pressEscapeIfOpen();
+  }
+
+  #pressEscapeIfOpen(): void
+  {
+    if (!this.isAnyDropdownOpen()) return;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+  }
+}
+
+/**
+ * C.2g's press-and-hold on Previous or Next: hold the button, check the
+ * dropdown that opens against background's history for that direction (rows
+ * present, each with a title and a favicon or the grey square), then click
+ * the top row. Throws when the dropdown does not open or a row fails the
+ * check - the answers that would have been Fail.
+ *
+ * A failed row check still clicks the top row before throwing, as a tester
+ * answering Fail would still have clicked it: otherwise one cosmetic failure
+ * (a broken favicon) would leave the history where it was and fail every
+ * navigation check after it in the case. The click is skipped only when the
+ * dropdown did not open or has no rows.
+ */
+export function holdHistoryButtonAndPickTopRow(direction: HistoryDirection): StepRunner
+{
+  return async (ctx) =>
+  {
+    const toolbar = new TabHistoryToolbar(ctx.windowId);
+    try
+    {
+      const activeBefore = await toolbar.activeTabId();
+      await toolbar.hold(direction);
+      const dropdown = await toolbar.waitForDropdown(direction);
+
+      let rowCheckError: unknown;
+      try
+      {
+        await toolbar.checkRows(direction, dropdown);
+      }
+      catch (err)
+      {
+        rowCheckError = err;
+      }
+
+      // Nothing to click when the dropdown is empty: report the check's error
+      const rows = toolbar.rowsIn(dropdown);
+      if (rows.length === 0)
+      {
+        throw rowCheckError ?? new Error(`the "${TabHistoryToolbar.label(direction)}" dropdown has no rows to click`);
+      }
+
+      try
+      {
+        await toolbar.clickRow(rows[0], 'the top row of the history dropdown');
+        await toolbar.waitForDropdownClosed(direction, 'clicking its top row');
+        await toolbar.settleAfterNavigationFrom(activeBefore);
+      }
+      catch (clickError)
+      {
+        // Keep the row check's failure when the click fails as well, first
+        if (rowCheckError === undefined) throw clickError;
+        const messageOf = (err: unknown) => err instanceof Error ? err.message : String(err);
+        throw new Error(`${messageOf(rowCheckError)}; and then clicking the top row failed too: ${messageOf(clickError)}`);
+      }
+
+      if (rowCheckError !== undefined) throw rowCheckError;
+    }
+    catch (err)
+    {
+      await toolbar.closeLeftoverDropdown();
+      throw err;
+    }
+  };
+}
+
+/**
+ * C.2g's quick click on Previous: it must navigate, and the dropdown must not
+ * open. Watches for at least the hold threshold after the release, since a
+ * quick click wrongly taken as a hold would open the dropdown at that point.
+ */
+export function quickClickHistoryButton(direction: HistoryDirection): StepRunner
+{
+  return async (ctx) =>
+  {
+    const toolbar = new TabHistoryToolbar(ctx.windowId);
+    const label = TabHistoryToolbar.label(direction);
+    try
+    {
+      const activeBefore = await toolbar.activeTabId();
+      await toolbar.quickClick(direction);
+      const releasedAt = Date.now();
+
+      // Fail the moment a dropdown shows; pass once the tab has changed and
+      // the hold threshold has gone by with no dropdown
+      await waitFor(async () =>
+      {
+        if (toolbar.isAnyDropdownOpen()) throw new Error(`the quick click on "${label}" opened the history dropdown - it was taken as a press-and-hold`);
+        const navigated = (await toolbar.activeTabId()) !== activeBefore;
+        return navigated && Date.now() - releasedAt > TAB_HISTORY_HOLD_MS * 2;
+      }, NAVIGATION_TIMEOUT_MS, () => `the quick click on "${label}" did not navigate: tab ${activeBefore} was still active ${NAVIGATION_TIMEOUT_MS / 1000}s later`);
+    }
+    catch (err)
+    {
+      await toolbar.closeLeftoverDropdown();
+      throw err;
+    }
+  };
+}
+
+/**
+ * C.2g's dismiss gesture: hold to open the dropdown, then click the button
+ * once while it is open. The click lands on the menu's overlay, as a real one
+ * does. The dropdown must close and nothing may navigate.
+ *
+ * "Nothing navigates" can only be shown by watching for a while, so after the
+ * close this polls the active tab and the history position for a fixed quiet
+ * period and fails as soon as either moves.
+ */
+export function dismissHistoryDropdownWithClick(direction: HistoryDirection): StepRunner
+{
+  const QUIET_PERIOD_MS = 2000;
+
+  return async (ctx) =>
+  {
+    const toolbar = new TabHistoryToolbar(ctx.windowId);
+    const label = TabHistoryToolbar.label(direction);
+    try
+    {
+      await toolbar.hold(direction);
+      await toolbar.waitForDropdown(direction);
+
+      const activeBefore = await toolbar.activeTabId();
+      const indexBefore = await toolbar.currentIndex();
+      await toolbar.clickWhereButtonIs(direction);
+      await toolbar.waitForDropdownClosed(direction, `clicking "${label}" while it was open`);
+
+      const quietUntil = Date.now() + QUIET_PERIOD_MS;
+      // Watch for any navigation during the quiet period
+      while (Date.now() < quietUntil)
+      {
+        const activeNow = await toolbar.activeTabId();
+        const indexNow = await toolbar.currentIndex();
+        if (activeNow !== activeBefore || indexNow !== indexBefore)
+        {
+          throw new Error(`clicking "${label}" to dismiss the dropdown also navigated: active tab ${activeBefore} -> ${activeNow}, history index ${indexBefore} -> ${indexNow}`);
+        }
+        await sleep(100);
+      }
+    }
+    catch (err)
+    {
+      await toolbar.closeLeftoverDropdown();
+      throw err;
+    }
+  };
+}
+
+// dnd-kit's PointerSensor activation distance in UnifiedDndContext.tsx
+// (activationConstraint: { distance: 8 }). Not imported, to keep the React
+// context module out of what the parked page loads; SimulatedMouse.drag moves
+// a few pixels past it, and fails saying the drag never started if the
+// constraint is ever raised beyond that.
+const DND_ACTIVATION_DISTANCE_PX = 8;
+
+/**
+ * F.1's drag: press on the tab's row in the sidebar, drag it onto a space's
+ * icon in the space bar and drop it, through dnd-kit's real pointer sensor -
+ * so SpaceBar's own drop handler does the move. Waits for the tab's Chrome
+ * group to change, since that handler runs asynchronously after the drop;
+ * the case's assertion then checks which space it landed in.
+ */
+export function dragTabRowToSpaceIcon(opts: { tabRef: string; spaceRef: string }): StepRunner
+{
+  return async (ctx) =>
+  {
+    const tabId = resolveTabId(ctx, opts.tabRef);
+    const space = resolveSpace(ctx, opts.spaceRef);
+    const groupBefore = (await chrome.tabs.get(tabId)).groupId;
+
+    // TabList only makes a row draggable once it is on screen (useInView),
+    // and dnd-kit marks a draggable with aria-roledescription
+    const rowSelector = resolveTabRowSelector(ctx, tabId);
+    const draggableRowSelector = `${rowSelector}[aria-roledescription="draggable"]`;
+    document.querySelector(rowSelector)?.scrollIntoView({ block: 'center' });
+    const row = await waitFor(() => document.querySelector(draggableRowSelector) ?? undefined, GESTURE_EFFECT_TIMEOUT_MS,
+      () => `tab "${opts.tabRef}" has no draggable row (${draggableRowSelector}) in the sidebar - is the sidebar showing the tab's space?`);
+
+    const iconSelector = `[data-space-button="true"][data-space-id="${space.id}"]`;
+    const icon = document.querySelector(iconSelector);
+    if (!icon) throw new Error(`the "${space.name}" space icon (${iconSelector}) is not in the space bar - is Spaces turned on?`);
+    icon.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+
+    // Read fresh each time: a re-render may replace either node mid-drag
+    await new SimulatedMouse().drag({
+      source: row,
+      target: icon,
+      sourceName: `tab "${opts.tabRef}"'s row`,
+      targetName: `the "${space.name}" space icon`,
+      activationDistancePx: DND_ACTIVATION_DISTANCE_PX,
+      isActivated: () => document.querySelector(rowSelector)?.getAttribute('aria-pressed') === 'true',
+      isOverTarget: () => document.querySelector(iconSelector)?.getAttribute('data-test-drop-target') === 'true',
+      timeoutMs: GESTURE_EFFECT_TIMEOUT_MS,
+    });
+
+    await waitFor(async () => (await chrome.tabs.get(tabId)).groupId !== groupBefore, NAVIGATION_TIMEOUT_MS,
+      () => `the drop on the "${space.name}" icon did not move tab "${opts.tabRef}": it was still in its original group ${NAVIGATION_TIMEOUT_MS / 1000}s later, so SpaceBar's drop handler did not run or its move failed`);
+  };
 }
 
 /**
