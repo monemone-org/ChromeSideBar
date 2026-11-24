@@ -12,7 +12,7 @@
 // instead of it blocking the whole UI.
 
 import { CSSProperties, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { MoreVertical, X } from 'lucide-react';
+import { Loader2, MoreVertical, Play, X } from 'lucide-react';
 import { useSpacesContext } from '../../contexts/SpacesContext';
 import { useBookmarkTabsContext } from '../../contexts/BookmarkTabsContext';
 import { useBookmarks } from '../../hooks/useBookmarks';
@@ -27,6 +27,10 @@ import {
   clearResumeState,
   isParkedStepResult,
   PARK_PENDING_INSTRUCTION,
+  MANUAL_MODE_STORAGE_KEY,
+  MANUAL_STEP_NOTE,
+  formatInstruction,
+  manualVersionOf,
   readAllCaseResults,
   readBatchCaseIds,
   readBatchQueue,
@@ -123,11 +127,12 @@ function summarize(results: TestResult[]): CaseSummary
  *
  * A pause marked `external` counts too: inside the panel it waits like any
  * other, and only the driver script (tools/run-inpanel-tests.mjs) can do it
- * instead of a person.
+ * instead of a person. In Manual mode, so does every step with a manual
+ * version.
  */
-function requiresManualSteps(testCase: TestCase): boolean
+function requiresManualSteps(testCase: TestCase, manualMode: boolean): boolean
 {
-  return testCase.steps.some(step => step.kind === 'pause');
+  return testCase.steps.some(step => step.kind === 'pause' || (manualMode && manualVersionOf(step) !== undefined));
 }
 
 /** Whether the step is a closedPanel step - the steps the panel parks itself for. */
@@ -317,6 +322,36 @@ function renderPausedLine(line: string, key: number): JSX.Element
 const ALL_SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F', 'P', 'T', 'U'];
 
 // chrome.storage.local key for the ids of cases the tester has unchecked.
+/**
+ * The panel's title with what the runner is doing, e.g.
+ * "Test Runner (dev) - running 23/56". In a batch the count is the case now
+ * running (or paused) out of the whole batch; batchQueue holds only the cases
+ * after it, so the current position is total minus what is left. A single
+ * case run shows its id instead, and an idle runner shows the plain title.
+ */
+function runnerStatusTitle(
+  isPaused: boolean,
+  isBusy: boolean,
+  runningCaseId: string | null,
+  batchCaseIds: readonly string[] | null,
+  batchQueue: readonly string[] | null
+): string
+{
+  const title = 'Test Runner (dev)';
+  if (!isPaused && !isBusy) return title;
+
+  const status = isPaused ? 'paused' : 'running';
+
+  // Inside a batch: show the position of the current case
+  if (batchCaseIds && batchQueue)
+  {
+    const position = batchCaseIds.length - batchQueue.length;
+    return `${title} - ${status} ${position}/${batchCaseIds.length}`;
+  }
+
+  return runningCaseId ? `${title} - ${status} ${runningCaseId}` : `${title} - ${status}`;
+}
+
 const DESELECTED_CASES_STORAGE_KEY = 'testRunnerDeselectedCaseIds';
 
 type SectionCheckState = 'all' | 'some' | 'none';
@@ -552,6 +587,9 @@ export const TestRunnerPanel = ({
   // same hand-picked subset survives the panel remounting and can be re-run
   // as-is. The list always shows every case; this only decides what runs.
   const [deselectedCaseIds, setDeselectedCaseIds] = useChromeLocalStorage<string[]>(DESELECTED_CASES_STORAGE_KEY, []);
+  // "Manual" checkbox: steps with a manual version wait for the tester to do
+  // them with real input. Persisted, and read by runner.ts's ManualMode.
+  const [manualMode, setManualMode] = useChromeLocalStorage<boolean>(MANUAL_MODE_STORAGE_KEY, false);
   const selection = useMemo(() => new CaseSelection(deselectedCaseIds), [deselectedCaseIds]);
   // Set once the mount effect has started an automatic resume, so it starts
   // only one: React StrictMode runs the mount effect twice in dev, and both
@@ -739,12 +777,14 @@ export const TestRunnerPanel = ({
         // panel back resumes from it. Falls through to the banner, which
         // says what went wrong, if the parked page is missing from this
         // build.
-        if (isClosedPanelStep(testCase, outcome.pausedAt.stepIndex) && await parkPanel())
+        // In Manual mode the checkpoint says so, and the tester closes the
+        // panel for real instead
+        const stored = await readResumeState();
+        if (!stored?.manual && isClosedPanelStep(testCase, outcome.pausedAt.stepIndex) && await parkPanel())
         {
           return false;
         }
 
-        const stored = await readResumeState();
         setPausedState(stored ?? null);
         return false;
       }
@@ -878,7 +918,7 @@ export const TestRunnerPanel = ({
     const parkedStepHandled = pausedState.parkedCompleted === true
       || pausedState.parkedError !== undefined
       || (lastResult !== undefined && isParkedStepResult(lastResult));
-    if (isClosedPanelStep(pausedCase, pausedState.stepIndex) && !parkedStepHandled)
+    if (!pausedState.manual && isClosedPanelStep(pausedCase, pausedState.stepIndex) && !parkedStepHandled)
     {
       if (!await parkPanel())
       {
@@ -888,21 +928,30 @@ export const TestRunnerPanel = ({
     }
 
     let state = pausedState;
+    // Derived here rather than read off pausedConfirm below, which is
+    // declared further down the component and would be a forward reference.
+    const step = pausedCase.steps[pausedState.stepIndex];
+    const manual = pausedState.manual ? manualVersionOf(step) : undefined;
     if (verdict !== undefined)
     {
-      // Derived here rather than read off pausedConfirm below, which is
-      // declared further down the component and would be a forward reference.
-      const step = pausedCase.steps[pausedState.stepIndex];
+      const confirm = manual ? manual.confirm : step.kind === 'pause' ? step.confirm : undefined;
       const result: TestResult = {
-        name: step.kind === 'pause' && step.confirm ? step.confirm : step.label,
+        name: confirm ?? step.label,
         passed: verdict,
       };
       if (note) result.note = note;
+      else if (manual) result.note = MANUAL_STEP_NOTE;
       // Without a note there'd be nothing under a red line explaining it, so
       // say plainly that a person called it rather than an assertion.
       if (!verdict && !note) result.error = 'Reported as failed by the tester, with no note.';
 
       state = { ...pausedState, results: [...pausedState.results, result] };
+    }
+    else if (manual)
+    {
+      // A step the tester did by hand stands in for an automated one, so it
+      // gets a result like that step would have
+      state = { ...pausedState, results: [...pausedState.results, { name: step.label, passed: true, note: MANUAL_STEP_NOTE }] };
     }
     setConfirmNote('');
 
@@ -1052,6 +1101,7 @@ export const TestRunnerPanel = ({
     ALL_CASES.filter(c => caseResults[c.id]?.some(r => !r.passed)).map(c => c.id)
   );
   const isBusy = runningCaseId !== null || runningAll;
+  const statusTitle = runnerStatusTitle(pausedState !== null, isBusy, runningCaseId, batchCaseIds, batchQueue);
 
   const pausedCase = pausedState ? ALL_CASES.find(c => c.id === pausedState.caseId) : undefined;
   const pausedStep = pausedCase && pausedState ? pausedCase.steps[pausedState.stepIndex] : undefined;
@@ -1062,14 +1112,19 @@ export const TestRunnerPanel = ({
   const lastPausedResult = pausedState ? pausedState.results[pausedState.results.length - 1] : undefined;
   const pausedStepDoneOnParkedPage = pausedState?.parkedCompleted === true
     || (lastPausedResult !== undefined && isParkedStepResult(lastPausedResult));
-  // A closedPanel step has no written instruction: the banner explains that
-  // the parked page has not run it yet, or says nothing once it has
-  const pausedInstruction = pausedStep?.kind === 'pause'
-    ? pausedStep.instruction
-    : pausedStep?.kind === 'closedPanel' && !pausedStepDoneOnParkedPage ? PARK_PENDING_INSTRUCTION : '';
+  // A step the tester performs in Manual mode shows its manual instructions.
+  // A closedPanel step has no written instruction otherwise: the banner
+  // explains that the parked page has not run it yet, or says nothing once
+  // it has.
+  const pausedManual = pausedState?.manual ? manualVersionOf(pausedStep) : undefined;
+  const pausedInstruction = pausedManual
+    ? formatInstruction(pausedManual.steps)
+    : pausedStep?.kind === 'pause'
+      ? pausedStep.instruction
+      : pausedStep?.kind === 'closedPanel' && !pausedStepDoneOnParkedPage ? PARK_PENDING_INSTRUCTION : '';
   // Set only on a pause that asks the tester to judge something. Its presence
   // is what swaps the banner's single Resume button for Pass/Fail.
-  const pausedConfirm = pausedStep?.kind === 'pause' ? pausedStep.confirm : undefined;
+  const pausedConfirm = pausedManual ? pausedManual.confirm : pausedStep?.kind === 'pause' ? pausedStep.confirm : undefined;
   const hasAnyResults = Object.keys(caseResults).length > 0;
   const hasAnyFailedResults = Object.values(caseResults).some(results => results.some(r => !r.passed));
 
@@ -1091,7 +1146,7 @@ export const TestRunnerPanel = ({
       style={{ height: '45vh' }}
     >
       <div className="flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
-        <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100">Test Runner (dev)</h3>
+        <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100">{statusTitle}</h3>
         <div className="flex items-center gap-1">
           <div className="relative">
             <button
@@ -1127,6 +1182,36 @@ export const TestRunnerPanel = ({
                 >
                   {showFailures ? 'Hide Failed Tests and Steps' : 'Show Failed Tests and Steps'}
                 </button>
+                <div className="my-1 border-t border-gray-200 dark:border-gray-600" />
+                {/* A menu row rather than a plain button so the checkbox shows whether Manual mode is on. */}
+                <label
+                  className={`flex items-center gap-2 px-3 py-1.5 select-none ${isBusy ? 'opacity-50' : 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                  title="Pause at every step whose automated version differs from real use (simulated mouse, a message for a key press, the parked page for a closed panel), so you do it yourself with real input. Off: those steps run automatically."
+                >
+                  <input
+                    type="checkbox"
+                    checked={manualMode}
+                    onChange={(e) => setManualMode(e.target.checked)}
+                    disabled={isBusy}
+                  />
+                  <span>Manual</span>
+                </label>
+                <button
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:hover:bg-transparent"
+                  onClick={() => { updateSelection(CaseSelection.onlyChecking(failedCaseIds, ALL_CASES)); setIsMenuOpen(false); }}
+                  disabled={isBusy || failedCaseIds.size === 0}
+                  title="Check only the cases whose last result has a failing step, and uncheck everything else"
+                >
+                  Select Failed
+                </button>
+                <button
+                  className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:hover:bg-transparent"
+                  onClick={() => { void clearResults(); setIsMenuOpen(false); }}
+                  disabled={isBusy || !hasAnyResults}
+                  title="Several cases have a known-gap assertion that's expected to currently fail - clear results here once you've seen it, so the panel stops auto-opening for it on every sidebar open."
+                >
+                  Clear Results
+                </button>
               </div>
             )}
           </div>
@@ -1136,6 +1221,38 @@ export const TestRunnerPanel = ({
             className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-500"
           >
             <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      {/*
+        Section checkboxes and run controls sit outside the scroll container
+        below, so they stay pinned under the title bar while the case list
+        scrolls.
+      */}
+      <div className="flex-shrink-0 p-3 border-b border-gray-200 dark:border-gray-700 text-sm text-gray-900 dark:text-gray-100">
+        <div className="flex justify-between items-center gap-2">
+          {/* Select-all toggles for a section's cases - they don't hide anything, the list below always shows every case. Wraps on a narrow panel so the play button stays on this row. */}
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
+            {ALL_SECTIONS.map(section => (
+              <SectionCheckbox
+                key={section}
+                section={section}
+                state={selection.sectionState(section, ALL_CASES)}
+                onToggle={() => updateSelection(selection.withSectionToggled(section, ALL_CASES))}
+                disabled={isBusy}
+              />
+            ))}
+          </div>
+          {/* Runs the checked cases. Icon only to keep the bar to one row; the count and running case are in the tooltip, and the title bar shows progress. */}
+          <button
+            className="p-1.5 rounded bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50 flex-shrink-0"
+            onClick={runAll}
+            disabled={isBusy || selectedCases.length === 0}
+            title={runningAll ? `Running tests… (${runningCaseId ?? ''})` : `Run Tests (${selectedCases.length})`}
+            aria-label={runningAll ? 'Running tests' : `Run ${selectedCases.length} selected tests`}
+          >
+            {runningAll ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} fill="currentColor" />}
           </button>
         </div>
       </div>
@@ -1193,46 +1310,6 @@ export const TestRunnerPanel = ({
           </div>
         )}
 
-        <div className="flex flex-wrap justify-between items-center gap-2">
-          {/* Select-all toggles for a section's cases - they don't hide anything, the list below always shows every case. */}
-          <div className="flex items-center gap-2">
-            {ALL_SECTIONS.map(section => (
-              <SectionCheckbox
-                key={section}
-                section={section}
-                state={selection.sectionState(section, ALL_CASES)}
-                onToggle={() => updateSelection(selection.withSectionToggled(section, ALL_CASES))}
-                disabled={isBusy}
-              />
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
-              onClick={() => updateSelection(CaseSelection.onlyChecking(failedCaseIds, ALL_CASES))}
-              disabled={isBusy || failedCaseIds.size === 0}
-              title="Check only the cases whose last result has a failing step, and uncheck everything else"
-            >
-              Select failed
-            </button>
-            <button
-              className="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50"
-              onClick={clearResults}
-              disabled={isBusy || !hasAnyResults}
-              title="Several cases have a known-gap assertion that's expected to currently fail - clear results here once you've seen it, so the panel stops auto-opening for it on every sidebar open."
-            >
-              Clear Results
-            </button>
-            <button
-              className="px-2 py-1 rounded bg-blue-700 text-white hover:bg-blue-800 disabled:opacity-50"
-              onClick={runAll}
-              disabled={isBusy || selectedCases.length === 0}
-            >
-              {runningAll ? `Running tests… (${runningCaseId ?? ''})` : `Run Tests (${selectedCases.length})`}
-            </button>
-          </div>
-        </div>
-
         <div className="space-y-0.5">
           {ALL_CASES.map(testCase =>
           {
@@ -1264,7 +1341,7 @@ export const TestRunnerPanel = ({
                     </span>
                     <span className="font-mono text-xs text-gray-500 mr-1">{testCase.id}</span>
                     <span>{testCase.title}</span>
-                    {requiresManualSteps(testCase) && (
+                    {requiresManualSteps(testCase, manualMode) && (
                       <span
                         className="ml-1 px-1 rounded text-[10px] leading-4 flex-shrink-0 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
                         title="Pauses partway for something only Chrome itself or a person can do - the driver script (tools/run-inpanel-tests.mjs) does it when it runs the suite, otherwise you do it and click Resume"

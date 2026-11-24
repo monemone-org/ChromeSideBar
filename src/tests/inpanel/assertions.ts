@@ -7,7 +7,8 @@ import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resol
 import { lastAudibleTrackerProxy } from '../../managers/proxies/lastAudibleTrackerProxy';
 import { hasShortcutListener } from './backgroundHooks';
 
-async function tabGroupTitle(tabId: number): Promise<string | undefined>
+/** The title of a tab's Chrome group, or undefined while the tab has no group. */
+export async function tabGroupTitle(tabId: number): Promise<string | undefined>
 {
   const tab = await chrome.tabs.get(tabId);
   if (tab.groupId === undefined || tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return undefined;

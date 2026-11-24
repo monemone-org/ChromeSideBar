@@ -145,11 +145,23 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
     // AudioTestPage)
     openAudioTab({ spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
-    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab')),
+    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab'), {
+      steps: [
+        'Switch to the newly opened test tone tab in Chrome.',
+        'Click **Play** and let it play for a second or two (unmuted - a muted tab does not count as audible).',
+        'Come back to the sidebar and click Resume below.',
+      ],
+    }),
     assertTabAudible('audioTab', true),
 
     // The tab stays open - it has to survive into the restart
-    actionStep('Stop audio playback in the tone tab', stopTestAudio('audioTab')),
+    actionStep('Stop audio playback in the tone tab', stopTestAudio('audioTab'), {
+      steps: [
+        'Switch back to the test tone tab and click **Stop**, so the tab goes silent.',
+        'Leave the tab open - it has to survive into the restart.',
+        'Come back to the sidebar and click Resume below.',
+      ],
+    }),
     assertTabAudible('audioTab', false),
 
     // The tracker keeps a silent tab in its list (nothing clears it until the

@@ -8,29 +8,46 @@ severity: low
 
 ## Summary
 
-If a bookmark's tab is open and the bookmark is deleted via `chrome://bookmarks` (Chrome's own bookmark manager, not the extension's own UI), the tab keeps running but disappears from both the bookmark tree (node gone) and the regular tab list (still counted internally as "managed"). It becomes unreachable from the sidebar.
+If a bookmark's tab is open and the bookmark is deleted in `chrome://bookmarks` (Chrome's own bookmark manager, not the extension's own UI), the tab keeps running but disappears from both lists in the sidebar. It is gone from the bookmark tree, because the bookmark node is gone. It is also missing from the regular tab list, because the sidebar still counts it as a tab that a bookmark manages, and the tab list hides those. Nothing in the sidebar can reach the tab any more.
 
 ## Repro
 
-- **B.5** - delete via `chrome://bookmarks` with the sidebar open
-- **B.5b** - same, with the sidebar closed at delete time - same outcome either way
+- **B.5** deletes the bookmark in `chrome://bookmarks` with the sidebar open.
+- **B.5b** does the same with the sidebar closed. The outcome is identical either way.
 
-Bookmark-only. Not applicable to pinned sites: they have no Chrome-native surface at all (no bookmark tree node, no `chrome://bookmarks` entry), and their only removal path (`PinnedBar.tsx`'s unpin action → `DeletePinnedSiteAction`) always closes the tab first, so there's no code path that can orphan a pinned site's tab.
+This is bookmark-only. Pinned sites have no Chrome-native surface at all (no bookmark tree node, no `chrome://bookmarks` entry), and their only removal path, the unpin action in `PinnedBar.tsx` that runs `DeletePinnedSiteAction`, always closes the tab first. So no code path can orphan a pinned site's tab.
 
 See `docs/test/tab-space-association-test-cases.md` (`### B.5`, `### B.5b`) for the detailed steps.
 
 ## Root cause
 
-There is no `chrome.bookmarks.onRemoved` listener anywhere in the extension (`background.ts` or any context) - confirmed by grep, zero matches.
+Nothing in the extension listens for `chrome.bookmarks.onRemoved`, neither in `background.ts` nor in any sidebar context.
 
-The extension's own delete option (`src/actions/deleteBookmarkAction.ts`, `DeleteBookmarkAction.do()`) never hits this gap, because it explicitly closes the tab itself via `chrome.tabs.remove()` as part of the delete - it doesn't rely on any event listener. But that only covers deletes that go through the extension's own UI. Deleting the same bookmark from `chrome://bookmarks` bypasses that code path entirely, and since nothing listens for `chrome.bookmarks.onRemoved`, the tab and its stored association (`tabAssociations`) are never cleaned up.
+The extension's own delete option (`DeleteBookmarkAction.do()` in `src/actions/deleteBookmarkAction.ts`) never hits this gap, because it closes the tab itself with `chrome.tabs.remove()` as part of the delete. It does not rely on any event. But that only covers deletes that go through the extension's own UI. A delete in `chrome://bookmarks` bypasses that code, and since no listener hears it, `TabAssociationManager` keeps the tab's association and `tabSpaceRegistry` keeps its space entry.
 
-This isn't a sidebar-open-vs-closed issue like G2 - there's no listener at all, in either state, so B.5 and B.5b reproduce identically.
+Unlike G2, this has nothing to do with whether the sidebar is open: there is no listener in either state, so B.5 and B.5b fail the same way.
 
-## Proposed fix (not yet scoped/agreed)
+## Proposed fix
 
-Add a `chrome.bookmarks.onRemoved` listener in `background.ts`. On removal, look up whether any window's `tabAssociations_{windowId}` has an entry with `itemKey === 'bookmark-{removedId}'` (or the removed id's descendants, if a folder was deleted) and if so, close that tab and clear the association - similar in spirit to what `DeleteBookmarkAction` already does for the extension's own delete path, but triggered by the native event instead of the UI action.
+Keep the tab open and turn it into a regular, unassociated tab. The person deleted the bookmark, not the page, and may still be reading it; closing a tab they did not ask to close would lose whatever state it had. Once unlinked, the tab shows up in the regular tab list like any other tab, in whatever Chrome group it already sits in. This is the same end state as a bookmark row's "Move To Tabs" menu item.
+
+This is also what B.5 and B.5b already check for: the tab still exists, and the bookmark is no longer loaded.
+
+The change, all in background:
+
+1. Add a `chrome.bookmarks.onRemoved` listener in `background.ts`, waiting on `stateReady` like the other listeners.
+2. Collect the removed bookmark ids. A deleted folder takes everything under it, and `removeInfo.node` carries the removed node with its children, so walk it and gather every bookmark id beneath it, not just the top one.
+3. For each window, look in `TabAssociationManager`'s map for tabs whose item key is `bookmark-{id}` for one of those ids. For each tab found:
+   - remove it from `tabSpaceRegistry` (`tabSpaceRegistry.unregister(windowId, tabId)`), the same way the group-change handler does, since an unassociated tab gets its space from its live Chrome group;
+   - call `tabAssociationManager.deassociate(windowId, tabId)`. That also removes the backup entry, and its broadcast tells any open sidebar, so the sidebar needs no change.
+
+`TabAssociationManager` has no lookup from item key to tab today, so step 3 needs a small method on it, for example `findTabsForItemKeys(itemKeys)`, returning each match with its window id.
+
+### Points to check while implementing
+
+- **The extension's own delete.** `DeleteBookmarkAction.do()` closes the tab and removes the bookmark, so `onRemoved` fires for that delete too. If the tab is already closed by then, the lookup finds nothing and the listener does nothing. If the bookmark is removed before the tab closes, the listener unlinks a tab that is about to close anyway, which is harmless. Its undo recreates the bookmark with a new id, so the listener never sees the restored one.
+- **Bookmark import in replace mode** removes bookmarks in bulk through the same API, so the listener will unlink every open bookmark tab it touches. That matches what a person would expect after replacing their bookmarks, but run P.8 and the import cases to be sure nothing there relied on the old behaviour.
 
 ## Status
 
-Not fixed.
+Not fixed. The fix above is agreed; implementation has not started.

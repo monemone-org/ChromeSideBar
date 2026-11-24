@@ -1,18 +1,20 @@
 // Section T - tab association ordering.
 // docs/test/tab-space-association-test-cases.md#section-t---tab-association-ordering
 //
-// Each case here pins down one bug found by reviewing step 6b (the move of
-// tab associations into background's TabAssociationManager). They only show
+// T.1 to T.5 each pin down one bug found by reviewing step 6b (the move of
+// tab associations into background's TabAssociationManager), and T.6 the race
+// behind issue N1, where the sidebar and background group the same new tab.
+// They only show
 // when two things happen in one particular order, so most of them use
 // background's DEV-only test hooks (backgroundHooks.ts) to hold background at
 // a named point, fail one call, or send a broadcast of the case's choosing.
 // T.1 needs real audio instead, which it plays on the DEV-only tone page.
 
 import { TestCase, TestStep } from '../types';
-import { AudioTestPage, createTestBookmark, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import { AudioTestPage, createTestBookmark, createTestSpace, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
 import { actionStep, bookmarkExistingTab, closeTab, openAudioTab, openBookmarkTab, openRegularTab, playTestAudio, switchSpaceVerified } from '../actions';
-import { assertBookmarkLoaded, assertTabAudible } from '../assertions';
-import { resolveStringRef, resolveTabId } from '../stepHelpers';
+import { assertBookmarkLoaded, assertTabAudible, assertTabInSpace } from '../assertions';
+import { resolveSpace, resolveStringRef, resolveTabId } from '../stepHelpers';
 import {
   armGate,
   broadcastFromBackground,
@@ -27,6 +29,7 @@ import { tabAssociationsProxy } from '../../../managers/proxies/tabAssociationsP
 import { ManagerId } from '../../../managers/proxies/messageRouting';
 import { TAB_ASSOCIATIONS_CHANGED, TabAssociations } from '../../../managers/shared/tabAssociationsApi';
 import { TestGateName } from '../../../managers/shared/backgroundTestHooksApi';
+import { createTabInSpace } from '../../../utils/tabOperations';
 
 // How long an open is allowed to take before T.2 calls it hung
 const OPEN_TIMEOUT_MS = 5000;
@@ -118,7 +121,13 @@ export const T1_PLAYING_TAB_ONTO_BOOKMARK: TestCase = {
     // The DEV-only tone page, which the next step starts (see AudioTestPage)
     openAudioTab({ spaceRef: 'spaceA', tabRef: 'audioTab' }),
 
-    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab')),
+    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab'), {
+      steps: [
+        'Switch to the newly opened test tone tab in Chrome.',
+        'Click **Play** and let it play for a second or two - unmuted, a muted tab does not count as audible.',
+        'Come back to the sidebar and click Resume below.',
+      ],
+    }),
     assertTabAudible('audioTab', true),
 
     // Any change to the mirror will do; this is the ordinary way to cause one
@@ -425,10 +434,93 @@ export const T5_INDEX_REFRESH_AFTER_RETARGET: TestCase = {
   ],
 };
 
+// =============================================================================
+// T.6 - a bookmark dragged onto another space's icon
+// =============================================================================
+
+// Dragging a bookmark (or a pinned site) onto a space icon in the space bar
+// opens its URL as a new tab in that space, through createTabInSpace. When
+// the sidebar creates the tab and then groups it itself, background's
+// chrome.tabs.onCreated handling groups the same new tab into the active
+// space at the same time, and whichever writer goes second wins (issue N1,
+// and docs/decisions/2026-11-23-new-tab-grouping-two-writers.md). The gate
+// holds background right after it has read the new tab with no group, so the
+// sidebar always finishes first and background then moves the tab out of the
+// space it was dropped on.
+//
+// Once createTabInSpace places the tab through SpaceTabManager.createTabs,
+// background's request for the new tab runs after the tab is placed and
+// leaves it alone, so the gate is never reached and the tab stays put.
+//
+// The automated drop calls createTabInSpace directly; in Manual mode the
+// tester drags the bookmark for real while the gate is armed, and the case
+// finds the tab the drop opened by its URL.
+const T6_URL = testUrl('t6');
+
+export const T6_BOOKMARK_DROP_LANDS_IN_TARGET_SPACE: TestCase = {
+  id: 'T.6',
+  title: 'A bookmark dragged onto another space\'s icon opens in that space',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'T6 bookmark', T6_URL, 'bookmark');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    {
+      kind: 'action',
+      label: 'Hold background just after it reads a new tab',
+      run: async () =>
+      {
+        await armGate(TestGateName.GROUPING_AFTER_TAB_READ);
+      },
+    },
+    actionStep('Drag the bookmark onto space B\'s icon', async (ctx) =>
+    {
+      // What the space bar's drop calls for a bookmark or a pinned site
+      const result = await createTabInSpace(T6_URL, resolveSpace(ctx, 'spaceB').id, ctx.windowId);
+      if (result.tab?.id !== undefined) ctx.refs.set('tab', result.tab.id);
+      if (!result.success) throw new Error(`createTabInSpace failed: ${result.error}`);
+    }, {
+      steps: [
+        `In the sidebar's bookmark tree, drag "T6 bookmark" onto the "${TEST_SPACE_VIDEO_NAME}" icon in the space bar and drop it there.`,
+        'A new tab opens for it - leave it alone.',
+        'Click Resume below.',
+      ],
+    }),
+    {
+      kind: 'action',
+      label: 'Let background go on',
+      run: async (ctx) =>
+      {
+        const gate = TestGateName.GROUPING_AFTER_TAB_READ;
+
+        // Give background's request for the new tab a moment to reach the
+        // gate, if it is going to, so releasing it lets it act. It never
+        // arrives once the tab is placed in one job, which is fine.
+        try { await waitForGate(gate, 500); }
+        catch { /* not held */ }
+        await releaseGate(gate);
+
+        // In Manual mode the tab came from the tester's drop, so find it
+        if (!ctx.refs.has('tab'))
+        {
+          const [tab] = await chrome.tabs.query({ windowId: ctx.windowId, url: T6_URL });
+          if (tab?.id === undefined) throw new Error(`no tab on ${T6_URL} - did the drop open one?`);
+          ctx.refs.set('tab', tab.id);
+        }
+      },
+    },
+    assertTabInSpace('tab', 'spaceB'),
+  ],
+};
+
 export const SECTION_T_CASES: TestCase[] = [
   T1_PLAYING_TAB_ONTO_BOOKMARK,
   T2_OPEN_SURVIVES_REJECTED_ASSOCIATION,
   T3_STALE_BROADCAST_KEEPS_LIVE_INFO,
   T4_RESTORE_SKIPS_TAKEN_TAB_IN_BACKUP,
   T5_INDEX_REFRESH_AFTER_RETARGET,
+  T6_BOOKMARK_DROP_LANDS_IN_TARGET_SPACE,
 ];

@@ -385,7 +385,9 @@ export async function resetTestData(getCtx: () => TestContext): Promise<void>
     await sleep(FIXTURE_TICK_MS);
   }
 
-  const testPins = getCtx().pinnedSites.filter(p => p.title.startsWith(TEST_PINNED_PREFIX));
+  // Test pins: the ones fixtures create carry the title prefix, and a pin a
+  // tester made by hand from a test page (P.10) is on a test URL instead
+  const testPins = getCtx().pinnedSites.filter(p => p.title.startsWith(TEST_PINNED_PREFIX) || p.url.startsWith(TEST_URL_PREFIX));
   for (const pin of testPins)
   {
     getCtx().removePin(pin.id);

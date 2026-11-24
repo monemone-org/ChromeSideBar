@@ -3,6 +3,7 @@ import { truncateTitle } from '../utils/truncateTitle';
 import { Space } from '../contexts/SpacesContext';
 import { toChromeColor } from '../utils/groupColors';
 import { spaceManagerProxy } from '../managers/proxies/spaceManagerProxy';
+import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
 
 interface TabSnapshot
 {
@@ -156,25 +157,34 @@ export class DeleteSpaceAction implements UndoableAction
     if (this.snapshot.tabs.length > 0)
     {
       const sorted = [...this.snapshot.tabs].sort((a, b) => a.index - b.index);
-      const newTabIds: number[] = [];
 
+      // Every tab goes back into one group with the space's name and color.
+      // SpaceTabManager creates each tab and puts it in that group as one
+      // job, so background's own grouping of the new tab cannot move it in
+      // between - see docs/decisions/2026-11-23-new-tab-grouping-two-writers.md.
+      // The first tab creates the group; the rest join it by id, and would
+      // recreate it if it had somehow gone in the meantime.
+      const newGroup = { title: this.snapshot.space.name, color: toChromeColor(this.snapshot.space.color) };
+      let spaceGroupId: number | undefined;
+
+      // One tab at a time, in index order, so each lands where it was
       for (const tabSnapshot of sorted)
       {
         try
         {
-          const newTab = await chrome.tabs.create({
-            url: tabSnapshot.url,
-            active: false,
-            windowId: this.windowId,
-            index: tabSnapshot.index,
-          });
+          const { tabIds, groupId } = await spaceTabManagerProxy.createTabs(
+            this.windowId,
+            [{ url: tabSnapshot.url, index: tabSnapshot.index }],
+            { kind: 'group', groupId: spaceGroupId, newGroup }
+          );
+          spaceGroupId = groupId ?? spaceGroupId;
 
-          if (!newTab.id) continue;
-          newTabIds.push(newTab.id);
+          const newTabId = tabIds[0];
+          if (newTabId === undefined) continue;
 
           if (import.meta.env.DEV)
           {
-            console.log(`[DeleteSpaceAction] undo: created tab "${tabSnapshot.title}" → id=${newTab.id} (idx=${tabSnapshot.index})`);
+            console.log(`[DeleteSpaceAction] undo: created tab "${tabSnapshot.title}" → id=${newTabId} (idx=${tabSnapshot.index}, group=${groupId})`);
           }
 
           // Restore association
@@ -182,42 +192,17 @@ export class DeleteSpaceAction implements UndoableAction
           {
             try
             {
-              await this.restoreAssociation(newTab.id, tabSnapshot.itemKey);
+              await this.restoreAssociation(newTabId, tabSnapshot.itemKey);
             }
             catch (err)
             {
-              console.error(`[DeleteSpaceAction] undo: failed to restore association for tab ${newTab.id}:`, err);
+              console.error(`[DeleteSpaceAction] undo: failed to restore association for tab ${newTabId}:`, err);
             }
           }
         }
         catch (err)
         {
           console.error(`[DeleteSpaceAction] undo: failed to create tab "${tabSnapshot.title}":`, err);
-        }
-      }
-
-      // Re-create tab group with space name and color
-      if (newTabIds.length > 0)
-      {
-        try
-        {
-          const groupId = await chrome.tabs.group({
-            tabIds: newTabIds,
-            createProperties: { windowId: this.windowId },
-          });
-          await chrome.tabGroups.update(groupId, {
-            title: this.snapshot.space.name,
-            color: toChromeColor(this.snapshot.space.color),
-          });
-
-          if (import.meta.env.DEV)
-          {
-            console.log(`[DeleteSpaceAction] undo: created group "${this.snapshot.space.name}" (id=${groupId})`);
-          }
-        }
-        catch (err)
-        {
-          console.error('[DeleteSpaceAction] undo: failed to create tab group:', err);
         }
       }
     }

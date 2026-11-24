@@ -169,7 +169,6 @@ export const SpaceBar: React.FC<SpaceBarProps> = ({
               const result = await createTabInSpace(
                 item.url.url,
                 targetSpaceId,
-                spaces,
                 windowId
               );
               if (import.meta.env.DEV && !result.success)

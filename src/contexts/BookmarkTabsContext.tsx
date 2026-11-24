@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef, useSyncExternalStore, ReactNode } from 'react';
 import { createChromeErrorHandler } from '../utils/chromeError';
 import { tabSpaceRegistryProxy } from '../managers/proxies/tabSpaceRegistryProxy';
+import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
 import { tabAssociationsProxy } from '../managers/proxies/tabAssociationsProxy';
 import { TabAssociations } from '../managers/shared/tabAssociationsApi';
 import { isUrlDrifted, isDomainDrifted } from '../utils/urlCompare';
@@ -210,6 +211,48 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     });
   }, [tabToItem]);
 
+  // Fill in live info and audible state for tabs that newly joined the
+  // mirror. The cleanup above drops both as soon as a tab leaves the map, and
+  // Chrome only reports changes, so a tab that comes back (a stale broadcast
+  // followed by the real one, T.3) or one that was already playing when it
+  // got its bookmark (T.1) would otherwise stay without them until the tab
+  // navigates or its audio stops and starts. Call sites that seed a tab
+  // themselves still do; this covers every way a tab can join, including
+  // ones no call site here knows about.
+  const seededTabIdsRef = useRef<Set<number>>(new Set());
+  useEffect(() =>
+  {
+    const joined = [...tabToItem.keys()].filter(tabId => !seededTabIdsRef.current.has(tabId));
+    seededTabIdsRef.current = new Set(tabToItem.keys());
+    if (joined.length === 0) return;
+
+    // Read each joined tab once and record what Chrome says about it now
+    for (const tabId of joined)
+    {
+      chrome.tabs.get(tabId, (tab) =>
+      {
+        if (chrome.runtime.lastError || !tab) return;
+
+        // The tab may have left the map again while this read was in flight
+        if (!tabToItemRef.current.has(tabId)) return;
+
+        // Keep whatever a call site or onUpdated already recorded, which is at
+        // least as fresh as this read
+        setLiveTabs((prev) => prev.get(tabId) ? prev : prev.withTab(tabId, tab));
+
+        setAudibleTabs((prev) =>
+        {
+          if (prev.has(tabId) === !!tab.audible) return prev;
+
+          const next = new Set(prev);
+          if (tab.audible) next.add(tabId);
+          else next.delete(tabId);
+          return next;
+        });
+      });
+    }
+  }, [tabToItem]);
+
   // Break one tab's association. Background does the work and broadcasts the
   // result, so there is nothing to update here - the mirror already shows the
   // change by the time this returns.
@@ -326,27 +369,42 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
         const tabId = tab.id;
         const windowId = currentWindowId ?? tab.windowId;
 
-        // Store association (pass url+index so the backup entry needs no extra lookup)
+        // Store association (pass url+index so the backup entry needs no extra lookup).
+        // A rejection here would otherwise escape this callback and leave the
+        // promise above unresolved forever (T.2). The tab is open either way,
+        // so on failure it stays a regular tab and its id is still returned.
         const createdUrl = tab.url ?? url;
-        await storeAssociation(tabId, itemKey, createdUrl, tab.index);
-
-        // Seed live info now - onUpdated events that fired before the mirror
-        // knew this tab was managed were dropped
-        setLiveTabs((prev) => prev.withTab(tabId, { ...tab, url: createdUrl }));
-
-        // Register space with background for bookmark tabs
-        if (spaceId && windowId)
+        let associated = true;
+        try
         {
-          tabSpaceRegistryProxy.register(windowId, tabId, spaceId);
+          await storeAssociation(tabId, itemKey, createdUrl, tab.index);
+        }
+        catch (err)
+        {
+          console.error('Failed to associate new tab:', err);
+          associated = false;
+        }
+
+        // Only a tab that now stands in for its item gets live info and a space
+        if (associated)
+        {
+          // Seed live info now - onUpdated events that fired before the mirror
+          // knew this tab was managed were dropped
+          setLiveTabs((prev) => prev.withTab(tabId, { ...tab, url: createdUrl }));
+
+          // Register space with background for bookmark tabs
+          if (spaceId && windowId)
+          {
+            tabSpaceRegistryProxy.register(windowId, tabId, spaceId);
+          }
         }
 
         // Tell background to re-check this tab (will group into space if active)
         if (windowId)
         {
-          chrome.runtime.sendMessage({
-            action: 'queue-tab-for-grouping',
-            tabId,
-            windowId
+          spaceTabManagerProxy.requestGrouping(windowId, tabId).catch((err) =>
+          {
+            console.error('Failed to request grouping:', err);
           });
         }
 
@@ -502,11 +560,9 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     {
       tabSpaceRegistryProxy.register(currentWindowId, tabId, spaceId);
 
-      chrome.runtime.sendMessage({
-        action: 'queue-tab-for-grouping',
-        tabId,
-        windowId: currentWindowId,
-        spaceId
+      spaceTabManagerProxy.assignTabToSpace(currentWindowId, tabId, spaceId).catch((err) =>
+      {
+        console.error('Failed to assign tab to space:', err);
       });
     }
 
@@ -613,7 +669,10 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
     if (tabId !== undefined)
     {
       await tabAssociationsProxy.deassociate(currentWindowId, tabId);
-      chrome.runtime.sendMessage({ action: 'queue-tab-for-grouping', tabId, windowId: currentWindowId });
+      spaceTabManagerProxy.requestGrouping(currentWindowId, tabId).catch((err) =>
+      {
+        console.error('Failed to request grouping:', err);
+      });
     }
   }, [itemToTab, currentWindowId]);
 

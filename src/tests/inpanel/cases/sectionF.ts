@@ -29,7 +29,13 @@ export const F1_DRAG_TAB_TO_SPACE: TestCase = {
     openRegularTab({ url: testUrl('f1-tab'), spaceRef: 'spaceA', tabRef: 'tab' }),
     assertTabInSpace('tab', 'spaceA'),
 
-    actionStep('Drag the tab row onto the other space\'s icon', dragTabRowToSpaceIcon({ tabRef: 'tab', spaceRef: 'spaceB' })),
+    actionStep('Drag the tab row onto the other space\'s icon', dragTabRowToSpaceIcon({ tabRef: 'tab', spaceRef: 'spaceB' }), {
+      steps: [
+        `The sidebar is showing "${TEST_SPACE_WORK_NAME}", which has exactly one tab.`,
+        `Drag that tab row onto the "${TEST_SPACE_VIDEO_NAME}" space icon in the space bar (hover an icon to see its name) and drop it there.`,
+        'Click Resume below.',
+      ],
+    }),
 
     assertTabInSpace('tab', 'spaceB'),
   ],

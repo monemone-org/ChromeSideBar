@@ -20,6 +20,10 @@ export const TestGateName = {
   // TabAssociationManager.refreshBackupIndices, after chrome.tabs.query
   // returns and before the index updates are queued
   REFRESH_BACKUP_INDICES_AFTER_TAB_QUERY: 'TabAssociationManager.refreshBackupIndices.afterTabQuery',
+  // SpaceTabManager's processing of a grouping request, after it has read the
+  // tab and found it still needs grouping, and before it looks the space's
+  // group up
+  GROUPING_AFTER_TAB_READ: 'SpaceTabManager.processGroupingRequest.afterTabRead',
 } as const;
 
 export type TestGateNameType = typeof TestGateName[keyof typeof TestGateName];

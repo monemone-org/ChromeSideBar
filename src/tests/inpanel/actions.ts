@@ -8,9 +8,10 @@
 import { getOrCreateSpaceGroup, moveTabToSpace, regroupAssociatedTab } from '../../utils/tabOperations';
 import { FollowActiveTabMode, FOLLOW_ACTIVE_TAB_KEY } from '../../utils/followActiveTab';
 import { BookmarkOpenMode } from '../../components/SettingsDialog';
-import { ClosedPanelRunner, PauseOptions, SavedRefs, StepRunner, TestContext, TestStep } from './types';
+import { ClosedPanelRunner, ManualStep, PauseOptions, SavedRefs, StepRunner, TestContext, TestStep } from './types';
 import { getScrollContainer, resolveSpace, resolveStringRef, resolveTabId, resolveTabRowSelector, SimulatedMouse, sleep, waitFor } from './stepHelpers';
 import { assertSidebarShowsSpace } from './assertions';
+import { spaceTabManagerProxy } from '../../managers/proxies/spaceTabManagerProxy';
 import { ARC_SHOW_TAB_TITLE_WHEN_DRIFTED_KEY, AudioTestPage, BOOKMARK_OPEN_MODE_KEY, testUrl } from './fixtures';
 import { DEV_TEST_RUN_COMMAND_ACTION, DevTestRunCommandMessage, DevTestRunCommandReply } from '../../utils/devTestCommand';
 import { TEST_AUDIO_CONTROL_ACTION, TestAudioCommand, TestAudioControlMessage, TestAudioControlReply } from './testAudioProtocol';
@@ -202,12 +203,10 @@ export function selectTabFromHistoryDropdown(tabRef: string): TestStep
  * clear of the opposite edge.
  *
  * Opens the very first filler tab on its own, awaited, before parallelizing
- * the rest - getOrCreateSpaceGroup now coalesces concurrent create-race
- * callers into one creation (see tabOperations.ts's resolveGroupId), so this
- * isn't required for correctness anymore, but seeding the group with a known
- * single tab first keeps this function's own intent unambiguous and avoids
- * every tab in the first batch hitting the "does this group exist yet" race
- * at once for no benefit (they'd all just wait on the same promise anyway).
+ * the rest. SpaceTabManager creates and places each filler one at a time in
+ * its grouping queue (see createTabInSpaceForTest), so this isn't required
+ * for correctness, but seeding the group with a known single tab first keeps
+ * this function's own intent unambiguous.
  */
 export function openFillerTabsUntilScrollable(spaceRef: string): TestStep
 {
@@ -234,9 +233,7 @@ export function openFillerTabsUntilScrollable(spaceRef: string): TestStep
 
       const openFiller = async (label: string) =>
       {
-        const tab = await chrome.tabs.create({ url: testUrl(label), active: false, windowId: ctx.windowId });
-        if (tab.id === undefined) throw new Error('chrome.tabs.create did not return an id');
-        await getOrCreateSpaceGroup(tab.id, space, ctx.windowId);
+        await createTabInSpaceForTest(ctx, testUrl(label), space.id);
       };
 
       let opened = 0;
@@ -383,14 +380,24 @@ export function openRegularTab(opts: { url: string; spaceRef: string; tabRef: st
   };
 }
 
+/**
+ * Opens a tab already placed in a space, through the same SpaceTabManager
+ * job the product uses for a tab the sidebar wants somewhere specific. Doing
+ * it in two steps here (create, then group) raced background's own grouping
+ * of the new tab - see docs/test/issues/N1-no-group-with-id-when-adding-tab-to-space.md.
+ */
 async function openTabInSpace(ctx: TestContext, url: string, spaceRef: string, tabRef: string): Promise<void>
 {
-  const space = resolveSpace(ctx, spaceRef);
-  const tab = await chrome.tabs.create({ url, active: false, windowId: ctx.windowId });
-  if (tab.id === undefined) throw new Error('chrome.tabs.create did not return an id');
+  const tabId = await createTabInSpaceForTest(ctx, url, resolveSpace(ctx, spaceRef).id);
+  ctx.refs.set(tabRef, tabId);
+}
 
-  await getOrCreateSpaceGroup(tab.id, space, ctx.windowId);
-  ctx.refs.set(tabRef, tab.id);
+/** One tab, created and placed in a space by SpaceTabManager. Returns its id. */
+async function createTabInSpaceForTest(ctx: TestContext, url: string, spaceId: string): Promise<number>
+{
+  const { tabIds } = await spaceTabManagerProxy.createTabs(ctx.windowId, [{ url }], { kind: 'space', spaceId });
+  if (tabIds.length === 0) throw new Error(`SpaceTabManager.createTabs opened no tab for ${url}`);
+  return tabIds[0];
 }
 
 /**
@@ -635,26 +642,31 @@ export function pause(label: string, steps: string[], options?: string | PauseOp
   return { kind: 'pause', label, instruction, ...resolved };
 }
 
-/** An action step whose work is a StepRunner built elsewhere, such as the stand-ins below. */
-export function actionStep(label: string, run: StepRunner): TestStep
+/**
+ * An action step whose work is a StepRunner built elsewhere, such as the
+ * stand-ins below. `manual` is how a tester does the same with real input,
+ * for the runner's Manual mode (see ManualStep in types.ts).
+ */
+export function actionStep(label: string, run: StepRunner, manual?: ManualStep): TestStep
 {
-  return { kind: 'action', label, run };
+  return { kind: 'action', label, run, manual };
 }
 
-/** An assert step whose check is a StepRunner built elsewhere, such as the gesture checks below. */
-export function assertStep(label: string, run: StepRunner): TestStep
+/** An assert step whose check is a StepRunner built elsewhere, such as the gesture checks below. `manual` as for actionStep. */
+export function assertStep(label: string, run: StepRunner, manual?: ManualStep): TestStep
 {
-  return { kind: 'assert', label, run };
+  return { kind: 'assert', label, run, manual };
 }
 
 /**
  * A step that runs on the parked page with the sidebar app unloaded - from
  * the extension's side, the same state as a closed panel. See the
- * closed-panel actions below for what `run` can be.
+ * closed-panel actions below for what `run` can be. `manual` is how a tester
+ * closes the panel for real and does the same by hand, for Manual mode.
  */
-export function closedPanelStep(label: string, run: ClosedPanelRunner): TestStep
+export function closedPanelStep(label: string, run: ClosedPanelRunner, manual?: ManualStep): TestStep
 {
-  return { kind: 'closedPanel', label, run };
+  return { kind: 'closedPanel', label, run, manual };
 }
 
 // ---------------------------------------------------------------------------

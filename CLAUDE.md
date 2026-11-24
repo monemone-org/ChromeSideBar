@@ -9,7 +9,7 @@ Read `READEME.md` for more details about the extension.
 ## Development Workflow
 
 <Important>
-1. **Always discuss first** - Before editing any file or executing any command, explain what you plan to do and get explicit approval. This applies in ALL modes, not just plan mode.
+1. **Discuss logic changes first** - Before you change code logic (for example, to implement a feature or fix a bug), explain what you plan to do and get explicit approval. This applies in ALL modes, not just plan mode. Other edits inside this project, such as comments and docs, do not need approval. Do not run `git add`, `git mv`, `git rm`, or `git commit`. Notify the user to run them.
 </Important>
 2. **Minimize dependencies** - Avoid adding new npm packages unless necessary; prefer native browser APIs and existing libraries
 

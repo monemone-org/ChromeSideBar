@@ -16,6 +16,7 @@ import { useExternalUrlDropForTabs, TabDropTarget } from '../hooks/useExternalUr
 import { useBookmarks } from '../hooks/useBookmarks';
 import { SPEAKER_ICON_SIZE } from '../constants';
 import { moveTabToSpace as moveTabToSpaceUtil } from '../utils/tabOperations';
+import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
 import { filterBookmarkableTabs, saveTabGroupAsBookmarkFolder } from '../utils/bookmarkOperations';
 import { useFindSpaceForFolder } from '../hooks/useFindSpaceForFolder';
 
@@ -1355,18 +1356,23 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
         }
       }
 
-      // Create the tab
-      const newTab = await chrome.tabs.create({
-        url,
-        index,
-        active: false,
-        windowId: windowId ?? undefined,
-      });
-
-      // Add to group if specified
-      if (newTab.id && groupId)
+      // Create the tab. Into a group: SpaceTabManager creates and groups it
+      // as one job, so background's own grouping of the new tab cannot pull
+      // it into the active space in between (see
+      // docs/decisions/2026-11-23-new-tab-grouping-two-writers.md). Without a
+      // group, background places it the way it places any new tab.
+      if (groupId && windowId !== null)
       {
-        await chrome.tabs.group({ tabIds: [newTab.id], groupId });
+        await spaceTabManagerProxy.createTabs(windowId, [{ url, index }], { kind: 'group', groupId });
+      }
+      else
+      {
+        await chrome.tabs.create({
+          url,
+          index,
+          active: false,
+          windowId: windowId ?? undefined,
+        });
       }
 
       showToast('Tab created from dropped link');
@@ -1971,6 +1977,15 @@ export const TabList = ({ onPin, onPinMultiple, tabGroupDisplayOrder = 'groupsFi
               deassociatePinnedTab(itemKey.replace('pinned-', ''));
             }
             allTabIds.push(item.tabId);
+          }
+          else if (targetGroupId && windowId !== null)
+          {
+            // No live tab, dropped on a group: SpaceTabManager creates the tab
+            // already in that group, so background's own grouping of the new
+            // tab cannot pull it into the active space before the grouping
+            // below (see docs/decisions/2026-11-23-new-tab-grouping-two-writers.md)
+            const { tabIds } = await spaceTabManagerProxy.createTabs(windowId, [{ url: item.url }], { kind: 'group', groupId: targetGroupId });
+            allTabIds.push(...tabIds);
           }
           else
           {

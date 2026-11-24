@@ -1,5 +1,6 @@
 import { UndoableAction } from './types';
 import { truncateTitle } from '../utils/truncateTitle';
+import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
 
 interface TabSnapshot
 {
@@ -143,63 +144,50 @@ export class CloseTabAction implements UndoableAction
     {
       try
       {
-        // Recreate the tab
-        const newTab = await chrome.tabs.create({
-          url: snapshot.url,
-          active: false,
-          windowId: this.windowId,
-          index: snapshot.index,
-        });
+        // Recreate the tab, in its old group when it had one
+        let newTabId: number | undefined;
 
-        if (!newTab.id) continue;
+        if (snapshot.groupId !== -1 && snapshot.groupTitle !== undefined)
+        {
+          // SpaceTabManager creates and groups the tab as one job, so
+          // background's own grouping of the new tab cannot move it out of
+          // the group in between - see
+          // docs/decisions/2026-11-23-new-tab-grouping-two-writers.md.
+          // The group is the one recreated earlier in this undo batch, else
+          // the original (still there if not all its tabs were closed), else
+          // a new group with the old title and color.
+          const groupKey = `${snapshot.groupTitle}|${snapshot.groupColor}`;
+          const { tabIds, groupId } = await spaceTabManagerProxy.createTabs(
+            this.windowId,
+            [{ url: snapshot.url, index: snapshot.index }],
+            {
+              kind: 'group',
+              groupId: groupMap.get(groupKey) ?? snapshot.groupId,
+              newGroup: { title: snapshot.groupTitle, color: snapshot.groupColor ?? 'grey' },
+            }
+          );
+          if (groupId !== undefined) groupMap.set(groupKey, groupId);
+          newTabId = tabIds[0];
+        }
+        else
+        {
+          // A tab that had no group comes back like any new tab: background
+          // puts it in the active space
+          const newTab = await chrome.tabs.create({
+            url: snapshot.url,
+            active: false,
+            windowId: this.windowId,
+            index: snapshot.index,
+          });
+          newTabId = newTab.id;
+        }
+
+        if (newTabId === undefined) continue;
 
         if (import.meta.env.DEV)
         {
-          console.log(`[CloseTabAction] undo: created tab "${snapshot.title}" → id=${newTab.id} `
+          console.log(`[CloseTabAction] undo: created tab "${snapshot.title}" → id=${newTabId} `
             + `(idx=${snapshot.index}, group=${snapshot.groupTitle ?? 'none'})`);
-        }
-
-        // Restore group membership
-        if (snapshot.groupId !== -1 && snapshot.groupTitle !== undefined)
-        {
-          const groupKey = `${snapshot.groupTitle}|${snapshot.groupColor}`;
-
-          if (groupMap.has(groupKey))
-          {
-            // Group already recreated in this undo batch — add tab to it
-            await chrome.tabs.group({ tabIds: [newTab.id], groupId: groupMap.get(groupKey)! });
-          }
-          else
-          {
-            // Try original groupId first (still exists if not all its tabs were closed)
-            let targetGroupId: number | null = null;
-
-            try
-            {
-              const orig = await chrome.tabGroups.get(snapshot.groupId);
-              if (orig) targetGroupId = snapshot.groupId;
-            }
-            catch { /* original group gone */ }
-
-            if (targetGroupId)
-            {
-              await chrome.tabs.group({ tabIds: [newTab.id], groupId: targetGroupId });
-              groupMap.set(groupKey, targetGroupId);
-            }
-            else
-            {
-              // Original group gone — create new group
-              const newGroupId = await chrome.tabs.group({
-                tabIds: [newTab.id],
-                createProperties: { windowId: this.windowId },
-              });
-              await chrome.tabGroups.update(newGroupId, {
-                title: snapshot.groupTitle,
-                color: snapshot.groupColor,
-              });
-              groupMap.set(groupKey, newGroupId);
-            }
-          }
         }
 
         // Restore bookmark/pinned association
@@ -207,11 +195,11 @@ export class CloseTabAction implements UndoableAction
         {
           try
           {
-            await this.restoreAssociation(newTab.id, snapshot.itemKey);
+            await this.restoreAssociation(newTabId, snapshot.itemKey);
           }
           catch (err)
           {
-            console.error(`[CloseTabAction] undo: failed to restore association for tab ${newTab.id}:`, err);
+            console.error(`[CloseTabAction] undo: failed to restore association for tab ${newTabId}:`, err);
           }
         }
       }

@@ -6,9 +6,11 @@
 
 import { TestGateNameType } from '../shared/backgroundTestHooksApi';
 
-// An armed gate that nobody releases (a case that failed half way) lets
-// background through on its own after this long, so one broken run can't
-// leave a listener stuck for the rest of the worker's life
+// A gate that holds something and is not released (a case that failed half
+// way) lets it through on its own this long after it arrived, so one broken
+// run can't leave a listener stuck for the rest of the worker's life.
+// Counted from the arrival, not from arming, because in the runner's Manual
+// mode the tester can take a while to perform the action that arrives here
 const GATE_AUTO_RELEASE_MS = 15000;
 
 /**
@@ -32,11 +34,6 @@ class TestGate
     this.#release = resolve;
   });
 
-  constructor()
-  {
-    setTimeout(() => this.#release(), GATE_AUTO_RELEASE_MS);
-  }
-
   /** Called by background at the gate's point. Waits only for the first arrival. */
   async holdFirstArrival(): Promise<void>
   {
@@ -44,6 +41,7 @@ class TestGate
 
     this.#hasArrival = true;
     this.#markArrived();
+    setTimeout(() => this.#release(), GATE_AUTO_RELEASE_MS);
     await this.#released;
   }
 

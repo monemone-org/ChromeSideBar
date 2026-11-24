@@ -7,13 +7,47 @@
 // for the step shapes and TestRunnerPanel.tsx for how this is driven from
 // the UI.
 
-import { ResumeState, TestCase, TestContext, TestResult, TestStep } from './types';
+import { ManualStep, ResumeState, TestCase, TestContext, TestResult, TestStep } from './types';
 import { sleep } from './stepHelpers';
 
 export const RESUME_STORAGE_KEY = 'testRunnerResumeState';
 export const CASE_RESULTS_STORAGE_KEY = 'testRunnerCaseResults';
 export const BATCH_QUEUE_STORAGE_KEY = 'testRunnerBatchQueue';
 export const BATCH_CASE_IDS_STORAGE_KEY = 'testRunnerBatchCaseIds';
+export const MANUAL_MODE_STORAGE_KEY = 'testRunnerManualMode';
+
+/**
+ * The panel's "Manual" checkbox. With it on, every step that has a manual
+ * version (see ManualStep in types.ts) waits for the tester to perform it
+ * with real input instead of running its automated version. The panel writes
+ * it through useChromeLocalStorage, which stores JSON text ("true"/"false"),
+ * and the runner reads it each time a run starts or resumes.
+ */
+export class ManualMode
+{
+  static async isOn(): Promise<boolean>
+  {
+    const stored = await chrome.storage.local.get([MANUAL_MODE_STORAGE_KEY]);
+    const value: unknown = stored[MANUAL_MODE_STORAGE_KEY];
+    return value === true || value === 'true';
+  }
+}
+
+/** A step's manual instructions as the banner shows them: one numbered line each. */
+export function formatInstruction(steps: string[]): string
+{
+  return steps.map((step, i) => `${i + 1}. ${step}`).join('\n');
+}
+
+/** The manual version of a step, if it has one. */
+export function manualVersionOf(step: TestStep | undefined): ManualStep | undefined
+{
+  return step && step.kind !== 'pause' ? step.manual : undefined;
+}
+
+// The note on the result of a step the tester performed in Manual mode, so a
+// downloaded results file says which steps a person did
+export const MANUAL_STEP_NOTE = 'Done by the tester (Manual mode).';
 
 // The note every closedPanel step's result carries, so a downloaded results
 // file says the step ran on the parked page rather than in the panel.
@@ -150,14 +184,17 @@ export async function runFrom(
 ): Promise<RunOutcome>
 {
   const results = [...priorResults];
+  const manualMode = await ManualMode.isOn();
 
   for (let i = fromIndex; i < testCase.steps.length; i++)
   {
     const step = testCase.steps[i];
+    const manual = manualMode ? manualVersionOf(step) : undefined;
 
-    // Both stop the run here: a closedPanel step runs on the parked page and
-    // a pause waits for the tester or the driver
-    if (step.kind === 'pause' || step.kind === 'closedPanel')
+    // All of these stop the run here: a closedPanel step runs on the parked
+    // page, a pause waits for the tester or the driver, and in Manual mode a
+    // step with a manual version waits for the tester to perform it
+    if (step.kind === 'pause' || step.kind === 'closedPanel' || manual)
     {
       const refs: Record<string, string | number> = {};
       for (const [key, value] of getCtx().refs.entries())
@@ -172,9 +209,15 @@ export async function runFrom(
       {
         checkpoint.external = step.external;
       }
+      if (manual)
+      {
+        checkpoint.manual = true;
+      }
 
       await chrome.storage.local.set({ [RESUME_STORAGE_KEY]: checkpoint });
-      const instruction = step.kind === 'pause' ? step.instruction : PARK_PENDING_INSTRUCTION;
+      const instruction = manual
+        ? formatInstruction(manual.steps)
+        : step.kind === 'pause' ? step.instruction : PARK_PENDING_INSTRUCTION;
       return { results, pausedAt: { stepIndex: i, instruction } };
     }
 

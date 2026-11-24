@@ -68,7 +68,7 @@ The driver does these steps:
 3. It opens the Test Runner, selects the cases, and clicks **Run Tests**.
 4. During the run, it reads the state of the runner in `chrome.storage.local`. When a pause has the `external` mark, the driver does the action and clicks Resume.
 5. At the end, it closes the windows that it opened. It also closes new windows that the run left open, but only when every tab in them is a test page or an extension page. It never closes a window that was open before the run started.
-6. It puts back the cases that you ticked in the Test Runner. A later run from the panel then starts the way that you left it.
+6. It puts back the cases that you ticked in the Test Runner and the state of its Manual checkbox. The driver always runs with Manual off. A later run from the panel then starts the way that you left it.
 
 The driver writes the results to `tools/tmp/test-results-<timestamp>.json`. The file has the same format as the **Download Results** file of the panel, plus a `driver` section. The `driver` section lists the skipped cases and the cases that gave no result. It also lists the external actions that the driver did, and the errors in the driver itself. The driver also prints a summary in the terminal.
 

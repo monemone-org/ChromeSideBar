@@ -898,6 +898,8 @@ export const P6_BACKGROUND_FILLS_MISSING_FAVICON: TestCase = {
 // with background's, but the background write it wants to race never happens,
 // so a pass proves less than usual.
 const P7_RACE_URL = P7_FAVICON_SITE;
+// Pin B's full title, as the manual version of the race step names it
+const P7_PIN_B_TITLE = `${TEST_PINNED_PREFIX}P7 pin B`;
 
 /**
  * The assertion this case exists for: this window and background hold the
@@ -1078,7 +1080,13 @@ export const P7_FAVICON_PATCH_DOES_NOT_RESURRECT: TestCase = {
     assertPinPresent('pinA', true),
     assertPinPresent('pinB', true),
 
-    actionStep('Race a background favicon write against an unpin', openRaceTabAndUnpin({ urlRef: 'pinAUrl', unpinRef: 'pinB', faviconPinRef: 'pinA', raceTabRef: 'raceTab' })),
+    actionStep('Race a background favicon write against an unpin', openRaceTabAndUnpin({ urlRef: 'pinAUrl', unpinRef: 'pinB', faviconPinRef: 'pinA', raceTabRef: 'raceTab' }), {
+      steps: [
+        `Click this link to open the page in a background tab: ${P7_RACE_URL}`,
+        `The moment you click it, unpin "${P7_PIN_B_TITLE}" from the pinned bar (right-click it, then Unpin) - closer together is better, but do not worry about being exact.`,
+        'Come back to the sidebar and click Resume.',
+      ],
+    }),
 
     // B was unpinned through the menu action, so the refs still hold its id -
     // the assertion is that it stayed gone rather than being brought back by
@@ -1086,7 +1094,12 @@ export const P7_FAVICON_PATCH_DOES_NOT_RESURRECT: TestCase = {
     assertPinPresent('pinB', false),
     assertMirrorMatchesBackground(),
 
-    assertStep('Pin A picked up the site favicon', assertPinPickedUpSiteFavicon('pinA', 'raceTab')),
+    assertStep('Pin A picked up the site favicon', assertPinPickedUpSiteFavicon('pinA', 'raceTab'), {
+      confirm: 'Did pin A pick up the site favicon?',
+      steps: [
+        'Look at pin A in the pinned bar - a pass means its icon became the site favicon, and if the network is down or the page did not load, answer Fail and note why.',
+      ],
+    }),
 
     // The race tab is on a real site, so cleanup's URL-prefix match will not
     // close it.
@@ -1394,118 +1407,187 @@ export const P9_IMPORT_APPEND_AND_REPLACE: TestCase = {
 // without asking the tester to judge anything. Driving it the other way round
 // would reduce every step to "does the other window look right?".
 //
-// Counts, not titles: pins made by hand through the pinned bar can't be given
-// a test-prefixed title without a lot of fiddling, and a count is enough to
-// show the broadcast landed. It also means the tester's own pins don't matter.
+// The runner opens the other window itself, on P10_OTHER_PIN_URL, so the
+// tester has nothing to type and the case knows which window is which. The
+// pin made by hand is told apart by its URL, not its title: the tester pins
+// that page's tab, so the pin keeps the page's own
+// title ("Example Domain") and can't carry the test prefix. Fixture cleanup
+// removes it anyway, because it also removes pins on a test URL.
+//
+// Two neighbour pins from setup give the tester something to move the pin
+// past - with only one pin in the bar there is no other position to drag it
+// to - and make it plain in the other window which pin is which.
 const P10_OWN_PIN_TITLE = `${TEST_PINNED_PREFIX}P10 from window 2`;
+const P10_OTHER_PIN_URL = testUrl('p10-other');
+const P10_OTHER_PIN_INDEX_REF = 'otherPinIndex';
+const P10_POLL_MS = 200;
+const P10_OTHER_WINDOW_REF = 'otherWindow';
 
-/** Record how many pins this window currently shows, as the baseline for the deltas below. */
-function recordPinCount(countRef: string): TestStep
+/** Position of the pin on P10_OTHER_PIN_URL in a pin list, or -1 when it is not there. */
+function otherPinIndex(pins: readonly PinnedSite[]): number
 {
-  return {
-    kind: 'action',
-    label: 'Record this window\'s current pin count',
-    run: async (ctx) =>
-    {
-      ctx.refs.set(countRef, mirrorPins().length);
-    },
-  };
+  return pins.findIndex(pin => pin.url === P10_OTHER_PIN_URL);
 }
 
 /**
- * Wait for this window's mirror to reach baseline + delta.
+ * Explains a timeout in a P.10 check. Two very different things look the same
+ * from this window: a change that happened but never reached it, and a change
+ * the tester did not actually make. Background's own list tells them apart.
+ */
+async function diagnoseOtherPin(isExpected: (pins: readonly PinnedSite[]) => boolean): Promise<string>
+{
+  return isExpected(await backgroundPins())
+    ? 'background\'s own list DOES show the change, so the broadcast to this window was lost - that is a bug in the sync, not in how the step was performed'
+    : 'background\'s own list does not show it either, so the change never reached background at all - check that you performed it, and in the NEW window';
+}
+
+/**
+ * Wait for this window's mirror to satisfy `isExpected`.
  *
  * Polling, not a fixed wait: the tester performs the action in the other
  * window at their own pace, and the broadcast arrives whenever it arrives.
  */
-function assertPinCountDelta(countRef: string, delta: number, timeoutMs: number): TestStep
+function assertOtherPin(
+  label: string,
+  timeoutMs: number,
+  isExpected: (pins: readonly PinnedSite[], ctx: TestContext) => boolean,
+  describeMiss: (pins: readonly PinnedSite[]) => string,
+  onPass?: (pins: readonly PinnedSite[], ctx: TestContext) => void
+): TestStep
 {
-  const POLL_MS = 200;
-
   return {
     kind: 'assert',
-    label: `This window's pin count changes by ${delta} within ${timeoutMs}ms`,
+    label,
     run: async (ctx) =>
     {
-      const baseline = ctx.refs.get(countRef);
-      if (typeof baseline !== 'number') throw new Error(`assertPinCountDelta: no count in ref "${countRef}"`);
-
-      const expected = baseline + delta;
       const deadline = Date.now() + timeoutMs;
 
+      // Poll this window's mirror until the change shows up or time runs out
       while (Date.now() < deadline)
       {
-        if (mirrorPins().length === expected) return;
-        await sleep(POLL_MS);
+        const pins = mirrorPins();
+        if (isExpected(pins, ctx))
+        {
+          onPass?.(pins, ctx);
+          return;
+        }
+        await sleep(P10_POLL_MS);
       }
 
-      // Two very different things look identical from here: a change that
-      // happened but never reached this window, and a change the tester did
-      // not actually make. Background's own list tells them apart, so say
-      // which it was instead of reporting a bare timeout.
-      const backgroundCount = (await backgroundPins()).length;
-      const diagnosis = backgroundCount === expected
-        ? 'background\'s own list DOES show the change, so the broadcast to this window was lost - that is a bug in the sync, not in how the step was performed'
-        : `background's own list also shows ${backgroundCount} pins, so the change never reached background at all - check that you performed it, and in the OTHER window`;
-
-      throw new Error(`expected ${expected} pins in this window, still ${mirrorPins().length}. ${diagnosis}`);
+      const diagnosis = await diagnoseOtherPin(pins => isExpected(pins, ctx));
+      throw new Error(`${describeMiss(mirrorPins())}. ${diagnosis}`);
     },
   };
+}
+
+/** The pin made in the other window arrives here, and its position is remembered for the move check. */
+function assertOtherPinArrives(timeoutMs: number): TestStep
+{
+  return assertOtherPin(
+    `The pin on ${P10_OTHER_PIN_URL} appears in this window within ${timeoutMs}ms`,
+    timeoutMs,
+    pins => otherPinIndex(pins) !== -1,
+    () => `no pin on ${P10_OTHER_PIN_URL} in this window`,
+    (pins, ctx) => ctx.refs.set(P10_OTHER_PIN_INDEX_REF, otherPinIndex(pins))
+  );
+}
+
+/** The pin moved in the other window is still here, at a different position. */
+function assertOtherPinMoved(timeoutMs: number): TestStep
+{
+  // The position recorded when the pin arrived
+  const recordedIndex = (ctx: TestContext): number =>
+  {
+    const index = ctx.refs.get(P10_OTHER_PIN_INDEX_REF);
+    if (typeof index !== 'number') throw new Error(`assertOtherPinMoved: no index in ref "${P10_OTHER_PIN_INDEX_REF}"`);
+    return index;
+  };
+
+  return assertOtherPin(
+    `The pin on ${P10_OTHER_PIN_URL} moves to a new position in this window within ${timeoutMs}ms`,
+    timeoutMs,
+    (pins, ctx) =>
+    {
+      const index = otherPinIndex(pins);
+      return index !== -1 && index !== recordedIndex(ctx);
+    },
+    pins =>
+    {
+      const index = otherPinIndex(pins);
+      return index === -1
+        ? `the pin on ${P10_OTHER_PIN_URL} is gone from this window, though it was only meant to move`
+        : `the pin on ${P10_OTHER_PIN_URL} is still at position ${index}`;
+    }
+  );
+}
+
+/** The pin unpinned in the other window is gone here too. */
+function assertOtherPinGone(timeoutMs: number): TestStep
+{
+  return assertOtherPin(
+    `The pin on ${P10_OTHER_PIN_URL} disappears from this window within ${timeoutMs}ms`,
+    timeoutMs,
+    pins => otherPinIndex(pins) === -1,
+    () => `the pin on ${P10_OTHER_PIN_URL} is still in this window`
+  );
 }
 
 export const P10_TWO_WINDOWS_STAY_IN_SYNC: TestCase = {
   id: 'P.10',
   title: 'Two windows stay in sync (guided, run in the receiving window)',
+  setup: async (getCtx) =>
+  {
+    await createTestPinnedSite(getCtx, 'P10 neighbour one', testUrl('p10-neighbour-one'), 'neighbourOne');
+    await createTestPinnedSite(getCtx, 'P10 neighbour two', testUrl('p10-neighbour-two'), 'neighbourTwo');
+  },
   steps: [
+    openPageForTester({ url: P10_OTHER_PIN_URL, ref: P10_OTHER_WINDOW_REF, inNewWindow: true }),
     pause(
-      'Setup: open a second window with the sidebar',
+      'Setup: open the sidebar in the new window',
       [
-        'Open another Chrome window and open this extension\'s sidebar in it - that one is "the other window" in the steps below, and THIS window, the one running the test, is the receiving one.',
+        'A new window just opened on an "Example Domain" page - that is "the new window" in the steps below, and THIS window, the one running the test, is the receiving one.',
+        'Open this extension\'s sidebar in the new window.',
+        `Both pinned bars should already show two test pins, "${TEST_PINNED_PREFIX}P10 neighbour one" and "${TEST_PINNED_PREFIX}P10 neighbour two".`,
         'Drive only this window\'s test runner - both sidebars have their own.',
         'Click Resume when both sidebars are open.',
       ]
     ),
-    recordPinCount('baseline'),
 
     pause(
-      'Manual step: add a pin in the OTHER window',
+      'Manual step: pin the page in the NEW window',
       [
-        'Switch to the other window.',
-        'Pin any tab (right-click a tab row in its sidebar, or drag it to the pinned bar).',
-        'Do not touch this window\'s pinned bar.',
+        'In the new window, pin the "Example Domain" tab: hover its row in that window\'s sidebar and click the pin button, or drag the row to the pinned bar.',
+        'Do not add or remove any other pin, in either window.',
         'Come back and click Resume.',
       ]
     ),
-    assertPinCountDelta('baseline', 1, 10000),
+    assertOtherPinArrives(10000),
 
-    // Split into two pauses on purpose. One step asking for a reorder AND an
+    // Split into two pauses on purpose. One step asking for a move AND an
     // unpin is easy to half-complete, and the miss would only surface two
     // steps later with no clue which half went wrong.
     pause(
-      'Manual step: reorder the pin in the OTHER window',
+      'Manual step: move the pin in the NEW window',
       [
-        'In the other window, drag the new pin to a different position in its pinned bar.',
+        'In the new window, drag the "Example Domain" pin to a different position among the pins, for example in front of the two test pins.',
         'Do not unpin it yet, that is the next step.',
         'Come back and click Resume.',
       ]
     ),
-    // A reorder changes order, not count, so this checks the pin is still
-    // here rather than expecting a delta. It exists to keep the two manual
-    // actions apart, so a missed unpin is reported as a missed unpin.
-    assertPinCountDelta('baseline', 1, 10000),
+    assertOtherPinMoved(10000),
 
     pause(
-      'Manual step: unpin that same pin in the OTHER window',
+      'Manual step: unpin that same pin in the NEW window',
       [
-        'In the other window, right-click the pin you just moved and choose **Unpin**.',
+        'In the new window, right-click the "Example Domain" pin and choose **Unpin**.',
         'Make sure it actually disappears from that window\'s pinned bar before continuing.',
         'Come back and click Resume.',
       ]
     ),
-    assertPinCountDelta('baseline', 0, 10000),
+    assertOtherPinGone(10000),
 
     // The reverse direction. This half the runner cannot check itself - it
-    // has no way to read the other window's mirror - so it makes the change
+    // has no way to read the new window's mirror - so it makes the change
     // and asks.
     {
       kind: 'action',
@@ -1513,14 +1595,15 @@ export const P10_TWO_WINDOWS_STAY_IN_SYNC: TestCase = {
       run: async (ctx) => { await ctx.addPin(testUrl('p10-from-window-2'), P10_OWN_PIN_TITLE); },
     },
     pause(
-      'Check the OTHER window',
+      'Check the NEW window',
       [
-        'Switch to the other window and look at its pinned bar.',
+        'Switch to the new window and look at its pinned bar.',
         `A pin titled "${P10_OWN_PIN_TITLE}" should have appeared there, with no reload.`,
         'Come back and answer below.',
       ],
-      'Did the other window show the new pin?'
+      'Did the new window show the new pin?'
     ),
+    closeTesterWindow(P10_OTHER_WINDOW_REF),
   ],
 };
 

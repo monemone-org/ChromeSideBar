@@ -1,6 +1,6 @@
 ---
 created: 2026-08-05
-status: open
+status: fixed
 severity: medium
 ---
 
@@ -42,4 +42,10 @@ Not a standalone patch - tracked as part of the single-owner refactor in `docs/d
 
 ## Status
 
-Not fixed. Deferred until the shared-storage-multiple-writers.md refactor lands - fixing one repro path without the others would just be a partial patch of the same root cause.
+Fixed in commit `83f058c` (step 6 of the shared-storage refactor), as proposed above. `TabAssociationManager` in background is now the only writer of the associations:
+
+- The group-change handler in `chrome.tabs.onUpdated` calls `tabAssociationManager.deassociate` directly instead of messaging the sidebar (A.3, A.7 step 5).
+- Background has its own `chrome.tabs.onDetached` listener, which deassociates a tab dragged to another window (A.6, A.6c).
+- The startup check keeps an association only when its tab still exists and still lives in the same window.
+
+A.3, A.6 and A.6c failed in the September runs and pass now.

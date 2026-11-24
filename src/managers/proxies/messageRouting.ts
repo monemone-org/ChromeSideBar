@@ -23,6 +23,7 @@ export const ManagerId = {
   LAST_AUDIBLE: 'LastAudibleTracker',
   PINNED_SITES: 'PinnedSitesManager',
   TAB_ASSOCIATIONS: 'TabAssociationManager',
+  SPACE_TAB: 'SpaceTabManager',
 } as const;
 
 export type ManagerIdType = typeof ManagerId[keyof typeof ManagerId];

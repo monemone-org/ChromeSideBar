@@ -44,6 +44,7 @@ import {
   Replace
 } from 'lucide-react';
 import { getRandomGroupColor } from '../utils/groupColors';
+import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
 import { SpaceFolderIcon } from './SpaceFolderIcon';
 import clsx from 'clsx';
 import {
@@ -939,23 +940,21 @@ export const BookmarkTree = ({ onPin, onPinMultiple, hideOtherBookmarks = false,
       return;
     }
 
-    const createdTabIds: number[] = [];
-    for (const bookmark of bookmarksList)
-    {
-      const tab = await chrome.tabs.create({ url: bookmark.url, active: false, windowId: windowId ?? undefined });
-      if (tab.id) createdTabIds.push(tab.id);
-    }
+    // SpaceTabManager opens every tab and puts them in the new folder group
+    // as one job, so background's own grouping of each new tab cannot pull
+    // one into the active space in between (see
+    // docs/decisions/2026-11-23-new-tab-grouping-two-writers.md)
+    const targetWindowId = windowId ?? (await chrome.windows.getCurrent()).id;
+    if (targetWindowId === undefined) return;
+
+    const { tabIds: createdTabIds } = await spaceTabManagerProxy.createTabs(
+      targetWindowId,
+      bookmarksList.map(bookmark => ({ url: bookmark.url })),
+      { kind: 'group', newGroup: { title: folderName, color: getRandomGroupColor() } }
+    );
 
     if (createdTabIds.length > 0)
     {
-      const groupId = await chrome.tabs.group({
-        tabIds: createdTabIds,
-        createProperties: windowId ? { windowId } : undefined
-      });
-      await chrome.tabGroups.update(groupId, {
-        title: folderName,
-        color: getRandomGroupColor()
-      });
       // Activate the first tab in the group
       await chrome.tabs.update(createdTabIds[0], { active: true });
       onShowToast?.(`Opened ${createdTabIds.length} tabs as "${folderName}"`);

@@ -19,7 +19,7 @@ This is the manual test plan for the fixes in this round, before release. The fi
 A known gap is a fault that is not fixed yet. Make sure that each gap below still occurs. Do not assume that no error means no fault.
 
 - G1: You delete a bookmark in the bookmark manager of Chrome (`chrome://bookmarks`) while its tab is open. The tab becomes orphaned: it continues to run, but it disappears from both lists. This gap is not fixed yet. It applies only to bookmarks. The delete option of the extension always closes the tab first, and Chrome has no delete function for pinned sites. See B.5.
-- G2: You drag a tracked tab to another space while the side panel is closed. The association fix depends on a message to the sidebar. When you open the panel again, the bookmark still shows "loaded" against the old space. This gap is not fixed yet.
+- G2: You drag a tracked tab to another space, or to another window, while the side panel is closed. The bookmark used to stay "loaded" against the old space, because only the sidebar cleared the association. This gap is fixed: background now clears the association itself. A.3, A.6 and A.6c check it.
 - G3: You use the "Remove from group" command of Chrome on a tracked tab. The detection runs only when the tab moves to another group, not when it leaves its group. Thus the bookmark association stays. When you activate that tab later, the sidebar can switch back to the original bookmark space of the tab. This gap is not fixed yet.
 
 ## Prerequisites
@@ -46,6 +46,8 @@ The cases use these terms:
 The in-panel test runner automates each case marked "Yes" below. The runner exists only in a DEV build, in `src/tests/inpanel/`. To open it, use the DEV dropdown of the sidebar → "Test Runner…". Each case marked "No" is manual only.
 
 A guided case stops at a pause and asks you to do one action. Then the runner checks the result. Some cases have one pause that needs Chrome itself: a reload of the extension, a stop of the service worker, or a clear of browsing data. The driver script `tools/run-inpanel-tests.mjs` does that action when it runs the suite. When you run the case from the panel, you do it.
+
+The Test Runner has a "Manual" checkbox. When you turn it on, each step that the runner usually does with simulated input becomes a pause, and you do it yourself with real input: a real close of the side panel, real key presses, real mouse gestures, and the real Play and Stop buttons of the tone page. Use Manual mode for a run that is fully real. The automated run, with Manual off, is the one for regression. `docs/test/writing-test-cases.md` describes how a step gets a manual version.
 
 | Case | Covered |
 | ---- | ------- |
@@ -108,6 +110,7 @@ A guided case stops at a pause and asks you to do one action. Then the runner ch
 | T.3  | Yes     |
 | T.4  | Yes     |
 | T.5  | Yes     |
+| T.6  | Yes     |
 | U.1  | Yes     |
 | U.2  | Yes     |
 | U.3  | Yes     |
@@ -170,14 +173,14 @@ You can move the Chrome group of a tab in two ways. Test both. They can behave d
 | 4    | Switch back to Space A and look at the bookmark tree | The bookmark is not loaded and not active |
 | 5    | Do steps 1 to 4 again with method b | The result is the same. Make sure that both methods break the association |
 
-### A.3 Bookmark tab moved to a different space's group, sidebar CLOSED (known gap G2)
+### A.3 Bookmark tab moved to a different space's group, sidebar CLOSED (G2, fixed)
 
 | Step | Action | Expected Result |
 | ---- | ------ | --------------- |
 | 1    | Click a bookmark in Space A to open its tab | The bookmark shows "loaded" |
 | 2    | Close the sidebar panel | - |
 | 3    | Move the tab (method a) into the group of Space B | - |
-| 4    | Open the sidebar again and look at Space A | Expected because of G2: the bookmark still shows "loaded". It points at a tab that is now in the group of Space B. Make sure that this still occurs |
+| 4    | Open the sidebar again and look at Space A | The bookmark shows "not loaded", the same as in A.2. The tab stays open in the group of Space B as a regular tab |
 
 ### A.4 Pinned tab moved to a different space's group
 
@@ -351,7 +354,7 @@ This case does not apply to pinned sites. Chrome has no view of them at all: the
 | 1    | Open the tab of a bookmark | The bookmark shows "loaded" |
 | 2    | Close the sidebar panel | - |
 | 3    | Open `chrome://bookmarks`, find that bookmark, and delete it there, not in the tree of the extension | - |
-| 4    | Open the sidebar again | The same gap as in B.5 step 2. No `chrome.bookmarks.onRemoved` listener exists at all. Thus this is not a race with the sidebar state, which is different from G2 (G2 depends on an open sidebar to receive a message). The open or closed sidebar at the time of the delete does not change the result. Make sure that this prediction is correct |
+| 4    | Open the sidebar again | The same gap as in B.5 step 2. No `chrome.bookmarks.onRemoved` listener exists at all. Thus this is not a race with the sidebar state, which is different from G2 (G2 depended on an open sidebar to receive a message). The open or closed sidebar at the time of the delete does not change the result. Make sure that this prediction is correct |
 
 This case does not apply to pinned sites. They are entries in `chrome.storage.local`, not real bookmarks, so they have no entry in `chrome://bookmarks`. You can delete a pinned site only in the sidebar of the extension, and you cannot do that while the sidebar is closed.
 
@@ -751,15 +754,19 @@ The fixture goes through `importFullBackup` -> `replacePinnedSites` / `appendPin
 
 The sync between windows is a broadcast from the manager, so it needs a direct check.
 
-The case is guided. Run it in window 2, the receiving window. It reads its own mirror, so the runner makes every check and you do only the actions.
+The case is guided. Run it from the test runner of your usual window, the receiving window. The case opens the other window itself, on `https://example.com/inpanel-test-p10-other`, and closes it at the end. The receiving window reads its own mirror, so the runner makes every check and you do only the actions.
+
+Its setup creates two test pins, "P10 neighbour one" and "P10 neighbour two", so that the pin you add has somewhere to move to. The case finds your pin by its URL, so other pins in the bar do not affect the checks. Cleanup removes your pin too, because it removes every pin on a test URL.
+
+In the table, window 1 is the new window and window 2 is the receiving window.
 
 | Step | Action | Expected Result |
 | ---- | ------ | --------------- |
-| 1    | Open the sidebar in two windows, and start this case in window 2 | Both sidebars show the same pins |
-| 2    | At the pause, add a pin in window 1 | The mirror of window 2 gets the pin. You do not reload or type anything in window 2 |
-| 3    | At the pause, move that pin to a new position in window 1, and do nothing else | Window 2 still shows the pin |
+| 1    | Start this case in window 2. It opens window 1 on an "Example Domain" page. At the pause, open the sidebar in window 1 | Both sidebars show the same pins, including the two neighbour pins |
+| 2    | At the pause, pin the "Example Domain" tab from the sidebar of window 1 | The mirror of window 2 gets a pin on that URL. You do not reload or type anything in window 2 |
+| 3    | At the pause, drag that pin to a new position in window 1, and do nothing else | The pin moves to a new position in window 2 too |
 | 4    | At the pause, unpin it in window 1. Make sure that it disappears there | The mirror of window 2 also drops it |
-| 5    | At the pause, add a pin in window 2 (the window of the runner) | Window 1 shows it. The runner cannot read the mirror of the other window, so you must look. Thus this step is a `confirm` pause |
+| 5    | The runner adds a pin in window 2 | Window 1 shows it. The runner cannot read the mirror of the other window, so you must look. Thus this step is a `confirm` pause. The case then closes window 1 |
 
 ---
 
@@ -818,6 +825,14 @@ The tables below describe each case with these actions.
 | 1    | Open a bookmark. Then open two regular tabs | - |
 | 2    | Close one regular tab. While background updates the stored tab indices, point the bookmark at the other regular tab | - |
 | 3    | Read the backup entry of the bookmark | It names the new tab, with the index of the new tab, not the index of the old tab |
+
+### T.6 A bookmark dragged onto another space's icon opens in that space
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Make space A active. Hold background just after it reads a new tab that has no group | - |
+| 2    | Drag a bookmark onto the icon of space B in the space bar | A new tab opens for it in the group of space B |
+| 3    | Let background go on | The tab stays in space B. Background must not move it to the active space A |
 
 ---
 

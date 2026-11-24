@@ -1,6 +1,7 @@
 import { PinnedSite } from '../hooks/usePinnedSites';
 import { Space } from '../contexts/SpacesContext';
 import { isEmoji } from './emoji';
+import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
 
 // Convert PascalCase to kebab-case — used only for v1 backup migration
 function toKebabCase(name: string): string
@@ -148,37 +149,22 @@ async function clearBookmarkFolder(folderId: string): Promise<void> {
   }
 }
 
-// Import tab groups by creating tabs and grouping them
+// Import tab groups by creating tabs and grouping them. SpaceTabManager opens
+// each group's tabs and groups them as one job, so background's own grouping
+// of every new tab cannot pull one into the active space in between - see
+// docs/decisions/2026-11-23-new-tab-grouping-two-writers.md.
 async function importTabGroups(tabGroups: TabGroupBackup[]): Promise<void> {
+  const windowId = (await chrome.windows.getCurrent()).id;
+  if (windowId === undefined) return;
+
   for (const group of tabGroups) {
     if (group.tabs.length === 0) continue;
 
-    // Create all tabs for this group
-    const createdTabIds: number[] = [];
-    for (const tabInfo of group.tabs) {
-      const tab = await chrome.tabs.create({
-        url: tabInfo.url,
-        active: false,
-        pinned: tabInfo.pinned,
-      });
-      if (tab.id) {
-        createdTabIds.push(tab.id);
-      }
-    }
-
-    // Group the tabs
-    if (createdTabIds.length > 0) {
-      // Get windowId from first created tab
-      const firstTab = await chrome.tabs.get(createdTabIds[0]);
-      const groupId = await chrome.tabs.group({
-        tabIds: createdTabIds,
-        createProperties: { windowId: firstTab.windowId }
-      });
-      await chrome.tabGroups.update(groupId, {
-        title: group.title,
-        color: group.color,
-      });
-    }
+    await spaceTabManagerProxy.createTabs(
+      windowId,
+      group.tabs.map(tabInfo => ({ url: tabInfo.url, pinned: tabInfo.pinned })),
+      { kind: 'group', newGroup: { title: group.title, color: group.color } }
+    );
   }
 }
 

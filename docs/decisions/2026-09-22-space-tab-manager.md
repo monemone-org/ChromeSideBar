@@ -13,6 +13,12 @@ Not yet. This refactor starts after [[2026-07-30-shared-storage-multiple-writers
 
 It also reverses one decision from that plan on purpose. Its message inventory says orchestration messages like `set-active-tab-and-space` "stay as direct handlers in `background.ts` and keep their current names", because no single manager owned them. That was the right call while managers were being ported one at a time, but once every piece of state has an owner, the orchestration left behind in `background.ts` turns out to be about one thing, and this doc proposes giving that thing an owner too.
 
+## The part that already exists
+
+The grouping part of this proposal was built first, to fix the race in `2026-11-23-new-tab-grouping-two-writers.md`. `SpaceTabManager` exists in `src/managers/impl/spaceTabManager.ts` as a routed manager. It owns the grouping queue (`processGroupingRequest`, `findGroupByName` and the `TAB_GROUP_TITLE_SET` workaround moved out of `background.ts`), `queueNewTab` for `chrome.tabs.onCreated`, and three sidebar methods: `createTabs`, `assignTabToSpace` and `requestGrouping`. The raw `queue-tab-for-grouping` message is gone. It reads the active space, the space list and the pinned check through callbacks.
+
+`SpaceWindowStateManager`, `TabSpaceRegistry`, `getSpaceForTab`, `setActiveTabAndSpace` and the `onActivated` follow logic are still where this document says they are. The rest of the proposal moves them into `SpaceTabManager`, and the sections below still describe the grouping queue as it was before, as the starting point of that plan.
+
 ## Background
 
 Four separate pieces of code today answer the same two questions: which space is this window showing, and which space does this tab belong to?

@@ -1,6 +1,5 @@
 import { SpaceMessageAction, Space } from './utils/spaceMessages';
 import { FOLLOW_ACTIVE_TAB_KEY, parseFollowActiveTabMode } from './utils/followActiveTab';
-import { toChromeColor } from './utils/groupColors';
 import { fetchFaviconAsBase64, getFaviconUrl } from './utils/favicon';
 import { parseManagerActionId, RoutedManager } from './managers/proxies/messageRouting';
 import { SpaceWindowStateManager } from './managers/impl/spaceWindowStateManager';
@@ -10,6 +9,7 @@ import { TabHistoryManager } from './managers/impl/tabHistoryManager';
 import { LastAudibleTracker } from './managers/impl/lastAudibleTracker';
 import { PinnedSitesManager } from './managers/impl/pinnedSitesManager';
 import { TabAssociationManager } from './managers/impl/tabAssociationManager';
+import { SpaceTabManager } from './managers/impl/spaceTabManager';
 import { backgroundTestHooks } from './managers/impl/backgroundTestHooks';
 import {
   BACKGROUND_TEST_HOOK_ACTION,
@@ -23,11 +23,6 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Feature flags
 const ENABLE_AUTO_GROUP_NEW_TABS = false;
-
-// Workaround: chrome.tabGroups.update() sets title/color internally but
-// chrome.tabGroups.query() returns stale data until manual collapse/expand.
-// See https://github.com/brave/brave-browser/issues/52949
-const ISSUE_52949_WORKAROUND = true;
 
 // =============================================================================
 // TabGroupTracker - Manages active tab group (for auto-grouping feature)
@@ -140,19 +135,6 @@ class NewsVersionChecker
 // =============================================================================
 // Space-Group Helper Functions
 // =============================================================================
-
-// Find Chrome group by name in a window
-async function findGroupByName(windowId: number, name: string): Promise<number | undefined>
-{
-  const groups = await chrome.tabGroups.query({ windowId, title: name });
-  return groups[0]?.id;
-}
-
-// Get a space by ID from the in-memory SpaceManager cache
-async function getSpaceById(spaceId: string): Promise<Space | undefined>
-{
-  return spaceManager.getSpaces().find(s => s.id === spaceId);
-}
 
 // Find a space by name from the in-memory SpaceManager cache
 async function findSpaceByName(name: string | undefined): Promise<Space | undefined>
@@ -291,6 +273,13 @@ const tabAssociationManager = new TabAssociationManager();
 // Reads the history manager's activation order, so it has to come after it.
 const lastAudibleTracker = new LastAudibleTracker(historyManager);
 tabSpaceRegistry = new TabSpaceRegistry();
+// Owns the grouping queue. Reads the active space, the space list and the
+// pinned check through callbacks rather than holding the managers themselves.
+const spaceTabManager = new SpaceTabManager({
+  getActiveSpace: (windowId) => spaceStateManager.getActiveSpace(windowId),
+  getSpace: (spaceId) => spaceManager.getSpaces().find(s => s.id === spaceId),
+  isPinnedManagedTab: (windowId, tabId) => tabAssociationManager.isPinnedManagedTab(windowId, tabId),
+});
 const newsVersionChecker = new NewsVersionChecker();
 
 // Promise that resolves when all state managers have loaded.
@@ -405,6 +394,7 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
   historyManager.remove(removeInfo.windowId, tabId);
   lastAudibleTracker.clearIfMatches(tabId);
   tabSpaceRegistry.unregister(removeInfo.windowId, tabId);
+  spaceTabManager.forgetTab(tabId);
 
   if (!removeInfo.isWindowClosing)
   {
@@ -565,132 +555,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
   }
 });
 
-// Queue for batching tab grouping to prevent race conditions
-interface TabGroupingRequest
-{
-  tabId: number;
-  windowId: number;
-  spaceId: string;  // Target space, captured at queue time
-  force: boolean;  // Move even if already in a different group (see queueTabForGrouping)
-}
-const groupingQueue: TabGroupingRequest[] = [];
-let isProcessingGroupingQueue = false;
-
-// Queue a tab for grouping - prevents race condition when multiple tabs created rapidly
-// spaceId is the target space to group into. If omitted (e.g. Cmd+T new tabs), falls
-// back to whichever space is currently active in this window, captured at queue time
-// (not processing time).
-//
-// An explicit spaceId means the caller has a definite target (e.g. moving a
-// bookmark's tab to match its new Space) - the request is "forced": the tab moves
-// even if it's already in a different group. Without one, only tabs still
-// ungrouped by processing time are claimed, so a queued new-tab request can't
-// race ahead of - and clobber - a group assigned in the meantime.
-function queueTabForGrouping(tab: chrome.tabs.Tab, spaceId?: string): void
-{
-  if (!tab.id || !tab.windowId) return;
-
-  const targetSpaceId = spaceId ?? spaceStateManager.getActiveSpace(tab.windowId);
-  if (!targetSpaceId || targetSpaceId === 'all') return;
-
-  groupingQueue.push({ tabId: tab.id, windowId: tab.windowId, spaceId: targetSpaceId, force: spaceId !== undefined });
-  processGroupingQueue();
-}
-
-// Process queued tabs sequentially - prevents race condition
-async function processGroupingQueue(): Promise<void>
-{
-  if (isProcessingGroupingQueue) return;  // Already processing, items will be picked up
-  isProcessingGroupingQueue = true;
-
-  try
-  {
-    while (groupingQueue.length > 0)
-    {
-      const request = groupingQueue.shift()!;
-      await processGroupingRequest(request);
-    }
-  }
-  finally
-  {
-    isProcessingGroupingQueue = false;
-  }
-}
-
-// Process a single grouping request
-async function processGroupingRequest(request: TabGroupingRequest): Promise<void>
-{
-  const { tabId, windowId, spaceId, force } = request;
-
-  // Check if this is a pinned-site managed tab (keep ungrouped).
-  // An in-memory lookup on TabAssociationManager's map, so no yield point
-  // between the check and the ungroup below.
-  if (tabAssociationManager.isPinnedManagedTab(windowId, tabId))
-  {
-    // Ungroup if currently in a group
-    try
-    {
-      const tab = await chrome.tabs.get(tabId);
-      if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
-      {
-        await chrome.tabs.ungroup(tabId);
-      }
-    }
-    catch { /* Tab may be closed */ }
-    return;
-  }
-
-  try
-  {
-    // Verify tab still exists. Skip only if already grouped and this isn't a
-    // forced move (see queueTabForGrouping) - avoids clobbering a group assigned
-    // to a newly-created tab in the gap between queueing and processing.
-    const tab = await chrome.tabs.get(tabId);
-    if (tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && !force) return;
-
-    const space = await getSpaceById(spaceId);
-    if (!space) return;
-
-    // Find existing Chrome group with Space's name
-    const existingGroupId = await findGroupByName(windowId, space.name);
-
-    // Already in the right group - nothing to do
-    if (existingGroupId && tab.groupId === existingGroupId) return;
-
-    if (existingGroupId)
-    {
-      await chrome.tabs.group({ tabIds: [tabId], groupId: existingGroupId });
-    }
-    else
-    {
-      const newGroupId = await chrome.tabs.group({
-        tabIds: [tabId],
-        createProperties: { windowId }
-      });
-      await chrome.tabGroups.update(newGroupId, {
-        title: space.name,
-        color: toChromeColor(space.color),
-      });
-
-      if (ISSUE_52949_WORKAROUND)
-      {
-        // Send correct group details directly — query() returns stale data for new groups
-        chrome.runtime.sendMessage({
-          type: 'TAB_GROUP_TITLE_SET',
-          groupId: newGroupId,
-          title: space.name,
-          color: toChromeColor(space.color),
-          windowId
-        }).catch(() => {});
-      }
-    }
-  }
-  catch (error)
-  {
-    if (import.meta.env.DEV) console.error('[processGroupingRequest] Failed:', error);
-  }
-}
-
 // Add new tabs to active Space's Chrome group
 chrome.tabs.onCreated.addListener(async (tab) =>
 {
@@ -706,13 +570,13 @@ chrome.tabs.onCreated.addListener(async (tab) =>
   await stateReady;
 
   // Ungrouped tab - queue for grouping
-  // (processGroupingRequest will check if it's a managed tab and ungroup if needed)
+  // (SpaceTabManager checks whether it's a managed tab and ungroups it if needed)
   // Mone: we need to change tab's active space group in background.ts and not in Tablist,
   //       useTab or BookmarkTabContext because we need this to work even when the SideBar
   //       is hidden.
   //       e.g. user is in Space A. user hide side bar. user use Cmd+T to create new tab.
   //            new tab should be also under Space A.
-  queueTabForGrouping(tab);
+  spaceTabManager.queueNewTab(tab);
 });
 
 // =============================================================================
@@ -742,6 +606,7 @@ registerManager(historyManager);
 registerManager(lastAudibleTracker);
 registerManager(pinnedSitesManager);
 registerManager(tabAssociationManager);
+registerManager(spaceTabManager);
 
 // Answers one DEV-only test hook message from the in-panel test runner - see
 // managers/shared/backgroundTestHooksApi.ts.
@@ -844,22 +709,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) =>
       }
     })();
     return true;  // async response
-  }
-
-  // Re-queue a tab for grouping check (used by sidebar after storing association).
-  // spaceId is optional - when given (e.g. associating an existing tab with a
-  // bookmark in a specific Space's folder), it overrides the active-space fallback.
-  if (message.action === 'queue-tab-for-grouping')
-  {
-    (async () =>
-    {
-      await stateReady;
-      if (message.tabId && message.windowId)
-      {
-        queueTabForGrouping({ id: message.tabId, windowId: message.windowId } as chrome.tabs.Tab, message.spaceId);
-      }
-    })();
-    return;
   }
 
   if (message.action === 'set-active-tab-and-space')

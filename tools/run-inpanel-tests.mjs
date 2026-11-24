@@ -107,6 +107,7 @@ const STORAGE_KEYS = {
   batchQueue: 'testRunnerBatchQueue',
   batchCaseIds: 'testRunnerBatchCaseIds',
   deselected: 'testRunnerDeselectedCaseIds',
+  manual: 'testRunnerManualMode',
 };
 
 const DEFAULT_TIMEOUT_MINUTES = 45;
@@ -2219,10 +2220,10 @@ class TestRunDriver
     });
   }
 
-  /** Remembers the tester's own checkbox choices, to put them back at the end. */
+  /** Remembers the tester's own checkbox choices (the case selection and Manual), to put them back at the end. */
   async saveSettings()
   {
-    this.originalSettings = await this.helper.readStorage([STORAGE_KEYS.deselected]);
+    this.originalSettings = await this.helper.readStorage([STORAGE_KEYS.deselected, STORAGE_KEYS.manual]);
   }
 
   async restoreSettings()
@@ -2230,6 +2231,7 @@ class TestRunDriver
     if (!this.originalSettings) return;
     await this.writeStorageTolerantly({
       [STORAGE_KEYS.deselected]: this.originalSettings[STORAGE_KEYS.deselected] ?? null,
+      [STORAGE_KEYS.manual]: this.originalSettings[STORAGE_KEYS.manual] ?? null,
     });
   }
 
@@ -2255,6 +2257,10 @@ class TestRunDriver
    * setter writes it); the hook picks the change up from
    * chrome.storage.onChanged. The deselected list is built from the panel's
    * own case list, so any case not named stays checked as it would by default.
+   *
+   * Also turns the panel's Manual checkbox off: in Manual mode the steps
+   * with a manual version wait for a person, and the driver is there to run
+   * without one.
    */
   async applySelection(caseIds)
   {
@@ -2262,6 +2268,7 @@ class TestRunDriver
     const deselected = this.availableCaseIds.filter(id => !wanted.has(id));
     await this.helper.call(HelperScripts.writeStorage, {
       [STORAGE_KEYS.deselected]: JSON.stringify(deselected),
+      [STORAGE_KEYS.manual]: JSON.stringify(false),
     });
     await this.panel.waitForView(`the Test Runner to show "Run Tests (${caseIds.length})"`, v => v.showsSelection(caseIds), {
       timeoutMs: 15000,

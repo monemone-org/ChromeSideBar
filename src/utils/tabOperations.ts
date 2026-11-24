@@ -4,6 +4,7 @@
 
 import { Space } from '../contexts/SpacesContext';
 import { tabSpaceRegistryProxy } from '../managers/proxies/tabSpaceRegistryProxy';
+import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
 import { toChromeColor } from './groupColors';
 
 // Keyed by "windowId:spaceName" - deduplicates concurrent getOrCreateSpaceGroup
@@ -143,7 +144,10 @@ export async function regroupAssociatedTab(
   if (!targetSpace) return;
 
   tabSpaceRegistryProxy.register(windowId, tabId, targetSpace.id);
-  chrome.runtime.sendMessage({ action: 'queue-tab-for-grouping', tabId, windowId, spaceId: targetSpace.id });
+  spaceTabManagerProxy.assignTabToSpace(windowId, tabId, targetSpace.id).catch((err) =>
+  {
+    console.error('Failed to assign tab to space:', err);
+  });
 }
 
 /**
@@ -187,49 +191,38 @@ export async function createTabFromUrl(
 
 /**
  * Create a new tab in a specific space.
- * Creates or finds the space's Chrome group and adds the new tab to it.
+ *
+ * SpaceTabManager creates the tab and puts it in the space's group as one
+ * job. Creating it here and then grouping it raced background's own grouping
+ * of every new tab, which could move it to the active space or delete the
+ * group it was just put in - see
+ * docs/decisions/2026-11-23-new-tab-grouping-two-writers.md.
  *
  * @param url - The URL to open
- * @param spaceId - The space to create the tab in
- * @param spaces - Array of available spaces
+ * @param spaceId - The space to create the tab in ('all' leaves it ungrouped)
  * @param windowId - The window to create the tab in
  * @returns Object with success status and the created tab
  */
 export async function createTabInSpace(
   url: string,
   spaceId: string,
-  spaces: readonly Space[],
   windowId: number
 ): Promise<{ success: boolean; tab?: chrome.tabs.Tab; error?: string }>
 {
   try
   {
-    // Create the tab first
-    const tab = await chrome.tabs.create({
-      url,
-      active: false,
-      windowId
-    });
+    const { tabIds } = await spaceTabManagerProxy.createTabs(
+      windowId,
+      [{ url }],
+      spaceId === 'all' ? { kind: 'none' } : { kind: 'space', spaceId }
+    );
 
-    if (!tab.id)
+    if (tabIds.length === 0)
     {
       return { success: false, error: 'Failed to create tab' };
     }
 
-    // If "all" space, just create without grouping
-    if (spaceId === 'all')
-    {
-      return { success: true, tab };
-    }
-
-    // Move to space's group
-    const result = await moveTabToSpace(tab.id, spaceId, spaces, windowId);
-    if (!result.success)
-    {
-      return { success: false, tab, error: result.error };
-    }
-
-    return { success: true, tab };
+    return { success: true, tab: await chrome.tabs.get(tabIds[0]) };
   }
   catch (error)
   {

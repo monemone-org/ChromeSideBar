@@ -582,18 +582,45 @@ function matchBackupWindows(
 }
 
 // Build a filtered backup containing only matched entries, updated with new tabIds.
-function buildFilteredBackup(
-  backup: WindowAssociationBackup,
-  tabMatches: Record<string, number>
+/**
+ * The backup a restored window should have: one entry per association it
+ * ends up with, not per backup entry that matched a tab. A matched entry the
+ * restore skipped, because its item or its tab was already taken by a newer
+ * association, must not be written back, or the next restart would restore
+ * it (T.4).
+ *
+ * An entry comes from the restored backup when the restore applied it, and
+ * otherwise from the current window's own backup, which is where a newer
+ * association's entry already is. An association found in neither gets its
+ * entry from the save still queued behind this restore.
+ */
+function buildMergedBackup(
+  associations: TabAssociations,
+  restoredBackup: WindowAssociationBackup,
+  tabMatches: Record<string, number>,
+  currentBackup: WindowAssociationBackup | undefined
 ): WindowAssociationBackup
 {
-  const filtered: WindowAssociationBackup = {};
-  for (const [itemKey, tabId] of Object.entries(tabMatches))
+  const merged: WindowAssociationBackup = {};
+
+  // Find an entry for each association the window ends up with
+  for (const [id, itemKey] of Object.entries(associations))
   {
-    const entry = backup[itemKey];
-    if (entry) filtered[itemKey] = { ...entry, tabId };
+    const tabId = Number(id);
+    const restoredEntry = restoredBackup[itemKey];
+    const currentEntry = currentBackup?.[itemKey];
+
+    if (tabMatches[itemKey] === tabId && restoredEntry)
+    {
+      merged[itemKey] = { ...restoredEntry, tabId };
+    }
+    else if (currentEntry?.tabId === tabId)
+    {
+      merged[itemKey] = currentEntry;
+    }
   }
-  return filtered;
+
+  return merged;
 }
 
 // =============================================================================
@@ -854,8 +881,7 @@ export class TabAssociationManager implements RoutedManager, TabAssociationsApi
    */
   async refreshBackupIndices(windowId: number): Promise<void>
   {
-    const associations = this.getAssociations(windowId);
-    if (Object.keys(associations).length === 0) return;
+    if (Object.keys(this.getAssociations(windowId)).length === 0) return;
 
     const allTabs = await chrome.tabs.query({ windowId });
     const tabIndexMap = new Map(allTabs.map(t => [t.id!, t.index]));
@@ -865,6 +891,9 @@ export class TabAssociationManager implements RoutedManager, TabAssociationsApi
       await backgroundTestHooks.passGate(TestGateName.REFRESH_BACKUP_INDICES_AFTER_TAB_QUERY);
     }
 
+    // Read the map only now, after the query: an item that moved to another
+    // tab while it ran would otherwise be given its old tab's index (T.5)
+    const associations = this.getAssociations(windowId);
     const updates: Record<string, number> = {};
     for (const [id, itemKey] of Object.entries(associations))
     {
@@ -974,9 +1003,10 @@ export class TabAssociationManager implements RoutedManager, TabAssociationsApi
       }
       this.#commit(currentId, associations);
 
-      // Update backup: keep only matched entries under the current window ID
+      // Update backup: one entry per association the window now has, under
+      // the current window ID
       const backup = backups.get(backupId)!;
-      const filtered = buildFilteredBackup(backup, tabMatches);
+      const filtered = buildMergedBackup(associations, backup, tabMatches, backups.get(currentId));
 
       if (backupId !== currentId)
       {

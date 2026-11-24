@@ -90,6 +90,14 @@ The steps above do not test two things:
 - A real close of the side panel. Background does not track whether the panel is open, so a parked panel and a closed panel are the same for it. If background starts to track the panel, the closed-panel cases must be examined again.
 - The delivery of a real key press by Chrome to the extension.
 
+## Manual mode
+
+The Test Runner has a "Manual" checkbox, which is off by default. When it is on, each step whose automated version differs from real use becomes a pause, and you do the step yourself with real input. You close the side panel for real, press the real keys, use the real mouse, and click the real buttons. The automated run is good enough for regression, and Manual mode is for a run that is fully real. The driver always runs with Manual mode off, and it puts your setting back at the end.
+
+Give a step a manual version when its automated version differs from what a user does. Pass a `ManualStep` as the last argument of `actionStep()`, `assertStep()` or `closedPanelStep()`. The `steps` are the instruction that the banner shows, in the same style as a pause. Add `confirm` when the automated version checks something that the tester must judge in Manual mode, for example whether a dropdown showed a title in each row. The runner then records the tester's Pass or Fail under that question. A step that the tester does without a question gets a passed result with a note that says a person did it.
+
+Keep the checks automated in both modes. Setup, the assert steps, and the background test gates do not change in Manual mode. A case that arms a gate before a gesture still holds background while you do the gesture for real. The gate lets go on its own 15 seconds after background arrives at it, so take your time before the gesture, but click Resume soon after it.
+
 Do the action also when a check fails. An assert step that performs a gesture must do the gesture before it throws an error. The steps after it then run against the state that the case expects. If the step does not do the action, one small failure can make each later assertion in the case fail. An example of a small failure is a broken favicon in a row of a dropdown. Use `holdHistoryButtonAndPickTopRow` as the example.
 
 Do everything that a person would do, side effects too. Assume that a person would switch to a tab and play its audio. The step must then make the tab active, and not only start the audio. Background adds a tab to its tab history when the tab becomes active. If the step starts the audio only, the history is different. The assertion in E.3 that Previous goes back to the audio tab then fails.

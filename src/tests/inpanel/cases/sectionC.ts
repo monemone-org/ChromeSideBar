@@ -567,11 +567,23 @@ export const C2C_HISTORY_SHORTCUTS: TestCase = {
     scrollRowOutOfView('tab2'),
     assertTabRowVisible('tab2', false),
 
-    actionStep('Press the history BACK shortcut (Previous Used Tab)', pressShortcut('prev-used-tab')),
+    actionStep('Press the history BACK shortcut (Previous Used Tab)', pressShortcut('prev-used-tab'), {
+      steps: [
+        'Press the "Previous Used Tab" shortcut (default Cmd+Shift+Comma - check chrome://extensions/shortcuts if unsure).',
+        'Leave the sidebar panel open.',
+        'Click Resume below.',
+      ],
+    }),
     assertSidebarShowsSpace('spaceA'),
     assertTabRowVisible('tab1', true),
 
-    actionStep('Press the history FORWARD shortcut (Next Used Tab)', pressShortcut('next-used-tab')),
+    actionStep('Press the history FORWARD shortcut (Next Used Tab)', pressShortcut('next-used-tab'), {
+      steps: [
+        'Press the "Next Used Tab" shortcut (default Cmd+Shift+Period).',
+        'Leave the sidebar panel open.',
+        'Click Resume below.',
+      ],
+    }),
     assertSidebarShowsSpace('spaceB'),
     assertTabRowVisible('tab2', true),
   ],
@@ -602,14 +614,26 @@ export const C2C_HISTORY_SHORTCUTS_SAME_SPACE: TestCase = {
 
     scrollRowOutOfView('tab1'),
     assertTabRowVisible('tab1', false),
-    actionStep('Press the history BACK shortcut (Previous Used Tab)', pressShortcut('prev-used-tab')),
+    actionStep('Press the history BACK shortcut (Previous Used Tab)', pressShortcut('prev-used-tab'), {
+      steps: [
+        'Press the "Previous Used Tab" shortcut (default Cmd+Shift+Comma - check chrome://extensions/shortcuts if unsure).',
+        'Leave the sidebar panel open.',
+        'Click Resume below.',
+      ],
+    }),
     assertTabActive('tab1'),
     assertSidebarShowsSpace('spaceA'),
     assertTabRowVisible('tab1', true),
 
     scrollRowOutOfView('tab2'),
     assertTabRowVisible('tab2', false),
-    actionStep('Press the history FORWARD shortcut (Next Used Tab)', pressShortcut('next-used-tab')),
+    actionStep('Press the history FORWARD shortcut (Next Used Tab)', pressShortcut('next-used-tab'), {
+      steps: [
+        'Press the "Next Used Tab" shortcut (default Cmd+Shift+Period).',
+        'Leave the sidebar panel open.',
+        'Click Resume below.',
+      ],
+    }),
     assertTabActive('tab2'),
     assertSidebarShowsSpace('spaceA'),
     assertTabRowVisible('tab2', true),
@@ -716,7 +740,13 @@ export const C2E_AUDIO_QUICK_JUMP: TestCase = {
     openFillerTabsUntilScrollable('spaceB'),
     openAudioTab({ spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
-    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab')),
+    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab'), {
+      steps: [
+        'Switch to the newly opened test tone tab in Chrome.',
+        'Click **Play** and leave it playing (unmuted - a muted tab does not count as audible).',
+        'Come back to the sidebar and click Resume below.',
+      ],
+    }),
     assertTabAudible('audioTab', true),
     scrollRowOutOfView('audioTab'),
     assertTabRowVisible('audioTab', false),
@@ -751,7 +781,13 @@ export const C2E_AUDIO_QUICK_JUMP_BOOKMARK: TestCase = {
     openFillerBookmarksUntilScrollable('spaceB'),
     openAudioBookmarkTab({ bookmarkRef: 'bm', spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
-    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab')),
+    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab'), {
+      steps: [
+        'Switch to the newly opened test tone tab in Chrome.',
+        'Click **Play** and leave it playing (unmuted - a muted tab does not count as audible).',
+        'Come back to the sidebar and click Resume below.',
+      ],
+    }),
     assertTabAudible('audioTab', true),
     scrollRowOutOfView('audioTab'),
     assertTabRowVisible('audioTab', false),
@@ -783,7 +819,13 @@ export const C2E_AUDIO_QUICK_JUMP_SAME_SPACE: TestCase = {
     openFillerTabsUntilScrollable('spaceB'),
     openAudioTab({ spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
-    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab')),
+    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab'), {
+      steps: [
+        'Switch to the newly opened test tone tab in Chrome.',
+        'Click **Play** and leave it playing (unmuted - a muted tab does not count as audible).',
+        'Come back to the sidebar and click Resume below.',
+      ],
+    }),
     assertTabAudible('audioTab', true),
     scrollRowOutOfView('audioTab'),
     assertTabRowVisible('audioTab', false),
@@ -816,7 +858,13 @@ export const C2E_AUDIO_QUICK_JUMP_SAME_SPACE_COLLAPSED: TestCase = {
     openFillerBookmarksUntilScrollable('spaceB'),
     openAudioBookmarkTab({ bookmarkRef: 'bm', spaceRef: 'spaceB', tabRef: 'audioTab' }),
 
-    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab')),
+    actionStep('Start audio playback in the tone tab', playTestAudio('audioTab'), {
+      steps: [
+        'Switch to the newly opened test tone tab in Chrome.',
+        'Click **Play** and leave it playing (unmuted - a muted tab does not count as audible).',
+        'Come back to the sidebar and click Resume below.',
+      ],
+    }),
     assertTabAudible('audioTab', true),
     // Precondition: switching to the tab to start playback must not have expanded
     // the folder, so the row still isn't rendered.
@@ -855,7 +903,13 @@ export const C2F_AUDIO_DROPDOWN: TestCase = {
 
     // The Work tab first, then the Video tab: the Video tab must be the more
     // recent, so selecting the Work entry is a real choice and not the default
-    actionStep('Start playback in both tone tabs, Work first', playTestAudio('audioTabA', 'audioTabB')),
+    actionStep('Start playback in both tone tabs, Work first', playTestAudio('audioTabA', 'audioTabB'), {
+      steps: [
+        'Two test tone tabs were opened. Click **Play** on both, leaving both unmuted.',
+        `Play the ${TEST_SPACE_WORK_NAME} one FIRST, then the ${TEST_SPACE_VIDEO_NAME} one - the ${TEST_SPACE_VIDEO_NAME} tab must be the more recent, so selecting the ${TEST_SPACE_WORK_NAME} entry is a real choice rather than the default.`,
+        'Come back to the sidebar and click Resume below.',
+      ],
+    }),
     assertTabAudible('audioTabA', true),
     assertTabAudible('audioTabB', true),
     // Both must be listed, otherwise "pick a specific entry" is a one-item menu.
@@ -934,7 +988,15 @@ export const C2G_HISTORY_DROPDOWN_GESTURE: TestCase = {
     activateTabNative('tab3'),
     assertSidebarShowsSpace('spaceA'),
 
-    assertStep('Hold Previous: the dropdown opens, every row shows a title and a favicon or the grey fallback, and the top row is picked', holdHistoryButtonAndPickTopRow('prev')),
+    assertStep('Hold Previous: the dropdown opens, every row shows a title and a favicon or the grey fallback, and the top row is picked', holdHistoryButtonAndPickTopRow('prev'), {
+      confirm: 'Did the dropdown appear on the hold, and did every row show a title plus either a favicon or the grey fallback square?',
+      steps: [
+        'Press and hold the toolbar\'s "Previous" (back arrow) button for about half a second, until a dropdown appears.',
+        'Check every row shows a title, and either a favicon or a small grey square where one is missing (Toolbar.tsx falls back to that square, so a grey one is not a failure). The titles all read the same because these are example.com test tabs - that is expected.',
+        'Click the TOP row. The list is most-recent-first, so that is the tab activated just before the current one.',
+        'Come back to the sidebar and answer below.',
+      ],
+    }),
 
     // Clicking the top row runs the same navigateToIndex C.2d calls directly,
     // but this time through the real dropdown. A space switch and a scroll
@@ -943,7 +1005,14 @@ export const C2G_HISTORY_DROPDOWN_GESTURE: TestCase = {
     assertSidebarShowsSpace('spaceB'),
     assertTabRowVisible('tab2', true),
 
-    assertStep('Quick-click Previous: it navigates without opening the dropdown', quickClickHistoryButton('prev')),
+    assertStep('Quick-click Previous: it navigates without opening the dropdown', quickClickHistoryButton('prev'), {
+      confirm: 'Did the quick click navigate WITHOUT opening the dropdown?',
+      steps: [
+        'Click the toolbar\'s "Previous" button and release immediately.',
+        'No dropdown should appear - a quick click navigates instead of opening the list.',
+        'Come back to the sidebar and answer below.',
+      ],
+    }),
 
     // The history index sits on tab2 after the dropdown jump, so one step back
     // is tab1. Landing anywhere else means the quick-click branch navigated
@@ -955,14 +1024,30 @@ export const C2G_HISTORY_DROPDOWN_GESTURE: TestCase = {
     // renders a full-screen Overlay (MenuBase.tsx, fixed inset-0 z-40) over
     // the whole panel, so the press never reaches the button and no hold timer
     // can start.
-    assertStep('Click Previous with the dropdown open: the dropdown closes and nothing navigates', dismissHistoryDropdownWithClick('prev')),
+    assertStep('Click Previous with the dropdown open: the dropdown closes and nothing navigates', dismissHistoryDropdownWithClick('prev'), {
+      confirm: 'Did the click dismiss the open dropdown without navigating anywhere?',
+      steps: [
+        'Press and hold "Previous" until the dropdown appears.',
+        'Click "Previous" once, normally, while the dropdown is still open.',
+        'The dropdown should close, and nothing should navigate.',
+        'Come back to the sidebar and answer below.',
+      ],
+    }),
 
     assertTabActive('tab1'),
 
     // Not covered: handleHistoryMouseLeave's timer cancel. Reaching it means
     // pressing the button and dragging off within the 300ms before the
     // dropdown opens, which is too fiddly to perform the same way twice.
-    assertStep('Hold Next: the dropdown lists the entries ahead of the current position, and the top row is picked', holdHistoryButtonAndPickTopRow('next')),
+    assertStep('Hold Next: the dropdown lists the entries ahead of the current position, and the top row is picked', holdHistoryButtonAndPickTopRow('next'), {
+      confirm: 'Did the Next dropdown list the entries AHEAD of the current position, with titles and favicons?',
+      steps: [
+        'Press and hold the toolbar\'s "Next" (forward arrow) button until its dropdown appears.',
+        'It should list the entries ahead of the current position, again with titles and favicons.',
+        'Click the TOP row.',
+        'Come back to the sidebar and answer below.',
+      ],
+    }),
 
     // Forward from tab1 is tab2, the entry the backward pass left behind.
     assertTabActive('tab2'),

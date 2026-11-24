@@ -150,15 +150,30 @@ export type PauseOptions =
 //   otherwise it leaves the pause to a person.
 export type ExternalAction = 'stop-service-worker' | 'reload-extension' | 'clear-browsing-data';
 
+/**
+ * How a tester performs a step by hand, for the steps whose automated
+ * version differs from a real user's input (simulated mouse events, a
+ * message standing in for a key press, the parked page standing in for a
+ * closed panel). With the runner's Manual mode on, such a step becomes a
+ * pause that shows these instructions; with it off, the automated version
+ * runs. `confirm` makes the pause ask a Pass/Fail question, for a step whose
+ * automated version checks something the tester now has to judge.
+ */
+export interface ManualStep
+{
+  steps: string[];
+  confirm?: string;
+}
+
 export type TestStep =
-  | { kind: 'action'; label: string; run: StepRunner }
-  | { kind: 'assert'; label: string; run: StepRunner }
+  | { kind: 'action'; label: string; run: StepRunner; manual?: ManualStep }
+  | { kind: 'assert'; label: string; run: StepRunner; manual?: ManualStep }
   // Runs on the parked page with the sidebar app unloaded - from the
   // extension's side, the same state as a closed panel. The runner writes a
   // checkpoint and parks the panel; the parked page runs the step and sends
   // the panel back, which resumes on its own. A failure ends the case, like
   // a failed action.
-  | { kind: 'closedPanel'; label: string; run: ClosedPanelRunner }
+  | { kind: 'closedPanel'; label: string; run: ClosedPanelRunner; manual?: ManualStep }
   | ({ kind: 'pause'; label: string; instruction: string } & PauseOptions);
 
 export interface TestCase
@@ -200,4 +215,8 @@ export interface ResumeState
   // script can tell from storage alone which pauses it should act on. Absent
   // on every other checkpoint.
   external?: ExternalAction;
+  // Set when Manual mode turned a step with a manual version into a pause:
+  // the tester performs the step, and the banner shows its manual
+  // instructions instead of running or parking for it.
+  manual?: boolean;
 }

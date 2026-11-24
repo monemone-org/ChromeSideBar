@@ -1,0 +1,53 @@
+---
+created: 2026-11-23
+status: open
+severity: low
+---
+
+# Chrome's "Remove from group" keeps a bookmark tab's association (G3)
+
+## Summary
+
+When a bookmark's tab is taken out of its Chrome group with Chrome's own "Remove from group" (or any other way of leaving a group without joining another), the tab stays associated with its bookmark. The bookmark still shows as loaded, and the tab still counts as being in the bookmark's space, although it is no longer in that space's group. Activating the tab later can switch the sidebar back to the bookmark's space, where the tab is not actually shown.
+
+## Repro
+
+- **A.5** ungroups a bookmark tab, first with the sidebar open and then with it closed, and checks after each that the bookmark is no longer loaded. Both checks fail.
+
+See `docs/test/tab-space-association-test-cases.md` (`### A.5`) for the detailed steps.
+
+## Root cause
+
+The group-change handler in `chrome.tabs.onUpdated` in `src/background.ts` only reacts when a tab joins a group:
+
+```ts
+if (changeInfo.groupId !== undefined && changeInfo.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && tab?.windowId)
+```
+
+When a tracked tab joins the group of a different space, the handler removes it from `tabSpaceRegistry` and calls `tabAssociationManager.deassociate`, which is what A.2 checks. But leaving a group reports `groupId === TAB_GROUP_ID_NONE`, which this condition skips, so nothing happens.
+
+## Proposed fix
+
+Treat leaving a group the same way as moving to another space's group: the tab stays open and becomes a regular, unassociated tab. An ungrouped tab belongs to no space, so it can no longer be in its bookmark's space, and the association no longer describes where the tab is.
+
+The change is in that one handler:
+
+1. Let the condition also accept `TAB_GROUP_ID_NONE`.
+2. For a tab that `tabSpaceRegistry` has registered to a space:
+   - if the new group id is `TAB_GROUP_ID_NONE`, the tab has left its space, so unregister and deassociate it;
+   - otherwise keep today's check: look up the group's space and deassociate only when it differs from the registered space.
+
+Pinned sites are not affected. Their tabs are kept ungrouped on purpose and are never registered in `tabSpaceRegistry`, and the handler only acts on registered tabs, which is also why A.4 (a pinned site's tab being grouped) keeps its association.
+
+### Points to check while implementing
+
+Some of the extension's own operations take a bookmark tab out of its group on the way to somewhere else. If any of them leaves the group in a separate step before joining the new one, this fix would unlink the tab in between. Check each of these, and the test cases that cover them:
+
+- **Moving a bookmark to another space** (`regroupAssociatedTab`, A.7, A.7b, A.7c). It groups the tab straight into the new space's group, which should report only the new group id.
+- **Deleting a space and its undo** (`DeleteSpaceAction`, D.2). Check whether deleting the space ungroups its tabs, and whether its bookmark tabs are meant to stay associated afterwards.
+- **Moving a tab to another window** (A.6, A.6b). A tab detached from its window loses its group, which may report `TAB_GROUP_ID_NONE` before the window move is handled. The result is the same (the tab is unlinked), but the order should not cause an error.
+- **Chrome's "Ungroup" on a whole group** and closing a group. Every bookmark tab in it would be unlinked, which is consistent with this fix, but worth confirming by hand.
+
+## Status
+
+Not fixed. The fix above is agreed; implementation has not started.
