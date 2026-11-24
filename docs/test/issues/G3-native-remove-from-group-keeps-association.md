@@ -39,15 +39,30 @@ The change is in that one handler:
 
 Pinned sites are not affected. Their tabs are kept ungrouped on purpose and are never registered in `tabSpaceRegistry`, and the handler only acts on registered tabs, which is also why A.4 (a pinned site's tab being grouped) keeps its association.
 
+### The tab sort must stop ungrouping first
+
+The handler change alone would break "Sort by Domain (A-Z)" and "(Z-A)" on the Tabs header. `sortTabs` in `src/hooks/useTabs.ts` sorts every tab in the window, bookmark tabs included, in three steps. It ungroups every grouped tab, moves the tabs into the new order, and then creates new groups with the old titles and colours.
+
+Today the links survive this. Background ignores the first step, and in the last step each tab joins a group with the same title, which is the same space. With the handler change, the first step would count as leaving the group, and every open bookmark tab in a space group would be unlinked by one sort.
+
+So the fix comes in this order:
+
+1. Rewrite `sortTabs` so it never ungroups. It reorders whole groups with `chrome.tabGroups.move`, and the tabs inside each group and the ungrouped tabs with `chrome.tabs.move`, the way `sortGroupTabs` already sorts within one group. Groups keep their ids, so nothing has to be rebuilt.
+2. Make the handler change above.
+3. Add a regression case. A space has open bookmark tabs and some regular tabs. Sort the Tabs list, and check that the bookmark tabs are still loaded and still in the space's group.
+
+Delaying the unlink in background, and checking afterwards whether the tab was regrouped, was ruled out. It depends on timing, and a sort over many tabs can take longer than any delay we would choose.
+
 ### Points to check while implementing
 
 Some of the extension's own operations take a bookmark tab out of its group on the way to somewhere else. If any of them leaves the group in a separate step before joining the new one, this fix would unlink the tab in between. Check each of these, and the test cases that cover them:
 
-- **Moving a bookmark to another space** (`regroupAssociatedTab`, A.7, A.7b, A.7c). It groups the tab straight into the new space's group, which should report only the new group id.
+- **Moving a bookmark to another space** (`regroupAssociatedTab`, A.7, A.7b, A.7c). It groups the tab straight into the new space's group, so Chrome reports only the new group id. The code confirms this.
+- **Moving a regular tab between spaces and dragging tabs in the Tabs list** (`moveTabToSpace`, `src/utils/tabMove.ts`). These do ungroup tabs, but the Tabs list hides bookmark tabs, so only regular tabs reach them.
 - **Deleting a space and its undo** (`DeleteSpaceAction`, D.2). Check whether deleting the space ungroups its tabs, and whether its bookmark tabs are meant to stay associated afterwards.
 - **Moving a tab to another window** (A.6, A.6b). A tab detached from its window loses its group, which may report `TAB_GROUP_ID_NONE` before the window move is handled. The result is the same (the tab is unlinked), but the order should not cause an error.
 - **Chrome's "Ungroup" on a whole group** and closing a group. Every bookmark tab in it would be unlinked, which is consistent with this fix, but worth confirming by hand.
 
 ## Status
 
-Not fixed. The fix above is agreed; implementation has not started.
+Not fixed. The handler change is agreed. The `sortTabs` rewrite it depends on is proposed and waiting for approval. Implementation has not started.

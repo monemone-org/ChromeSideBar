@@ -1,6 +1,6 @@
 ---
 created: 2026-11-18
-status: fixed, not verified
+status: fixed
 severity: medium
 ---
 
@@ -71,7 +71,9 @@ Case T.6 in `src/tests/inpanel/cases/sectionT.ts` holds background right after i
 
 ## Status
 
-Fixed, not verified. To verify the fix, run the cases that failed, and T.6, several times through the driver:
+Fixed. In the full driver run of 2026-11-24, A.1, C.2c, C.2e and T.6 passed, and no case reported `No group with id`.
+
+The race depends on timing, so a single clean run does not prove it is gone. To check it again, run those cases several times through the driver:
 
 1. Build the debug build with `npm run build:debug`.
 2. Start the test Chrome with `tools/start-test-chrome.sh`. Make sure that the extension is loaded unpacked from the `dist` folder of this checkout.

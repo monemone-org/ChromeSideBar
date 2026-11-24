@@ -1,6 +1,6 @@
 ---
 created: 2026-11-23
-status: implemented, not verified
+status: implemented
 decision: 2026-11-23-new-tab-grouping-two-writers
 ---
 
@@ -177,7 +177,7 @@ After this step T.6 passes, because that drop now goes through `createTabs`.
 ### Step 5: docs
 
 - The decision doc: status `accepted`, and the open question points to this plan as the chosen direction.
-- N1: status stays "fixed, not verified" until a run shows A.1, C.2e and T.6 passing, and its "Who can see it" section notes that the product paths are fixed.
+- N1: status "fixed" once a run shows A.1, C.2e and T.6 passing, and its "Who can see it" section notes that the product paths are fixed.
 - `2026-09-22-space-tab-manager.md`: the grouping queue, `createTabs`, `assignTabToSpace` and `requestGrouping` are already in `SpaceTabManager`, so its migration covers only the orchestration functions, the active-space state and the registry.
 - `docs/state-reference.md`, if it lists the grouping queue's owner.
 
@@ -187,6 +187,8 @@ After this step T.6 passes, because that drop now goes through `createTabs`.
 - The suite stays at the same results after step 2, apart from T.6 still failing, because step 2 changes no behavior.
 - After step 4, run A.1, C.2c, C.2e and T.6 several times through the driver, as the N1 doc describes, and look for `No group with id` in the summaries.
 - By hand, because no case covers them: drag a bookmark onto a space icon whose space has no tabs, use "open all in group" on a folder while another space is active, close a grouped tab and undo, and delete a space with tabs and undo. In each case the tabs should end up in the expected group, and the console should show no `[processGroupingRequest] Failed` line.
+
+In the full driver run of 2026-11-24, A.1, C.2c, C.2e and T.6 passed, and no case reported `No group with id`. Repeated runs and the checks by hand are still worth doing, because the race depends on timing.
 
 ## Cost and risk
 

@@ -65,11 +65,3 @@ Only enable logging in debug build:
 - `docs/features/` - Feature specs
 - `docs/state-reference.md` - Extension state reference
 
-## Versioning
-
-**Before running command git-commit-msg**, update extension version number with:
-
-```bash
-./tools/update-version.sh
-```
-

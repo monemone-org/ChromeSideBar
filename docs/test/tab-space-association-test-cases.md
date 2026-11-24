@@ -20,7 +20,7 @@ A known gap is a fault that is not fixed yet. Make sure that each gap below stil
 
 - G1: You delete a bookmark in the bookmark manager of Chrome (`chrome://bookmarks`) while its tab is open. The tab becomes orphaned: it continues to run, but it disappears from both lists. This gap is not fixed yet. It applies only to bookmarks. The delete option of the extension always closes the tab first, and Chrome has no delete function for pinned sites. See B.5.
 - G2: You drag a tracked tab to another space, or to another window, while the side panel is closed. The bookmark used to stay "loaded" against the old space, because only the sidebar cleared the association. This gap is fixed: background now clears the association itself. A.3, A.6 and A.6c check it.
-- G3: You use the "Remove from group" command of Chrome on a tracked tab. The detection runs only when the tab moves to another group, not when it leaves its group. Thus the bookmark association stays. When you activate that tab later, the sidebar can switch back to the original bookmark space of the tab. This gap is not fixed yet.
+- G3: You use the "Remove from group" command of Chrome on a tracked tab. The detection runs only when the tab moves to another group, not when it leaves its group. Thus the bookmark association stays. When you activate that tab later, the sidebar can switch back to the original bookmark space of the tab. This gap is not fixed yet. The Tabs sort ungroups and regroups every tab, so the fix has to change the sort first. Otherwise one sort would unlink every open bookmark tab. See `docs/test/issues/G3-native-remove-from-group-keeps-association.md`.
 
 ## Prerequisites
 
