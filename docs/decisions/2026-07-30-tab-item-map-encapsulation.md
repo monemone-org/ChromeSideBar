@@ -1,10 +1,16 @@
 ---
 created: 2026-07-30
 decision: tab-item-association-class
-status: proposed
+status: superseded
 ---
 
 # Encapsulate itemToTab/tabToItem as a Class
+
+## Outcome
+
+Superseded by step 6b of [[2026-07-30-shared-storage-multiple-writers]] (`TabAssociationManager`). The problem below is gone. The sidebar no longer keeps the two maps as separate `useState` fields, and it never writes them. Background owns the one association map, the sidebar mirrors it through `tabAssociationsProxy`, and `BookmarkTabsContext.tsx` builds both lookup directions from that mirror in a single `useMemo`. The two directions can't drift apart, and the seven paired clone-and-set sites no longer exist.
+
+One small point of this proposal is left. The context still exposes `itemToTab` and `tabToItem` as raw `Map`s, where the code style prefers a class with named lookups. That's a minor clean-up, not the bug this doc was written for, so it doesn't need a plan of its own.
 
 ## Background
 

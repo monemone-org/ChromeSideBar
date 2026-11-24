@@ -2,7 +2,7 @@
 created: 2026-09-21
 step: 6
 manager: TabAssociationManager
-status: proposed
+status: shipped
 ---
 
 # Step 6b: Port `TabAssociationManager`

@@ -1,3 +1,9 @@
+---
+created: 2026-01-28
+decision: remove-restore-last-active-space
+status: implemented
+---
+
 # Remove Restore Last Active Space Feature
 
 **Date:** 2026-01-28

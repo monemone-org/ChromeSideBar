@@ -2,7 +2,7 @@
 created: 2026-09-17
 step: 5
 manager: PinnedSitesManager
-status: implemented, pending verification
+status: shipped
 ---
 
 # Step 5: Port `PinnedSitesManager`

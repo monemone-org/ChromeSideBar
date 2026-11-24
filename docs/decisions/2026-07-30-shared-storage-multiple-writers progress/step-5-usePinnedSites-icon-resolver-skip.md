@@ -1,6 +1,6 @@
 ---
 created: 2026-09-19
-status: fixed, verification pending
+status: fixed
 area: usePinnedSites icon resolver
 ---
 
@@ -10,8 +10,8 @@ Found while verifying step 5 (`step-5-pinned-sites-manager.md`) through the
 in-panel test runner. This bug is pre-existing behaviour in
 `src/hooks/usePinnedSites.ts` - step 5 did not introduce it, it just made a
 test exist that hits it reliably. The fix described at the bottom has now been
-applied, and P.9 passes when run on its own. What is still outstanding is a
-full-suite run, which is the condition that was actually broken - see "What to
+applied. P.9 passes on its own, and it also passed in the full-suite run of
+2026-11-24, which is the condition that was actually broken - see "What to
 test".
 
 ## Parts involved

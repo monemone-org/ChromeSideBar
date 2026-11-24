@@ -179,13 +179,16 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
 
     // Its own window, not a tab here: tab history is kept per window, so a tab
     // in this window would change what Previous goes back to.
-    openPageForTester({ url: 'chrome://extensions', ref: 'extensionsWindow', inNewWindow: true }),
+    openPageForTester({ url: 'chrome://serviceworker-internals', ref: 'workerWindow', inNewWindow: true }),
     pause(
       'Manual step: stop the service worker (do NOT reload the extension)',
       [
-        'In the window that just opened, find this extension and click its **service worker** link - DevTools opens for the worker.',
-        'In those DevTools, go to **Application** -> **Service Workers** and click **Stop** - waiting a minute or so for it to idle out works too.',
-        'Do NOT click the extension\'s **reload** button - that is a fresh extension load and clears chrome.storage.session, which is exactly what this case needs kept.',
+        // Stopped from chrome://serviceworker-internals rather than DevTools:
+        // DevTools on an extension worker has no Stop button, and while it
+        // is attached it keeps the worker alive, so idling out never happens.
+        `In the window that just opened, find the entry whose Script is **chrome-extension://${chrome.runtime.id}/background.js** and click its **Stop** button.`,
+        'If that entry already shows **Running Status: STOPPED** (only a **Start** button), the worker has idled out and this step is done. Close any DevTools window open on the worker first - it keeps the worker running.',
+        'Do NOT click **Unregister** - it removes the worker\'s registration, which a stop does not. Do NOT reload the extension from chrome://extensions either - that is a fresh extension load and clears chrome.storage.session, which is exactly what this case needs kept.',
         'Come back to this window by clicking inside the sidebar, not a tab, and click Resume below.',
       ],
       { external: 'stop-service-worker' }
@@ -207,7 +210,7 @@ export const E3_SERVICE_WORKER_RESTART: TestCase = {
     // Closed last, not straight after the pause: closing a window moves
     // Chrome's focus back to this one, and everything above is measuring this
     // window's tab activity.
-    closeTesterWindow('extensionsWindow'),
+    closeTesterWindow('workerWindow'),
   ],
 };
 

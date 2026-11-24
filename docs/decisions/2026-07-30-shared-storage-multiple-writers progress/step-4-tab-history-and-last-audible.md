@@ -2,7 +2,7 @@
 created: 2026-09-13
 step: 4
 manager: TabHistoryManager, LastAudibleTracker
-status: implemented, pending verification
+status: shipped
 ---
 
 # Step 4: Port `TabHistoryManager` and `LastAudibleTracker`

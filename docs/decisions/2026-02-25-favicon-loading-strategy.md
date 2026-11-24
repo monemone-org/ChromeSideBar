@@ -48,10 +48,10 @@ Once resolved, `favicon` is saved back to storage so this only runs once per sit
 
 When any tab reports a new `favIconUrl`, background.ts:
 
-1. Matches pinned sites by hostname
+1. Matches pinned sites by hostname, reading `PinnedSitesManager`'s in-memory list
 2. Skips sites that already have `favicon`, `customIconName`, or `emoji`
-3. Fetches the favicon via `fetchAsBase64(changeInfo.favIconUrl)`
-4. Saves directly to storage — side panel picks up via `storage.onChanged`
+3. Fetches the favicon via `fetchFaviconAsBase64(getFaviconUrl(tab.url))`, Chrome's `_favicon` API, rather than `changeInfo.favIconUrl` itself. Fetching the page's own icon URL hits CORS errors on private servers, and Chrome has just cached the icon, so the `_favicon` lookup succeeds.
+4. Calls `pinnedSitesManager.setFavicons(...)` with one patch per site. The manager checks each pin again before applying, because the user may have set an icon by hand during the fetch. Then it saves the list and broadcasts it, and every open side panel updates its mirror from that broadcast.
 
 This handles the case where the user opens a pinned site for the first time. Chrome loads
 the page, fires `favIconUrl`, and the pin gets updated automatically — no reload needed.

@@ -1,10 +1,18 @@
 ---
 created: 2026-07-30
 decision: single-writer-shared-storage
-status: proposed
+status: implemented
 ---
 
 # Multiple Writers to Shared Storage
+
+## Outcome
+
+All six steps of the migration below have shipped, the last one in commit `83f058c`. Every storage key this doc names now has one writer in background, and the sidebar reaches each one through a proxy and a mirror. All three cases are fixed: Case 1 by step 6b, Case 2 by step 5, and Case 3 by step 3.
+
+The design changed on the way. Step 6a replaced the echo guard and the pending-write counter of sections 4, 5 and 7 with one simpler rule: every write names one operation, every broadcast carries the whole resulting value, and every proxy applies every broadcast it receives. Those sections are kept as the record of how the design got there, and each one says what replaced it.
+
+The full in-panel suite run on 2026-11-24 passed everything except A.5 (G3) and B.5 and B.5b (G1). Neither gap is caused by two writers, so this refactor was never going to fix them. They are behaviour changes with their own issue docs. See "Follow-ups" at the end of the migration order.
 
 ## Background
 
@@ -93,6 +101,8 @@ Orchestration. No single manager owns these - they coordinate several, so they s
 | `deassociate-tab` (broadcast) | emitted from group-change detection; moves to `TabAssociationManager` once that exists |
 
 Four total, and `deassociate-tab` is temporary. Small enough that leaving them direct costs little.
+
+Two of the four are gone now. Step 6b removed `deassociate-tab`, because background calls `TabAssociationManager.deassociate` itself and the manager's broadcast tells the sidebars. `queue-tab-for-grouping` became methods of `SpaceTabManager`, which owns all new-tab grouping (`docs/decisions/2026-11-23-new-tab-grouping-two-writers.md`). Only `set-active-tab-and-space` and `tab-activated` are still direct.
 
 ### Explicitly out of scope
 
@@ -195,6 +205,8 @@ This is not hypothetical: D.2 in the in-panel suite deletes a space and asserts 
 **What replaced it, in one line:** the optimistic write already gives read-after-write, with no round trip needed to prove it. The ack's payload is no longer applied to the mirror at all - the proxy resolves with it (some callers still need to know the write landed), but nothing touches the store on the way through. The actual fix for cross-context echoes is a sender id, not the ack: see step 3.5 below.
 
 ### 5. The mirror is a plain store, not React state
+
+**The plain store still holds. The echo handling in this section was replaced by step 6a.** `ExternalStore` shipped as `MirrorStore` in `src/stores/mirrorStore.ts`, which each proxy holds as a field. Its `set` skips a value whose JSON matches the one it already holds. Proxies no longer skip their own echo by `senderId`. They apply every broadcast, and the JSON check is what stops an echo from re-rendering anything. So in the worked example below, t7 now applies the echo, which changes nothing. `senderId` is kept only as a label that says a sidebar caused the change.
 
 Point 4 only works if the mirror can be written and read in the same tick. React state cannot: `setSpaces(next)` schedules a re-render, it does not change the `spaces` const the running function captured at render time. Applying an acked state into `useState` puts us right back where we started.
 
@@ -343,6 +355,8 @@ Each operation's list transform is a pure function in `managers/shared/pinnedSit
 
 ### 7. Broadcasts that arrive mid-write (added by step 5)
 
+**Replaced by step 6a.** The pending-write counter described here, and the drain and re-read that came with it, were removed. Once `SpaceManager` also took per-operation writes, no caller rebuilt a whole list from its mirror, so a briefly stale mirror could no longer be written back out. A proxy now applies a foreign broadcast like any other. Our own echo arrives a moment later with the whole value, our change included, and corrects the mirror. The cost is a possible flicker for one round trip. The `spaceManagerProxy` follow-up at the end of this section was never needed.
+
 The sender-id guard from step 3.5 only covers a context's own echo. A broadcast from *elsewhere* is always applied, which is correct when nothing of ours is in flight and wrong when something is:
 
 ```
@@ -377,17 +391,25 @@ One manager end to end before porting the rest, so the layer is proven on someth
    - `spaceManagerProxy` exposes its mirror as a `readonly Space[]` `snapshot` getter, read by the CRUD callbacks at call time instead of a render-captured value.
 4. **`TabHistoryManager`**, **`LastAudibleTracker`** - done (commit `11ffa97`). Mechanical, as expected.
 5. **`PinnedSitesManager`** (new) - done, fixes Case 2. The first manager whose API is per-operation rather than whole-list, and the first with a writer in background that nobody asked for - see sections 6 and 7 above for both, and for the `spaceManagerProxy` follow-up this leaves behind. `PinnedSite` moved from `hooks/usePinnedSites.ts` to `managers/shared/pinnedSitesApi.ts`, since the service worker needs the type and must not import a React module; the hook re-exports it. The hook keeps its public API, so `App.tsx` and the components below it are unchanged apart from the list now being `readonly`.
-6. **`TabAssociationManager`** (new) - fixes Case 1. Largest, most invasive, most protected by existing tests. Do it last.
+6. **`TabAssociationManager`** (new) - done (commit `83f058c`), fixes Case 1. It shipped in two parts:
+   - **6a** (`step-6a-per-operation-writes-and-simple-mirrors.md`) made `SpaceManager` take per-operation writes and simplified every proxy, as described at the top of sections 5 and 7.
+   - **6b** (`step-6-tab-association-manager.md`) made background the only writer of the live map and its backup. Background now reconciles each window, checks the window id while it does, and listens for `chrome.tabs.onDetached` itself. That fixed G2.
 
-Behaviour fixes (`chrome.tabs.onDetached`, and the `docs/test/issues/**` items G1/G2/D1) are a deliberate **second step**, after the routing is in place. Two things not to lose track of:
+Behaviour fixes (`chrome.tabs.onDetached`, and the `docs/test/issues/**` items G1/G2/D1) are a deliberate **second step**, after the routing is in place.
 
-- Case 3 gets fixed for free by step 3 above, so it needs no separate work.
-- The in-flight-broadcast counter from section 7 wants porting to `spaceManagerProxy`, ideally as a shared proxy base rather than a second copy.
-- The `onDetached` listener called out in Case 1's scope note is easy to skip, because nothing else in this doc names it. It belongs to step 6 or the follow-up pass, not to neither.
+### Follow-ups
+
+- **Case 3** was fixed by step 3, with no separate work.
+- **The in-flight-broadcast counter** from section 7 was not ported to `spaceManagerProxy`. Step 6a removed it from `pinnedSitesManagerProxy` instead.
+- **The `onDetached` listener** from Case 1's scope note went in with step 6b, so G2 is fixed (`docs/test/issues/G2-association-survives-sidebar-closed.md`).
+- **The ordering faults found after step 6** (T.1 to T.5 in `docs/test/tab-space-association-test-cases.md`) were fixed in `a9d4964`. Each was a stale read of the links, in the sidebar or in the backup.
+- **Still open:** G1 (`G1-native-bookmark-delete-orphans-tab.md`), G3 (`G3-native-remove-from-group-keeps-association.md`) and D1 (`D1-space-rename-not-synced-across-windows.md`), all in `docs/test/issues/`. G1 and G3 have agreed fixes. G3 first needs the Tabs sort to stop ungrouping tabs.
 
 ## Verification
 
 The in-panel test runner (`src/tests/inpanel/`, sidebar DEV dropdown) covers exactly the association behaviour this refactor can break - Sections A, B, C, D, E of `docs/test/tab-space-association-test-cases.md`. Run it green before starting to establish a baseline, then after each manager port. Several cases carry known-gap assertions that already fail (G1/G2/G3), so record which ones are red at baseline rather than assuming a red result is new.
+
+After step 6, the full suite run on 2026-11-24 (Sections A to F, P, T and U, through `tools/run-inpanel-tests.mjs`) failed only A.5, B.5 and B.5b, the known gaps G3 and G1. A.3, A.6 and A.6c, which reproduced G2, now pass.
 
 ## Cost / scope
 

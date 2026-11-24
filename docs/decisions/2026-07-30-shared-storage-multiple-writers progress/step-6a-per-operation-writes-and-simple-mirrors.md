@@ -1,7 +1,7 @@
 ---
 created: 2026-09-21
 step: 6a
-status: proposed
+status: shipped
 ---
 
 # Step 6a: Per-operation writes everywhere, and much simpler mirrors

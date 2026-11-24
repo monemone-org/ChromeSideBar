@@ -1,7 +1,7 @@
 ---
 created: 2026-11-23
 decision: new-tab-grouping-two-writers
-status: accepted
+status: implemented
 depends-on: 2026-01-22-queue-tab-grouping-location
 ---
 
