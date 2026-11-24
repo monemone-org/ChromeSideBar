@@ -18,7 +18,7 @@ This is the manual test plan for the fixes in this round, before release. The fi
 
 A known gap is a fault that is not fixed yet. Make sure that each gap below still occurs. Do not assume that no error means no fault.
 
-- G1: You delete a bookmark in the bookmark manager of Chrome (`chrome://bookmarks`) while its tab is open. The tab becomes orphaned: it continues to run, but it disappears from both lists. This gap is not fixed yet. It applies only to bookmarks. The delete option of the extension always closes the tab first, and Chrome has no delete function for pinned sites. See B.5.
+- G1: You delete a bookmark in the bookmark manager of Chrome (`chrome://bookmarks`) while its tab is open. The tab used to become orphaned: it continued to run, but it disappeared from both lists. This gap is fixed: background now listens for `chrome.bookmarks.onRemoved` and turns the tab into a regular tab. It applies only to bookmarks. The delete option of the extension always closes the tab first, and Chrome has no delete function for pinned sites. B.5, B.5b and B.5c check it.
 - G2: You drag a tracked tab to another space, or to another window, while the side panel is closed. The bookmark used to stay "loaded" against the old space, because only the sidebar cleared the association. This gap is fixed: background now clears the association itself. A.3, A.6 and A.6c check it.
 - G3: You use the "Remove from group" command of Chrome on a tracked tab. The bookmark association used to stay, because the detection ran only when the tab moved to another group. This gap is fixed: background now unlinks a bookmark tab that leaves its group, and the Tabs sort no longer ungroups tabs. A.5 checks the fix, and A.5d checks the sort. See `docs/test/issues/G3-native-remove-from-group-keeps-association.md`.
 
@@ -72,6 +72,7 @@ The Test Runner has a "Manual" checkbox. When you turn it on, each step that the
 | B.4  | No      |
 | B.5  | Yes     |
 | B.5b | Yes     |
+| B.5c | Yes     |
 | C.1a | Yes     |
 | C.1b | Yes     |
 | C.1c | Yes     |
@@ -347,16 +348,16 @@ The result depends on the "Continue where you left off" setting of Chrome (Setti
 | 4    | With "Continue where you left off" off, quit Chrome and start it again | Chrome opens with no restored tabs. Make sure only that no errors occur. `chrome.windows.onRemoved` deleted the association backup of the window when the window closed (`background.ts:1055-1070`). Thus nothing is left to restore, even if Chrome tried |
 | 5    | With "Continue where you left off" on, quit Chrome and start it again | Chrome restores the window and its tabs with new tab IDs. See E.2 for the full check. The restore works only if the backup survived the quit. This is a race between the operating system, which stops the process, and the cleanup in `onRemoved`. If this step gives different results on different runs, the race is the cause |
 
-### B.5 Delete a bookmark while its tab is open (known gap G1)
+### B.5 Delete a bookmark while its tab is open (G1, fixed)
 
-This case applies only to bookmarks. The delete option in the bookmark tree of the extension (`DeleteBookmarkAction`) calls `chrome.tabs.remove()` on the associated tab. Thus it never orphans a tab. G1 occurs only through the bookmark manager of Chrome (`chrome://bookmarks`), because the extension has no `chrome.bookmarks.onRemoved` listener to see that delete. This case is the sidebar-open version of B.5b, which covers the sidebar-closed version. Keep both.
+This case applies only to bookmarks. The delete option in the bookmark tree of the extension (`DeleteBookmarkAction`) calls `chrome.tabs.remove()` on the associated tab. Thus it never orphans a tab. G1 occurred only through the bookmark manager of Chrome (`chrome://bookmarks`), because the extension had no `chrome.bookmarks.onRemoved` listener to see that delete. Background has one now. This case is the sidebar-open version of B.5b, which covers the sidebar-closed version. Keep both.
 
 This case does not apply to pinned sites. Chrome has no view of them at all: they have no node in the bookmark tree and no entry in `chrome://bookmarks` (see the note after B.5b). Their only remove path is the unpin action in `PinnedBar.tsx` → `DeletePinnedSiteAction`, and that path always closes the tab. No code path can orphan the tab of a pinned site.
 
 | Step | Action | Expected Result |
 | ---- | ------ | --------------- |
 | 1    | Open the tab of a bookmark | The bookmark shows "loaded" |
-| 2    | Delete that bookmark (not the tab) in the bookmark manager of Chrome (`chrome://bookmarks`), not in the tree of the extension | Expected because of G1: the tab continues to run. But it disappears from both lists. It is not in the bookmark tree, because the node is gone. It is not in the regular tab list, because the sidebar still counts it as managed. Make sure that this still occurs, and record whether you can reach the tab from the sidebar at all |
+| 2    | Delete that bookmark (not the tab) in the bookmark manager of Chrome (`chrome://bookmarks`), not in the tree of the extension | The tab continues to run, and it now shows in the regular tab list, in whatever group it was in. The bookmark is gone from the tree |
 
 ### B.5b Delete a bookmark via Chrome's native bookmark manager, sidebar closed
 
@@ -365,9 +366,18 @@ This case does not apply to pinned sites. Chrome has no view of them at all: the
 | 1    | Open the tab of a bookmark | The bookmark shows "loaded" |
 | 2    | Close the sidebar panel | - |
 | 3    | Open `chrome://bookmarks`, find that bookmark, and delete it there, not in the tree of the extension | - |
-| 4    | Open the sidebar again | The same gap as in B.5 step 2. No `chrome.bookmarks.onRemoved` listener exists at all. Thus this is not a race with the sidebar state, which is different from G2 (G2 depended on an open sidebar to receive a message). The open or closed sidebar at the time of the delete does not change the result. Make sure that this prediction is correct |
+| 4    | Open the sidebar again | The same result as in B.5 step 2: the tab shows in the regular tab list. The listener is in background, so the open or closed sidebar at the time of the delete does not change the result |
 
 This case does not apply to pinned sites. They are entries in `chrome.storage.local`, not real bookmarks, so they have no entry in `chrome://bookmarks`. You can delete a pinned site only in the sidebar of the extension, and you cannot do that while the sidebar is closed.
+
+### B.5c Delete a folder whose bookmarks have open tabs
+
+Chrome reports a folder delete as one `chrome.bookmarks.onRemoved` event for the folder, not one per bookmark in it. This case checks that every open tab under the folder is unlinked, not only a tab whose bookmark the event names.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | In Space A, make a subfolder with two bookmarks, and open the tab of each | Both bookmarks show "loaded" |
+| 2    | Delete the subfolder in the bookmark manager of Chrome (`chrome://bookmarks`) | Both tabs continue to run, and both show in the regular tab list. The folder and its bookmarks are gone from the tree |
 
 ---
 

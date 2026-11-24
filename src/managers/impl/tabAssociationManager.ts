@@ -862,6 +862,26 @@ export class TabAssociationManager implements RoutedManager, TabAssociationsApi
   }
 
   /**
+   * Every tab, in any window, associated with one of the given item keys.
+   * For an item that went away outside the extension (G1: a bookmark deleted
+   * in chrome://bookmarks), whose tabs the caller then deassociates.
+   */
+  findTabsForItemKeys(itemKeys: ReadonlySet<string>): { windowId: number; tabId: number }[]
+  {
+    const found: { windowId: number; tabId: number }[] = [];
+
+    // Look through each window's map for tabs that name one of the keys
+    for (const [windowId, associations] of this.#byWindow)
+    {
+      for (const [tabId, itemKey] of Object.entries(associations))
+      {
+        if (itemKeys.has(itemKey)) found.push({ windowId, tabId: Number(tabId) });
+      }
+    }
+    return found;
+  }
+
+  /**
    * A tracked tab navigated: refresh the URL and index its backup entry holds,
    * so the domain-matching passes have something current to compare against
    * after a restart. Does nothing for a tab nobody tracks.

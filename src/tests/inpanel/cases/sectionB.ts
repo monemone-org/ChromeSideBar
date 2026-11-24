@@ -3,12 +3,13 @@
 
 import { CloseTabAction } from '../../../actions/closeTabAction';
 import { TestCase, TestStep } from '../types';
-import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import { createTestBookmark, createTestBookmarkInFolder, createTestPinnedSite, createTestSpace, createTestSubfolder, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
 import {
   closedPanelStep,
   closeTab,
   closeTabWhileClosed,
   deleteBookmarkNative,
+  deleteFolderNative,
   openBookmarkTab,
   openPinnedTab,
   openRegularTab,
@@ -184,7 +185,7 @@ export const B3_MULTI_CLOSE_TABS: TestCase = {
 // the sidebar closed.
 export const B5_DELETE_BOOKMARK_TAB_OPEN: TestCase = {
   id: 'B.5',
-  title: 'Delete a bookmark while its tab is open (known gap G1)',
+  title: 'Delete a bookmark while its tab is open (G1, fixed)',
   setup: async (getCtx) =>
   {
     await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
@@ -201,10 +202,9 @@ export const B5_DELETE_BOOKMARK_TAB_OPEN: TestCase = {
     // Tab is left running - there's no code path that closes it, since
     // DeleteBookmarkAction (which does close the tab) isn't what fired here.
     assertTabExists('tab1', true),
-    // Correct behavior: once the bookmark it's tied to is gone, the tab's
-    // association should clear too. Per known gap G1, there's no
-    // chrome.bookmarks.onRemoved listener anywhere in the extension to catch
-    // a native deletion, so this is expected to currently FAIL.
+    // Once the bookmark it's tied to is gone, the tab's association clears
+    // too: background's chrome.bookmarks.onRemoved listener unlinks it (G1),
+    // and the tab stays open as a regular tab.
     assertBookmarkLoaded('bm', false),
   ],
 };
@@ -231,11 +231,40 @@ export const B5B_DELETE_BOOKMARK_SIDEBAR_CLOSED: TestCase = {
     }),
     assertBookmarkExists('bm', false),
     assertTabExists('tab1', true),
-    // Same gap as B.5 (G1), reproduced with the sidebar actually closed this
-    // time - the doc's point here is that this is NOT a sidebar-open/closed
-    // race like G2 (there's simply no listener at all), so the outcome
-    // should be identical to B.5's. Expected to currently FAIL, same reason.
+    // Same as B.5 (G1), with the sidebar actually closed this time. The
+    // listener lives in background, so the outcome is identical to B.5's.
     assertBookmarkLoaded('bm', false),
+  ],
+};
+
+// G1 for a folder: deleting a folder removes every bookmark under it, and the
+// onRemoved event names only the folder. Both open tabs must be unlinked, which
+// only happens if the listener walks the removed subtree.
+export const B5C_DELETE_FOLDER_TABS_OPEN: TestCase = {
+  id: 'B.5c',
+  title: 'Delete a folder whose bookmarks have open tabs',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSubfolder(getCtx(), 'spaceA', 'B5c folder', 'folder');
+    await createTestBookmarkInFolder(getCtx(), 'folder', 'B5c bookmark one', testUrl('b5c-one'), 'bmOne');
+    await createTestBookmarkInFolder(getCtx(), 'folder', 'B5c bookmark two', testUrl('b5c-two'), 'bmTwo');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+
+    openBookmarkTab({ bookmarkRef: 'bmOne', url: testUrl('b5c-one'), spaceRef: 'spaceA', tabRef: 'tabOne' }),
+    openBookmarkTab({ bookmarkRef: 'bmTwo', url: testUrl('b5c-two'), spaceRef: 'spaceA', tabRef: 'tabTwo' }),
+    assertBookmarkLoaded('bmOne', true),
+    assertBookmarkLoaded('bmTwo', true),
+
+    deleteFolderNative('folder'),
+    assertBookmarkExists('bmOne', false),
+    assertBookmarkExists('bmTwo', false),
+    assertTabExists('tabOne', true),
+    assertTabExists('tabTwo', true),
+    assertBookmarkLoaded('bmOne', false),
+    assertBookmarkLoaded('bmTwo', false),
   ],
 };
 
@@ -246,4 +275,5 @@ export const SECTION_B_CASES: TestCase[] = [
   B3_MULTI_CLOSE_TABS,
   B5_DELETE_BOOKMARK_TAB_OPEN,
   B5B_DELETE_BOOKMARK_SIDEBAR_CLOSED,
+  B5C_DELETE_FOLDER_TABS_OPEN,
 ];

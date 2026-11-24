@@ -1,6 +1,6 @@
 ---
 created: 2026-08-05
-status: open
+status: fixed
 severity: low
 ---
 
@@ -50,4 +50,9 @@ The change, all in background:
 
 ## Status
 
-Not fixed. The fix above is agreed; implementation has not started.
+Fixed. Section B passed, B.5c included, and so did P.8 and P.9. An import in replace mode, tried by hand, turned every open bookmark tab into a regular tab, as expected. The fix above is in:
+
+- `bookmarkItemKey(id)` in `src/managers/shared/tabAssociationsApi.ts` builds the `bookmark-{id}` key.
+- `TabAssociationManager.findTabsForItemKeys(itemKeys)` returns every tab, in any window, associated with one of the keys. It is background-only, like `isPinnedManagedTab`.
+- The `chrome.bookmarks.onRemoved` listener in `src/background.ts` collects the ids of the whole removed subtree, then unregisters and deassociates each tab it finds.
+- B.5 and B.5b now expect the tab to be unlinked. The new case B.5c deletes a folder with two open bookmarks and checks that both tabs are unlinked.

@@ -9,6 +9,7 @@ import { TabHistoryManager } from './managers/impl/tabHistoryManager';
 import { LastAudibleTracker } from './managers/impl/lastAudibleTracker';
 import { PinnedSitesManager } from './managers/impl/pinnedSitesManager';
 import { TabAssociationManager } from './managers/impl/tabAssociationManager';
+import { bookmarkItemKey } from './managers/shared/tabAssociationsApi';
 import { SpaceTabManager } from './managers/impl/spaceTabManager';
 import { backgroundTestHooks } from './managers/impl/backgroundTestHooks';
 import {
@@ -420,6 +421,35 @@ chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
 
   // Removing a tab from the window shifts the indices of the tabs after it
   await tabAssociationManager.refreshBackupIndices(detachInfo.oldWindowId);
+});
+
+// A bookmark deleted outside the extension (chrome://bookmarks, or an import
+// that replaces bookmarks) leaves its open tab behind. That tab becomes a
+// regular, unassociated tab: the person deleted the bookmark, not the page.
+// Without this the tab stayed associated and vanished from both lists in the
+// sidebar - see G1 in docs/test/issues/G1-native-bookmark-delete-orphans-tab.md.
+// The extension's own delete closes the tab first, so this finds nothing then.
+chrome.bookmarks.onRemoved.addListener(async (_id, removeInfo) =>
+{
+  await stateReady;
+
+  // A deleted folder takes everything under it, so collect every node in the
+  // removed subtree, not just the one the event names
+  const itemKeys = new Set<string>();
+  const collect = (node: chrome.bookmarks.BookmarkTreeNode) =>
+  {
+    itemKeys.add(bookmarkItemKey(node.id));
+    node.children?.forEach(collect);
+  };
+  collect(removeInfo.node);
+
+  // Unlink each open tab of a removed bookmark, the same way the group-change
+  // handler does when a tab leaves its bookmark's space
+  for (const { windowId, tabId } of tabAssociationManager.findTabsForItemKeys(itemKeys))
+  {
+    tabSpaceRegistry.unregister(windowId, tabId);
+    tabAssociationManager.deassociate(windowId, tabId);
+  }
 });
 
 // Clean up in-memory maps and local backup when a window is closed

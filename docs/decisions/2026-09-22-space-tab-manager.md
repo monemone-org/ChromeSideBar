@@ -9,13 +9,13 @@ depends-on: 2026-07-30-shared-storage-multiple-writers
 
 ## When to do this
 
-After the behaviour fix G1. This refactor was meant to start once [[2026-07-30-shared-storage-multiple-writers]] was finished, which meant three things:
+Any time now. This refactor was meant to start once [[2026-07-30-shared-storage-multiple-writers]] was finished, which meant three things:
 
 - **Step 6 (`TabAssociationManager`)** has shipped.
 - **The in-flight broadcast counter** for `spaceManagerProxy` is no longer needed, because step 6a removed the counter instead of porting it.
-- **The behaviour-fix pass** is nearly done. G2 was fixed by step 6b, and G3 (`docs/test/issues/G3-native-remove-from-group-keeps-association.md`) is fixed too. G1 (`docs/test/issues/G1-native-bookmark-delete-orphans-tab.md`) has an agreed fix that isn't implemented yet.
+- **The behaviour-fix pass** is done. G2 was fixed by step 6b, and G1 (`docs/test/issues/G1-native-bookmark-delete-orphans-tab.md`) and G3 (`docs/test/issues/G3-native-remove-from-group-keeps-association.md`) are fixed too.
 
-G1 adds a `chrome.bookmarks.onRemoved` listener to background, next to the listeners this refactor moves, so doing it first would put two changes on the same code at once.
+G1 added a `chrome.bookmarks.onRemoved` listener to background, and G3 changed the group-change handler. Both sit next to the listeners this refactor moves, and both are in, so nothing else is waiting on the same code.
 
 It also reverses one decision from that plan on purpose. Its message inventory says orchestration messages like `set-active-tab-and-space` "stay as direct handlers in `background.ts` and keep their current names", because no single manager owned them. That was the right call while managers were being ported one at a time, but once every piece of state has an owner, the orchestration left behind in `background.ts` turns out to be about one thing, and this doc proposes giving that thing an owner too.
 

@@ -1516,6 +1516,20 @@ export function deleteBookmarkNative(bookmarkRef: string): TestStep
   };
 }
 
+/** Delete a bookmark folder and everything in it (native chrome.bookmarks.removeTree) - mirrors deleting a folder in chrome://bookmarks. */
+export function deleteFolderNative(folderRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Delete folder "${folderRef}" and its contents (native chrome.bookmarks.removeTree)`,
+    run: async (ctx) =>
+    {
+      const folderId = resolveStringRef(ctx, folderRef);
+      await chrome.bookmarks.removeTree(folderId);
+    },
+  };
+}
+
 /** Pop a tab out into its own new Chrome window - mirrors dragging a tab out of the tab strip. resetTestData() finds and closes the new window itself by scanning for test-tagged tabs, not via a ref, so nothing needs to be recorded here. */
 export function moveTabToNewWindow(opts: { tabRef: string }): TestStep
 {
