@@ -17,6 +17,7 @@ import {
   openPinnedTab,
   openRegularTab,
   switchSpaceVerified,
+  sortTabsListByDomain,
   ungroupTab,
   ungroupTabWhileClosed,
 } from '../actions';
@@ -202,7 +203,7 @@ export const A4_PINNED_TAB_MOVED: TestCase = {
 
 export const A5_BOOKMARK_TAB_UNGROUP: TestCase = {
   id: 'A.5',
-  title: 'Bookmark tab: native "Remove from group" / ungroup (known gap G3)',
+  title: 'Bookmark tab: native "Remove from group" / ungroup (G3, fixed)',
   setup: async (getCtx) =>
   {
     await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
@@ -223,13 +224,11 @@ export const A5_BOOKMARK_TAB_UNGROUP: TestCase = {
     assertBookmarkLoaded('bmOpen', true),
     ungroupTab('tabOpen'),
     assertTabUngrouped('tabOpen'),
-    // Correct behavior: ungrouping should deassociate the bookmark the same
-    // way a cross-space move does in A.2. Currently expected to FAIL per
-    // known gap G3 - the detection only fires on a move to ANOTHER group,
-    // not on leaving the group entirely - so a red X here is correct until
-    // G3 is fixed. (Doc step 4/7's "does activating the tab force-switch the
-    // sidebar back" is left unasserted - it's an open question in the doc
-    // itself, not a stated requirement.)
+    // Ungrouping deassociates the bookmark the same way a cross-space move
+    // does in A.2: an ungrouped tab is in no space, so it is no longer in its
+    // bookmark's space (G3). (Doc step 4/7's "does activating the tab
+    // force-switch the sidebar back" is left unasserted - it's an open
+    // question in the doc itself, not a stated requirement.)
     assertBookmarkLoaded('bmOpen', false),
 
     openBookmarkTab({ bookmarkRef: 'bmClosed', url: testUrl('a5-closed'), spaceRef: 'spaceA', tabRef: 'tabClosed' }),
@@ -243,7 +242,7 @@ export const A5_BOOKMARK_TAB_UNGROUP: TestCase = {
       ],
     }),
     assertTabUngrouped('tabClosed'),
-    // Same G3 gap as the panel-open half above - expected to currently FAIL.
+    // Same as the panel-open half above: background unlinks the tab itself.
     assertBookmarkLoaded('bmClosed', false),
   ],
 };
@@ -318,6 +317,40 @@ export const A5C_PINNED_TAB_UNGROUP: TestCase = {
     // assertion that actually depends on it having happened.
     assertTabUngrouped('tabClosed'),
     assertPinnedLoaded('pinClosed', true),
+  ],
+};
+
+// Guards the G3 fix: the Tabs sort must move tabs without taking them out of
+// their groups. A sort that ungroups and regroups would report every bookmark
+// tab as leaving its space's group, and background would unlink them all.
+export const A5D_SORT_KEEPS_BOOKMARK_TABS: TestCase = {
+  id: 'A.5d',
+  title: 'Sorting the Tabs list keeps bookmark tabs linked (G3 regression)',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'A5d bm one', testUrl('a5d-one'), 'bmOne');
+    await createTestBookmark(getCtx(), 'spaceA', 'A5d bm two', testUrl('a5d-two'), 'bmTwo');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    // Regular tabs in the same space, so the group holds both kinds of tab
+    // and the sort has something to reorder around the bookmark tabs
+    openRegularTab({ url: testUrl('a5d-regular-z'), spaceRef: 'spaceA', tabRef: 'regularZ' }),
+    openBookmarkTab({ bookmarkRef: 'bmOne', url: testUrl('a5d-one'), spaceRef: 'spaceA', tabRef: 'tabOne' }),
+    openRegularTab({ url: testUrl('a5d-regular-a'), spaceRef: 'spaceA', tabRef: 'regularA' }),
+    openBookmarkTab({ bookmarkRef: 'bmTwo', url: testUrl('a5d-two'), spaceRef: 'spaceA', tabRef: 'tabTwo' }),
+    assertBookmarkLoaded('bmOne', true),
+    assertBookmarkLoaded('bmTwo', true),
+
+    sortTabsListByDomain(),
+
+    assertTabInSpace('tabOne', 'spaceA'),
+    assertTabInSpace('tabTwo', 'spaceA'),
+    assertTabInSpace('regularZ', 'spaceA'),
+    assertTabInSpace('regularA', 'spaceA'),
+    assertBookmarkLoaded('bmOne', true),
+    assertBookmarkLoaded('bmTwo', true),
   ],
 };
 
@@ -547,6 +580,7 @@ export const SECTION_A_CASES: TestCase[] = [
   A5_BOOKMARK_TAB_UNGROUP,
   A5B_REGULAR_TAB_UNGROUP,
   A5C_PINNED_TAB_UNGROUP,
+  A5D_SORT_KEEPS_BOOKMARK_TABS,
   A6_BOOKMARK_TAB_MOVED_TO_WINDOW,
   A6B_REGULAR_TAB_MOVED_TO_WINDOW,
   A6C_PINNED_TAB_MOVED_TO_WINDOW,

@@ -25,6 +25,53 @@ const compareDomainTitle = (a: chrome.tabs.Tab, b: chrome.tabs.Tab): number =>
   return (a.title || '').localeCompare(b.title || '');
 };
 
+// One block that sortTabs moves as a whole: a Chrome group with its tabs in
+// sorted order, or a single ungrouped tab.
+class SortUnit
+{
+  private constructor(readonly groupId: number | null, readonly tabs: chrome.tabs.Tab[])
+  {
+  }
+
+  get firstTab(): chrome.tabs.Tab
+  {
+    return this.tabs[0];
+  }
+
+  /**
+   * Splits tabs into units: one per Chrome group, with that group's tabs
+   * sorted by domain in the given direction (1 ascending, -1 descending), and
+   * one per ungrouped tab.
+   */
+  static fromTabs(tabs: chrome.tabs.Tab[], sign: number): SortUnit[]
+  {
+    const units: SortUnit[] = [];
+    const groups = new Map<number, chrome.tabs.Tab[]>();
+
+    // Gather grouped tabs by group, and make each ungrouped tab its own unit
+    for (const tab of tabs)
+    {
+      const grouped = tab.groupId !== undefined && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE;
+      if (!grouped)
+      {
+        units.push(new SortUnit(null, [tab]));
+        continue;
+      }
+      const members = groups.get(tab.groupId);
+      if (members) members.push(tab);
+      else groups.set(tab.groupId, [tab]);
+    }
+
+    // Each group becomes one unit with its tabs in sorted order
+    for (const [groupId, members] of groups)
+    {
+      members.sort((a, b) => sign * compareDomainTitle(a, b));
+      units.push(new SortUnit(groupId, members));
+    }
+    return units;
+  }
+}
+
 // Module-level Set tracking windowIds with active batch operations
 const batchOperationWindows = new Set<number>();
 
@@ -107,150 +154,89 @@ export const useTabs = (windowId?: number) => {
     });
   }, [handleError]);
 
+  // Sorts the window's tabs by domain and orders the groups, without ever
+  // taking a tab out of its group. Whole groups move with chrome.tabGroups.move
+  // and tabs move only within their own group's span. Ungrouping first and
+  // regrouping afterwards would report every grouped tab as leaving its group,
+  // and background unlinks a bookmark tab that leaves its space's group (G3).
   const sortTabs = useCallback(async (direction: 'asc' | 'desc' = 'asc',
                                       tabGroups: chrome.tabGroups.TabGroup[] = [],
                                       displayOrder: TabGroupDisplayOrder = 'groupsFirst') =>
   {
-    // Build group info map (id -> {title, color})
-    const groupInfoMap = new Map<number, { title: string; color: chrome.tabGroups.ColorEnum }>();
-    tabGroups.forEach(g => groupInfoMap.set(g.id, { title: g.title || '', color: g.color }));
+    const sign = direction === 'asc' ? 1 : -1;
+    const groupTitles = new Map<number, string>();
+    tabGroups.forEach(g => groupTitles.set(g.id, g.title || ''));
 
-    const sorted = [...tabs].sort((a, b) =>
+    // Chrome keeps its own pinned tabs first and never groups them, so they
+    // are sorted among themselves and the rest starts after them
+    const pinnedTabs = tabs.filter(t => t.pinned).sort((a, b) => sign * compareDomainTitle(a, b));
+    const units = SortUnit.fromTabs(tabs.filter(t => !t.pinned), sign);
+
+    // Order the units. Same rules as the Tabs list display: groups by title,
+    // grouped vs ungrouped by the display order setting, and everything else
+    // by domain, comparing a group by its first sorted tab
+    units.sort((a, b) =>
     {
-      const aGrouped = a.groupId && a.groupId !== -1;
-      const bGrouped = b.groupId && b.groupId !== -1;
       let cmp: number;
-
-      if (aGrouped && bGrouped)
+      if (a.groupId !== null && b.groupId !== null)
       {
-        if (a.groupId === b.groupId)
-        {
-          // Same group: sort by domain, then title
-          cmp = compareDomainTitle(a, b);
-        }
-        else
-        {
-          // Different groups: sort by group title, then groupId as tiebreaker
-          const titleA = groupInfoMap.get(a.groupId!)?.title || '';
-          const titleB = groupInfoMap.get(b.groupId!)?.title || '';
-          cmp = titleA.localeCompare(titleB);
-          if (cmp === 0) cmp = a.groupId! - b.groupId!;
-        }
+        cmp = (groupTitles.get(a.groupId) ?? '').localeCompare(groupTitles.get(b.groupId) ?? '');
+        if (cmp === 0) cmp = a.groupId - b.groupId;
       }
-      else if (displayOrder === 'groupsFirst' && (aGrouped || bGrouped))
+      else if (displayOrder === 'groupsFirst' && (a.groupId !== null || b.groupId !== null))
       {
-        // Grouped tabs come first
-        cmp = aGrouped ? -1 : 1;
+        cmp = a.groupId !== null ? -1 : 1;
       }
-      else if (displayOrder === 'groupsLast' && (aGrouped || bGrouped))
+      else if (displayOrder === 'groupsLast' && (a.groupId !== null || b.groupId !== null))
       {
-        // Ungrouped tabs come first
-        cmp = aGrouped ? 1 : -1;
+        cmp = a.groupId !== null ? 1 : -1;
       }
       else
       {
-        // Both ungrouped, or chromeOrder: sort by domain, then title
-        cmp = compareDomainTitle(a, b);
+        cmp = compareDomainTitle(a.firstTab, b.firstTab);
       }
-
-      return direction === 'asc' ? cmp : -cmp;
+      return sign * cmp;
     });
 
-    // Collect tabs by original groupId - use array to preserve encounter order
-    const groupOrder: number[] = [];
-    const tabsByGroup = new Map<number, number[]>();
-    sorted.forEach((tab) =>
+    const moveGroup = (groupId: number, index: number): Promise<void> =>
     {
-      if (tab.groupId && tab.groupId !== -1)
+      return new Promise((resolve) =>
       {
-        if (!tabsByGroup.has(tab.groupId))
+        chrome.tabGroups.move(groupId, { index }, () =>
         {
-          groupOrder.push(tab.groupId);
-          tabsByGroup.set(tab.groupId, []);
-        }
-        tabsByGroup.get(tab.groupId)!.push(tab.id!);
-      }
-    });
-
-    // Get all grouped tab IDs
-    const allGroupedTabIds = groupOrder.flatMap(gid => tabsByGroup.get(gid)!);
+          handleError('sort group');
+          resolve();
+        });
+      });
+    };
 
     // Batch mode: suppress listener-triggered refetches during sort operations
     if (windowId) batchOperationWindows.add(windowId);
     try
     {
-      if (allGroupedTabIds.length > 0)
+      // Place the pinned tabs in their sorted order
+      for (const [index, tab] of pinnedTabs.entries())
       {
-        // Step 1: Ungroup all grouped tabs first
-        await new Promise<void>((resolve) =>
-        {
-          chrome.tabs.ungroup(allGroupedTabIds, () =>
-          {
-            handleError('ungroup for sort');
-            resolve();
-          });
-        });
-
-        // Step 2: Move tabs to sorted positions
-        for (const [index, tab] of sorted.entries())
-        {
-          await new Promise<void>((resolve) =>
-          {
-            chrome.tabs.move(tab.id!, { index }, () =>
-            {
-              handleError('sort');
-              resolve();
-            });
-          });
-        }
-
-        // Step 3: Recreate groups and re-group tabs (in encounter order)
-        for (const origGroupId of groupOrder)
-        {
-          const tabIds = tabsByGroup.get(origGroupId)!;
-          const info = groupInfoMap.get(origGroupId);
-          await new Promise<void>((resolve) =>
-          {
-            chrome.tabs.group({
-              tabIds,
-              createProperties: windowId ? { windowId } : undefined
-            }, (newGroupId) =>
-            {
-              if (handleError('regroup'))
-              {
-                resolve();
-                return;
-              }
-              if (info)
-              {
-                chrome.tabGroups.update(newGroupId, { title: info.title, color: info.color }, () =>
-                {
-                  handleError('update group');
-                  resolve();
-                });
-              }
-              else
-              {
-                resolve();
-              }
-            });
-          });
-        }
+        await moveTab(tab.id!, index);
       }
-      else
+
+      // Place each unit left to right. Everything before `position` is final,
+      // so the index a unit moves to is always the start of the unplaced
+      // tabs. That is never in the middle of a group, so a group can move
+      // there, and an ungrouped tab moved there cannot join a group.
+      let position = pinnedTabs.length;
+      for (const unit of units)
       {
-        // No grouped tabs, just move
-        for (const [index, tab] of sorted.entries())
+        // A group moves as a whole, then its tabs are reordered inside it
+        if (unit.groupId !== null)
         {
-          await new Promise<void>((resolve) =>
-          {
-            chrome.tabs.move(tab.id!, { index }, () =>
-            {
-              handleError('sort');
-              resolve();
-            });
-          });
+          await moveGroup(unit.groupId, position);
         }
+        for (const [offset, tab] of unit.tabs.entries())
+        {
+          await moveTab(tab.id!, position + offset);
+        }
+        position += unit.tabs.length;
       }
     }
     finally
@@ -258,7 +244,7 @@ export const useTabs = (windowId?: number) => {
       if (windowId) batchOperationWindows.delete(windowId);
       fetchTabs();
     }
-  }, [tabs, handleError, fetchTabs, windowId]);
+  }, [tabs, handleError, fetchTabs, windowId, moveTab]);
 
   // const closeAllTabs = useCallback(() => {
   //   const tabIds = tabs.map(t => t.id!);

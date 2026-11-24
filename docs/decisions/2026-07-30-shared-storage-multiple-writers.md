@@ -401,9 +401,10 @@ Behaviour fixes (`chrome.tabs.onDetached`, and the `docs/test/issues/**` items G
 
 - **Case 3** was fixed by step 3, with no separate work.
 - **The in-flight-broadcast counter** from section 7 was not ported to `spaceManagerProxy`. Step 6a removed it from `pinnedSitesManagerProxy` instead.
-- **The `onDetached` listener** from Case 1's scope note went in with step 6b, so G2 is fixed (`docs/test/issues/G2-association-survives-sidebar-closed.md`).
+- **The `onDetached` listener** from Case 1's scope note went in with step 6b, so G2 is fixed (`docs/test/issues/fixed/G2-association-survives-sidebar-closed.md`).
 - **The ordering faults found after step 6** (T.1 to T.5 in `docs/test/tab-space-association-test-cases.md`) were fixed in `a9d4964`. Each was a stale read of the links, in the sidebar or in the backup.
-- **Still open:** G1 (`G1-native-bookmark-delete-orphans-tab.md`), G3 (`G3-native-remove-from-group-keeps-association.md`) and D1 (`D1-space-rename-not-synced-across-windows.md`), all in `docs/test/issues/`. G1 and G3 have agreed fixes. G3 first needs the Tabs sort to stop ungrouping tabs.
+- **G3** (`docs/test/issues/G3-native-remove-from-group-keeps-association.md`) is fixed. Background unlinks a bookmark tab that leaves its group, and the Tabs sort no longer ungroups tabs on the way.
+- **Still open:** G1 (`G1-native-bookmark-delete-orphans-tab.md`) and D1 (`D1-space-rename-not-synced-across-windows.md`), both in `docs/test/issues/`. G1 has an agreed fix.
 
 ## Verification
 

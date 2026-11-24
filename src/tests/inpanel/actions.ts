@@ -384,7 +384,7 @@ export function openRegularTab(opts: { url: string; spaceRef: string; tabRef: st
  * Opens a tab already placed in a space, through the same SpaceTabManager
  * job the product uses for a tab the sidebar wants somewhere specific. Doing
  * it in two steps here (create, then group) raced background's own grouping
- * of the new tab - see docs/test/issues/N1-no-group-with-id-when-adding-tab-to-space.md.
+ * of the new tab - see docs/test/issues/fixed/N1-no-group-with-id-when-adding-tab-to-space.md.
  */
 async function openTabInSpace(ctx: TestContext, url: string, spaceRef: string, tabRef: string): Promise<void>
 {
@@ -1376,6 +1376,67 @@ export function closeTesterWindow(windowRef: string): TestStep
       catch { /* already closed */ }
     },
   };
+}
+
+/**
+ * Sort the Tabs list from its header menu ("..." -> "Sort by Domain (A-Z)"),
+ * by clicking the real button and menu item, so it runs the same sortTabs a
+ * person does. Waits until the window's tab order stops changing, since the
+ * sort moves tabs one call at a time after the click returns.
+ */
+export function sortTabsListByDomain(): TestStep
+{
+  const MENU_LABEL = 'Sort by Domain (A-Z)';
+  const SETTLE_POLL_MS = 300;
+  const SETTLE_TIMEOUT_MS = 5000;
+
+  return actionStep(`Sort the Tabs list: "${MENU_LABEL}"`, async (ctx) =>
+  {
+    const mouse = new SimulatedMouse();
+    const menuButton = document.querySelector<HTMLElement>('button[aria-label="Tab options"]');
+    if (!menuButton) throw new Error('the Tabs header\'s "Tab options" button is not in the sidebar');
+    menuButton.scrollIntoView({ block: 'center' });
+    await mouse.click(menuButton, 'the Tabs header\'s "Tab options" button');
+
+    // The menu renders in a portal after the click, so wait for the item.
+    // Menu items are divs (MenuBase's Item), not buttons; the item is the only
+    // div whose whole text is the label, since the menu around it holds the
+    // other items' text too.
+    //
+    // The menu first renders at the button's right edge, which is past the
+    // panel's edge, and moves itself inside the viewport on the next render.
+    // So wait until the item is where a click would land on it, as a person
+    // would only click it once it is on screen.
+    const findReachableItem = () =>
+    {
+      const item = [...document.querySelectorAll<HTMLElement>('div')].find(d => d.textContent?.trim() === MENU_LABEL);
+      if (!item) return undefined;
+      const { x, y } = SimulatedMouse.centerOf(item);
+      const hit = document.elementFromPoint(x, y);
+      return hit && item.contains(hit) ? item : undefined;
+    };
+    const item = await waitFor(findReachableItem, 2000, () => `the "${MENU_LABEL}" menu item never appeared on screen after opening the Tabs menu`);
+    await mouse.click(item, `the "${MENU_LABEL}" menu item`);
+
+    // Wait for the sort to finish: the tab order is read until two reads in a
+    // row agree
+    const tabOrder = async () => (await chrome.tabs.query({ windowId: ctx.windowId })).map(t => `${t.id}:${t.groupId}`).join(',');
+    let previous = '';
+    await waitFor(async () =>
+    {
+      await sleep(SETTLE_POLL_MS);
+      const current = await tabOrder();
+      const settled = current === previous;
+      previous = current;
+      return settled;
+    }, SETTLE_TIMEOUT_MS, () => `the tab order was still changing ${SETTLE_TIMEOUT_MS}ms after the sort started`);
+  }, {
+    steps: [
+      'In the sidebar, scroll to the **Tabs** header and click its **...** button.',
+      `Choose **${MENU_LABEL}**.`,
+      'Wait until the tabs stop moving, then click Resume below.',
+    ],
+  });
 }
 
 /** Remove a tab from its Chrome group entirely, without joining another one - mirrors native right-click "Remove from group". */

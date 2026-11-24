@@ -53,7 +53,7 @@ After the merge with the step-6 branch, a review found that each stand-in except
 
 ### Known issue found during the work
 
-Sometimes a step that opens tabs into a test space fails with the error "No group with id". This happened once in A.1 and once in C.2e. When it happens, the case fails at the step that opens the tabs, for example "Open filler tabs in space ...". Nobody has examined the cause yet. `docs/test/issues/N1-no-group-with-id-when-adding-tab-to-space.md` describes the failures, a possible cause, and the steps to reproduce it.
+Sometimes a step that opens tabs into a test space fails with the error "No group with id". This happened once in A.1 and once in C.2e. When it happens, the case fails at the step that opens the tabs, for example "Open filler tabs in space ...". Nobody has examined the cause yet. `docs/test/issues/fixed/N1-no-group-with-id-when-adding-tab-to-space.md` describes the failures, a possible cause, and the steps to reproduce it.
 
 ## Merging this branch
 

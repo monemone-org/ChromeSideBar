@@ -412,7 +412,7 @@ chrome.tabs.onRemoved.addListener(async (tabId, removeInfo) =>
 // tab, so its association here goes. Background has the correct oldWindowId
 // on the event; before this, the only onDetached listener lived in the sidebar
 // and so did nothing while it was closed - see G2/A.6 in
-// docs/test/issues/G2-association-survives-sidebar-closed.md.
+// docs/test/issues/fixed/G2-association-survives-sidebar-closed.md.
 chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
 {
   await stateReady;
@@ -484,17 +484,28 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
   // bookmark's space. Once deassociated it's a regular tab, which gets its
   // space from its live Chrome group directly (see getSpaceForTab), so there
   // is nothing left in tabSpaceRegistry to keep in sync - just remove it.
-  if (changeInfo.groupId !== undefined && changeInfo.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE && tab?.windowId)
+  //
+  // Leaving a group without joining another (Chrome's "Remove from group",
+  // ungrouping the whole group) counts the same way: an ungrouped tab is in no
+  // space, so it is no longer in its bookmark's space either (G3). Pinned-site
+  // tabs are never registered, so keeping them ungrouped never reaches this.
+  if (changeInfo.groupId !== undefined && tab?.windowId)
   {
     try
     {
       const registeredSpaceId = tabSpaceRegistry.getSpace(tab.windowId, tabId);
       if (registeredSpaceId)
       {
-        const group = await chrome.tabGroups.get(changeInfo.groupId);
-        const space = await findSpaceByName(group.title);
+        // The space the tab is in now: none when it left its group, otherwise
+        // the space whose name matches the new group's title
+        let currentSpaceId: string | undefined;
+        if (changeInfo.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
+        {
+          const group = await chrome.tabGroups.get(changeInfo.groupId);
+          currentSpaceId = (await findSpaceByName(group.title))?.id;
+        }
 
-        if (space?.id !== registeredSpaceId)
+        if (currentSpaceId !== registeredSpaceId)
         {
           tabSpaceRegistry.unregister(tab.windowId, tabId);
 

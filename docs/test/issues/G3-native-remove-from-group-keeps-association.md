@@ -1,6 +1,6 @@
 ---
 created: 2026-11-23
-status: open
+status: fixed
 severity: low
 ---
 
@@ -65,4 +65,8 @@ Some of the extension's own operations take a bookmark tab out of its group on t
 
 ## Status
 
-Not fixed. The handler change is agreed. The `sortTabs` rewrite it depends on is proposed and waiting for approval. Implementation has not started.
+Fixed. Sections A to D passed with the fix in, A.5 and A.5d included. The only failures were B.5 and B.5b, which are G1. The three steps above are in:
+
+- `sortTabs` in `src/hooks/useTabs.ts` moves whole groups with `chrome.tabGroups.move` and tabs only within their own group's span. Chrome's own pinned tabs are sorted among themselves first.
+- The group-change handler in `src/background.ts` also reacts to `TAB_GROUP_ID_NONE`, and unlinks a registered tab that is no longer in its registered space.
+- A.5d sorts the Tabs list with two bookmark tabs and two regular tabs in one space, and checks that all four stay grouped and both bookmarks stay loaded.

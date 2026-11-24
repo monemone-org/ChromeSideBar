@@ -20,7 +20,7 @@ A known gap is a fault that is not fixed yet. Make sure that each gap below stil
 
 - G1: You delete a bookmark in the bookmark manager of Chrome (`chrome://bookmarks`) while its tab is open. The tab becomes orphaned: it continues to run, but it disappears from both lists. This gap is not fixed yet. It applies only to bookmarks. The delete option of the extension always closes the tab first, and Chrome has no delete function for pinned sites. See B.5.
 - G2: You drag a tracked tab to another space, or to another window, while the side panel is closed. The bookmark used to stay "loaded" against the old space, because only the sidebar cleared the association. This gap is fixed: background now clears the association itself. A.3, A.6 and A.6c check it.
-- G3: You use the "Remove from group" command of Chrome on a tracked tab. The detection runs only when the tab moves to another group, not when it leaves its group. Thus the bookmark association stays. When you activate that tab later, the sidebar can switch back to the original bookmark space of the tab. This gap is not fixed yet. The Tabs sort ungroups and regroups every tab, so the fix has to change the sort first. Otherwise one sort would unlink every open bookmark tab. See `docs/test/issues/G3-native-remove-from-group-keeps-association.md`.
+- G3: You use the "Remove from group" command of Chrome on a tracked tab. The bookmark association used to stay, because the detection ran only when the tab moved to another group. This gap is fixed: background now unlinks a bookmark tab that leaves its group, and the Tabs sort no longer ungroups tabs. A.5 checks the fix, and A.5d checks the sort. See `docs/test/issues/G3-native-remove-from-group-keeps-association.md`.
 
 ## Prerequisites
 
@@ -58,6 +58,7 @@ The Test Runner has a "Manual" checkbox. When you turn it on, each step that the
 | A.5  | Yes     |
 | A.5b | Yes     |
 | A.5c | Yes     |
+| A.5d | Yes     |
 | A.6  | Yes     |
 | A.6b | Yes     |
 | A.6c | Yes     |
@@ -193,17 +194,17 @@ You can move the Chrome group of a tab in two ways. Test both. They can behave d
 | 5    | Move the pinned tab (method a) into the group of another space | - |
 | 6    | Open the sidebar again | The pinned icon still shows "loaded". A click on it activates the same tab again |
 
-### A.5 Bookmark tab: native "Remove from group" / ungroup (known gap G3)
+### A.5 Bookmark tab: native "Remove from group" / ungroup (G3, fixed)
 
 | Step | Action | Expected Result |
 | ---- | ------ | --------------- |
 | 1    | Click a bookmark in Space A to open its tab | The bookmark shows "loaded" |
 | 2    | Right-click the tab in the tab strip of Chrome → "Remove from group" | The tab has no group now |
-| 3    | Look at the bookmark in the tree of Space A | Expected because of G3: the bookmark still shows "loaded". The association stays, which is different from A.2 |
-| 4    | Activate that tab, which has no group now, from another place (for example, Cmd+Tab through the Chrome tabs) | Because of G3, look at whether the sidebar switches back to Space A. The tab is not really in Space A now |
-| 5    | Close the sidebar panel. Then do it again: right-click the bookmark tab in the tab strip → "Remove from group" | - |
-| 6    | Open the sidebar again and look at the tree of Space A | The bookmark still shows "loaded", as in step 3 |
-| 7    | Activate that tab from another place | Look at whether the sidebar switches to Space A, as in step 4 |
+| 3    | Look at the bookmark in the tree of Space A | The bookmark shows as unloaded. The tab stays open as a regular tab with no group, the same result as A.2 |
+| 4    | Activate that tab from another place (for example, Cmd+Tab through the Chrome tabs) | The sidebar does not switch to Space A, because the tab is no longer in Space A |
+| 5    | Close the sidebar panel. Then do it again with another bookmark tab: right-click it in the tab strip → "Remove from group" | - |
+| 6    | Open the sidebar again and look at the tree of Space A | The bookmark shows as unloaded, as in step 3 |
+| 7    | Activate that tab from another place | The sidebar does not switch to Space A, as in step 4 |
 
 ### A.5b Regular tab: native "Remove from group" / ungroup
 
@@ -223,6 +224,16 @@ You can move the Chrome group of a tab in two ways. Test both. They can behave d
 | 3    | With the sidebar open, right-click the tab → "Remove from group" | The pinned icon continues to track the tab in any group. The association logic does not group pinned tabs |
 | 4    | Close the sidebar panel. Do steps 1 to 3 again with another pinned tab | - |
 | 5    | Open the sidebar again | The pinned icon still shows "loaded". A click on it activates the same tab again |
+
+### A.5d Sorting the Tabs list keeps bookmark tabs linked
+
+The Tabs sort used to ungroup every tab and then group them again. Since the G3 fix, a bookmark tab that leaves its group is unlinked, so this case checks that the sort no longer takes tabs out of their groups.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | In Space A, open two bookmarks and two regular tabs, mixed | Both bookmarks show "loaded". All four tabs are in the group of Space A |
+| 2    | Click the "..." button of the Tabs header → "Sort by Domain (A-Z)" | The tabs are reordered |
+| 3    | Look at the tab strip of Chrome and at the bookmark tree | All four tabs are still in the group of Space A, and both bookmarks still show "loaded" |
 
 ### A.6 Tab moved to a different window
 

@@ -26,7 +26,7 @@ and local storage for a backup that survives a browser restart. And the
 in-panel test suite exercises it directly, so a mistake here shows up as a
 failing test rather than as a rare race. It is also the first step that is
 expected to turn failing tests green: A.3, A.6 and A.6c all reproduce G2
-(`docs/test/issues/G2-association-survives-sidebar-closed.md`), and making
+(`docs/test/issues/fixed/G2-association-survives-sidebar-closed.md`), and making
 background the owner of the associations is the fix that issue asks for.
 
 ## What exists before this step

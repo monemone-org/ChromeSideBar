@@ -11,7 +11,7 @@ depends-on: 2026-01-22-queue-tab-grouping-location
 
 When the sidebar creates a tab and then puts it into a group itself, background also sees the new tab through `chrome.tabs.onCreated` and tries to group it into the active space. The two writers race. Depending on which one reads the tab first, the sidebar's call fails with `No group with id`, or the tab ends up in the wrong group with no error at all.
 
-The in-panel tests hit this first, as issue N1 (`docs/test/issues/N1-no-group-with-id-when-adding-tab-to-space.md`), and seven product paths had the same race. The decision is that a tab the sidebar wants somewhere specific is created and placed by background, as one job in its grouping queue, through `SpaceTabManager.createTabs`. Background's own request for the new tab then runs after the tab is placed and leaves it alone. This document explains the race, an interim fix that was not enough, the product paths, and the decision. `2026-11-23-new-tab-grouping-two-writers progress/implementation-plan.md` is the plan that carried it out.
+The in-panel tests hit this first, as issue N1 (`docs/test/issues/fixed/N1-no-group-with-id-when-adding-tab-to-space.md`), and seven product paths had the same race. The decision is that a tab the sidebar wants somewhere specific is created and placed by background, as one job in its grouping queue, through `SpaceTabManager.createTabs`. Background's own request for the new tab then runs after the tab is placed and leaves it alone. This document explains the race, an interim fix that was not enough, the product paths, and the decision. `2026-11-23-new-tab-grouping-two-writers progress/implementation-plan.md` is the plan that carried it out.
 
 ## How a new tab gets its space
 
