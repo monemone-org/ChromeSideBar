@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Search, Globe } from 'lucide-react';
 import clsx from 'clsx';
-import { getIconUrl, getIconNames } from '../utils/iconify';
+import { getIconNames, iconSvgCache } from '../utils/iconify';
 import { isEmoji } from '../utils/emoji';
 import { COLOR_CIRCLE_SIZE } from '../utils/groupColors';
 import { EMOJI_DATA, EMOJI_CATEGORIES } from '../data/emojiData';
@@ -108,6 +108,14 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
   const [iconsError, setIconsError] = useState<string | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [emojiScrollTop, setEmojiScrollTop] = useState(0);
+  // Bumped when iconSvgCache loads new icons, to re-render the grid
+  const [, setIconCacheVersion] = useState(0);
+
+  // Re-render when batched icon SVGs arrive
+  useEffect(() =>
+  {
+    return iconSvgCache.subscribe(() => setIconCacheVersion((v) => v + 1));
+  }, []);
 
   // Load icons on mount
   useEffect(() =>
@@ -195,6 +203,17 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
     }));
   }, [filteredEmojis, emojiStartRow, emojiEndRow]);
 
+  // Ask the cache for the icons on screen (plus the preview) in one batch
+  useEffect(() =>
+  {
+    const names = activeTab === 'icons' ? visibleIcons.map(({ name }) => name) : [];
+    if (selectedIcon)
+    {
+      names.push(selectedIcon);
+    }
+    iconSvgCache.request(names);
+  }, [visibleIcons, activeTab, selectedIcon]);
+
   // Scroll handler
   const handleGridScroll = useCallback((e: React.UIEvent<HTMLDivElement>) =>
   {
@@ -217,12 +236,17 @@ export const IconColorPicker: React.FC<IconColorPickerProps> = ({
     setEmojiScrollTop(0);
   }, [emojiSearch, selectedEmojiCategory]);
 
-  // Render an icon by name from CDN
+  // Render an icon by name from the batched cache, empty box while it loads
   const renderIcon = (iconName: string, size: number = 18) =>
   {
+    const dataUrl = iconSvgCache.getDataUrl(iconName);
+    if (!dataUrl)
+    {
+      return <span style={{ width: size, height: size }} />;
+    }
     return (
       <img
-        src={getIconUrl(iconName)}
+        src={dataUrl}
         alt={iconName}
         width={size}
         height={size}
