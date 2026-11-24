@@ -3,7 +3,7 @@ import { Space } from './spaceMessages';
 // Find the Space that owns a bookmark folder, given the folder's full title path
 // (root-to-leaf, as returned by useBookmarks().getBookmarkSegments).
 //
-// A bookmark folder is assumed to belong to at most one Space (see CLAUDE.md
+// A bookmark folder is assumed to belong to at most one Space (see AGENTS.md
 // "Design Assumptions") - if more than one Space's folder segments match, the
 // first one found wins.
 export function findSpaceForFolderSegments(folderSegments: string[], spaces: readonly Space[]): Space | undefined

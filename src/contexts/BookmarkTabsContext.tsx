@@ -542,7 +542,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   // Associate an existing tab with a bookmark (for drag-drop from tabs to bookmarks,
   // or "Add to Bookmark"). spaceId is the Space that owns the bookmark's folder -
   // resolved by the caller, since a folder belongs to at most one Space (see
-  // CLAUDE.md "Design Assumptions"). Mirrors createItemTab's registration +
+  // AGENTS.md "Design Assumptions"). Mirrors createItemTab's registration +
   // grouping so a bookmarked tab always matches its bookmark's Space, regardless
   // of which space the tab happened to be in before it was bookmarked.
   const associateExistingTab = useCallback(async (
