@@ -195,7 +195,7 @@ function makeSpace(n: number, overrides?: Partial<Space>): Space
   return {
     id: `space_test_${n}`,
     name: `TestSpace${n}`,
-    icon: 'Folder',
+    icon: '🧪',
     color: 'blue',
     bookmarkFolderPath: '',
     ...overrides,
@@ -232,7 +232,7 @@ const TEST_CASES: TestCase[] = [
   // Case 3: Space with specific color/icon
   {
     name: 'Case 3: Space with color and icon',
-    spaces: [makeSpace(1, { color: 'red', icon: 'Star' })],
+    spaces: [makeSpace(1, { color: 'red', icon: '⭐' })],
     deleteSpaceId: 'space_test_1',
     tabsInGroup: [{ url: testUrl(1) }],
     expectedSpacesAfterDo: [],

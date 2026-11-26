@@ -2,7 +2,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useBookmarkTabsContext } from './BookmarkTabsContext';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { Space, ALL_SPACE } from '../utils/spaceMessages';
-import { toChromeColor } from '../utils/groupColors';
 import { spaceWindowStateProxy } from '../managers/proxies/spaceWindowStateProxy';
 import { useSpaceWindowState } from '../hooks/useSpaceWindowState';
 import { spaceManagerProxy } from '../managers/proxies/spaceManagerProxy';
@@ -246,30 +245,10 @@ export const SpacesProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Update Space in storage - per-operation, so only this Space's fields
     // change and a write another call made after this callback was created
-    // is left alone
+    // is left alone. A new name or color reaches the Chrome groups through
+    // background, which retitles the space's group in every window (D1)
     ignoreWriteFailure(spaceManagerProxy.updateSpace(id, updates));
-
-    // Sync name/color changes to Chrome group
-    if (windowId && (updates.name || updates.color))
-    {
-      try
-      {
-        // Find Chrome group with the OLD name
-        const groups = await chrome.tabGroups.query({ windowId, title: space.name });
-        if (groups.length > 0)
-        {
-          await chrome.tabGroups.update(groups[0].id, {
-            title: updates.name ?? space.name,
-            color: toChromeColor(updates.color ?? space.color),
-          });
-        }
-      }
-      catch (error)
-      {
-        if (import.meta.env.DEV) console.error('[updateSpace] Failed to sync to Chrome group:', error);
-      }
-    }
-  }, [getSpaceById, windowId]);
+  }, [getSpaceById]);
 
   // Batch-update folder path + segments for multiple spaces at once (e.g. after a folder rename)
   const updateSpaceFolderPaths = useCallback((updates: { id: string; bookmarkFolderPath: string; bookmarkFolderSegments: string[] }[]) =>

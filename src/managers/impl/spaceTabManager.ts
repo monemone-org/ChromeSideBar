@@ -259,6 +259,52 @@ export class SpaceTabManager implements RoutedManager, SpaceTabManagerApi
     this.#queueActiveSpaceRequest(tab.windowId, tab.id, true);
   }
 
+  /**
+   * Gives a space's group its new title and color in every window, after the
+   * space was renamed or recolored. Background-only: SpaceManager's edit
+   * callback calls it, so every window's group follows the space, including
+   * windows whose sidebar is closed (D1).
+   *
+   * Runs on the grouping queue. A grouping job queued after the rename looks
+   * the group up by the new name, so the rename has to happen first, or that
+   * job would find nothing and create a second group.
+   */
+  renameSpaceGroups(oldTitle: string, newTitle: string, color: chrome.tabGroups.ColorEnum): Promise<void>
+  {
+    return this.#queue.run(async () =>
+    {
+      const groups = await chrome.tabGroups.query({ title: oldTitle });
+
+      // Update the space's group in each window that has one
+      for (const group of groups)
+      {
+        try
+        {
+          await chrome.tabGroups.update(group.id, { title: newTitle, color });
+          if (ISSUE_52949_WORKAROUND)
+          {
+            // Same as createGroup: query() can return the stale title for a while
+            chrome.runtime.sendMessage({
+              type: 'TAB_GROUP_TITLE_SET',
+              groupId: group.id,
+              title: newTitle,
+              color,
+              windowId: group.windowId,
+            }).catch(() => {});
+          }
+        }
+        catch (error)
+        {
+          // The group may have closed since the query; the others still get renamed
+          if (import.meta.env.DEV)
+          {
+            console.error(`[renameSpaceGroups] Failed to update group ${group.id}:`, error);
+          }
+        }
+      }
+    });
+  }
+
   /** chrome.tabs.onRemoved's entry point: a closed tab needs no placed-tab entry. */
   forgetTab(tabId: number): void
   {

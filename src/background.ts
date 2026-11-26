@@ -11,6 +11,7 @@ import { PinnedSitesManager } from './managers/impl/pinnedSitesManager';
 import { TabAssociationManager } from './managers/impl/tabAssociationManager';
 import { bookmarkItemKey } from './managers/shared/tabAssociationsApi';
 import { SpaceTabManager } from './managers/impl/spaceTabManager';
+import { toChromeColor } from './utils/groupColors';
 import { backgroundTestHooks } from './managers/impl/backgroundTestHooks';
 import {
   BACKGROUND_TEST_HOOK_ACTION,
@@ -260,7 +261,18 @@ async function setActiveTabAndSpace(
 // =============================================================================
 
 const spaceStateManager = new SpaceWindowStateManager();
-const spaceManager = new SpaceManager();
+// A renamed or recolored space retitles its Chrome group in every window.
+// spaceTabManager is declared further down; this only runs on a rename, long
+// after both exist.
+const spaceManager = new SpaceManager({
+  onSpaceRenamed: (before, after) =>
+  {
+    spaceTabManager.renameSpaceGroups(before.name, after.name, toChromeColor(after.color)).catch((error) =>
+    {
+      console.error('[SpaceManager] Failed to rename the space\'s groups:', error);
+    });
+  },
+});
 // setActiveTabAndSpace and getSpaceForTab are orchestration living here, so
 // the manager takes them rather than importing them back out of this file -
 // see TabHistoryDeps in managers/impl/tabHistoryManager.ts.

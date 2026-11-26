@@ -87,6 +87,7 @@ The Test Runner has a "Manual" checkbox. When you turn it on, each step that the
 | C.2f | Yes     |
 | C.2g | Yes     |
 | D.1  | Yes     |
+| D.1b | Yes     |
 | D.2  | Yes     |
 | D.3  | Yes     |
 | D.4  | Yes     |
@@ -560,7 +561,7 @@ Not covered: the timer cancel in `handleHistoryMouseLeave`. To reach it, you mus
 | ---- | ------ | --------------- |
 | 1    | Open a bookmark tab in Space A | The bookmark is loaded. The tab is in the Chrome group of Space A |
 | 2    | Rename Space A (in Settings, or right-click → Edit Space) | The title of the Chrome group changes to the new name. The bookmark tab still shows as loaded. When you activate it, it still goes to the renamed space |
-| 3    | Open two windows that both show the group of Space A. Rename the space from window 1 | Look at the sidebar and the group of window 2. Record whether its Chrome group also gets the new name, or becomes orphaned (its title no longer matches the space name). This was reported as a probable gap from before this round. Make sure that you record the result |
+| 3    | Open two windows that both show the group of Space A. Rename the space from window 1 | The Chrome group in window 2 also gets the new name, and its sidebar shows the new name. Background renames the group of the space in every window, also in a window whose sidebar is closed (D1). D.1b automates this step |
 
 ### D.2 Delete a space with tracked tabs
 

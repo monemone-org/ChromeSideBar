@@ -50,11 +50,26 @@ function findFolderSegmentsByPath(
   return null;
 }
 
+/** What SpaceManager tells its owner about, passed in at construction. */
+export interface SpaceManagerDeps
+{
+  // A space's name or color changed. Background uses it to retitle that
+  // space's Chrome group in every window (D1), which this class, being only
+  // the owner of the space list, leaves to SpaceTabManager.
+  onSpaceRenamed?(before: Space, after: Space): void;
+}
+
 export class SpaceManager implements RoutedManager, SpaceManagerApi
 {
   readonly managerId = ManagerId.SPACES;
 
   private spaces: Space[] = [];
+  #deps: SpaceManagerDeps;
+
+  constructor(deps: SpaceManagerDeps = {})
+  {
+    this.#deps = deps;
+  }
 
   /** See RoutedManager.dispatch. */
   async dispatch(method: string, message: Record<string, unknown>): Promise<unknown>
@@ -200,7 +215,16 @@ export class SpaceManager implements RoutedManager, SpaceManagerApi
 
   updateSpace(id: string, edit: SpaceEdit, originId?: string): Space[]
   {
-    return this.#commit(applyUpdateSpace(this.spaces, id, edit), 'updateSpace', originId);
+    const before = this.spaces.find(s => s.id === id);
+    const spaces = this.#commit(applyUpdateSpace(this.spaces, id, edit), 'updateSpace', originId);
+    const after = spaces.find(s => s.id === id);
+
+    // A new name or color has to reach the space's Chrome groups too
+    if (before && after && (before.name !== after.name || before.color !== after.color))
+    {
+      this.#deps.onSpaceRenamed?.(before, after);
+    }
+    return spaces;
   }
 
   updateSpaceFolderPaths(updates: SpaceFolderPathUpdate[], originId?: string): Space[]

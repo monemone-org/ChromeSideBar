@@ -405,7 +405,7 @@ Behaviour fixes (`chrome.tabs.onDetached`, and the `docs/test/issues/**` items G
 - **The ordering faults found after step 6** (T.1 to T.5 in `docs/test/tab-space-association-test-cases.md`) were fixed in `a9d4964`. Each was a stale read of the links, in the sidebar or in the backup.
 - **G3** (`docs/test/issues/G3-native-remove-from-group-keeps-association.md`) is fixed. Background unlinks a bookmark tab that leaves its group, and the Tabs sort no longer ungroups tabs on the way.
 - **G1** (`docs/test/issues/G1-native-bookmark-delete-orphans-tab.md`) is fixed. A `chrome.bookmarks.onRemoved` listener in background turns the open tab of a deleted bookmark, or of every bookmark in a deleted folder, into a regular tab.
-- **Still open:** D1 (`docs/test/issues/D1-space-rename-not-synced-across-windows.md`).
+- **D1** (`docs/test/issues/D1-space-rename-not-synced-across-windows.md`) is fixed. Background renames and recolors a space's Chrome group in every window, so a window whose sidebar did not make the change, or is closed, keeps its group matched to the space. An import in replace mode still does not rename groups, which the issue doc records as a separate gap.
 
 ## Verification
 

@@ -6,16 +6,13 @@ import { spaceManagerProxy } from '../../../managers/proxies/spaceManagerProxy';
 import { Space } from '../../../contexts/SpacesContext';
 import { TestCase, TestStep } from '../types';
 import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { openBookmarkTab, openPinnedTab, openRegularTab, renameSpace, switchSpaceVerified } from '../actions';
-import { assertBookmarkLoaded, assertPinnedLoaded, assertSpaceExists, assertTabExists, assertTabInSpace, assertTabUngrouped } from '../assertions';
-import { resolveSpace, resolveStringRef } from '../stepHelpers';
+import { closeTesterWindow, openBookmarkTab, openPinnedTab, openRegularTab, renameSpace, switchSpaceVerified } from '../actions';
+import { assertBookmarkLoaded, assertPinnedLoaded, assertSpaceExists, assertTabExists, assertTabInSpace, assertTabInSpaceWithin, assertTabUngrouped } from '../assertions';
+import { resolveSpace, resolveStringRef, waitFor } from '../stepHelpers';
+import { toChromeColor } from '../../../utils/groupColors';
 
-// D.1's doc step 3 (renaming from a second window and checking whether a
-// FIRST window's own Chrome group also picks it up) needs a second live
-// sidebar/window to observe - out of scope here, same reason B.4/E.2 are
-// left manual (see docs/test/tab-space-association-test-cases.md). This case
-// only covers steps 1-2 (single window: rename syncs the Chrome group,
-// association survives).
+// D.1 covers doc steps 1-2 (single window: rename syncs the Chrome group,
+// association survives). D.1b below covers step 3, the second window.
 export const D1_RENAME_SPACE_WITH_TRACKED_TABS: TestCase = {
   id: 'D.1',
   title: 'Rename a space while it has tracked tabs',
@@ -31,11 +28,95 @@ export const D1_RENAME_SPACE_WITH_TRACKED_TABS: TestCase = {
     assertTabInSpace('tab1', 'spaceA'),
 
     renameSpace('spaceA', 'Work renamed (inpanel-test)'),
-    // resolveSpace() inside assertTabInSpace looks up spaceA's CURRENT name
-    // via getSpaceById, so this only passes if the Chrome group's title was
-    // actually updated to match the rename, not just the Space object.
-    assertTabInSpace('tab1', 'spaceA'),
+    // resolveSpace() inside assertTabInSpaceWithin looks up spaceA's CURRENT
+    // name via getSpaceById, so this only passes if the Chrome group's title
+    // was actually updated to match the rename, not just the Space object.
+    // Background retitles the group as a queued job after it stores the
+    // rename, so the check allows it a moment.
+    assertTabInSpaceWithin('tab1', 'spaceA', 3000),
     assertBookmarkLoaded('bm', true),
+  ],
+};
+
+// D.1 doc step 3 (D1): a second window also has a group for the space, and
+// the rename happens in this one. Background retitles the space's group in
+// every window, so the other window's group must follow, though no sidebar
+// is open there.
+const D1B_OTHER_WINDOW_REF = 'otherWindow';
+const D1B_OTHER_TAB_REF = 'otherTab';
+
+function openSpaceGroupInOtherWindow(spaceRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Open a second window with a tab in space "${spaceRef}"'s group`,
+    run: async (ctx) =>
+    {
+      const space = resolveSpace(ctx, spaceRef);
+
+      // Unfocused, so this window and its sidebar stay in front
+      const window = await chrome.windows.create({ url: testUrl('d1b-other-window'), focused: false });
+      const tabId = window?.tabs?.[0]?.id;
+      if (window?.id === undefined || tabId === undefined) throw new Error('could not open a second window with a tab');
+      ctx.refs.set(D1B_OTHER_WINDOW_REF, window.id);
+      ctx.refs.set(D1B_OTHER_TAB_REF, tabId);
+
+      // Group it the way a person would by hand, titled with the space's name
+      const groupId = await chrome.tabs.group({ tabIds: [tabId], createProperties: { windowId: window.id } });
+      await chrome.tabGroups.update(groupId, { title: space.name, color: toChromeColor(space.color) });
+    },
+  };
+}
+
+function assertOtherWindowGroupTitle(spaceRef: string, timeoutMs: number): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `The second window's group is titled with space "${spaceRef}"'s name within ${timeoutMs}ms`,
+    run: async (ctx) =>
+    {
+      const space = resolveSpace(ctx, spaceRef);
+      const tabId = ctx.refs.get(D1B_OTHER_TAB_REF);
+      if (typeof tabId !== 'number') throw new Error('no tab in a second window - did the step that opens it run?');
+
+      const groupTitle = async () =>
+      {
+        const tab = await chrome.tabs.get(tabId);
+        if (tab.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE) return undefined;
+        return (await chrome.tabGroups.get(tab.groupId)).title;
+      };
+
+      let last: string | undefined;
+      await waitFor(async () =>
+      {
+        last = await groupTitle();
+        return last === space.name;
+      }, timeoutMs, () => `expected the second window's group to be titled "${space.name}", got ${last === undefined ? '(ungrouped)' : `"${last}"`}`);
+    },
+  };
+}
+
+export const D1B_RENAME_SPACE_OTHER_WINDOW: TestCase = {
+  id: 'D.1b',
+  title: 'Rename a space: its group in another window is renamed too (D1)',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'D1b bookmark', testUrl('d1b-bookmark'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('d1b-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    assertTabInSpace('tab1', 'spaceA'),
+    openSpaceGroupInOtherWindow('spaceA'),
+    assertOtherWindowGroupTitle('spaceA', 1000),
+
+    renameSpace('spaceA', 'Work renamed (inpanel-test)'),
+    assertTabInSpaceWithin('tab1', 'spaceA', 3000),
+    assertOtherWindowGroupTitle('spaceA', 3000),
+    assertBookmarkLoaded('bm', true),
+
+    closeTesterWindow(D1B_OTHER_WINDOW_REF),
   ],
 };
 
@@ -272,6 +353,7 @@ export const D4_MIGRATE_LEGACY_SPACE_ON_UPDATE: TestCase = {
 
 export const SECTION_D_CASES: TestCase[] = [
   D1_RENAME_SPACE_WITH_TRACKED_TABS,
+  D1B_RENAME_SPACE_OTHER_WINDOW,
   D2_DELETE_SPACE_WITH_TRACKED_TABS,
   D3_BACKGROUND_SPACE_CACHE_DROPS_DELETED_SPACE,
   D4_MIGRATE_LEGACY_SPACE_ON_UPDATE,
