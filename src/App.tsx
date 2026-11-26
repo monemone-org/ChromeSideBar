@@ -606,7 +606,7 @@ function App() {
   );
   const [spaceColorAlpha, setSpaceColorAlpha] = useChromeLocalStorage(
     'sidebar-space-color-alpha',
-    100,
+    40,
     { parse: (v) => parseInt(v, 10), serialize: (v) => v.toString() }
   );
   const [followActiveTab, setFollowActiveTab] = useChromeLocalStorage<FollowActiveTabMode>(
