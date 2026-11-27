@@ -1,6 +1,6 @@
 ---
 created: 2026-11-26
-status: fixed, not verified
+status: fixed
 severity: low
 ---
 
@@ -45,4 +45,4 @@ If a space is renamed between closing a tab and undoing, `CloseTabAction` finds 
 
 ## Status
 
-Fixed, not verified. Without the fix, B.3c, D.2c, T.8, T.8b and T.8c failed at the check that the bookmark is unloaded, with the G3 fix already in. T.8d, T.8e and T.8f guard the fix and passed without it, and so did B.3c's pinned-site step. To verify, build with `npm run build:debug`, run those cases, then Sections A, B, D and T in full.
+Fixed. Without the fix, B.3c, D.2c, T.8, T.8b and T.8c failed at the check that the bookmark is unloaded, with the G3 fix already in. T.8d, T.8e and T.8f guard the fix and passed without it, and so did B.3c's pinned-site step. With the fix, all of them pass, and so do Sections A to E, P.8, P.9 and T in full.
