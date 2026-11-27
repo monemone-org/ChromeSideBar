@@ -449,7 +449,7 @@ chrome.tabs.onDetached.addListener(async (tabId, detachInfo) =>
 // that replaces bookmarks) leaves its open tab behind. That tab becomes a
 // regular, unassociated tab: the person deleted the bookmark, not the page.
 // Without this the tab stayed associated and vanished from both lists in the
-// sidebar - see G1 in docs/test/issues/G1-native-bookmark-delete-orphans-tab.md.
+// sidebar - see G1 in docs/test/issues/fixed/G1-native-bookmark-delete-orphans-tab.md.
 // The extension's own delete closes the tab first, so this finds nothing then.
 chrome.bookmarks.onRemoved.addListener(async (_id, removeInfo) =>
 {

@@ -429,7 +429,7 @@ written its old copy back, which would have restored the association.
 ## What this step does not do
 
 - **It doesn't fix G1 or G3.** G1
-  (`docs/test/issues/G1-native-bookmark-delete-orphans-tab.md`) is that
+  (`docs/test/issues/fixed/G1-native-bookmark-delete-orphans-tab.md`) is that
   deleting a bookmark in Chrome's own bookmark manager leaves its tab
   associated, because nothing listens for `chrome.bookmarks.onRemoved`. It
   happens whether the sidebar is open or not, so a single owner doesn't fix

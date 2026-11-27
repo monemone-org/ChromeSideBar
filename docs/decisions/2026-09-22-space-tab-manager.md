@@ -13,7 +13,7 @@ Any time now. This refactor was meant to start once [[2026-07-30-shared-storage-
 
 - **Step 6 (`TabAssociationManager`)** has shipped.
 - **The in-flight broadcast counter** for `spaceManagerProxy` is no longer needed, because step 6a removed the counter instead of porting it.
-- **The behaviour-fix pass** is done. G2 was fixed by step 6b, and G1 (`docs/test/issues/G1-native-bookmark-delete-orphans-tab.md`) and G3 (`docs/test/issues/G3-native-remove-from-group-keeps-association.md`) are fixed too.
+- **The behaviour-fix pass** is done. G2 was fixed by step 6b, and G1 (`docs/test/issues/fixed/G1-native-bookmark-delete-orphans-tab.md`) and G3 (`docs/test/issues/fixed/G3-native-remove-from-group-keeps-association.md`) are fixed too.
 
 G1 added a `chrome.bookmarks.onRemoved` listener to background, and G3 changed the group-change handler. Both sit next to the listeners this refactor moves, and both are in, so nothing else is waiting on the same code.
 

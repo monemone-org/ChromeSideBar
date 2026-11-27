@@ -403,8 +403,8 @@ Behaviour fixes (`chrome.tabs.onDetached`, and the `docs/test/issues/**` items G
 - **The in-flight-broadcast counter** from section 7 was not ported to `spaceManagerProxy`. Step 6a removed it from `pinnedSitesManagerProxy` instead.
 - **The `onDetached` listener** from Case 1's scope note went in with step 6b, so G2 is fixed (`docs/test/issues/fixed/G2-association-survives-sidebar-closed.md`).
 - **The ordering faults found after step 6** (T.1 to T.5 in `docs/test/tab-space-association-test-cases.md`) were fixed in `a9d4964`. Each was a stale read of the links, in the sidebar or in the backup.
-- **G3** (`docs/test/issues/G3-native-remove-from-group-keeps-association.md`) is fixed. Background unlinks a bookmark tab that leaves its group, and the Tabs sort no longer ungroups tabs on the way.
-- **G1** (`docs/test/issues/G1-native-bookmark-delete-orphans-tab.md`) is fixed. A `chrome.bookmarks.onRemoved` listener in background turns the open tab of a deleted bookmark, or of every bookmark in a deleted folder, into a regular tab.
+- **G3** (`docs/test/issues/fixed/G3-native-remove-from-group-keeps-association.md`) is fixed. Background unlinks a bookmark tab that leaves its group, and the Tabs sort no longer ungroups tabs on the way.
+- **G1** (`docs/test/issues/fixed/G1-native-bookmark-delete-orphans-tab.md`) is fixed. A `chrome.bookmarks.onRemoved` listener in background turns the open tab of a deleted bookmark, or of every bookmark in a deleted folder, into a regular tab.
 - **D1** (`docs/test/issues/D1-space-rename-not-synced-across-windows.md`) is fixed. Background renames and recolors a space's Chrome group in every window, so a window whose sidebar did not make the change, or is closed, keeps its group matched to the space. An import in replace mode still does not rename groups, which the issue doc records as a separate gap.
 
 ## Verification
