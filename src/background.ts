@@ -282,10 +282,20 @@ const historyManager = new TabHistoryManager({
 });
 const groupTracker = new TabGroupTracker();
 const pinnedSitesManager = new PinnedSitesManager();
-const tabAssociationManager = new TabAssociationManager();
+// Keeps each tab's registered space in its backup entry, and registers it
+// again when a restart restores the association. tabSpaceRegistry is assigned
+// just below; these only run once events arrive, after both exist.
+const tabAssociationManager = new TabAssociationManager({
+  getTabSpace: (windowId, tabId) => tabSpaceRegistry.getSpace(windowId, tabId),
+  registerTabSpace: (windowId, tabId, spaceId) => tabSpaceRegistry.register(windowId, tabId, spaceId),
+});
 // Reads the history manager's activation order, so it has to come after it.
 const lastAudibleTracker = new LastAudibleTracker(historyManager);
-tabSpaceRegistry = new TabSpaceRegistry();
+// Each registration is copied into the tab's association backup, so it
+// survives a restart, which empties this registry's session storage
+tabSpaceRegistry = new TabSpaceRegistry({
+  onRegistered: (windowId, tabId, spaceId) => tabAssociationManager.noteTabSpace(windowId, tabId, spaceId),
+});
 // Owns the grouping queue. Reads the active space, the space list and the
 // pinned check through callbacks rather than holding the managers themselves.
 const spaceTabManager = new SpaceTabManager({

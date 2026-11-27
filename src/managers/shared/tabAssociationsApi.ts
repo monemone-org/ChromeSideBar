@@ -28,6 +28,11 @@ export interface TabAssociationBackupEntry
   tabId: number;
   url: string;
   tabIndex: number;
+  // The space the tab was registered to in TabSpaceRegistry, if any. The
+  // registry lives in session storage, so a restart empties it; the restore
+  // registers the tab again from this. Absent in entries saved before it
+  // existed, and for pinned-site tabs, which are never registered.
+  spaceId?: string;
 }
 
 // itemKey → { tabId, url, tabIndex } for one window

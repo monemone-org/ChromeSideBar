@@ -72,7 +72,7 @@ export interface TestContext
   // exactly the way the unpin menu item does.
   getTabIdForPinned: (pinnedId: string) => number | undefined;
   getItemKeyForTab: (tabId: number) => string | null;
-  restoreItemAssociation: (tabId: number, itemKey: string) => Promise<void>;
+  restoreItemAssociation: (tabId: number, itemKey: string, spaceId?: string) => Promise<void>;
   associateExistingTab: (tabId: number, bookmarkId: string, spaceId?: string) => Promise<void>;
   // What a bookmark row's "Move To Tabs" menu item calls: breaks the
   // association, leaving the tab open where it is.

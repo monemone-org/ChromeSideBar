@@ -34,14 +34,14 @@ export class DeleteSpaceAction implements UndoableAction
   private windowId: number;
   private snapshot: SpaceSnapshot | null = null;
   private getItemKeyForTab?: (tabId: number) => string | null;
-  private restoreAssociation?: (tabId: number, itemKey: string) => Promise<void>;
+  private restoreAssociation?: (tabId: number, itemKey: string, spaceId?: string) => Promise<void>;
 
   constructor(
     spaceId: string,
     getSpaces: () => readonly Space[],
     windowId: number,
     getItemKeyForTab?: (tabId: number) => string | null,
-    restoreAssociation?: (tabId: number, itemKey: string) => Promise<void>
+    restoreAssociation?: (tabId: number, itemKey: string, spaceId?: string) => Promise<void>
   )
   {
     this.spaceId = spaceId;
@@ -192,7 +192,8 @@ export class DeleteSpaceAction implements UndoableAction
           {
             try
             {
-              await this.restoreAssociation(newTabId, tabSnapshot.itemKey);
+              // Back in the restored space, which keeps its id through the undo
+              await this.restoreAssociation(newTabId, tabSnapshot.itemKey, this.snapshot.space.id);
             }
             catch (err)
             {

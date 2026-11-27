@@ -7,6 +7,14 @@
 import { ManagerId, RoutedManager } from '../proxies/messageRouting';
 import { TabSpaceRegistryApi } from '../shared/tabSpaceRegistryApi';
 
+/** What TabSpaceRegistry tells its owner about, passed in at construction. */
+export interface TabSpaceRegistryDeps
+{
+  // A tab was registered to a space. Background copies it into the tab's
+  // association backup, since this registry does not survive a restart.
+  onRegistered?(windowId: number, tabId: number, spaceId: string): void;
+}
+
 export class TabSpaceRegistry implements RoutedManager, TabSpaceRegistryApi
 {
   static STORAGE_KEY = 'bg_tabSpaces';
@@ -15,6 +23,12 @@ export class TabSpaceRegistry implements RoutedManager, TabSpaceRegistryApi
 
   // Map<windowId, Map<tabId, spaceId>>
   #registry: Map<number, Map<number, string>> = new Map();
+  #deps: TabSpaceRegistryDeps;
+
+  constructor(deps: TabSpaceRegistryDeps = {})
+  {
+    this.#deps = deps;
+  }
 
   /** See RoutedManager.dispatch. */
   async dispatch(method: string, message: Record<string, unknown>): Promise<unknown>
@@ -38,6 +52,7 @@ export class TabSpaceRegistry implements RoutedManager, TabSpaceRegistryApi
     }
     this.#registry.get(windowId)!.set(tabId, spaceId);
     this.save();
+    this.#deps.onRegistered?.(windowId, tabId, spaceId);
   }
 
   getSpace(windowId: number, tabId: number): string | undefined

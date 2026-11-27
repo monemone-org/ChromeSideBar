@@ -1,6 +1,7 @@
 import { UndoableAction } from './types';
 import { truncateTitle } from '../utils/truncateTitle';
 import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
+import { spaceManagerProxy } from '../managers/proxies/spaceManagerProxy';
 
 interface TabSnapshot
 {
@@ -26,13 +27,13 @@ export class CloseTabAction implements UndoableAction
   private windowId: number;
   private snapshots: TabSnapshot[] = [];
   private getItemKeyForTab?: (tabId: number) => string | null;
-  private restoreAssociation?: (tabId: number, itemKey: string) => Promise<void>;
+  private restoreAssociation?: (tabId: number, itemKey: string, spaceId?: string) => Promise<void>;
 
   constructor(
     tabIds: number[],
     windowId: number,
     getItemKeyForTab?: (tabId: number) => string | null,
-    restoreAssociation?: (tabId: number, itemKey: string) => Promise<void>
+    restoreAssociation?: (tabId: number, itemKey: string, spaceId?: string) => Promise<void>
   )
   {
     this.tabIds = tabIds;
@@ -195,7 +196,12 @@ export class CloseTabAction implements UndoableAction
         {
           try
           {
-            await this.restoreAssociation(newTabId, snapshot.itemKey);
+            // The space whose group the tab was in when it closed, found by
+            // group title the same way background matches groups to spaces
+            const spaceId = snapshot.groupTitle
+              ? spaceManagerProxy.snapshot.find(s => s.name === snapshot.groupTitle)?.id
+              : undefined;
+            await this.restoreAssociation(newTabId, snapshot.itemKey, spaceId);
           }
           catch (err)
           {

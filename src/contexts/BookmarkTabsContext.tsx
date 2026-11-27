@@ -3,7 +3,7 @@ import { createChromeErrorHandler } from '../utils/chromeError';
 import { tabSpaceRegistryProxy } from '../managers/proxies/tabSpaceRegistryProxy';
 import { spaceTabManagerProxy } from '../managers/proxies/spaceTabManagerProxy';
 import { tabAssociationsProxy } from '../managers/proxies/tabAssociationsProxy';
-import { TabAssociations } from '../managers/shared/tabAssociationsApi';
+import { isBookmarkItemKey, TabAssociations } from '../managers/shared/tabAssociationsApi';
 import { isUrlDrifted, isDomainDrifted } from '../utils/urlCompare';
 import { LiveTabInfoMap } from './liveTabInfo';
 
@@ -25,7 +25,9 @@ interface BookmarkTabsContextValue
   isBookmarkDrifted: (bookmarkId: string, savedUrl: string) => boolean;
   resetBookmarkTab: (bookmarkId: string, savedUrl: string) => Promise<void>;
   associateExistingTab: (tabId: number, bookmarkId: string, spaceId?: string) => Promise<void>;
-  restoreItemAssociation: (tabId: number, itemKey: string) => Promise<void>;
+  // spaceId: the space a restored bookmark tab belongs to, registered with
+  // background the same way opening a bookmark registers it
+  restoreItemAssociation: (tabId: number, itemKey: string, spaceId?: string) => Promise<void>;
   deassociateBookmarkTab: (bookmarkId: string) => void;
   // Pinned site functions
   openPinnedTab: (pinnedId: string, url: string) => Promise<number | undefined>;
@@ -575,9 +577,17 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
   }, [storeAssociation, currentWindowId]);
 
   // Restore an item association by raw itemKey (for undo — works for both bookmark and pinned)
-  const restoreItemAssociation = useCallback(async (tabId: number, itemKey: string): Promise<void> =>
+  const restoreItemAssociation = useCallback(async (tabId: number, itemKey: string, spaceId?: string): Promise<void> =>
   {
     await storeAssociation(tabId, itemKey);
+
+    // A restored bookmark tab gets its space registered again, as createItemTab
+    // does for a new one, so background knows when it leaves that space (G3).
+    // Pinned-site tabs are never registered.
+    if (spaceId && isBookmarkItemKey(itemKey) && currentWindowId !== null)
+    {
+      tabSpaceRegistryProxy.register(currentWindowId, tabId, spaceId);
+    }
 
     // Seed live info for the newly managed tab
     chrome.tabs.get(tabId, (tab) =>
@@ -585,7 +595,7 @@ export const BookmarkTabsProvider = ({ children }: BookmarkTabsProviderProps) =>
       if (chrome.runtime.lastError || !tab) return;
       setLiveTabs((prev) => prev.withTab(tabId, tab));
     });
-  }, [storeAssociation]);
+  }, [storeAssociation, currentWindowId]);
 
   // Deassociate a bookmark from its tab (tab stays alive, bookmark becomes unloaded)
   const deassociateBookmarkTab = useCallback((bookmarkId: string): void =>

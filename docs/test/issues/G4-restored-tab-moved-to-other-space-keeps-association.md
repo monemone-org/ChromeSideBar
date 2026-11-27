@@ -1,6 +1,6 @@
 ---
 created: 2026-11-26
-status: open
+status: fixed, not verified
 severity: low
 ---
 
@@ -29,7 +29,7 @@ The sidebar registers a tab when it opens a bookmark, and when a bookmark moves 
 - **The startup restore** (`TabAssociationManager.restoreFromBackup`). The registry lives in session storage, which a restart empties, and the backup in local storage has no record of the tab's space.
 - **Undo** (`restoreItemAssociation` in `src/contexts/BookmarkTabsContext.tsx`, used by `CloseTabAction` and `DeleteSpaceAction`). It links the reopened tab but does not register it.
 
-## Proposed fix
+## Fix
 
 Register the space again on both paths:
 
@@ -45,4 +45,4 @@ If a space is renamed between closing a tab and undoing, `CloseTabAction` finds 
 
 ## Status
 
-Open. B.3c, D.2c, T.8, T.8b and T.8c reproduce it: with the G3 fix in, they fail at the check that the bookmark is unloaded. T.8d, T.8e and T.8f guard the fix and pass without it, and so does B.3c's pinned-site step.
+Fixed, not verified. Without the fix, B.3c, D.2c, T.8, T.8b and T.8c failed at the check that the bookmark is unloaded, with the G3 fix already in. T.8d, T.8e and T.8f guard the fix and passed without it, and so did B.3c's pinned-site step. To verify, build with `npm run build:debug`, run those cases, then Sections A, B, D and T in full.

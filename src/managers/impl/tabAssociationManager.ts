@@ -628,9 +628,27 @@ function buildMergedBackup(
 // The manager
 // =============================================================================
 
+/**
+ * What TabAssociationManager reads from and writes to TabSpaceRegistry, passed
+ * in as callbacks so it holds no reference to it. The backup keeps each tab's
+ * registered space, so a restore can register the tab again.
+ */
+export interface TabAssociationDeps
+{
+  getTabSpace(windowId: number, tabId: number): string | undefined;
+  registerTabSpace(windowId: number, tabId: number, spaceId: string): void;
+}
+
 export class TabAssociationManager implements RoutedManager, TabAssociationsApi
 {
   readonly managerId = ManagerId.TAB_ASSOCIATIONS;
+
+  #deps: TabAssociationDeps;
+
+  constructor(deps: TabAssociationDeps)
+  {
+    this.#deps = deps;
+  }
 
   // windowId -> that window's live associations. The authoritative copy:
   // session storage is written from here, never read back except by load().
@@ -741,13 +759,16 @@ export class TabAssociationManager implements RoutedManager, TabAssociationsApi
 
     const save = this.#backup.saveResolved(windowId, itemKey, async () =>
     {
-      // Fill in whatever the caller didn't have, so the backup entry is complete
-      if (url !== undefined && tabIndex !== undefined) return { tabId, url, tabIndex };
+      // Fill in whatever the caller didn't have, so the backup entry is complete.
+      // The space is read here, inside the queue, so a registration that
+      // arrived since the association is included.
+      const spaceId = this.#deps.getTabSpace(windowId, tabId);
+      if (url !== undefined && tabIndex !== undefined) return { tabId, url, tabIndex, spaceId };
 
       try
       {
         const tab = await chrome.tabs.get(tabId);
-        return { tabId, url: url ?? tab.url ?? '', tabIndex: tabIndex ?? tab.index };
+        return { tabId, url: url ?? tab.url ?? '', tabIndex: tabIndex ?? tab.index, spaceId };
       }
       catch
       {
@@ -902,7 +923,29 @@ export class TabAssociationManager implements RoutedManager, TabAssociationsApi
     const itemKey = this.getAssociations(windowId)[tabId];
     if (itemKey === undefined) return;
 
-    await this.#backup.save(windowId, itemKey, { tabId, url, tabIndex });
+    await this.#backup.save(windowId, itemKey, { tabId, url, tabIndex, spaceId: this.#deps.getTabSpace(windowId, tabId) });
+  }
+
+  /**
+   * A tab was registered to a space in TabSpaceRegistry: record that space in
+   * its backup entry, so a restart can register it again. Registration often
+   * arrives after the association, whose own backup save may already have run
+   * without it. Does nothing for a tab nobody tracks.
+   */
+  noteTabSpace(windowId: number, tabId: number, spaceId: string): void
+  {
+    const itemKey = this.getAssociations(windowId)[tabId];
+    if (itemKey === undefined) return;
+
+    // Patch the entry inside the queue, so it is read after any save queued
+    // before it; an entry that has gone (or moved to another tab) is left alone
+    const save = this.#backup.saveResolved(windowId, itemKey, async () =>
+    {
+      const entry = (await getWindowBackup(windowId))[itemKey];
+      if (!entry || entry.tabId !== tabId || entry.spaceId === spaceId) return undefined;
+      return { ...entry, spaceId };
+    });
+    this.#finishInBackground(save, 'noteTabSpace');
   }
 
   /**
@@ -1034,9 +1077,20 @@ export class TabAssociationManager implements RoutedManager, TabAssociationsApi
       }
       this.#commit(currentId, associations);
 
+      // Register each restored tab to the space it had before the restart,
+      // since the restart emptied TabSpaceRegistry along with session storage
+      const backup = backups.get(backupId)!;
+      for (const [itemKey, tabId] of Object.entries(tabMatches))
+      {
+        const spaceId = backup[itemKey]?.spaceId;
+        if (spaceId && associations[tabId] === itemKey)
+        {
+          this.#deps.registerTabSpace(currentId, tabId, spaceId);
+        }
+      }
+
       // Update backup: one entry per association the window now has, under
       // the current window ID
-      const backup = backups.get(backupId)!;
       const filtered = buildMergedBackup(associations, backup, tabMatches, backups.get(currentId));
 
       if (backupId !== currentId)
