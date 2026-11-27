@@ -17,10 +17,11 @@ import {
   recordTabForBookmark,
   recordTabForPinned,
   removeBookmarkWhileClosed,
+  renameSpace,
   ungroupTab,
   switchSpaceVerified,
 } from '../actions';
-import { assertBookmarkExists, assertBookmarkLoaded, assertPinnedLoaded, assertTabExists, assertTabInSpace, assertTabUngrouped } from '../assertions';
+import { assertBookmarkExists, assertBookmarkLoaded, assertPinnedLoaded, assertTabExists, assertTabInSpace, assertTabInSpaceWithin, assertTabUngrouped } from '../assertions';
 
 export const B1_CLOSE_BOOKMARK_TAB: TestCase = {
   id: 'B.1',
@@ -256,6 +257,44 @@ export const B3C_UNDO_CLOSE_THEN_MOVE: TestCase = {
   ],
 };
 
+// B.3c with the space renamed between the close and the undo. Undo puts the
+// tab back into its old group, which the rename kept and retitled, but it
+// looks the tab's space up by the title the group had at the close. No space
+// has that name any more, so unless undo finds the space some other way, the
+// reopened tab is not registered, and moving it into another space's group
+// leaves the bookmark loaded (G4).
+export const B3D_UNDO_CLOSE_AFTER_RENAME_THEN_MOVE: TestCase = {
+  id: 'B.3d',
+  title: 'A bookmark tab reopened by undo after its space was renamed is unlinked when it moves to another space\'s group',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'B3d bookmark', testUrl('b3d-bookmark'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    // Keeps the space's group alive while the bookmark tab is closed, so
+    // undo can put the tab back into the same, renamed group
+    openRegularTab({ url: testUrl('b3d-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('b3d-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+
+    doCloseTabs(['tab1']),
+    renameSpace('spaceA', 'Work renamed (inpanel-test)'),
+    // Background retitles the group a moment after the rename is stored
+    assertTabInSpaceWithin('dummyTab', 'spaceA', 3000),
+
+    undoCloseTabs(),
+    assertBookmarkLoaded('bm', true),
+    recordTabForBookmark('bm', 'reopenedTab'),
+    assertTabInSpace('reopenedTab', 'spaceA'),
+
+    moveTabNative({ tabRef: 'reopenedTab', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('reopenedTab', 'spaceB'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
 // B.5's own intro in the doc calls this "a same-sidebar-state variant of
 // B.5b" - deliberately no closed-panel step here (unlike B.5b).
 // deleteBookmarkNative fires the same chrome.bookmarks.onRemoved event the
@@ -353,6 +392,7 @@ export const SECTION_B_CASES: TestCase[] = [
   B3_MULTI_CLOSE_TABS,
   B3B_UNDO_CLOSE_THEN_UNGROUP,
   B3C_UNDO_CLOSE_THEN_MOVE,
+  B3D_UNDO_CLOSE_AFTER_RENAME_THEN_MOVE,
   B5_DELETE_BOOKMARK_TAB_OPEN,
   B5B_DELETE_BOOKMARK_SIDEBAR_CLOSED,
   B5C_DELETE_FOLDER_TABS_OPEN,

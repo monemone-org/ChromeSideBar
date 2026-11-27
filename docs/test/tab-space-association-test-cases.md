@@ -72,6 +72,7 @@ The Test Runner has a "Manual" checkbox. When you turn it on, each step that the
 | B.3  | Yes     |
 | B.3b | Yes     |
 | B.3c | Yes     |
+| B.3d | Yes     |
 | B.4  | No      |
 | B.5  | Yes     |
 | B.5b | Yes     |
@@ -368,6 +369,16 @@ When a tab joins a group, background learns only the new group. To see that the 
 | 1    | In Space A, open a bookmark and a pinned site. Close both from the sidebar at once, then undo | Both show "loaded" again. The bookmark's tab is in the group of Space A |
 | 2    | Drag the bookmark's tab into the group of Space B | The bookmark shows as unloaded. The tab stays in Space B as a regular tab |
 | 3    | Drag the pinned site's tab into the group of Space B | The pinned site still shows "loaded", as in A.4 |
+
+### B.3d A bookmark tab reopened by undo after its space was renamed is unlinked when it moves to another space's group
+
+B.3c with the space renamed between the close and the undo. Undo puts the tab back into the renamed group, but it looks the tab's space up by the group's title at the time of the close, which no space has any more. Unless undo finds the space another way, the reopened tab is not registered (G4).
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | In Space A, open a bookmark and a regular tab. Close the bookmark's tab from the sidebar | The bookmark shows as unloaded. An undo toast shows |
+| 2    | Rename Space A, then undo | The tab opens in the renamed group, and the bookmark shows "loaded" |
+| 3    | Drag the bookmark's tab into the group of Space B | The bookmark shows as unloaded |
 
 ### B.4 Close the whole window with tracked tabs open
 
