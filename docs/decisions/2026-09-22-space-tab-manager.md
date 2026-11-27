@@ -9,101 +9,108 @@ depends-on: 2026-07-30-shared-storage-multiple-writers
 
 ## When to do this
 
-Any time now. This refactor was meant to start once [[2026-07-30-shared-storage-multiple-writers]] was finished, which meant three things:
+Any time. The plan this one waited for, [[2026-07-30-shared-storage-multiple-writers]], is implemented, and the behaviour fixes that touched the same listeners are in: G1, G3 and G4 (`docs/test/issues/fixed/`) and D1.
 
-- **Step 6 (`TabAssociationManager`)** has shipped.
-- **The in-flight broadcast counter** for `spaceManagerProxy` is no longer needed, because step 6a removed the counter instead of porting it.
-- **The behaviour-fix pass** is done. G2 was fixed by step 6b, and G1 (`docs/test/issues/fixed/G1-native-bookmark-delete-orphans-tab.md`) and G3 (`docs/test/issues/fixed/G3-native-remove-from-group-keeps-association.md`) are fixed too.
+It reverses one decision from that plan on purpose. Its message inventory says orchestration messages like `set-active-tab-and-space` "stay as direct handlers in `background.ts` and keep their current names", because no single manager owned them. That was the right call while managers were being ported one at a time. Now that every piece of state has an owner, the orchestration left behind in `background.ts` turns out to be about one thing, and this doc proposes giving that thing an owner too.
 
-G1 added a `chrome.bookmarks.onRemoved` listener to background, and G3 changed the group-change handler. Both sit next to the listeners this refactor moves, and both are in, so nothing else is waiting on the same code.
+## Where things stand
 
-It also reverses one decision from that plan on purpose. Its message inventory says orchestration messages like `set-active-tab-and-space` "stay as direct handlers in `background.ts` and keep their current names", because no single manager owned them. That was the right call while managers were being ported one at a time, but once every piece of state has an owner, the orchestration left behind in `background.ts` turns out to be about one thing, and this doc proposes giving that thing an owner too.
+### The half that is done
 
-## The part that already exists
+`SpaceTabManager` (`src/managers/impl/spaceTabManager.ts`) exists as a routed manager, `ManagerId.SPACE_TAB`. It was built first to fix the race in `2026-11-23-new-tab-grouping-two-writers.md`, and it owns everything about putting tabs into Chrome groups:
 
-The grouping part of this proposal was built first, to fix the race in `2026-11-23-new-tab-grouping-two-writers.md`. `SpaceTabManager` exists in `src/managers/impl/spaceTabManager.ts` as a routed manager. It owns the grouping queue (`processGroupingRequest`, `findGroupByName` and the `TAB_GROUP_TITLE_SET` workaround moved out of `background.ts`), `queueNewTab` for `chrome.tabs.onCreated`, and three sidebar methods: `createTabs`, `assignTabToSpace` and `requestGrouping`. The raw `queue-tab-for-grouping` message is gone. It reads the active space, the space list and the pinned check through callbacks.
+- **The grouping queue.** `GroupingQueue`, an internal class in the same file, runs grouping jobs one at a time. `processGroupingRequest`, `findGroupByName` and the `TAB_GROUP_TITLE_SET` workaround for Brave moved here from `background.ts`.
+- **`PlacedTabs`**, which remembers the tabs `createTabs` has already placed, so the `chrome.tabs.onCreated` path does not group them a second time.
+- **Sidebar methods** (`SpaceTabManagerApi`): `createTabs`, `assignTabToSpace` and `requestGrouping`. The raw `queue-tab-for-grouping` message is gone.
+- **Background methods:** `queueNewTab` for `chrome.tabs.onCreated`, `forgetTab` for `chrome.tabs.onRemoved`, and `renameSpaceGroups`, which retitles a renamed space's group in every window (D1).
 
-`SpaceWindowStateManager`, `TabSpaceRegistry`, `getSpaceForTab`, `setActiveTabAndSpace` and the `onActivated` follow logic are still where this document says they are. The rest of the proposal moves them into `SpaceTabManager`, and the sections below still describe the grouping queue as it was before, as the starting point of that plan.
+It reads the active space, the space list and the pinned check through callbacks (`SpaceTabDeps`), not by holding the other managers.
 
-## Background
+### The half that is left
 
-Four separate pieces of code today answer the same two questions: which space is this window showing, and which space does this tab belong to?
+These pieces answer the same two questions, which space a window shows and which space a tab belongs to, and they are still spread over two managers and `background.ts`:
 
-- `SpaceWindowStateManager` (class, `src/managers/impl/spaceWindowStateManager.ts`) owns the per-window active space. It stores one `SpaceWindowState` (`{ activeSpaceId: string }`) per window id in session storage under `spaceWindowState_{windowId}`, and the sidebar mirrors it through `spaceWindowStateProxy`.
-- `TabSpaceRegistry` (class, `src/managers/impl/tabSpaceRegistry.ts`) owns a per-window map from tab id to space id, stored in session storage under `bg_tabSpaces`. The sidebar writes to it when it opens a tab from a bookmark, so background knows the tab's home space before Chrome has grouped it. The sidebar never reads it.
-- `getSpaceForTab(windowId, tabId)` (function in `background.ts`, returns `Promise<string | undefined>`) works out a tab's space. It returns `undefined` for pinned-site tabs, then tries the tab's live Chrome group (matched to a space by group title), then falls back to the registry, and finally returns `undefined` for an ungrouped tab, which callers treat as "All".
-- `setActiveTabAndSpace(tabId)` (function in `background.ts`, returns `Promise<{ success: boolean; error?: string }>`) activates a tab, calls `getSpaceForTab`, switches the window's active space if needed, and broadcasts `tab-activated` with `explicit: true` so the sidebar scrolls.
+- **`SpaceWindowStateManager`** (`src/managers/impl/spaceWindowStateManager.ts`) owns the per-window active space. It stores one `SpaceWindowState` (`{ activeSpaceId: string }`) per window in session storage under `spaceWindowState_{windowId}`, and the sidebar mirrors it through `spaceWindowStateProxy`.
+- **`TabSpaceRegistry`** (`src/managers/impl/tabSpaceRegistry.ts`) owns a per-window map from tab id to space id, in session storage under `bg_tabSpaces`. The sidebar writes to it through `tabSpaceRegistryProxy` when it opens a bookmark tab, links an existing tab to a bookmark, moves a bookmark to another space, and when undo links a tab again. The sidebar never reads it. Since G4, it reports each registration to `TabAssociationManager.noteTabSpace`, which copies the space into the association backup, so the startup restore can register the tab again after a restart.
+- **`getSpaceForTab(windowId, tabId)`** (a function in `background.ts`) works out a tab's space. It returns `undefined` for a pinned-site tab, then tries the tab's live Chrome group (matched to a space by title), then the registry, and finally returns `undefined` for an ungrouped tab, which callers treat as "All".
+- **`setActiveTabAndSpace(tabId)`** (a function in `background.ts`) activates a tab, calls `getSpaceForTab`, switches the window's active space if needed, and broadcasts `tab-activated` with `explicit: true` so the sidebar scrolls.
+- **The `chrome.tabs.onActivated` listener** repeats `setActiveTabAndSpace`'s "resolve the space, maybe switch" logic inline, with the extra rule that the "Follow active tab" setting can turn it off, and then broadcasts a passive `tab-activated`.
+- **The group-change handler** in `chrome.tabs.onUpdated`. A bookmark tab that leaves every group is unlinked from its bookmark, decided from the link alone (G3). A tab that joins a group is unlinked when the group's space differs from the tab's registered space, which needs the registry because Chrome reports only the new group (G4).
 
-Two more pieces of `background.ts` belong to the same idea even though they are not named that way:
+Because the two orchestration functions live in `background.ts` and not on a manager, `TabHistoryManager` cannot import them (`background.ts` already imports it, so that would be circular). It works around this with `TabHistoryDeps`, an interface of those two functions that `background.ts` passes in at construction.
 
-- The `chrome.tabs.onActivated` listener repeats `setActiveTabAndSpace`'s "resolve the space, maybe switch" logic inline, with the extra rule that the "Follow active tab" setting can turn it off, and then broadcasts a passive `tab-activated`.
-- The grouping queue (`queueTabForGrouping`, `processGroupingQueue`, `processGroupingRequest`, plus the `findGroupByName` helper) is what actually puts a tab into its space's Chrome group. It reads the window's active space and asks `TabAssociationManager.isPinnedManagedTab` whether to keep the tab ungrouped.
+The sidebar still reaches this orchestration through raw messages that bypass the manager and proxy layer:
 
-Because the two orchestration functions live in `background.ts` rather than on a manager, `TabHistoryManager` cannot import them (`background.ts` already imports it, so that would be circular). It works around this with `TabHistoryDeps`, an interface of those two functions that `background.ts` passes in at construction.
-
-The sidebar also talks to this orchestration through raw messages that bypass the manager/proxy layer:
-
-| Raw message | Direction | Senders / receivers |
+| Raw message | Direction | Senders and receivers |
 |---|---|---|
-| `set-active-tab-and-space` | sidebar → background, request/reply | `useFollowActiveTab.ts:81`, `AudioTabsDropdown.tsx:29`, `App.tsx:866`, `tests/inpanel/actions.ts:64,101,126` |
-| `queue-tab-for-grouping` | sidebar → background, fire-and-forget | `BookmarkTabsContext.tsx:344,470,539`, `tabOperations.ts:146` |
-| `tab-activated` (`SpaceMessageAction.TAB_ACTIVATED`) | background → every context | received by `useFollowActiveTab.ts:116` |
-| `TAB_GROUP_TITLE_SET` (uses `type`, not `action`) | background → every context | received by `useTabGroups.ts:53` |
+| `set-active-tab-and-space` | sidebar to background, request and reply | sent by `useFollowActiveTab.ts`, `AudioTabsDropdown.tsx`, `App.tsx` and three in-panel test actions in `tests/inpanel/actions.ts` |
+| `tab-activated` (`SpaceMessageAction.TAB_ACTIVATED`) | background to every context | received by `useFollowActiveTab.ts` |
+| `TAB_GROUP_TITLE_SET` (uses `type`, not `action`) | `SpaceTabManager` to every context | received by `useTabGroups.ts` |
 
-Three of the `set-active-tab-and-space` senders still pass a `skipHistory: false` field that background has not read for a long time, which is a small sign of what happens to hand-written message shapes nobody type-checks.
+`AudioTabsDropdown`, `App` and one test action still pass a `skipHistory: false` field that background has not read for a long time, which is a small sign of what happens to hand-written message shapes nobody type-checks.
 
 ## What is wrong with the current layout
 
-None of this is broken, so this is a tidy-up rather than a bug fix. The cost is in how hard the code is to follow and change.
+None of this is broken, so this is a tidy-up and not a bug fix. The cost is in how hard the code is to follow and change.
 
 - **The logic is spread out.** Deciding "which space should this window show now that this tab is active" lives in two copies (the `onActivated` listener and `setActiveTabAndSpace`), while the state they read and write lives in two other classes. Anyone changing the rule has to find all four places.
-- **The sidebar uses two calling styles for one concept.** `tabSpaceRegistryProxy.register(...)` goes through a typed proxy, but the `queue-tab-for-grouping` message that almost always follows it on the next line is a hand-built object. The pair shows up three times (`BookmarkTabsContext.tsx:337/344`, `:467/470`, `tabOperations.ts:145/146`).
+- **The sidebar uses two proxies for one concept.** `tabSpaceRegistryProxy.register(...)` is almost always followed on the next line by `spaceTabManagerProxy.assignTabToSpace(...)` or `requestGrouping(...)`. The pair shows up in `createItemTab` and `associateExistingTab` in `BookmarkTabsContext.tsx`, and in `regroupAssociatedTab` in `tabOperations.ts`.
+- **The registry and the association manager are wired to each other in `background.ts`.** G4 added `TabSpaceRegistryDeps.onRegistered` and `TabAssociationDeps.getTabSpace` and `registerTabSpace`, which `background.ts` connects with forward references. That wiring belongs to whoever owns the registry.
 - **`TabHistoryDeps` works around a structural problem.** The circular-import explanation in `tabHistoryManager.ts` only exists because the functions have no home.
 - **`SpaceMessageAction` is down to one entry.** `src/utils/spaceMessages.ts` has a whole enum, plus a long comment explaining where everything else went, just to hold `TAB_ACTIVATED`.
 
 ## Proposal
 
-Add one routed manager, `SpaceTabManager`, that owns "window → active space" and "tab → space" together, along with every operation that reads or changes them. It takes over `SpaceWindowStateManager` and `TabSpaceRegistry`, the two orchestration functions, the `onActivated` follow logic, and the grouping queue. `TabAssociationManager` stays separate, because it owns a different relation (tab ↔ bookmark or pinned item) with its own backup and restore machinery, and `SpaceTabManager` uses it rather than absorbing it.
+Make `SpaceTabManager` own "window to active space" and "tab to space" together, along with every operation that reads or changes them. It takes over `SpaceWindowStateManager` and `TabSpaceRegistry`, the two orchestration functions, the `onActivated` follow logic and the group-change handler. `TabAssociationManager` stays separate, because it owns a different relation (tab to bookmark or pinned item) with its own backup and restore machinery. `SpaceTabManager` uses it and does not absorb it.
 
 ### Structure
 
-Absorbing the two managers doesn't mean pasting all their code into one file. Their storage code stays in small internal classes that `SpaceTabManager` holds, so each storage key still has exactly one class that reads and writes it. Only `SpaceTabManager` is routed, so the sidebar sees one manager id and one proxy.
+Absorbing the two managers does not mean pasting all their code into one file. Their storage code stays in small internal classes that `SpaceTabManager` holds, so each storage key still has exactly one class that reads and writes it. Only `SpaceTabManager` is routed, so the sidebar sees one manager id and one proxy.
 
 ```
-┌─ SpaceTabManager (routed, ManagerId.SPACE_TAB) ─────────────────────┐
-│                                                                     │
-│  sidebar-callable (SpaceTabManagerApi)                              │
-│    getState / setActiveSpace          (was SpaceWindowStateManager) │
-│    setActiveTabAndSpace               (was background.ts function)  │
-│    registerTab                        (was TabSpaceRegistry)        │
-│    assignTabToSpace / requestGrouping (was queue-tab-for-grouping)  │
-│                                                                     │
-│  background-internal                                                │
-│    getSpaceForTab, getActiveSpace, handleTabActivated,              │
-│    queueNewTab, onTabRemoved, onTabGroupChanged, removeWindow, load │
-│                                                                     │
-│  ┌─ WindowActiveSpaces ──┐ ┌─ TabSpaceRegistry ─┐ ┌─ GroupingQueue ─┐│
-│  │ windowId -> state     │ │ windowId ->        │ │ sequential      ││
-│  │ spaceWindowState_{id} │ │  tabId -> spaceId  │ │ tab grouping    ││
-│  │ (session storage)     │ │ bg_tabSpaces       │ │ (no storage)    ││
-│  └───────────────────────┘ └────────────────────┘ └─────────────────┘│
-└──────────────┬──────────────────────────────┬───────────────────────┘
-               │ constructor dependency       │ constructor dependency
-               ▼                              ▼
-     TabAssociationManager               SpaceManager
-     (isPinnedManagedTab, deassociate)   (spaces by id / by name)
+┌─ SpaceTabManager (routed, ManagerId.SPACE_TAB) ──────────────────────┐
+│                                                                      │
+│  sidebar-callable (SpaceTabManagerApi)                               │
+│    createTabs / assignTabToSpace / requestGrouping       (exist)     │
+│    getState / setActiveSpace       (from SpaceWindowStateManager)    │
+│    setActiveTabAndSpace            (from background.ts)              │
+│    registerTab                     (from TabSpaceRegistry)           │
+│                                                                      │
+│  background-internal                                                 │
+│    queueNewTab, forgetTab, renameSpaceGroups             (exist)     │
+│    getSpaceForTab, getActiveSpace, handleTabActivated,               │
+│    onTabGroupChanged, getTabSpace, removeWindow, load                │
+│                                                                      │
+│  ┌─ WindowActiveSpaces ──┐ ┌─ TabSpaceRegistry ─┐ ┌─ GroupingQueue ─┐ │
+│  │ windowId -> state     │ │ windowId ->        │ │ PlacedTabs      │ │
+│  │ spaceWindowState_{id} │ │  tabId -> spaceId  │ │ (no storage,    │ │
+│  │ (session storage)     │ │ bg_tabSpaces       │ │  exist)         │ │
+│  └───────────────────────┘ └────────────────────┘ └─────────────────┘ │
+└──────────────┬───────────────────────────────┬───────────────────────┘
+               │ constructor dependency        │ constructor dependency
+               ▼                               ▼
+     TabAssociationManager                SpaceManager
+     (isPinnedManagedTab,                 (spaces by id and by name)
+      isBookmarkManagedTab,
+      deassociate, noteTabSpace)
+               │
+               │ callbacks: getTabSpace, registerTabSpace
+               ▼
+     SpaceTabManager
 
      TabHistoryManager ── constructor dependency ──▶ SpaceTabManager
      LastAudibleTracker ── constructor dependency ─▶ TabHistoryManager
 ```
 
-The three internal classes, all in `src/managers/impl/`:
+The internal classes, all in `src/managers/impl/`:
 
-- `WindowActiveSpaces` (class, new file `windowActiveSpaces.ts`) is the storage half of today's `SpaceWindowStateManager`: the `Map<windowId, SpaceWindowState>`, `get`, `set`, `removeWindow` and `load`. It doesn't broadcast. `SpaceTabManager` broadcasts after each write, since it's the class that knows the `originId` and owns the action names.
-- `TabSpaceRegistry` (class, existing file) stays mostly as it is, minus `RoutedManager` and `dispatch`. It becomes a plain store again.
-- `GroupingQueue` (class, new file `tabGroupingQueue.ts`) is the queue and `processGroupingRequest` moved out of `background.ts`, including the `ISSUE_52949_WORKAROUND` send of `TAB_GROUP_TITLE_SET`. It needs the pinned check, the space lookup and the active space, and gets them through a small callback object from `SpaceTabManager` rather than holding references to the other managers itself.
+- **`WindowActiveSpaces`** (new file `windowActiveSpaces.ts`) is the storage half of today's `SpaceWindowStateManager`: the `Map<windowId, SpaceWindowState>`, `get`, `set`, `removeWindow` and `load`. It does not broadcast. `SpaceTabManager` broadcasts after each write, since it knows the `originId` and owns the action names.
+- **`TabSpaceRegistry`** (existing file) stays mostly as it is, minus `RoutedManager` and `dispatch`, and becomes a plain store again. Its `onRegistered` hook stays, and `SpaceTabManager` connects it to `TabAssociationManager.noteTabSpace`.
+- **`GroupingQueue` and `PlacedTabs`** already exist inside `spaceTabManager.ts`. They can move to their own file if that file gets too long, but nothing in this plan needs it.
 
-The storage keys don't change, so a service worker restart mid-session reads back exactly what the old code wrote.
+The storage keys do not change, so a service worker restart mid-session reads back exactly what the old code wrote.
+
+`TabAssociationManager` and `SpaceTabManager` need each other: `SpaceTabManager` asks whether a tab is pinned or a bookmark tab and calls `deassociate`, and the association manager reads and registers a tab's space for its backup (G4). The second direction stays a pair of callbacks, `getTabSpace` and `registerTabSpace`, now pointing at `SpaceTabManager`, the same forward-reference wiring `background.ts` uses today.
 
 ### API
 
@@ -111,6 +118,12 @@ The storage keys don't change, so a service worker restart mid-session reads bac
 // shared/spaceTabManagerApi.ts - what the sidebar can call
 interface SpaceTabManagerApi
 {
+  // Already there
+  createTabs(windowId: number, tabs: NewTab[], placement: TabPlacement): Promise<CreatedTabs>;
+  assignTabToSpace(windowId: number, tabId: number, spaceId: string): void;
+  requestGrouping(windowId: number, tabId: number): void;
+
+  // New
   getState(windowId: number): SpaceWindowState;
   setActiveSpace(windowId: number, spaceId: string): SpaceWindowState;
 
@@ -121,14 +134,6 @@ interface SpaceTabManagerApi
 
   // Record a tab's home space only - no grouping.
   registerTab(windowId: number, tabId: number, spaceId: string): void;
-
-  // Record the tab's home space AND move it into that space's Chrome group,
-  // even if it is already in another group (today: register + queue with spaceId).
-  assignTabToSpace(windowId: number, tabId: number, spaceId: string): void;
-
-  // Group the tab into the window's active space if it is still ungrouped
-  // (today: queue-tab-for-grouping without spaceId).
-  requestGrouping(windowId: number, tabId: number): void;
 }
 
 // Broadcasts, both built with makeManagerActionId(ManagerId.SPACE_TAB, ...)
@@ -136,25 +141,25 @@ SPACE_TAB_STATE_CHANGED   // { windowId, state: SpaceWindowState, senderId? }  (
 SPACE_TAB_TAB_ACTIVATED   // { windowId, tabId, spaceSwitched, explicit? }     (was 'tab-activated')
 ```
 
-The reason there are three grouping-related calls instead of one is that today's call sites mean three different things, and merging them would change behaviour:
+`registerTab` stays separate from `assignTabToSpace` because the call sites mean different things, and merging them would change behaviour:
 
-- `BookmarkTabsContext.tsx:467` (associate an existing tab with a bookmark) and `tabOperations.ts:145` (a bookmark moved to another space's folder) both register and then queue with an explicit `spaceId`, which forces the move. Both become `assignTabToSpace`.
-- `BookmarkTabsContext.tsx:337/344` (a tab just opened from a bookmark) registers the bookmark's space but queues **without** a `spaceId`, so the tab goes into the active space, and not at all when the active space is "All". That becomes `registerTab` followed by `requestGrouping`. See open question 2.
-- `BookmarkTabsContext.tsx:539` (a pinned tab being released) only queues. It becomes `requestGrouping`.
+- **`associateExistingTab`** (link an existing tab to a bookmark) and **`regroupAssociatedTab`** (a bookmark moved to another space's folder) register the space and then force the tab into that space's group. They call `registerTab` and `assignTabToSpace` today through two proxies, and `assignTabToSpace` can register the space itself once both live in one manager.
+- **`createItemTab`** (a tab just opened from a bookmark) registers the active space and then calls `requestGrouping`, so the tab goes into the active space, and is not grouped at all when the active space is "All". That stays `registerTab` followed by `requestGrouping`. See the open question below.
+- **`restoreItemAssociation`** (undo links a tab again) only registers. It becomes `registerTab`.
 
 Background-internal methods, called directly on the instance by `background.ts` listeners and other managers:
 
 - `getSpaceForTab(windowId, tabId): Promise<string | undefined>` has the same rules as today, reading the registry and `SpaceManager` directly.
-- `getActiveSpace(windowId): string` is the same as today's `SpaceWindowStateManager.getActiveSpace`.
+- `getActiveSpace(windowId): string` is today's `SpaceWindowStateManager.getActiveSpace`.
 - `handleTabActivated(windowId, tabId): Promise<void>` is the body of today's `onActivated` listener after the history push: resolve the space, read the follow mode from `chrome.storage.local`, switch if allowed, and broadcast a passive `SPACE_TAB_TAB_ACTIVATED`.
-- `queueNewTab(tab)` is what `chrome.tabs.onCreated` calls for an ungrouped new tab, today's `queueTabForGrouping(tab)` with no space.
-- `onTabRemoved(windowId, tabId)` drops the registry entry.
-- `onTabGroupChanged(windowId, tabId, groupId): Promise<void>` is today's `onUpdated` block: if the tab has a registered space and the new group belongs to a different space, drop the registry entry and call `tabAssociationManager.deassociate`.
+- `onTabGroupChanged(windowId, tabId, groupId): Promise<void>` is today's group-change block in `onUpdated`, with both branches as they are: leaving every group unlinks a bookmark tab through `TabAssociationManager` alone, and joining a group compares against the registry.
+- `getTabSpace(windowId, tabId)` reads the registry, for the association manager's backup.
+- `forgetTab` already exists for `onRemoved`. It also drops the tab's registry entry.
 - `removeWindow(windowId)` and `load()` forward to the internal stores.
 
 ### The proxy
 
-`spaceTabManagerProxy` replaces both `spaceWindowStateProxy` and `tabSpaceRegistryProxy`. It keeps the mirror store, `mirrorWindow(windowId)` and the optimistic `setActiveSpace` exactly as `spaceWindowStateProxy` has them today, and adds the new methods as plain `callManager` wrappers.
+`spaceTabManagerProxy` already exists for the grouping methods. It takes over from `spaceWindowStateProxy` and `tabSpaceRegistryProxy`: it gains the mirror store, `mirrorWindow(windowId)` and the optimistic `setActiveSpace` exactly as `spaceWindowStateProxy` has them today, and `registerTab` and `setActiveTabAndSpace` as plain `callManager` wrappers.
 
 One new piece is `onTabActivated(listener): () => void`, which returns an unsubscribe function. It needs its own listener set, because `subscribeToBroadcast` registers at most one handler per action and never unsubscribes (it was built for mirrors that live as long as the page). `useFollowActiveTab` adds and removes its handler as `mode` and `windowId` change, so the proxy subscribes to the broadcast once and forwards each message to whatever listeners are currently in the set.
 
@@ -176,9 +181,9 @@ chrome.tabs.onActivated.addListener(async (activeInfo) =>
 });
 ```
 
-The two flat branches in `chrome.runtime.onMessage` go away completely, so every message the service worker receives goes through `routedManagers`. The construction order becomes `spaceManager`, `tabAssociationManager`, `spaceTabManager`, `historyManager`, `lastAudibleTracker`, because each of these takes the previous ones in its constructor.
+The flat `set-active-tab-and-space` branch in `chrome.runtime.onMessage` goes away, so every message the service worker receives goes through `routedManagers`. The construction order becomes `spaceManager`, `tabAssociationManager`, `spaceTabManager`, `historyManager`, `lastAudibleTracker`, because each takes the previous ones in its constructor.
 
-`TabHistoryManager` gets `spaceTabManager` in place of the `{ setActiveTabAndSpace, getSpaceForTab }` object. `TabHistoryDeps` can stay as the parameter type, narrowed to those two methods, because it clearly documents what history actually uses. The circular-import explanation above it goes away, though, since there's no cycle any more: `SpaceTabManager` never needs history. The `result.success` checks in `navigate` and `navigateToIndex` are only used for DEV logs, so they turn into a `try`/`catch` around the call.
+`TabHistoryManager` gets `spaceTabManager` in place of the `{ setActiveTabAndSpace, getSpaceForTab }` object. `TabHistoryDeps` can stay as the parameter type, narrowed to those two methods, because it clearly documents what history actually uses. The circular-import explanation above it goes away, since there is no cycle any more: `SpaceTabManager` never needs history. The `result.success` checks in `navigate` and `navigateToIndex` are only used for DEV logs, so they turn into a `try`/`catch` around the call.
 
 ### Message inventory, before and after
 
@@ -188,11 +193,10 @@ The two flat branches in `chrome.runtime.onMessage` go away completely, so every
 | `SpaceWindowStateManager_msg_changed` | `SpaceTabManager_msg_stateChanged` |
 | `TabSpaceRegistry_msg_register` | `SpaceTabManager_msg_registerTab` |
 | `set-active-tab-and-space` (raw) | `SpaceTabManager_msg_setActiveTabAndSpace` |
-| `queue-tab-for-grouping` (raw) | `SpaceTabManager_msg_assignTabToSpace` / `_requestGrouping` |
 | `tab-activated` (raw) | `SpaceTabManager_msg_tabActivated` |
 | `TAB_GROUP_TITLE_SET` (raw) | unchanged, see "Out of scope" |
 
-`ManagerId.SPACE_WINDOW_STATE` and `ManagerId.TAB_SPACE_REGISTRY` are removed and `ManagerId.SPACE_TAB = 'SpaceTabManager'` is added. `SpaceMessageAction` and `SpaceMessageActionType` then have no entries left, so they're deleted, and `spaceMessages.ts` is left holding just the `Space` and `SpaceWindowState` types. Renaming that file is a separate cleanup.
+`ManagerId.SPACE_WINDOW_STATE` and `ManagerId.TAB_SPACE_REGISTRY` are removed. `SpaceMessageAction` and `SpaceMessageActionType` then have no entries left, so they are deleted, and `spaceMessages.ts` is left holding just the `Space` and `SpaceWindowState` types. Renaming that file is a separate cleanup.
 
 ## Worked example
 
@@ -202,40 +206,43 @@ Say window `7` is showing the "Work" space (`activeSpaceId: 'sp_work'`), and a t
 2. `SpaceTabManager.setActiveTabAndSpace(412)` calls `chrome.tabs.update(412, { active: true })`, which returns a tab with `windowId: 7`.
 3. It calls `getSpaceForTab(7, 412)`. `isPinnedManagedTab(7, 412)` is false. The tab's `groupId` is `88`, `chrome.tabGroups.get(88).title` is `"Music"`, and `SpaceManager` finds `sp_music` by that name, so the destination is `'sp_music'`.
 4. The current space is `'sp_work'`, which is neither `'all'` nor the destination, so it writes `{ activeSpaceId: 'sp_music' }` to `WindowActiveSpaces` for window 7 and broadcasts `SpaceTabManager_msg_stateChanged { windowId: 7, state: { activeSpaceId: 'sp_music' } }`. Every sidebar mirroring window 7 switches to Music.
-5. It broadcasts `SpaceTabManager_msg_tabActivated { windowId: 7, tabId: 412, spaceSwitched: true, explicit: true }`. The sidebar's `onTabActivated` listener scrolls tab 412 into view no matter what the follow mode is.
+5. It broadcasts `SpaceTabManager_msg_tabActivated { windowId: 7, tabId: 412, spaceSwitched: true, explicit: true }`. The sidebar's `onTabActivated` listener scrolls tab 412 into view whatever the follow mode is.
 6. Because the active tab actually changed in step 2, Chrome also fires `onActivated`. `background.ts` pushes 412 onto window 7's history and calls `handleTabActivated(7, 412)`. That resolves `sp_music` again, sees the window is already on it, and broadcasts a passive `tabActivated` with `spaceSwitched: false`. This is the same double event that happens today, so nothing changes here.
 
-For the registry fallback, say the user opens a bookmark from the Work space's folder as a new tab `415`. The sidebar calls `registerTab(7, 415, 'sp_work')` and then `requestGrouping(7, 415)`. If the user switches tabs before the grouping queue gets to 415, `getSpaceForTab(7, 415)` finds no group (`groupId` is `-1`), so it falls back to the registry and gets `'sp_work'`. Once the queue has grouped the tab into "Work", the live group answers first and the registry entry is never needed again.
+For the registry fallback, say the user opens a bookmark from the Work space's folder as a new tab `415`. The sidebar calls `registerTab(7, 415, 'sp_work')` and then `requestGrouping(7, 415)`. If the user switches tabs before the grouping queue gets to 415, `getSpaceForTab(7, 415)` finds no group (`groupId` is `-1`), so it falls back to the registry and gets `'sp_work'`. Once the queue has grouped the tab into "Work", the live group answers first. The registry entry stays, because the group-change handler needs it if the tab later moves into another space's group.
 
 ## Out of scope
 
-- **`TabAssociationManager`.** It stays its own manager. `SpaceTabManager` depends on it, not the other way round.
-- **`TAB_GROUP_TITLE_SET`.** This is a workaround for a Brave bug (brave-browser#52949) that tells the sidebar a new group's real title and color. It's about Chrome groups, not spaces, and it should go away once Brave fixes the bug, so it stays a raw message. It does move into `GroupingQueue` along with the code that sends it.
+- **`TabAssociationManager`.** It stays its own manager. `SpaceTabManager` depends on it, and it reaches back only through the two callbacks above.
+- **`TAB_GROUP_TITLE_SET`.** This is a workaround for a Brave bug (brave-browser#52949) that tells the sidebar a new group's real title and color. It is about Chrome groups, not spaces, and it should go away once Brave fixes the bug, so it stays a raw message. It already moved into `SpaceTabManager` with the grouping queue.
 - **`TabGroupTracker`.** It sits behind `ENABLE_AUTO_GROUP_NEW_TABS = false`, so it stays in `background.ts` untouched.
-- **Behaviour changes.** The rules for resolving a tab's space, following the active tab and grouping are carried over as they are. The one intended wire-level change is that `setActiveTabAndSpace` failures reject the proxy promise instead of resolving `{ success: false }`, and no caller reads that result today.
+- **Behaviour changes.** The rules for resolving a tab's space, following the active tab, grouping and unlinking are carried over as they are. The one intended wire-level change is that `setActiveTabAndSpace` failures reject the proxy promise instead of resolving `{ success: false }`, and no caller reads that result today.
 
-## Open questions
+## Settled questions
 
-1. **Name.** `SpaceTabManager` is the working name. `WindowSpaceManager` would describe the "window shows a space, tabs belong to a space" split a bit more precisely, but either works.
-2. **Should a tab opened from a bookmark be grouped into its bookmark's space?** Today it's registered to the bookmark's space but grouped into the active space, and not grouped at all in "All". This doc keeps that behaviour (`registerTab` + `requestGrouping`). If the right behaviour is "always group into the bookmark's space", that call site becomes a single `assignTabToSpace`, but it's a behaviour change and should be decided separately.
-3. **Does `TabSpaceRegistry` need to exist at all?** It overlaps with `TabAssociationManager`, since a bookmark tab's home space could live on its association entry or be derived from the bookmark's folder. This is a guess I haven't checked: `regroupAssociatedTab` updates the registry separately when a bookmark moves, so it's probably not a clean merge. Worth another look once both managers sit next to each other.
+- **The name.** `SpaceTabManager` is the class that exists, so it stays.
+- **Whether `TabSpaceRegistry` needs to exist.** G3 and G4 answered it. Leaving a group needs only the bookmark link. Joining a group needs the tab's registered space, because Chrome reports only the new group. The space cannot be worked out from the bookmark's folder either, because a bookmark tab opens into the active space, and T.6 drops a bookmark onto another space's icon. So the registry stays, as an internal store.
+
+## Open question
+
+**Should a tab opened from a bookmark be grouped into its bookmark's space?** Today it is registered to the active space and grouped into it, and not grouped at all in "All". This doc keeps that behaviour (`registerTab` plus `requestGrouping`). If the right behaviour is "always group into the bookmark's space", that call site becomes a single `assignTabToSpace`, but it is a behaviour change and should be decided separately.
 
 ## Migration steps
 
-Each step leaves the extension working, and the in-panel test runner should be run after each one.
+Each step leaves the extension working. Run the in-panel test runner after each one.
 
-1. **Move the orchestration into `SpaceTabManager`, background only.** Create the class with `getSpaceForTab`, `setActiveTabAndSpace`, `handleTabActivated` and the grouping queue, holding the existing `SpaceWindowStateManager` and `TabSpaceRegistry` instances. Those two stay routed for now. Switch `TabHistoryManager` to the new instance and slim down the `background.ts` listeners. Nothing changes on the wire yet, and the two raw message handlers in `background.ts` just forward to the new class.
-2. **Route the orchestration messages.** Add `ManagerId.SPACE_TAB`, `SpaceTabManagerApi`, the proxy methods `setActiveTabAndSpace`, `assignTabToSpace`, `requestGrouping` and `onTabActivated`, and the `tabActivated` broadcast. Move every raw sender and receiver in the table above over to them (including the in-panel test actions), then delete the flat handlers and `SpaceMessageAction`.
-3. **Absorb the two managers.** Turn `SpaceWindowStateManager` into `WindowActiveSpaces` and remove routing from `TabSpaceRegistry`, then move `getState`, `setActiveSpace` and `registerTab` onto `SpaceTabManager` and the mirror onto `spaceTabManagerProxy`. Update `SpacesContext`, `useSpaceWindowState`, `SpaceNavigatorApp`, `BookmarkTabsContext` and `tabOperations`, then delete the two old proxies, their `shared/*Api.ts` files and their `ManagerId` entries. This step touches the most working code, so if it runs into trouble, stopping after step 2 still leaves a sensible layout.
+1. **Move the orchestration into `SpaceTabManager`, background only.** Add `getSpaceForTab`, `setActiveTabAndSpace`, `handleTabActivated` and `onTabGroupChanged`, holding the existing `SpaceWindowStateManager` and `TabSpaceRegistry` instances, which stay routed for now. Switch `TabHistoryManager` to the new instance and slim down the `background.ts` listeners. Nothing changes on the wire yet, and the raw `set-active-tab-and-space` handler just forwards to the new class.
+2. **Route the orchestration messages.** Add the proxy methods `setActiveTabAndSpace` and `onTabActivated` and the `tabActivated` broadcast. Move every raw sender and receiver in the table above over to them, including the in-panel test actions, then delete the flat handler and `SpaceMessageAction`.
+3. **Absorb the two managers.** Turn `SpaceWindowStateManager` into `WindowActiveSpaces` and remove routing from `TabSpaceRegistry`. Move `getState`, `setActiveSpace` and `registerTab` onto `SpaceTabManager`, the mirror onto `spaceTabManagerProxy`, and the registry and association callbacks onto `SpaceTabManager`. Update `SpacesContext`, `useSpaceWindowState`, `SpaceNavigatorApp`, `AudioTabsDropdown`, `BookmarkTabsContext` and `tabOperations`, then delete the two old proxies, their `shared/*Api.ts` files and their `ManagerId` entries. This step touches the most working code, so if it runs into trouble, stopping after step 2 still leaves a sensible layout.
 
 ## Verification
 
-The in-panel test runner covers this area heavily. Section C is built on `set-active-tab-and-space` (every C.2 case) and follow-active-tab, and Section A exercises the registry and grouping. Record which cases are red before starting, as the shared-storage plan does, so that a known failure isn't mistaken for a new one. Things to check by hand, because the tests don't cover them:
+The in-panel test runner covers this area heavily. Section C is built on `set-active-tab-and-space` (every C.2 case) and follow-active-tab, Section A exercises the registry and grouping, and B.3b to B.3d, D.2b, D.2c and T.7 to T.8f cover the group-change handler and the registry's restore and undo paths. All 79 cases passed on 2026-11-27, which is the baseline: a red case after a step is new. Things to check by hand, because the tests do not cover them:
 
-- The keyboard history shortcuts (`prev-used-tab` / `next-used-tab`) still switch space and scroll with the sidebar both open and closed.
-- The Space Navigator popup still switches space and closes, since it calls `getState` / `setActiveSpace` without mirroring.
-- With two windows open, switching the space in one sidebar doesn't move the other window's sidebar.
+- The keyboard history shortcuts (`prev-used-tab` and `next-used-tab`) still switch space and scroll, with the sidebar both open and closed.
+- The Space Navigator popup still switches space and closes, since it calls `getState` and `setActiveSpace` without mirroring.
+- With two windows open, switching the space in one sidebar does not move the other window's sidebar.
 
-## Cost / scope
+## Cost and scope
 
-This is medium-sized and mostly mechanical. Roughly 150 lines of orchestration and 120 lines of grouping queue move out of `background.ts`, two small managers turn into internal stores, one proxy replaces two, and about a dozen sidebar call sites switch from raw messages or old proxies to the new one. No storage format changes, and apart from the failure-reporting tweak above, no behaviour changes either.
+Medium-sized and mostly mechanical, and smaller than first planned, since the grouping queue has already moved. Roughly 150 lines of orchestration and the group-change handler move out of `background.ts`, two small managers turn into internal stores, one proxy replaces two, and about a dozen sidebar call sites switch from raw messages or old proxies to `spaceTabManagerProxy`. No storage format changes, and apart from the failure-reporting tweak above, no behaviour changes either.
