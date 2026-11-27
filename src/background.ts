@@ -529,25 +529,18 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
   //
   // Leaving a group without joining another (Chrome's "Remove from group",
   // ungrouping the whole group) counts the same way: an ungrouped tab is in no
-  // space, so it is no longer in its bookmark's space either (G3). Pinned-site
-  // tabs are never registered, so keeping them ungrouped never reaches this.
+  // space, so it is no longer in its bookmark's space either (G3).
   if (changeInfo.groupId !== undefined && tab?.windowId)
   {
     try
     {
-      const registeredSpaceId = tabSpaceRegistry.getSpace(tab.windowId, tabId);
-      if (registeredSpaceId)
+      // Left every group: decided from the link alone, without the registry,
+      // so it also covers a tab that undo or the startup restore linked
+      // without registering a space. Pinned-site tabs are kept ungrouped on
+      // purpose and have no bookmark link, so they are left alone.
+      if (changeInfo.groupId === chrome.tabGroups.TAB_GROUP_ID_NONE)
       {
-        // The space the tab is in now: none when it left its group, otherwise
-        // the space whose name matches the new group's title
-        let currentSpaceId: string | undefined;
-        if (changeInfo.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE)
-        {
-          const group = await chrome.tabGroups.get(changeInfo.groupId);
-          currentSpaceId = (await findSpaceByName(group.title))?.id;
-        }
-
-        if (currentSpaceId !== registeredSpaceId)
+        if (tabAssociationManager.isBookmarkManagedTab(tab.windowId, tabId))
         {
           tabSpaceRegistry.unregister(tab.windowId, tabId);
 
@@ -555,6 +548,25 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) =>
           // sidebar that may not be open. The manager's own broadcast tells
           // whichever sidebars are around - see G2/A.3.
           tabAssociationManager.deassociate(tab.windowId, tabId);
+        }
+      }
+      // Joined a group: Chrome reports only the new group, so whether the tab
+      // left its own space needs the space it was registered with (G4)
+      else
+      {
+        const registeredSpaceId = tabSpaceRegistry.getSpace(tab.windowId, tabId);
+        if (registeredSpaceId)
+        {
+          // The space the tab is in now: the one whose name matches the new
+          // group's title
+          const group = await chrome.tabGroups.get(changeInfo.groupId);
+          const currentSpaceId = (await findSpaceByName(group.title))?.id;
+
+          if (currentSpaceId !== registeredSpaceId)
+          {
+            tabSpaceRegistry.unregister(tab.windowId, tabId);
+            tabAssociationManager.deassociate(tab.windowId, tabId);
+          }
         }
       }
     }
@@ -690,7 +702,9 @@ async function handleBackgroundTestHook(request: BackgroundTestHookRequest): Pro
         return { ok: true };
 
       case 'forgetTabAssociationSession':
+        // A restart empties all session storage, the tab-space registry too
         tabAssociationManager.forgetSessionForTest(request.windowId);
+        tabSpaceRegistry.removeWindow(request.windowId);
         return { ok: true };
 
       case 'runTabAssociationRestore':

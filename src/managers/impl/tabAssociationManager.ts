@@ -33,6 +33,7 @@ import {
   applyAssociate,
   applyDeassociate,
   applyKeepTabs,
+  isBookmarkItemKey,
   isPinnedItemKey,
 } from '../shared/tabAssociationsApi';
 
@@ -859,6 +860,16 @@ export class TabAssociationManager implements RoutedManager, TabAssociationsApi
   isPinnedManagedTab(windowId: number, tabId: number): boolean
   {
     return isPinnedItemKey(this.getAssociations(windowId)[tabId]);
+  }
+
+  /**
+   * Whether a tab stands in for a bookmark. A plain in-memory lookup, like
+   * isPinnedManagedTab. background's group-change handler uses it to unlink a
+   * bookmark tab that leaves its group, from the link alone (G3).
+   */
+  isBookmarkManagedTab(windowId: number, tabId: number): boolean
+  {
+    return isBookmarkItemKey(this.getAssociations(windowId)[tabId]);
   }
 
   /**

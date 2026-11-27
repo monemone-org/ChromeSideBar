@@ -20,7 +20,8 @@ A known gap is a fault that is not fixed yet. Make sure that each gap below stil
 
 - G1: You delete a bookmark in the bookmark manager of Chrome (`chrome://bookmarks`) while its tab is open. The tab used to become orphaned: it continued to run, but it disappeared from both lists. This gap is fixed: background now listens for `chrome.bookmarks.onRemoved` and turns the tab into a regular tab. It applies only to bookmarks. The delete option of the extension always closes the tab first, and Chrome has no delete function for pinned sites. B.5, B.5b and B.5c check it.
 - G2: You drag a tracked tab to another space, or to another window, while the side panel is closed. The bookmark used to stay "loaded" against the old space, because only the sidebar cleared the association. This gap is fixed: background now clears the association itself. A.3, A.6 and A.6c check it.
-- G3: You use the "Remove from group" command of Chrome on a tracked tab. The bookmark association used to stay, because the detection ran only when the tab moved to another group. This gap is fixed: background now unlinks a bookmark tab that leaves its group, and the Tabs sort no longer ungroups tabs. A.5 checks the fix, and A.5d checks the sort. See `docs/test/issues/G3-native-remove-from-group-keeps-association.md`.
+- G3: You use the "Remove from group" command of Chrome on a tracked tab. The bookmark association used to stay, because the detection ran only when the tab moved to another group. This gap is fixed: background now unlinks a bookmark tab that leaves its group, and the Tabs sort no longer ungroups tabs. A.5 checks the fix, and A.5d checks the sort. See `docs/test/issues/G3-native-remove-from-group-keeps-association.md`. A tab linked again by undo or by the restore after a restart still kept its link when ungrouped, because background only acted on tabs in its space registry. B.3b, D.2b, T.7 and T.7b check that case.
+- G4: A bookmark tab linked again by undo or by the restore after a restart is moved into the group of another space. The link stays, because undo and the restore do not register the tab's space with background, and without it background cannot tell that the tab left its space. B.3c, D.2c and T.8 to T.8f check it. See `docs/test/issues/G4-restored-tab-moved-to-other-space-keeps-association.md`.
 
 ## Prerequisites
 
@@ -69,6 +70,8 @@ The Test Runner has a "Manual" checkbox. When you turn it on, each step that the
 | B.2  | Yes     |
 | B.2b | Yes     |
 | B.3  | Yes     |
+| B.3b | Yes     |
+| B.3c | Yes     |
 | B.4  | No      |
 | B.5  | Yes     |
 | B.5b | Yes     |
@@ -89,6 +92,8 @@ The Test Runner has a "Manual" checkbox. When you turn it on, each step that the
 | D.1  | Yes     |
 | D.1b | Yes     |
 | D.2  | Yes     |
+| D.2b | Yes     |
+| D.2c | Yes     |
 | D.3  | Yes     |
 | D.4  | Yes     |
 | E.1  | Yes, needs the driver or a person |
@@ -114,6 +119,14 @@ The Test Runner has a "Manual" checkbox. When you turn it on, each step that the
 | T.4  | Yes     |
 | T.5  | Yes     |
 | T.6  | Yes     |
+| T.7  | Yes     |
+| T.7b | Yes     |
+| T.8  | Yes     |
+| T.8b | Yes     |
+| T.8c | Yes     |
+| T.8d | Yes     |
+| T.8e | Yes     |
+| T.8f | Yes     |
 | U.1  | Yes     |
 | U.2  | Yes     |
 | U.3  | Yes     |
@@ -336,6 +349,25 @@ In step 4, use "Move to Space" on the bookmark row, not on the tab row. These ar
 | ---- | ------ | --------------- |
 | 1    | Open two or three bookmark tabs or pinned tabs | All show "loaded" |
 | 2    | Select more than one and close them through the sidebar (toolbar or context menu) | All change back to unloaded. An undo toast shows. If you click it, it restores them correctly |
+
+### B.3b A bookmark tab reopened by undo is unlinked when it leaves its group
+
+Undo opens a new tab and links the bookmark to it again. When that tab leaves its group, background must unlink it, the same as a tab the sidebar opened (G3).
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | Open a bookmark in Space A. Close its tab from the sidebar, then undo | A new tab opens in the group of Space A, and the bookmark shows "loaded" |
+| 2    | Right-click that tab in the tab strip of Chrome → "Remove from group" | The bookmark shows as unloaded. The tab stays open as a regular tab |
+
+### B.3c A bookmark tab reopened by undo is unlinked when it moves to another space's group
+
+When a tab joins a group, background learns only the new group. To see that the tab left its own space, it needs the space the tab was registered with, so undo has to register the reopened tab again (G4). A pinned site's tab is closed with it, and undo must not tie that tab to any space.
+
+| Step | Action | Expected Result |
+| ---- | ------ | --------------- |
+| 1    | In Space A, open a bookmark and a pinned site. Close both from the sidebar at once, then undo | Both show "loaded" again. The bookmark's tab is in the group of Space A |
+| 2    | Drag the bookmark's tab into the group of Space B | The bookmark shows as unloaded. The tab stays in Space B as a regular tab |
+| 3    | Drag the pinned site's tab into the group of Space B | The pinned site still shows "loaded", as in A.4 |
 
 ### B.4 Close the whole window with tracked tabs open
 
@@ -571,6 +603,17 @@ Not covered: the timer cancel in `handleHistoryMouseLeave`. To reach it, you mus
 | 2    | Also open the tab of a pinned site, and a plain regular tab, in Space A. All three types of tab are now open | - |
 | 3    | Delete Space A, with all three tabs open | The bookmark tab and the regular tab close. They are in the Chrome group of Space A, and `DeleteSpaceAction` closes that group. The pinned tab stays open, with no change. Make sure that no orphaned association or registry state stays for the two closed tabs if they are used again later |
 | 4    | Undo the delete of the space, if the sidebar offers it | The space, the bookmark tab, and the regular tab come back correctly, with their associations. The pinned tab had no change, so nothing comes back for it |
+
+### D.2b and D.2c Tabs reopened by undoing a space delete
+
+Undo brings the space back with its old id and reopens its tabs into its group. Background must unlink a reopened bookmark tab that leaves the space: D.2b ungroups it (G3), and D.2c moves it into another space's group, which needs the tab registered with the restored space again (G4).
+
+| Case | Step | Action | Expected Result |
+| ---- | ---- | ------ | --------------- |
+| D.2b | 1    | In Space A, open a bookmark and a regular tab. Delete Space A, then undo | Space A is back. The bookmark shows "loaded", and its tab is in its group |
+| D.2b | 2    | Right-click the bookmark's tab → "Remove from group" | The bookmark shows as unloaded |
+| D.2c | 1    | As D.2b step 1 | As D.2b step 1 |
+| D.2c | 2    | Drag the bookmark's tab into the group of Space B | The bookmark shows as unloaded |
 
 ### D.3 Background's own space cache must drop a deleted space immediately
 
@@ -855,6 +898,26 @@ The tables below describe each case with these actions.
 | 1    | Make space A active. Hold background just after it reads a new tab that has no group | - |
 | 2    | Drag a bookmark onto the icon of space B in the space bar | A new tab opens for it in the group of space B |
 | 3    | Let background go on | The tab stays in space B. Background must not move it to the active space A |
+
+### T.7 and T.8 Bookmark tabs restored after a restart
+
+A restart empties the tab-space registry of background, which is session storage, and the startup restore links the tabs again from the backup in local storage. The cases simulate the restart: they clear the live links and the registry of the window, keep the backup, and run the restore.
+
+- **T.7 and T.7b (G3):** a restored tab that leaves its group must be unlinked. Background can tell from the link alone.
+- **T.8 to T.8f (G4):** a restored tab that moves into another space's group must be unlinked. That needs the tab's space, so the restore has to register it again from the backup.
+
+| Case | Before the restart | After the restart | Expected Result |
+| ---- | ------------------ | ----------------- | --------------- |
+| T.7  | Open a bookmark in Space A | Ungroup its tab | The bookmark is loaded after the restore, and unloaded after the ungroup |
+| T.7b | Open a bookmark in Space A | Close the sidebar, ungroup the tab, and open the sidebar again | The bookmark is unloaded |
+| T.8  | Open a bookmark in Space A | Move its tab into the group of Space B | The bookmark is unloaded |
+| T.8b | Open a bookmark in Space A, then navigate its tab within the site | Move its tab into the group of Space B | The bookmark is unloaded. The save after the navigation kept the tab's space |
+| T.8c | Open a bookmark in Space A, then move the bookmark to Space B from the sidebar | Move its tab back into the group of Space A | The bookmark is unloaded. The restore used Space B, the space at the time of the restart |
+| T.8d | Open a bookmark in Space A | Move the bookmark to Space B from the sidebar, then move its tab back into the group of Space A | The bookmark stays loaded after the move, with its tab in Space B. It is unloaded after the tab moves back |
+| T.8e | Open a pinned site | Move its tab into the group of Space B | The pinned site stays loaded, as in A.4 |
+| T.8f | Open a bookmark in Space A, then remove the space from its backup entry, as an older version saved it | Nothing | The bookmark is loaded again after the restore |
+
+T.8d, T.8e and T.8f guard the G4 fix. They pass with and without it.
 
 ---
 

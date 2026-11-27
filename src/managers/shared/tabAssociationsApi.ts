@@ -36,10 +36,19 @@ export type WindowAssociationBackup = Record<string, TabAssociationBackupEntry>;
 /** itemKey prefix for a tab standing in for a pinned site rather than a bookmark. */
 export const PINNED_ITEM_KEY_PREFIX = 'pinned-';
 
+/** itemKey prefix for a tab standing in for a bookmark. */
+export const BOOKMARK_ITEM_KEY_PREFIX = 'bookmark-';
+
 /** The itemKey a bookmark's tab is associated under, "bookmark-{id}". */
 export function bookmarkItemKey(bookmarkId: string): string
 {
-  return `bookmark-${bookmarkId}`;
+  return `${BOOKMARK_ITEM_KEY_PREFIX}${bookmarkId}`;
+}
+
+/** Whether an itemKey names a bookmark rather than a pinned site. */
+export function isBookmarkItemKey(itemKey: string | undefined): boolean
+{
+  return itemKey !== undefined && itemKey.startsWith(BOOKMARK_ITEM_KEY_PREFIX);
 }
 
 /** Whether an itemKey names a pinned site rather than a bookmark. */

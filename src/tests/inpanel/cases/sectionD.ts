@@ -5,8 +5,8 @@ import { DeleteSpaceAction } from '../../../actions/deleteSpaceAction';
 import { spaceManagerProxy } from '../../../managers/proxies/spaceManagerProxy';
 import { Space } from '../../../contexts/SpacesContext';
 import { TestCase, TestStep } from '../types';
-import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { closeTesterWindow, openBookmarkTab, openPinnedTab, openRegularTab, renameSpace, switchSpaceVerified } from '../actions';
+import { createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import { closeTesterWindow, moveTabNative, openBookmarkTab, openPinnedTab, openRegularTab, recordTabForBookmark, renameSpace, switchSpaceVerified, ungroupTab } from '../actions';
 import { assertBookmarkLoaded, assertPinnedLoaded, assertSpaceExists, assertTabExists, assertTabInSpace, assertTabInSpaceWithin, assertTabUngrouped } from '../assertions';
 import { resolveSpace, resolveStringRef, waitFor } from '../stepHelpers';
 import { toChromeColor } from '../../../utils/groupColors';
@@ -204,6 +204,68 @@ export const D2_DELETE_SPACE_WITH_TRACKED_TABS: TestCase = {
   ],
 };
 
+// Undo of a space delete restores the space with its old id and reopens its
+// tabs into its group, linking each bookmark again through
+// restoreItemAssociation. D.2b checks G3 on such a tab (ungrouped, so in no
+// space), D.2c checks G4 (moved into another space's group, which background
+// can only see with the tab's registered space).
+export const D2B_UNDO_DELETE_SPACE_THEN_UNGROUP: TestCase = {
+  id: 'D.2b',
+  title: 'A tab reopened by undoing a space delete is unlinked when it is ungrouped',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'D2b bookmark', testUrl('d2b-bookmark'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('d2b-bookmark'), spaceRef: 'spaceA', tabRef: 'tab' }),
+    // Reopened with the space too, so ungrouping the bookmark tab below does
+    // not leave it the group's only member
+    openRegularTab({ url: testUrl('d2b-regular'), spaceRef: 'spaceA', tabRef: 'regularTab' }),
+
+    doDeleteSpace('spaceA'),
+    assertSpaceExists('spaceA', false),
+    undoDeleteSpace(),
+    assertSpaceExists('spaceA', true),
+    assertBookmarkLoaded('bm', true),
+    recordTabForBookmark('bm', 'reopenedTab'),
+    assertTabInSpace('reopenedTab', 'spaceA'),
+
+    ungroupTab('reopenedTab'),
+    assertTabUngrouped('reopenedTab'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+export const D2C_UNDO_DELETE_SPACE_THEN_MOVE: TestCase = {
+  id: 'D.2c',
+  title: 'A tab reopened by undoing a space delete is unlinked when it moves to another space\'s group',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'D2c bookmark', testUrl('d2c-bookmark'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('d2c-bookmark'), spaceRef: 'spaceA', tabRef: 'tab' }),
+    openRegularTab({ url: testUrl('d2c-regular'), spaceRef: 'spaceA', tabRef: 'regularTab' }),
+
+    doDeleteSpace('spaceA'),
+    assertSpaceExists('spaceA', false),
+    undoDeleteSpace(),
+    assertSpaceExists('spaceA', true),
+    assertBookmarkLoaded('bm', true),
+    recordTabForBookmark('bm', 'reopenedTab'),
+    assertTabInSpace('reopenedTab', 'spaceA'),
+
+    moveTabNative({ tabRef: 'reopenedTab', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('reopenedTab', 'spaceB'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
 /**
  * Reads background's OWN in-memory space list - the same
  * spaceManagerProxy.getSpaces() call SpaceNavigatorApp and
@@ -355,6 +417,8 @@ export const SECTION_D_CASES: TestCase[] = [
   D1_RENAME_SPACE_WITH_TRACKED_TABS,
   D1B_RENAME_SPACE_OTHER_WINDOW,
   D2_DELETE_SPACE_WITH_TRACKED_TABS,
+  D2B_UNDO_DELETE_SPACE_THEN_UNGROUP,
+  D2C_UNDO_DELETE_SPACE_THEN_MOVE,
   D3_BACKGROUND_SPACE_CACHE_DROPS_DELETED_SPACE,
   D4_MIGRATE_LEGACY_SPACE_ON_UPDATE,
 ];

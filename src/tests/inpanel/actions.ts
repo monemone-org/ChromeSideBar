@@ -1544,3 +1544,33 @@ export function moveTabToNewWindow(opts: { tabRef: string }): TestStep
     },
   };
 }
+
+/** Record the tab a bookmark is linked to right now under tabRef - for a tab that undo opened, whose id the case has not seen yet. */
+export function recordTabForBookmark(bookmarkRef: string, tabRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Record the tab linked to bookmark "${bookmarkRef}" as "${tabRef}"`,
+    run: async (ctx) =>
+    {
+      const tabId = ctx.getTabIdForBookmark(resolveStringRef(ctx, bookmarkRef));
+      if (tabId === undefined) throw new Error(`bookmark "${bookmarkRef}" is not linked to any tab`);
+      ctx.refs.set(tabRef, tabId);
+    },
+  };
+}
+
+/** Record the tab a pinned site is linked to right now under tabRef - the pinned-site counterpart of recordTabForBookmark. */
+export function recordTabForPinned(pinRef: string, tabRef: string): TestStep
+{
+  return {
+    kind: 'action',
+    label: `Record the tab linked to pinned site "${pinRef}" as "${tabRef}"`,
+    run: async (ctx) =>
+    {
+      const tabId = ctx.getTabIdForPinned(resolveStringRef(ctx, pinRef));
+      if (tabId === undefined) throw new Error(`pinned site "${pinRef}" is not linked to any tab`);
+      ctx.refs.set(tabRef, tabId);
+    },
+  };
+}

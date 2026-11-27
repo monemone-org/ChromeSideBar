@@ -3,20 +3,24 @@
 
 import { CloseTabAction } from '../../../actions/closeTabAction';
 import { TestCase, TestStep } from '../types';
-import { createTestBookmark, createTestBookmarkInFolder, createTestPinnedSite, createTestSpace, createTestSubfolder, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import { createTestBookmark, createTestBookmarkInFolder, createTestPinnedSite, createTestSpace, createTestSubfolder, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
 import {
   closedPanelStep,
   closeTab,
   closeTabWhileClosed,
   deleteBookmarkNative,
   deleteFolderNative,
+  moveTabNative,
   openBookmarkTab,
   openPinnedTab,
   openRegularTab,
+  recordTabForBookmark,
+  recordTabForPinned,
   removeBookmarkWhileClosed,
+  ungroupTab,
   switchSpaceVerified,
 } from '../actions';
-import { assertBookmarkExists, assertBookmarkLoaded, assertPinnedLoaded, assertTabExists, assertTabInSpace } from '../assertions';
+import { assertBookmarkExists, assertBookmarkLoaded, assertPinnedLoaded, assertTabExists, assertTabInSpace, assertTabUngrouped } from '../assertions';
 
 export const B1_CLOSE_BOOKMARK_TAB: TestCase = {
   id: 'B.1',
@@ -178,6 +182,80 @@ export const B3_MULTI_CLOSE_TABS: TestCase = {
   ],
 };
 
+// G3 for a tab reopened by undo. Undo opens a new tab and links the bookmark
+// to it through restoreItemAssociation. When the tab then leaves its group,
+// background must unlink it from the link alone, the same as for a tab the
+// sidebar opened.
+export const B3B_UNDO_CLOSE_THEN_UNGROUP: TestCase = {
+  id: 'B.3b',
+  title: 'A bookmark tab reopened by undo is unlinked when it leaves its group',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'B3b bookmark', testUrl('b3b-bookmark'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    // Keeps the space's group alive while the bookmark tab is closed
+    openRegularTab({ url: testUrl('b3b-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('b3b-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    assertBookmarkLoaded('bm', true),
+
+    doCloseTabs(['tab1']),
+    assertBookmarkLoaded('bm', false),
+    undoCloseTabs(),
+    assertBookmarkLoaded('bm', true),
+    recordTabForBookmark('bm', 'reopenedTab'),
+    assertTabInSpace('reopenedTab', 'spaceA'),
+
+    ungroupTab('reopenedTab'),
+    assertTabUngrouped('reopenedTab'),
+    assertTabExists('reopenedTab', true),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+// G4 for a tab reopened by undo: the other way out of a space. Moving a tab
+// into another space's group gives background only the new group, so it
+// needs the tab's registered space to see that the tab left its own. Undo has
+// to register the reopened bookmark tab again for that. The pinned site's tab
+// was never in a group, so undo must not register it with any space: moving
+// it into a space's group afterwards keeps it linked, as in A.4.
+export const B3C_UNDO_CLOSE_THEN_MOVE: TestCase = {
+  id: 'B.3c',
+  title: 'A bookmark tab reopened by undo is unlinked when it moves to another space\'s group',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'B3c bookmark', testUrl('b3c-bookmark'), 'bm');
+    await createTestPinnedSite(getCtx, 'B3c pin', testUrl('b3c-pin'), 'pin');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    // Keeps the space's group alive while the bookmark tab is closed
+    openRegularTab({ url: testUrl('b3c-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('b3c-bookmark'), spaceRef: 'spaceA', tabRef: 'tab1' }),
+    openPinnedTab({ pinRef: 'pin', url: testUrl('b3c-pin'), tabRef: 'tab2' }),
+
+    doCloseTabs(['tab1', 'tab2']),
+    undoCloseTabs(),
+    assertBookmarkLoaded('bm', true),
+    assertPinnedLoaded('pin', true),
+    recordTabForBookmark('bm', 'reopenedTab'),
+    recordTabForPinned('pin', 'reopenedPin'),
+    assertTabInSpace('reopenedTab', 'spaceA'),
+
+    moveTabNative({ tabRef: 'reopenedTab', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('reopenedTab', 'spaceB'),
+    assertBookmarkLoaded('bm', false),
+
+    moveTabNative({ tabRef: 'reopenedPin', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('reopenedPin', 'spaceB'),
+    assertPinnedLoaded('pin', true),
+  ],
+};
+
 // B.5's own intro in the doc calls this "a same-sidebar-state variant of
 // B.5b" - deliberately no closed-panel step here (unlike B.5b).
 // deleteBookmarkNative fires the same chrome.bookmarks.onRemoved event the
@@ -273,6 +351,8 @@ export const SECTION_B_CASES: TestCase[] = [
   B2_CLOSE_PINNED_TAB,
   B2B_CLOSE_REGULAR_TAB,
   B3_MULTI_CLOSE_TABS,
+  B3B_UNDO_CLOSE_THEN_UNGROUP,
+  B3C_UNDO_CLOSE_THEN_MOVE,
   B5_DELETE_BOOKMARK_TAB_OPEN,
   B5B_DELETE_BOOKMARK_SIDEBAR_CLOSED,
   B5C_DELETE_FOLDER_TABS_OPEN,

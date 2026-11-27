@@ -10,11 +10,27 @@
 // a named point, fail one call, or send a broadcast of the case's choosing.
 // T.1 needs real audio instead, which it plays on the DEV-only tone page.
 
-import { TestCase, TestStep } from '../types';
-import { AudioTestPage, createTestBookmark, createTestSpace, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
-import { actionStep, bookmarkExistingTab, closeTab, openAudioTab, openBookmarkTab, openRegularTab, playTestAudio, switchSpaceVerified } from '../actions';
-import { assertBookmarkLoaded, assertTabAudible, assertTabInSpace } from '../assertions';
-import { resolveSpace, resolveStringRef, resolveTabId } from '../stepHelpers';
+import { TestCase, TestContext, TestStep } from '../types';
+import { AudioTestPage, createTestBookmark, createTestPinnedSite, createTestSpace, TEST_SPACE_VIDEO_NAME, TEST_SPACE_WORK_NAME, testUrl } from '../fixtures';
+import {
+  actionStep,
+  bookmarkExistingTab,
+  closedPanelStep,
+  closeTab,
+  moveBookmarkSidebar,
+  moveTabNative,
+  navigateTab,
+  openAudioTab,
+  openBookmarkTab,
+  openPinnedTab,
+  openRegularTab,
+  playTestAudio,
+  switchSpaceVerified,
+  ungroupTab,
+  ungroupTabWhileClosed,
+} from '../actions';
+import { assertBookmarkLoaded, assertPinnedLoaded, assertTabAudible, assertTabInSpace, assertTabUngrouped } from '../assertions';
+import { resolveSpace, resolveStringRef, resolveTabId, waitFor } from '../stepHelpers';
 import {
   armGate,
   broadcastFromBackground,
@@ -27,7 +43,7 @@ import {
 } from '../backgroundHooks';
 import { tabAssociationsProxy } from '../../../managers/proxies/tabAssociationsProxy';
 import { ManagerId } from '../../../managers/proxies/messageRouting';
-import { TAB_ASSOCIATIONS_CHANGED, TabAssociations } from '../../../managers/shared/tabAssociationsApi';
+import { PINNED_ITEM_KEY_PREFIX, TAB_ASSOCIATIONS_CHANGED, TabAssociations } from '../../../managers/shared/tabAssociationsApi';
 import { TestGateName } from '../../../managers/shared/backgroundTestHooksApi';
 import { createTabInSpace } from '../../../utils/tabOperations';
 
@@ -516,6 +532,318 @@ export const T6_BOOKMARK_DROP_LANDS_IN_TARGET_SPACE: TestCase = {
   ],
 };
 
+// ---------------------------------------------------------------------------
+// T.7 and T.8: bookmark tabs after a browser restart. A restart empties the
+// tab-space registry with the rest of session storage, and the startup
+// restore links each tab to its bookmark again from the local backup.
+// forgetTabAssociationSession empties the registry the same way a restart
+// does, so these cases see what a real restart leaves behind.
+//
+// - T.7 and T.7b (G3): a restored tab that leaves its group must be unlinked.
+//   Background can tell that from the link alone.
+// - T.8 to T.8f (G4): a restored tab that moves into another space's group
+//   must be unlinked. Background only learns the new group, so it needs the
+//   tab's registered space, which the restore has to register again.
+// ---------------------------------------------------------------------------
+
+const pinnedKey = (pinnedId: string) => `${PINNED_ITEM_KEY_PREFIX}${pinnedId}`;
+
+// The local storage key of a window's association backup. Mirrors backupKey
+// in managers/impl/tabAssociationManager.ts, which does not export it.
+const backupStorageKey = (windowId: number) => `tabAssociationsBackup_${windowId}`;
+
+/**
+ * Wait until the backup entry for an item names the tab (and, with url, has
+ * that url). Reads go through background's backup queue, so once this
+ * returns, every backup save queued before the read has landed - including a
+ * registration's, which follows the association's own save.
+ */
+function settleBackupEntry(opts: { itemKey: (ctx: TestContext) => string; tabRef: string; url?: string }): TestStep
+{
+  return {
+    kind: 'assert',
+    label: `Precondition: the backup entry names tab "${opts.tabRef}"${opts.url ? ` at ${opts.url}` : ''}`,
+    run: async (ctx) =>
+    {
+      const key = opts.itemKey(ctx);
+      const tabId = resolveTabId(ctx, opts.tabRef);
+      let entry: unknown;
+      await waitFor(async () =>
+      {
+        const found = (await readTabAssociationBackup(ctx.windowId))[key];
+        entry = found;
+        return found?.tabId === tabId && (opts.url === undefined || found.url === opts.url);
+      }, 3000, () => `expected the backup entry ${key} to name tab ${tabId}${opts.url ? ` at ${opts.url}` : ''}, got ${JSON.stringify(entry)}`);
+    },
+  };
+}
+
+const bookmarkEntry = (bookmarkRef: string) => (ctx: TestContext) => bookmarkKey(resolveStringRef(ctx, bookmarkRef));
+const pinnedEntry = (pinRef: string) => (ctx: TestContext) => pinnedKey(resolveStringRef(ctx, pinRef));
+
+/** What a browser restart does to the links: session state is gone, then the startup restore runs from the backup. */
+function simulateRestart(): TestStep[]
+{
+  return [
+    {
+      kind: 'action',
+      label: 'Clear this window\'s live associations and tab-space registry, keeping the backup (as a restart does)',
+      run: async (ctx) =>
+      {
+        await forgetTabAssociationSession(ctx.windowId);
+      },
+    },
+    {
+      kind: 'action',
+      label: 'Run the startup restore',
+      run: async () =>
+      {
+        await runTabAssociationRestore();
+      },
+    },
+  ];
+}
+
+export const T7_RESTORE_THEN_UNGROUP: TestCase = {
+  id: 'T.7',
+  title: 'After a restart, a restored bookmark tab is unlinked when it is ungrouped',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'T7 bookmark', testUrl('t7'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    // Keeps the space's group alive whatever happens to the bookmark tab
+    openRegularTab({ url: testUrl('t7-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('t7'), spaceRef: 'spaceA', tabRef: 'tab' }),
+    settleBackupEntry({ itemKey: bookmarkEntry('bm'), tabRef: 'tab' }),
+
+    ...simulateRestart(),
+    assertBookmarkLoaded('bm', true),
+    assertTabInSpace('tab', 'spaceA'),
+
+    ungroupTab('tab'),
+    assertTabUngrouped('tab'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+// T.7 with the sidebar closed when the tab leaves its group, so only
+// background can unlink it
+export const T7B_RESTORE_THEN_UNGROUP_PANEL_CLOSED: TestCase = {
+  id: 'T.7b',
+  title: 'After a restart, a restored bookmark tab ungrouped while the sidebar is closed is unlinked',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'T7b bookmark', testUrl('t7b'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openRegularTab({ url: testUrl('t7b-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('t7b'), spaceRef: 'spaceA', tabRef: 'tab' }),
+    settleBackupEntry({ itemKey: bookmarkEntry('bm'), tabRef: 'tab' }),
+
+    ...simulateRestart(),
+    assertBookmarkLoaded('bm', true),
+
+    closedPanelStep('Ungroup the restored bookmark tab, panel closed', ungroupTabWhileClosed('tab'), {
+      steps: [
+        'Close the sidebar panel (Cmd+Shift+E or the toolbar icon).',
+        `In Chrome's own tab strip, right-click the tab for "${testUrl('t7b')}" → Remove from group.`,
+        'Reopen the sidebar panel to resume.',
+      ],
+    }),
+    assertTabUngrouped('tab'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+export const T8_RESTORE_THEN_MOVE_TO_OTHER_SPACE: TestCase = {
+  id: 'T.8',
+  title: 'After a restart, a restored bookmark tab is unlinked when it moves to another space\'s group',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'T8 bookmark', testUrl('t8'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openRegularTab({ url: testUrl('t8-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('t8'), spaceRef: 'spaceA', tabRef: 'tab' }),
+    settleBackupEntry({ itemKey: bookmarkEntry('bm'), tabRef: 'tab' }),
+
+    ...simulateRestart(),
+    assertBookmarkLoaded('bm', true),
+
+    // The same check as A.2, on a tab the restore linked
+    moveTabNative({ tabRef: 'tab', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('tab', 'spaceB'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+// The backup entry is saved again when the tab navigates, and that save must
+// keep the tab's space, or the restore has nothing to register
+export const T8B_NAVIGATE_THEN_RESTORE: TestCase = {
+  id: 'T.8b',
+  title: 'A bookmark tab that navigated before a restart is unlinked when it moves to another space\'s group after it',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'T8b bookmark', testUrl('t8b'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openRegularTab({ url: testUrl('t8b-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('t8b'), spaceRef: 'spaceA', tabRef: 'tab' }),
+    settleBackupEntry({ itemKey: bookmarkEntry('bm'), tabRef: 'tab' }),
+
+    // Navigating within the site keeps the link, and saves the entry again
+    navigateTab('tab', testUrl('t8b-next')),
+    settleBackupEntry({ itemKey: bookmarkEntry('bm'), tabRef: 'tab', url: testUrl('t8b-next') }),
+    assertBookmarkLoaded('bm', true),
+
+    ...simulateRestart(),
+    assertBookmarkLoaded('bm', true),
+
+    moveTabNative({ tabRef: 'tab', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('tab', 'spaceB'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+// The restore must register the space the tab is in when the restart
+// happens, not the one it was first opened in. If it registered space A, the
+// tab moving into space A's group would look like no change, and the
+// bookmark, which now lives in space B, would stay loaded there.
+export const T8C_MOVED_BOOKMARK_THEN_RESTORE: TestCase = {
+  id: 'T.8c',
+  title: 'A bookmark moved to another space before a restart is restored with its new space',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'T8c bookmark', testUrl('t8c'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    // Keeps space A's group alive after the bookmark tab leaves it
+    openRegularTab({ url: testUrl('t8c-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('t8c'), spaceRef: 'spaceA', tabRef: 'tab' }),
+
+    moveBookmarkSidebar({ bookmarkRef: 'bm', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('tab', 'spaceB'),
+    assertBookmarkLoaded('bm', true),
+    settleBackupEntry({ itemKey: bookmarkEntry('bm'), tabRef: 'tab' }),
+
+    ...simulateRestart(),
+    assertBookmarkLoaded('bm', true),
+
+    // Back into space A's group, which is no longer the bookmark's space
+    moveTabNative({ tabRef: 'tab', targetSpaceRef: 'spaceA' }),
+    assertTabInSpace('tab', 'spaceA'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+// Guards the other direction: moving a restored tab's bookmark to another
+// space through the sidebar must not unlink it, since the sidebar registers
+// the new space before it regroups the tab. After that, the tab moving back
+// into its old space's group leaves the bookmark's space.
+export const T8D_RESTORE_THEN_MOVE_BOOKMARK: TestCase = {
+  id: 'T.8d',
+  title: 'After a restart, moving a restored bookmark to another space keeps its tab linked',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'T8d bookmark', testUrl('t8d'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    // Keeps space A's group alive after the bookmark tab leaves it
+    openRegularTab({ url: testUrl('t8d-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('t8d'), spaceRef: 'spaceA', tabRef: 'tab' }),
+    settleBackupEntry({ itemKey: bookmarkEntry('bm'), tabRef: 'tab' }),
+
+    ...simulateRestart(),
+    assertBookmarkLoaded('bm', true),
+
+    moveBookmarkSidebar({ bookmarkRef: 'bm', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('tab', 'spaceB'),
+    assertBookmarkLoaded('bm', true),
+
+    moveTabNative({ tabRef: 'tab', targetSpaceRef: 'spaceA' }),
+    assertTabInSpace('tab', 'spaceA'),
+    assertBookmarkLoaded('bm', false),
+  ],
+};
+
+// A pinned site's tab is never tied to a space, and the restore must not
+// register one for it. If it did, moving the tab into another space's group
+// would unlink it, which A.4 says must not happen.
+export const T8E_RESTORE_PINNED_THEN_GROUP: TestCase = {
+  id: 'T.8e',
+  title: 'After a restart, a restored pinned-site tab stays linked when it is grouped',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestSpace(getCtx, { ref: 'spaceB', name: TEST_SPACE_VIDEO_NAME });
+    await createTestPinnedSite(getCtx, 'T8e pin', testUrl('t8e-pin'), 'pin');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openPinnedTab({ pinRef: 'pin', url: testUrl('t8e-pin'), tabRef: 'pinTab' }),
+    settleBackupEntry({ itemKey: pinnedEntry('pin'), tabRef: 'pinTab' }),
+
+    ...simulateRestart(),
+    assertPinnedLoaded('pin', true),
+
+    moveTabNative({ tabRef: 'pinTab', targetSpaceRef: 'spaceB' }),
+    assertTabInSpace('pinTab', 'spaceB'),
+    assertPinnedLoaded('pin', true),
+  ],
+};
+
+// A backup saved before entries recorded their space has no space to
+// register. The restore must still link the tab, the same as it always has.
+export const T8F_RESTORE_ENTRY_WITHOUT_SPACE: TestCase = {
+  id: 'T.8f',
+  title: 'The restore still links a tab whose backup entry records no space',
+  setup: async (getCtx) =>
+  {
+    await createTestSpace(getCtx, { ref: 'spaceA', name: TEST_SPACE_WORK_NAME });
+    await createTestBookmark(getCtx(), 'spaceA', 'T8f bookmark', testUrl('t8f'), 'bm');
+  },
+  steps: [
+    ...switchSpaceVerified('spaceA'),
+    openRegularTab({ url: testUrl('t8f-dummy'), spaceRef: 'spaceA', tabRef: 'dummyTab' }),
+    openBookmarkTab({ bookmarkRef: 'bm', url: testUrl('t8f'), spaceRef: 'spaceA', tabRef: 'tab' }),
+    settleBackupEntry({ itemKey: bookmarkEntry('bm'), tabRef: 'tab' }),
+    {
+      kind: 'action',
+      label: 'Remove the space from the bookmark\'s backup entry, as an older version saved it',
+      run: async (ctx) =>
+      {
+        const storageKey = backupStorageKey(ctx.windowId);
+        const itemKey = bookmarkEntry('bm')(ctx);
+        const backup = (await chrome.storage.local.get(storageKey))[storageKey] as Record<string, Record<string, unknown>> | undefined;
+        if (!backup?.[itemKey]) throw new Error(`no backup entry ${itemKey} under ${storageKey}`);
+        delete backup[itemKey].spaceId;
+        await chrome.storage.local.set({ [storageKey]: backup });
+      },
+    },
+
+    ...simulateRestart(),
+    assertBookmarkLoaded('bm', true),
+    assertTabInSpace('tab', 'spaceA'),
+  ],
+};
+
 export const SECTION_T_CASES: TestCase[] = [
   T1_PLAYING_TAB_ONTO_BOOKMARK,
   T2_OPEN_SURVIVES_REJECTED_ASSOCIATION,
@@ -523,4 +851,12 @@ export const SECTION_T_CASES: TestCase[] = [
   T4_RESTORE_SKIPS_TAKEN_TAB_IN_BACKUP,
   T5_INDEX_REFRESH_AFTER_RETARGET,
   T6_BOOKMARK_DROP_LANDS_IN_TARGET_SPACE,
+  T7_RESTORE_THEN_UNGROUP,
+  T7B_RESTORE_THEN_UNGROUP_PANEL_CLOSED,
+  T8_RESTORE_THEN_MOVE_TO_OTHER_SPACE,
+  T8B_NAVIGATE_THEN_RESTORE,
+  T8C_MOVED_BOOKMARK_THEN_RESTORE,
+  T8D_RESTORE_THEN_MOVE_BOOKMARK,
+  T8E_RESTORE_PINNED_THEN_GROUP,
+  T8F_RESTORE_ENTRY_WITHOUT_SPACE,
 ];

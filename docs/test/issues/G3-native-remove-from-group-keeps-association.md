@@ -62,6 +62,7 @@ Some of the extension's own operations take a bookmark tab out of its group on t
 - **Deleting a space and its undo** (`DeleteSpaceAction`, D.2). Check whether deleting the space ungroups its tabs, and whether its bookmark tabs are meant to stay associated afterwards.
 - **Moving a tab to another window** (A.6, A.6b). A tab detached from its window loses its group, which may report `TAB_GROUP_ID_NONE` before the window move is handled. The result is the same (the tab is unlinked), but the order should not cause an error.
 - **Chrome's "Ungroup" on a whole group** and closing a group. Every bookmark tab in it would be unlinked, which is consistent with this fix, but worth confirming by hand.
+- **Chrome's own "Pin" on a bookmark tab** is out of scope. Chrome takes a pinned tab out of its group, which may or may not reach this handler as leaving the group. What should happen to a bookmark tab pinned this way is not defined, so no test covers it and either result is accepted.
 
 ## Status
 
@@ -70,3 +71,13 @@ Fixed. Sections A to D passed with the fix in, A.5 and A.5d included. The only f
 - `sortTabs` in `src/hooks/useTabs.ts` moves whole groups with `chrome.tabGroups.move` and tabs only within their own group's span. Chrome's own pinned tabs are sorted among themselves first.
 - The group-change handler in `src/background.ts` also reacts to `TAB_GROUP_ID_NONE`, and unlinks a registered tab that is no longer in its registered space.
 - A.5d sorts the Tabs list with two bookmark tabs and two regular tabs in one space, and checks that all four stay grouped and both bookmarks stay loaded.
+
+### Tabs linked again by undo or by a restart
+
+A review found that the handler acted only on tabs in `tabSpaceRegistry`, and two paths link a bookmark tab without registering it: the startup restore after a browser restart, which empties the registry with the rest of session storage, and `restoreItemAssociation`, which the undo of closing a tab and of deleting a space uses. Such a tab stays linked after leaving its group.
+
+Leaving a group does not need the registry at all. A tab in no group is in no space, so it cannot be in its bookmark's space, whatever space it was in before. The handler now decides this from the link alone: when a tab leaves its group and is linked to a bookmark, it is unlinked (`TabAssociationManager.isBookmarkManagedTab`). Only joining a group still reads the registry. Pinned-site tabs are skipped by their link's key, since they are kept ungrouped on purpose. The fewer pieces of state the check depends on, the fewer ways it can go wrong.
+
+Moving such a tab into another space's group does need the tab's registered space, since Chrome reports only the new group. That is a separate bug, G4 (`docs/test/issues/G4-restored-tab-moved-to-other-space-keeps-association.md`).
+
+B.3b (close a bookmark tab, undo, ungroup it), D.2b (delete a space, undo, ungroup a reopened tab), T.7 (restart, ungroup) and T.7b (restart, ungroup with the sidebar closed) cover it. All four failed before the change, at the check that the bookmark is unloaded, and pass with it. Sections A to E, P.8, P.9 and T.1 to T.6 passed with it too.

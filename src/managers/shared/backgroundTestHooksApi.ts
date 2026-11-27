@@ -40,7 +40,8 @@ export type BackgroundTestHookRequest =
   // Send an arbitrary message to every extension context, as background
   | { op: 'broadcast'; message: Record<string, unknown> }
   // Drop one window's live associations without touching the backup, the way
-  // a browser restart clears session storage but leaves local storage alone
+  // a browser restart clears session storage but leaves local storage alone.
+  // Also empties the window's tab-space registry, which is session state too
   | { op: 'forgetTabAssociationSession'; windowId: number }
   // Run the startup restore now, without restarting the service worker
   | { op: 'runTabAssociationRestore' }
